@@ -1,8 +1,61 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Annotated, Literal, Union
-from pydantic import BaseModel, Field, model_validator
+from types import MappingProxyType
+from typing import Annotated, Any, Literal, Union
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_serializer,
+    model_validator,
+)
+
+# RateZero tenors that parallel-shift scalar ``rates[ccy]`` (and all pillars).
+_RATE_PARALLEL_TENORS = frozenset({"ALL", "PARALLEL"})
+
+
+def _deep_freeze(value: Any) -> Any:
+    """Recursively freeze mappings/lists so nested in-place mutation fails."""
+    if isinstance(value, Mapping):
+        return MappingProxyType({k: _deep_freeze(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return tuple(_deep_freeze(v) for v in value)
+    if isinstance(value, tuple):
+        return tuple(_deep_freeze(v) for v in value)
+    return value
+
+
+def _deep_unfreeze(value: Any) -> Any:
+    """Plain dict/list tree for JSON serialization and content hashing."""
+    if isinstance(value, Mapping):
+        return {k: _deep_unfreeze(v) for k, v in value.items()}
+    if isinstance(value, tuple):
+        return [_deep_unfreeze(v) for v in value]
+    if isinstance(value, list):
+        return [_deep_unfreeze(v) for v in value]
+    return value
+
+
+def _curve_matches_currency(payload: Mapping, currency: str) -> bool:
+    return str(payload.get("currency", "")).upper() == currency.upper()
+
+
+def _bump_curve_zeros(payload: Mapping, amount: float, tenor: str | None) -> dict:
+    """Copy a curve payload, shifting zeros for one tenor or all tenors."""
+    out = _deep_unfreeze(payload)
+    zeros = dict(out.get("zeros") or {})
+    if tenor is None:
+        for t in list(zeros):
+            zeros[t] = float(zeros[t]) + amount
+    elif tenor in zeros:
+        zeros[tenor] = float(zeros[tenor]) + amount
+    out["zeros"] = zeros
+    return out
 
 
 class AssetClass(str, Enum):
@@ -11,7 +64,18 @@ class AssetClass(str, Enum):
     FX = "fx"
 
 
-class EquityPosition(BaseModel):
+class PositionHierarchyMixin(BaseModel):
+    """Optional desk/strategy placement on a trade.
+
+    ``None`` inherits :attr:`Portfolio.desk` / :attr:`Portfolio.strategy`
+    (backward-compatible default). Explicit strings enable multi-desk books.
+    """
+
+    desk: str | None = None
+    strategy: str | None = None
+
+
+class EquityPosition(PositionHierarchyMixin):
     type: Literal["equity"]
     id: str
     symbol: str
@@ -21,7 +85,7 @@ class EquityPosition(BaseModel):
     book: str = "Equity"
 
 
-class EquityFuturePosition(BaseModel):
+class EquityFuturePosition(PositionHierarchyMixin):
     type: Literal["equity_future"]
     id: str
     symbol: str
@@ -35,7 +99,7 @@ class EquityFuturePosition(BaseModel):
     book: str = "Equity Derivatives"
 
 
-class EuropeanOptionPosition(BaseModel):
+class EuropeanOptionPosition(PositionHierarchyMixin):
     type: Literal["european_option"]
     id: str
     symbol: str
@@ -51,7 +115,7 @@ class EuropeanOptionPosition(BaseModel):
     book: str = "Equity Derivatives"
 
 
-class BondPosition(BaseModel):
+class BondPosition(PositionHierarchyMixin):
     type: Literal["bond"]
     id: str
     issuer: str
@@ -64,7 +128,7 @@ class BondPosition(BaseModel):
     book: str = "Rates"
 
 
-class SwapPosition(BaseModel):
+class SwapPosition(PositionHierarchyMixin):
     type: Literal["swap"]
     id: str
     currency: str = "USD"
@@ -77,7 +141,7 @@ class SwapPosition(BaseModel):
     book: str = "Rates Derivatives"
 
 
-class FXForwardPosition(BaseModel):
+class FXForwardPosition(PositionHierarchyMixin):
     type: Literal["fx_forward"]
     id: str
     pair: str
@@ -90,7 +154,7 @@ class FXForwardPosition(BaseModel):
     book: str = "FX"
 
 
-class FXOptionPosition(BaseModel):
+class FXOptionPosition(PositionHierarchyMixin):
     type: Literal["fx_option"]
     id: str
     pair: str
@@ -105,6 +169,25 @@ class FXOptionPosition(BaseModel):
     book: str = "FX Derivatives"
 
 
+class InterestRateFuturePosition(PositionHierarchyMixin):
+    """Exchange-traded short-rate future (simplified STIR-style mark).
+
+    Cap/floor and swaption domain types are deferred until curve/vol surfaces
+    exist (Quant Pricing charter: after Market Data M1.4/M1.5).
+    """
+
+    type: Literal["ir_future"]
+    id: str
+    currency: str = "USD"
+    quantity: float
+    # Dollar value of a 1bp move per contract (e.g. 25 for classic Eurodollar).
+    pv01: float = Field(default=25.0, gt=0)
+    quoted_rate: float
+    forward_rate: float
+    maturity_years: float = Field(gt=0)
+    book: str = "Rates Derivatives"
+
+
 Position = Annotated[
     Union[
         EquityPosition,
@@ -114,6 +197,7 @@ Position = Annotated[
         SwapPosition,
         FXForwardPosition,
         FXOptionPosition,
+        InterestRateFuturePosition,
     ],
     Field(discriminator="type"),
 ]
@@ -123,6 +207,7 @@ class Portfolio(BaseModel):
     id: str
     name: str
     positions: list[Position]
+    firm: str = "RiskForge"
     desk: str = "Global Macro"
     strategy: str = "Multi-Asset"
 
@@ -135,14 +220,316 @@ class Portfolio(BaseModel):
 
 
 class MarketSnapshot(BaseModel):
+    """Immutable market marks consumed by pricing and risk.
+
+    Flat dict fields remain the storage/API shape for compatibility. Typed
+    :meth:`bump` / :meth:`apply` / :meth:`diff` and sub-market views
+    (:attr:`equity`, :attr:`rates_market`, :attr:`vol`, :attr:`fx`) are the
+    preferred mutation/inspection APIs. Nested maps (including ``curves`` /
+    ``vol_surfaces`` payloads) are recursively frozen via ``MappingProxyType``
+    so in-place edits fail at every nesting level.
+
+    Bump units:
+    - EquitySpot / FXSpot: relative return (0.01 = +1%)
+    - EquityVol / FXVol: relative vol change (0.25 = +25% of current vol level)
+    - RateZero: absolute decimal rate shift (0.0001 = +1bp)
+      - tenor ``PARALLEL`` or ``ALL``: parallel-shift scalar ``rates[ccy]``,
+        all ``key_rates[ccy]`` pillars, and matching curve zeros
+      - specific tenor (e.g. ``10Y``): bump ``key_rates[ccy][tenor]`` and
+        matching curve zeros only — does **not** shift scalar ``rates[ccy]``
+    """
+
+    model_config = ConfigDict(frozen=True)
+
     id: str = "current"
     as_of: str = "current"
-    equity_spots: dict[str, float] = {}
-    equity_vols: dict[str, float] = {}
-    fx_spots: dict[str, float] = {}
-    fx_vols: dict[str, float] = {}
-    rates: dict[str, float] = {"USD": 0.04}
-    key_rates: dict[str, dict[str, float]] = {}
+    equity_spots: dict[str, float] = Field(default_factory=dict)
+    equity_vols: dict[str, float] = Field(default_factory=dict)
+    fx_spots: dict[str, float] = Field(default_factory=dict)
+    fx_vols: dict[str, float] = Field(default_factory=dict)
+    rates: dict[str, float] = Field(default_factory=lambda: {"USD": 0.04})
+    key_rates: dict[str, dict[str, float]] = Field(default_factory=dict)
+    dividend_yields: dict[str, float] = Field(default_factory=dict)
+    projection_rates: dict[str, float] = Field(default_factory=dict)
+    rate_spreads: dict[str, float] = Field(default_factory=dict)
+    # Named curve payloads: {name: {currency, curve_type, name, zeros}}
+    curves: dict[str, dict] = Field(default_factory=dict)
+    # Named vol surface payloads: {name: {asset_class, atm_vol, grid, ...}}
+    vol_surfaces: dict[str, dict] = Field(default_factory=dict)
+
+    _NESTED_MAP_FIELDS: tuple[str, ...] = (
+        "equity_spots",
+        "equity_vols",
+        "fx_spots",
+        "fx_vols",
+        "rates",
+        "key_rates",
+        "dividend_yields",
+        "projection_rates",
+        "rate_spreads",
+        "curves",
+        "vol_surfaces",
+    )
+
+    def _apply_nested_freeze(self) -> None:
+        """Recursively freeze all nested map fields in-place (via object.__setattr__)."""
+        for name in self._NESTED_MAP_FIELDS:
+            object.__setattr__(self, name, _deep_freeze(_deep_unfreeze(getattr(self, name))))
+
+    @model_validator(mode="after")
+    def _freeze_nested_maps(self):
+        self._apply_nested_freeze()
+        return self
+
+    def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False):
+        """Copy then re-freeze.
+
+        Pydantic v2 ``model_copy(update=...)`` does not re-run after validators, so
+        plain dict updates would otherwise leave nested ``curves`` /
+        ``vol_surfaces`` mutable.
+        """
+        copied = super().model_copy(update=update, deep=deep)
+        MarketSnapshot._apply_nested_freeze(copied)
+        return copied
+
+    @field_serializer(
+        "equity_spots",
+        "equity_vols",
+        "fx_spots",
+        "fx_vols",
+        "rates",
+        "dividend_yields",
+        "projection_rates",
+        "rate_spreads",
+        "key_rates",
+        "curves",
+        "vol_surfaces",
+    )
+    def _ser_nested_map(self, value: Mapping) -> dict:
+        return _deep_unfreeze(value)
+
+    @property
+    def equity(self):
+        from app.market.markets import EquityMarket
+
+        return EquityMarket(spots=self.equity_spots, dividend_yields=self.dividend_yields)
+
+    @property
+    def rates_market(self):
+        from app.market.markets import RateMarket
+
+        return RateMarket(
+            discount=self.rates,
+            projection=self.projection_rates,
+            spreads=self.rate_spreads,
+            key_rates=self.key_rates,
+        )
+
+    @property
+    def vol(self):
+        from app.market.markets import VolMarket
+
+        return VolMarket(equity=self.equity_vols, fx=self.fx_vols, surfaces=self.vol_surfaces)
+
+    @property
+    def fx(self):
+        from app.market.markets import FxMarket
+
+        return FxMarket(spots=self.fx_spots)
+
+    def _bump_rate_zero(self, factor, amount: float) -> MarketSnapshot:
+        """Parallel vs tenor RateZero shock (see class docstring)."""
+        ccy = factor.currency
+        tenor = factor.tenor
+        parallel = tenor in _RATE_PARALLEL_TENORS
+
+        rates = dict(self.rates)
+        key_rates = {c: dict(tenors) for c, tenors in self.key_rates.items()}
+        curves = {name: _deep_unfreeze(payload) for name, payload in self.curves.items()}
+
+        if parallel:
+            if ccy not in rates:
+                raise KeyError(f"rate not in snapshot: {ccy}")
+            rates[ccy] = rates[ccy] + amount
+            if ccy in key_rates:
+                key_rates[ccy] = {t: float(z) + amount for t, z in key_rates[ccy].items()}
+            for name, payload in list(curves.items()):
+                if _curve_matches_currency(payload, ccy):
+                    curves[name] = _bump_curve_zeros(payload, amount, tenor=None)
+            return self.model_copy(
+                update={
+                    "id": f"{self.id}:bump:{factor.key}:{tenor}",
+                    "rates": rates,
+                    "key_rates": key_rates,
+                    "curves": curves,
+                }
+            )
+
+        # Tenor-specific: key_rates + curve zeros only — never parallel-shift rates[ccy].
+        touched = False
+        if ccy in key_rates and tenor in key_rates[ccy]:
+            key_rates[ccy][tenor] = float(key_rates[ccy][tenor]) + amount
+            touched = True
+        for name, payload in list(curves.items()):
+            if not _curve_matches_currency(payload, ccy):
+                continue
+            zeros = payload.get("zeros") or {}
+            if tenor in zeros:
+                curves[name] = _bump_curve_zeros(payload, amount, tenor=tenor)
+                touched = True
+        if not touched:
+            raise KeyError(
+                f"tenor {tenor!r} not in key_rates or curves for {ccy}; "
+                f"use RateZero({ccy!r}, 'PARALLEL') or 'ALL' for a parallel shock"
+            )
+        return self.model_copy(
+            update={
+                "id": f"{self.id}:bump:{factor.key}:{tenor}",
+                "key_rates": key_rates,
+                "curves": curves,
+            }
+        )
+
+    def bump(self, factor, amount: float) -> MarketSnapshot:
+        """Return a new snapshot with one typed factor shocked."""
+        from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero
+
+        if isinstance(factor, EquitySpot):
+            spots = dict(self.equity_spots)
+            if factor.symbol not in spots:
+                raise KeyError(f"equity spot not in snapshot: {factor.symbol}")
+            spots[factor.symbol] = spots[factor.symbol] * (1.0 + amount)
+            return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "equity_spots": spots})
+        if isinstance(factor, FXSpot):
+            spots = dict(self.fx_spots)
+            if factor.pair not in spots:
+                raise KeyError(f"fx spot not in snapshot: {factor.pair}")
+            spots[factor.pair] = spots[factor.pair] * (1.0 + amount)
+            return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "fx_spots": spots})
+        if isinstance(factor, EquityVol):
+            vols = dict(self.equity_vols)
+            if factor.underlying not in vols:
+                raise KeyError(f"equity vol not in snapshot: {factor.underlying}")
+            vols[factor.underlying] = max(1e-6, vols[factor.underlying] * (1.0 + amount))
+            return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "equity_vols": vols})
+        if isinstance(factor, FXVol):
+            vols = dict(self.fx_vols)
+            if factor.pair not in vols:
+                raise KeyError(f"fx vol not in snapshot: {factor.pair}")
+            vols[factor.pair] = max(1e-6, vols[factor.pair] * (1.0 + amount))
+            return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "fx_vols": vols})
+        if isinstance(factor, RateZero):
+            return self._bump_rate_zero(factor, amount)
+        raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
+
+    def apply(self, shocks: list) -> MarketSnapshot:
+        """Apply an ordered sequence of ``(RiskFactor, amount)`` shocks."""
+        out = self
+        for factor, amount in shocks:
+            out = out.bump(factor, amount)
+        return out
+
+    def diff(self, other: MarketSnapshot) -> dict[str, float]:
+        """Content diff vs ``other`` (self → other).
+
+        Spots/vols (incl. surface grid nodes): relative changes.
+        Rates / key_rates / projection / dividends / curve zeros: absolute.
+        Keys use typed factor ``.key`` strings where applicable.
+        """
+        out: dict[str, float] = {}
+        for sym, base in self.equity_spots.items():
+            nxt = other.equity_spots.get(sym)
+            if nxt is not None and base != 0:
+                rel = (nxt - base) / base
+                if rel != 0:
+                    out[sym] = rel
+        for sym, base in self.equity_vols.items():
+            nxt = other.equity_vols.get(sym)
+            if nxt is not None and base != 0:
+                rel = (nxt - base) / base
+                if rel != 0:
+                    out[f"{sym}:VOL"] = rel
+        for pair, base in self.fx_spots.items():
+            nxt = other.fx_spots.get(pair)
+            if nxt is not None and base != 0:
+                rel = (nxt - base) / base
+                if rel != 0:
+                    out[pair] = rel
+        for pair, base in self.fx_vols.items():
+            nxt = other.fx_vols.get(pair)
+            if nxt is not None and base != 0:
+                rel = (nxt - base) / base
+                if rel != 0:
+                    out[f"{pair}:VOL"] = rel
+        for ccy, base in self.rates.items():
+            nxt = other.rates.get(ccy)
+            if nxt is not None and nxt != base:
+                out[f"{ccy}:RATE"] = nxt - base
+        for ccy, tenors in self.key_rates.items():
+            other_tenors = other.key_rates.get(ccy) or {}
+            for tenor, base in tenors.items():
+                nxt = other_tenors.get(tenor)
+                if nxt is not None and nxt != base:
+                    out[f"{ccy}:RATE:{tenor}"] = float(nxt) - float(base)
+        for ccy, base in self.projection_rates.items():
+            nxt = other.projection_rates.get(ccy)
+            if nxt is not None and nxt != base:
+                out[f"{ccy}:PROJ"] = float(nxt) - float(base)
+        for sym, base in self.dividend_yields.items():
+            nxt = other.dividend_yields.get(sym)
+            if nxt is not None and nxt != base:
+                out[f"{sym}:DIV"] = float(nxt) - float(base)
+        for name, payload in self.curves.items():
+            other_payload = other.curves.get(name)
+            if other_payload is None:
+                continue
+            zeros = payload.get("zeros") or {}
+            other_zeros = other_payload.get("zeros") or {}
+            for tenor, base in zeros.items():
+                nxt = other_zeros.get(tenor)
+                if nxt is not None and float(nxt) != float(base):
+                    out[f"{name}:ZERO:{tenor}"] = float(nxt) - float(base)
+        for name, payload in self.vol_surfaces.items():
+            other_payload = other.vol_surfaces.get(name)
+            if other_payload is None:
+                continue
+            grid = payload.get("grid") or {}
+            other_grid = other_payload.get("grid") or {}
+            for node, base in grid.items():
+                nxt = other_grid.get(node)
+                if nxt is not None and float(base) != 0 and float(nxt) != float(base):
+                    out[f"{name}:VOL:{node}"] = (float(nxt) - float(base)) / float(base)
+            base_atm = payload.get("atm_vol")
+            nxt_atm = other_payload.get("atm_vol")
+            if (
+                base_atm is not None
+                and nxt_atm is not None
+                and float(base_atm) != 0
+                and float(nxt_atm) != float(base_atm)
+            ):
+                out[f"{name}:ATM_VOL"] = (float(nxt_atm) - float(base_atm)) / float(base_atm)
+        return out
+
+    def content_hash(self) -> str:
+        """Deterministic hash of market marks (excludes id/as_of)."""
+        import hashlib
+        import json
+
+        payload = {
+            "equity_spots": _deep_unfreeze(self.equity_spots),
+            "equity_vols": _deep_unfreeze(self.equity_vols),
+            "fx_spots": _deep_unfreeze(self.fx_spots),
+            "fx_vols": _deep_unfreeze(self.fx_vols),
+            "rates": _deep_unfreeze(self.rates),
+            "key_rates": _deep_unfreeze(self.key_rates),
+            "dividend_yields": _deep_unfreeze(self.dividend_yields),
+            "projection_rates": _deep_unfreeze(self.projection_rates),
+            "rate_spreads": _deep_unfreeze(self.rate_spreads),
+            "curves": _deep_unfreeze(self.curves),
+            "vol_surfaces": _deep_unfreeze(self.vol_surfaces),
+        }
+        blob = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(blob).hexdigest()
 
 
 class Valuation(BaseModel):
@@ -153,6 +540,19 @@ class Valuation(BaseModel):
     vega: float = 0.0
     dv01: float = 0.0
     fx_delta: float = 0.0
+
+
+class VaRMethodology(str, Enum):
+    """Historical VaR approximation / revaluation mode (M2.3).
+
+    - LINEAR: first-order Greek approximation (no gamma)
+    - DELTA_GAMMA: delta-gamma + vega/DV01/FX (legacy default)
+    - FULL_REVALUATION: reprice under each historical shocked MarketSnapshot
+    """
+
+    LINEAR = "LINEAR"
+    DELTA_GAMMA = "DELTA_GAMMA"
+    FULL_REVALUATION = "FULL_REVALUATION"
 
 
 class RiskSummary(BaseModel):
@@ -166,6 +566,7 @@ class RiskSummary(BaseModel):
     var_95: float
     var_99: float
     expected_shortfall_99: float
+    methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
 
 
 class RiskFactorExposure(BaseModel):
@@ -212,6 +613,38 @@ class PositionStressContribution(BaseModel):
     contribution_pct: float
 
 
+class ScenarioContribution(BaseModel):
+    """One entity's stress P&L contribution for a scenario (M3.4).
+
+    ``pnl`` uses the same currency units and sign as portfolio stress P&L
+    (negative = loss). Contributions within a dimension sum to ``portfolio_pnl``.
+    """
+
+    key: str
+    label: str = ""
+    pnl: float
+    contribution_pct: float
+
+
+class ScenarioContributionBreakdown(BaseModel):
+    """Hierarchy + risk-factor decomposition for one stress scenario (M3.4)."""
+
+    scenario_id: str
+    portfolio_pnl: float
+    by_portfolio: list[ScenarioContribution]
+    by_desk: list[ScenarioContribution]
+    by_strategy: list[ScenarioContribution]
+    by_book: list[ScenarioContribution]
+    by_trade: list[ScenarioContribution]
+    by_risk_factor: list[ScenarioContribution]
+    reconciliation_error_portfolio: float = 0.0
+    reconciliation_error_desk: float = 0.0
+    reconciliation_error_strategy: float = 0.0
+    reconciliation_error_book: float = 0.0
+    reconciliation_error_trade: float = 0.0
+    reconciliation_error_risk_factor: float = 0.0
+
+
 class StressEvaluation(BaseModel):
     scenario_id: str
     scenario: str
@@ -227,6 +660,8 @@ class StressEvaluation(BaseModel):
     max_loss_pct: float | None = None
     by_position: dict[str, float]
     top_loss_contributors: list[PositionStressContribution]
+    # Full hierarchy/factor decomposition (M3.4); optional for backward compat.
+    contributions: ScenarioContributionBreakdown | None = None
 
 
 class ScenarioEvaluationReport(BaseModel):
@@ -251,25 +686,95 @@ class ReverseStressRequest(BaseModel):
     max_shock: float = Field(default=0.80, gt=0)
 
 
+class ReverseStressConvergence(BaseModel):
+    """Numerical solver diagnostics for single-factor reverse stress (M3.5)."""
+
+    iterations: int = Field(ge=0)
+    tolerance: float = Field(ge=0)
+    search_bound: float = Field(gt=0, description="Wire-unit search bound (relative or bp).")
+    bound_loss_pct: float = Field(ge=0, description="Loss % of |NAV| at the search bound.")
+    method: str = "binary_search"
+    message: str | None = None
+
+
 class ReverseStressResult(BaseModel):
+    """Reverse-stress answer: required factor move for a target loss.
+
+    Legacy fields (``factor``, ``target_loss_pct``, ``required_shock``,
+    ``achieved_loss_pct``, ``converged``) remain stable for
+    ``POST /risk/stress/reverse``. M3.5 adds absolute target loss, resulting
+    P&L, shock unit, base MV, and convergence diagnostics.
+    """
+
     factor: str
     target_loss_pct: float
     required_shock: float | None
     achieved_loss_pct: float
     converged: bool
+    # Absolute target loss in portfolio currency (|NAV| * target_loss_pct).
+    target_loss: float = 0.0
+    # Portfolio P&L at the solved shock (or at the search bound if not converged).
+    pnl: float = 0.0
+    shock_unit: Literal["relative", "bp"] = "relative"
+    base_market_value: float = 0.0
+    convergence: ReverseStressConvergence | None = None
+
+
+class MultiFactorReverseStressRequest(BaseModel):
+    """Constrained multi-factor reverse stress (M3.6)."""
+
+    portfolio: Portfolio
+    target_loss_pct: float = Field(gt=0)
+    factors: list[Literal["equity", "rates", "vol", "fx"]] | None = None
+    weights: dict[str, float] | None = None
+    max_shocks: dict[str, float] | None = None
+    max_shock: float = Field(default=0.80, gt=0)
+
+
+class FactorShockSolution(BaseModel):
+    factor: str
+    required_shock: float
+    shock_unit: Literal["relative", "bp"]
+    weight: float
+    max_shock: float
+
+
+class MultiFactorReverseStressResult(BaseModel):
+    """Multi-factor reverse-stress solution with documented solver metadata."""
+
+    target_loss_pct: float
+    target_loss: float
+    achieved_loss_pct: float
+    pnl: float
+    base_market_value: float
+    converged: bool
+    objective_l2: float | None = None
+    shocks: list[FactorShockSolution] = Field(default_factory=list)
+    factors: list[str] = Field(default_factory=list)
+    method: str = "ray_search_coordinate_descent"
+    iterations: int = 0
+    message: str | None = None
+    assumptions: list[str] = Field(default_factory=list)
 
 
 class ScenarioComparisonRequest(BaseModel):
     portfolio: Portfolio
     hedged_portfolio: Portfolio
     scenarios: list[StressScenario]
+    methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
 
 
 class ScenarioComparison(BaseModel):
+    """Per-scenario before/after hedge P&L (legacy fields) plus loss diagnostics (M3.7)."""
+
     scenario: str
     base_pnl: float
     hedged_pnl: float
     improvement: float
+    # Loss = max(0, -pnl); loss_improvement = base_loss - hedged_loss (>0 = hedge helps).
+    base_loss: float = 0.0
+    hedged_loss: float = 0.0
+    loss_improvement: float = 0.0
 
 
 class Contributor(BaseModel):
@@ -279,9 +784,37 @@ class Contributor(BaseModel):
     contribution_pct: float
 
 
+LimitMetric = Literal[
+    "var_99",
+    "var_95",
+    "expected_shortfall_99",
+    "dv01",
+    "key_rate_dv01",
+    "vega",
+    "fx_delta",
+    "single_position_pct",
+    "stress_loss",
+]
+
+LimitStatus = Literal["OK", "WARNING", "BREACH"]
+
+LimitScope = Literal["firm", "portfolio", "desk", "strategy", "book", "trade"]
+
+
 class RiskLimit(BaseModel):
-    metric: Literal["var_99", "dv01", "vega", "single_position_pct"]
+    """Configurable risk limit with optional warning band.
+
+    ``warning_threshold_pct`` is utilization (%) at/above which status becomes
+    WARNING while still below the hard ``limit`` (BREACH when value > limit).
+    ``scope`` / ``label`` are informational (e.g. firm vs desk VaR); evaluation
+    uses the portfolio subset passed to ``LimitEngine``.
+    """
+
+    metric: LimitMetric
     limit: float
+    warning_threshold_pct: float = 80.0
+    scope: LimitScope | None = None
+    label: str | None = None
 
 
 class LimitResult(BaseModel):
@@ -290,6 +823,10 @@ class LimitResult(BaseModel):
     limit: float
     utilization_pct: float
     breached: bool
+    status: LimitStatus = "OK"
+    warning_threshold_pct: float = 80.0
+    scope: LimitScope | None = None
+    label: str | None = None
 
 
 class VaRMethodResult(BaseModel):
@@ -303,19 +840,159 @@ class RiskContribution(BaseModel):
     position_id: str
     component_var: float
     contribution_pct: float
+    # Historical tail-conditional ES contribution (M2.5); optional for backward compat.
+    component_es: float | None = None
+    es_contribution_pct: float | None = None
+    # M2.7: Euler ∂VaR/∂w_i at current holdings; equals component_var when w_i ≡ 1
+    marginal_var: float = 0.0
+
+
+class ESContribution(BaseModel):
+    """One entity's historical Expected Shortfall contribution (M2.5).
+
+    ``component_es`` is the mean entity loss on portfolio-tail scenarios
+    (loss = -P&L). Contributions within a dimension sum to ``portfolio_es``.
+    """
+
+    key: str
+    label: str = ""
+    component_es: float
+    contribution_pct: float
+
+
+class ESContributionReport(BaseModel):
+    """Tail-conditional ES contributions by hierarchy and risk factor (M2.5)."""
+
+    portfolio_id: str
+    methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
+    confidence: float
+    portfolio_var: float
+    portfolio_es: float
+    by_position: list[ESContribution]
+    by_book: list[ESContribution]
+    by_strategy: list[ESContribution]
+    by_desk: list[ESContribution]
+    by_risk_factor: list[ESContribution]
+    reconciliation_error_position: float = 0.0
+    reconciliation_error_book: float = 0.0
+    reconciliation_error_strategy: float = 0.0
+    reconciliation_error_desk: float = 0.0
+    reconciliation_error_risk_factor: float = 0.0
 
 
 class VaRReport(BaseModel):
     portfolio_id: str
+    methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
     methods: list[VaRMethodResult]
     contributions: list[RiskContribution]
 
 
+class VaRMethodologyMetrics(BaseModel):
+    """One methodology's historical VaR/ES plus wall-clock runtime (M2.4)."""
+
+    methodology: VaRMethodology
+    var_95: float
+    var_99: float
+    expected_shortfall_99: float
+    runtime_ms: float
+
+
+class VaRMethodologyComparison(BaseModel):
+    """Side-by-side Linear / Δ-Γ / Full-revaluation VaR comparison (M2.4)."""
+
+    portfolio_id: str
+    observations: int
+    results: list[VaRMethodologyMetrics]
+
+
+class HierarchyLevel(str, Enum):
+    """Canonical firm risk tree (M4.1)."""
+
+    FIRM = "firm"
+    PORTFOLIO = "portfolio"
+    DESK = "desk"
+    STRATEGY = "strategy"
+    BOOK = "book"
+    TRADE = "trade"
+
+
+class HierarchyRef(BaseModel):
+    """Address of a node in the Firm → … → Trade tree for risk subsetting."""
+
+    level: HierarchyLevel
+    firm: str | None = None
+    portfolio_id: str | None = None
+    desk: str | None = None
+    strategy: str | None = None
+    book: str | None = None
+    trade_id: str | None = None
+
+
+class LimitDrilldownRequest(BaseModel):
+    """Drill into limit utilization at a hierarchy node (M4.6).
+
+    When ``metric`` is set, that metric is returned even if not breached
+    (unless ``breaches_only`` is true). When omitted, items follow
+    ``breaches_only`` against evaluated limits at the node.
+    """
+
+    portfolio: Portfolio
+    metric: LimitMetric | None = None
+    hierarchy: HierarchyRef | None = None
+    limits: list[RiskLimit] | None = None
+    top_n: int = Field(default=5, ge=1, le=100)
+    breaches_only: bool = True
+
+
+class LimitBreachDrilldown(BaseModel):
+    """One limit row enriched with hierarchy context and top contributors."""
+
+    hierarchy_node: str
+    hierarchy_level: LimitScope
+    metric: str
+    value: float
+    limit: float
+    utilization_pct: float
+    breached: bool
+    status: LimitStatus = "OK"
+    warning_threshold_pct: float = 80.0
+    scope: LimitScope | None = None
+    label: str | None = None
+    contributors: list[Contributor] = Field(default_factory=list)
+
+
+class LimitDrilldownReport(BaseModel):
+    portfolio_id: str
+    hierarchy_node: str
+    hierarchy_level: LimitScope
+    items: list[LimitBreachDrilldown] = Field(default_factory=list)
+
+
 class HierarchyNode(BaseModel):
+    """Risk tree node with NAV / Greeks / VaR / ES / stress / limits (M4.2).
+
+    Additive metrics (reconcile parent == sum children within abs 1e-9):
+    ``market_value``, ``delta``, ``gamma``, ``vega``, ``dv01``, ``fx_delta``,
+    and each scenario's stress ``pnl``.
+
+    Non-additive metrics are computed on the node sub-portfolio:
+    ``var_95``, ``var_99``, ``expected_shortfall_99``, ``limits``.
+    """
+
     name: str
-    level: Literal["portfolio", "desk", "strategy", "book", "trade"]
+    level: Literal["firm", "portfolio", "desk", "strategy", "book", "trade"]
     market_value: float
     var_99: float
+    path: str = ""
+    delta: float = 0.0
+    gamma: float = 0.0
+    vega: float = 0.0
+    dv01: float = 0.0
+    fx_delta: float = 0.0
+    var_95: float = 0.0
+    expected_shortfall_99: float = 0.0
+    stress: list[StressResult] = Field(default_factory=list)
+    limits: list[LimitResult] = Field(default_factory=list)
     children: list["HierarchyNode"] = []
 
 
@@ -338,6 +1015,36 @@ class AttributionRequest(BaseModel):
     current_portfolio: Portfolio
     previous_market: MarketSnapshot | None = None
     current_market: MarketSnapshot | None = None
+    # Day fraction for theta (maturity aging). 0 → no theta. Additive; optional for API compat.
+    dt_years: float = 0.0
+
+
+class RiskChangeItem(BaseModel):
+    """One driver of a change in a risk metric (VaR / ES), not P&L."""
+
+    driver: str
+    delta_risk: float
+
+
+class RiskChangeAttributionReport(BaseModel):
+    """Waterfall explaining why a risk metric changed between two states."""
+
+    metric: Literal["var_99", "var_95", "expected_shortfall_99"] = "var_99"
+    previous_risk: float
+    current_risk: float
+    total_change: float
+    explained_change: float
+    residual: float
+    items: list[RiskChangeItem]
+
+
+class RiskChangeAttributionRequest(BaseModel):
+    previous_portfolio: Portfolio
+    current_portfolio: Portfolio
+    previous_market: MarketSnapshot | None = None
+    current_market: MarketSnapshot | None = None
+    metric: Literal["var_99", "var_95", "expected_shortfall_99"] = "var_99"
+    methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
 
 
 class RiskQueryRequest(BaseModel):
@@ -349,3 +1056,328 @@ class RiskQueryResponse(BaseModel):
     intent: str
     answer: str
     data: dict
+
+
+class WhatIfChange(BaseModel):
+    """One hypothetical trade mutation for incremental VaR / what-if (M2.8/M2.9).
+
+    - ``add``: requires ``position`` with a new unique id
+    - ``remove``: requires ``position_id`` (or ``position.id``)
+    - ``modify``: requires ``position``; ``position_id`` defaults to ``position.id``
+    """
+
+    operation: Literal["add", "remove", "modify"]
+    position_id: str | None = None
+    position: Position | None = None
+
+
+class WhatIfRequest(BaseModel):
+    """What-if request: evaluate changes without mutating persisted portfolio state."""
+
+    portfolio: Portfolio
+    changes: list[WhatIfChange]
+    methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
+    scenarios: list[StressScenario] | None = None
+
+
+class WhatIfIncrementalRisk(BaseModel):
+    """Metric-wise after − before (currency loss for VaR/ES; same units as RiskSummary)."""
+
+    market_value: float
+    delta: float = 0.0
+    gamma: float = 0.0
+    vega: float = 0.0
+    dv01: float = 0.0
+    fx_delta: float = 0.0
+    var_95: float
+    var_99: float
+    expected_shortfall_99: float
+
+
+class FactorExposureChange(BaseModel):
+    factor: str
+    factor_type: Literal["equity", "vol", "rate", "fx"]
+    bucket: str
+    before: float
+    after: float
+    delta: float
+
+
+class HedgeComparisonReport(BaseModel):
+    """Strengthened hedge comparison (M3.7).
+
+    Sign conventions:
+    - ``hedge_cost`` = MV(hedged) − MV(base); positive ≈ capital deployed / higher MV
+    - ``var_improvement`` / ``es_improvement`` = base − hedged (>0 = risk reduced)
+    - per-scenario ``improvement`` remains hedged_pnl − base_pnl (legacy)
+    """
+
+    hedge_cost: float
+    base_market_value: float
+    hedged_market_value: float
+    base_var_99: float
+    hedged_var_99: float
+    base_expected_shortfall_99: float
+    hedged_expected_shortfall_99: float
+    var_improvement: float
+    es_improvement: float
+    methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
+    factor_exposure_changes: list[FactorExposureChange] = Field(default_factory=list)
+    scenarios: list[ScenarioComparison] = Field(default_factory=list)
+
+
+class StressLossChange(BaseModel):
+    scenario: str
+    before_pnl: float
+    after_pnl: float
+    delta_pnl: float
+
+
+class WhatIfReport(BaseModel):
+    """What-if / incremental VaR response (M2.8/M2.9)."""
+
+    portfolio_id: str
+    methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
+    before: RiskSummary
+    after: RiskSummary
+    incremental: WhatIfIncrementalRisk
+    changed_factor_exposures: list[FactorExposureChange] = Field(default_factory=list)
+    changed_stress_losses: list[StressLossChange] = Field(default_factory=list)
+
+
+class RiskRunStatus(str, Enum):
+    """Lifecycle states for a risk run (M5.2 domain; M5.3 execution)."""
+
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class RiskResultRef(BaseModel):
+    """Reference to a named result payload stored with a risk run.
+
+    Full payloads live in persistence ``risk_results``; the domain header only
+    carries type + optional row id so APIs can link without duplicating bodies.
+    """
+
+    result_type: str = Field(min_length=1)
+    result_id: int | None = None
+
+
+def _utcnow_domain() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class RiskRun(BaseModel):
+    """Domain DTO for a persisted / async risk computation (M5.2).
+
+    Persistence field mapping (ORM ``RiskRunRow``):
+    - ``completed_at`` ↔ ``finished_at``
+    - ``error`` ↔ ``error_message``
+    - ``result_refs`` ↔ ``risk_results`` (``result_type`` + row ``id``)
+    - ``pricing_engine_version``, ``methodology``, ``scenario_set`` are first-class
+      columns (Alembic ``002_risk_run_domain_fields``); ``run_type`` / ``request``
+      remain the generic envelope for M5.3/M5.4.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    portfolio_id: str = Field(min_length=1)
+    market_snapshot_id: str | None = None
+    created_at: datetime = Field(default_factory=_utcnow_domain)
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    pricing_engine_version: str | None = None
+    methodology: VaRMethodology | None = None
+    scenario_set: list[str] = Field(default_factory=list)
+    status: RiskRunStatus = RiskRunStatus.QUEUED
+    result_refs: list[RiskResultRef] = Field(default_factory=list)
+    error: str | None = None
+    run_type: str = Field(default="summary", min_length=1)
+    request: dict[str, Any] = Field(default_factory=dict)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def duration(self) -> float | None:
+        """Wall-clock seconds from ``started_at`` to ``completed_at``, if both set."""
+        if self.started_at is None or self.completed_at is None:
+            return None
+        return (self.completed_at - self.started_at).total_seconds()
+
+    @model_validator(mode="after")
+    def _validate_lifecycle(self) -> RiskRun:
+        if not self.id.strip():
+            raise ValueError("id must be non-empty")
+        if not self.portfolio_id.strip():
+            raise ValueError("portfolio_id must be non-empty")
+        for sid in self.scenario_set:
+            if not str(sid).strip():
+                raise ValueError("scenario_set entries must be non-empty")
+        if self.pricing_engine_version is not None and not self.pricing_engine_version.strip():
+            raise ValueError("pricing_engine_version must be non-empty when set")
+
+        if self.started_at is not None and self.completed_at is not None:
+            if self.completed_at < self.started_at:
+                raise ValueError("completed_at must be >= started_at")
+
+        status = self.status
+        if status == RiskRunStatus.QUEUED:
+            if self.started_at is not None or self.completed_at is not None:
+                raise ValueError("QUEUED runs must not have started_at or completed_at")
+            if self.error is not None:
+                raise ValueError("QUEUED runs must not have error")
+        elif status == RiskRunStatus.RUNNING:
+            if self.started_at is None:
+                raise ValueError("RUNNING runs require started_at")
+            if self.completed_at is not None:
+                raise ValueError("RUNNING runs must not have completed_at")
+            if self.error is not None:
+                raise ValueError("RUNNING runs must not have error")
+        elif status == RiskRunStatus.COMPLETED:
+            if self.started_at is None or self.completed_at is None:
+                raise ValueError("COMPLETED runs require started_at and completed_at")
+            if self.error is not None:
+                raise ValueError("COMPLETED runs must not have error")
+        elif status == RiskRunStatus.FAILED:
+            if self.started_at is None or self.completed_at is None:
+                raise ValueError("FAILED runs require started_at and completed_at")
+            if self.error is None or not str(self.error).strip():
+                raise ValueError("FAILED runs require a non-empty error")
+        return self
+
+
+class RiskRunCreateRequest(BaseModel):
+    """POST /risk/runs body (M5.4). Mounted under ``/risk`` until M7.2 ``/api/v1``."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "portfolio": {
+                        "id": "demo",
+                        "name": "Demo",
+                        "positions": [
+                            {
+                                "type": "equity",
+                                "id": "eq-1",
+                                "symbol": "AAPL",
+                                "quantity": 10,
+                                "price": 100.0,
+                            }
+                        ],
+                    },
+                    "run_type": "summary",
+                    "request": {"methodology": "DELTA_GAMMA"},
+                    "market_snapshot_id": None,
+                }
+            ]
+        },
+    )
+
+    portfolio: Portfolio
+    run_type: str = Field(default="summary", min_length=1)
+    request: dict[str, Any] = Field(default_factory=dict)
+    market_snapshot_id: str | None = None
+
+
+class RiskRunResultView(BaseModel):
+    """Named result payload attached to a risk run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    result_type: str
+    payload: dict[str, Any]
+
+
+class RiskRunView(BaseModel):
+    """API view of a risk run (wire shape for M5.3/M5.4).
+
+    Maps from domain ``RiskRun``:
+    - ``error_message`` ← ``error``
+    - ``finished_at`` ← ``completed_at``
+    - ``duration_seconds`` ← ``duration``
+    - ``results`` ← ``result_refs`` (+ optional payloads from persistence)
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                    "portfolio_id": "demo",
+                    "market_snapshot_id": None,
+                    "status": "QUEUED",
+                    "run_type": "summary",
+                    "request": {"methodology": "DELTA_GAMMA"},
+                    "pricing_engine_version": None,
+                    "methodology": None,
+                    "scenario_set": [],
+                    "error_message": None,
+                    "created_at": "2026-09-02T17:00:00+00:00",
+                    "started_at": None,
+                    "finished_at": None,
+                    "duration_seconds": None,
+                    "results": [],
+                }
+            ]
+        },
+    )
+
+    id: str
+    portfolio_id: str
+    market_snapshot_id: str | None = None
+    status: RiskRunStatus
+    run_type: str
+    request: dict[str, Any] = Field(default_factory=dict)
+    pricing_engine_version: str | None = None
+    methodology: VaRMethodology | None = None
+    scenario_set: list[str] = Field(default_factory=list)
+    error_message: str | None = None
+    created_at: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    duration_seconds: float | None = None
+    results: list[RiskRunResultView] = Field(default_factory=list)
+
+    @classmethod
+    def from_risk_run(
+        cls,
+        run: RiskRun,
+        *,
+        payloads: dict[str, dict[str, Any]] | None = None,
+    ) -> RiskRunView:
+        """Build wire view from domain DTO; attach payloads when provided."""
+        payload_map = payloads or {}
+        results: list[RiskRunResultView] = []
+        if payload_map:
+            for result_type, payload in payload_map.items():
+                results.append(RiskRunResultView(result_type=result_type, payload=payload))
+        else:
+            for ref in run.result_refs:
+                results.append(
+                    RiskRunResultView(
+                        result_type=ref.result_type,
+                        payload={},
+                    )
+                )
+        return cls(
+            id=run.id,
+            portfolio_id=run.portfolio_id,
+            market_snapshot_id=run.market_snapshot_id,
+            status=run.status,
+            run_type=run.run_type,
+            request=dict(run.request),
+            pricing_engine_version=run.pricing_engine_version,
+            methodology=run.methodology,
+            scenario_set=list(run.scenario_set),
+            error_message=run.error,
+            created_at=run.created_at.isoformat() if run.created_at else None,
+            started_at=run.started_at.isoformat() if run.started_at else None,
+            finished_at=run.completed_at.isoformat() if run.completed_at else None,
+            duration_seconds=run.duration,
+            results=results,
+        )

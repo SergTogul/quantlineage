@@ -4,7 +4,15 @@ import os
 
 from app.interfaces.pricing import PricingEngine
 from app.pricing.builtin import BuiltinPricingEngine
+from app.pricing.cache import CachedPricingEngine, PricingConfiguration
 from app.pricing.quantlib import QuantLibPricingEngine
+
+
+def _env_flag(name: str, default: bool = True) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
 
 
 def create_pricing_engine() -> PricingEngine:
@@ -12,10 +20,28 @@ def create_pricing_engine() -> PricingEngine:
 
     QuantLib is the application default.  The built-in implementation exists as a
     deterministic development/test fallback and as a cross-check implementation.
+
+    When ``RISKFORGE_PRICING_CACHE`` is enabled (default), the adapter is wrapped
+    in :class:`~app.pricing.cache.CachedPricingEngine` so repeated valuations of
+    the same trade + market + pricing configuration hit an LRU cache.
     """
     name = os.getenv("RISKFORGE_PRICING_ENGINE", "quantlib").strip().lower()
     if name == "quantlib":
-        return QuantLibPricingEngine()
-    if name == "builtin":
-        return BuiltinPricingEngine()
-    raise ValueError(f"Unknown pricing engine: {name!r}")
+        engine: PricingEngine = QuantLibPricingEngine()
+    elif name == "builtin":
+        engine = BuiltinPricingEngine()
+    else:
+        raise ValueError(f"Unknown pricing engine: {name!r}")
+
+    if _env_flag("RISKFORGE_PRICING_CACHE", default=True):
+        maxsize_raw = os.getenv("RISKFORGE_PRICING_CACHE_SIZE", "4096").strip()
+        try:
+            maxsize = max(1, int(maxsize_raw))
+        except ValueError:
+            maxsize = 4096
+        engine = CachedPricingEngine(
+            engine,
+            maxsize=maxsize,
+            config=PricingConfiguration.from_engine(engine),
+        )
+    return engine

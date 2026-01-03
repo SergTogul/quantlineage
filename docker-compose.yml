@@ -1,10 +1,51 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: riskforge
+      POSTGRES_PASSWORD: riskforge
+      POSTGRES_DB: riskforge
+    ports: ["5432:5432"]
+    volumes:
+      - riskforge_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U riskforge -d riskforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Apply schema before API/worker: docker compose run --rm backend alembic upgrade head
   backend:
     build: ./backend
     environment:
       RISKFORGE_PRICING_ENGINE: quantlib
+      # SQLAlchemy URL (psycopg3). Host ``postgres`` is the Compose service name.
+      RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@postgres:5432/riskforge
+      # Defer execution to the ``worker`` service (shared Postgres QUEUED rows).
+      RISKFORGE_EXTERNAL_WORKER: "1"
     ports: ["8000:8000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Same image / RiskRunWorker as API lifespan; claims QUEUED via FOR UPDATE SKIP LOCKED (M5.7).
+  # Compose ships one worker for the demo; extra replicas are claim-safe on Postgres (no Redis/RQ).
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      RISKFORGE_PRICING_ENGINE: quantlib
+      RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@postgres:5432/riskforge
+      RISKFORGE_WORKER_POLL_INTERVAL: "2"
+      RISKFORGE_WORKER_POLL_BATCH: "10"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   frontend:
     build: ./frontend
     ports: ["5173:80"]
     depends_on: [backend]
+
+volumes:
+  riskforge_pgdata:
