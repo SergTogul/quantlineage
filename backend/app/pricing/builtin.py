@@ -3,9 +3,12 @@ import math
 from statistics import NormalDist
 from app.domain.models import (
     BondPosition, EquityFuturePosition, EquityPosition, EuropeanOptionPosition,
-    FXForwardPosition, FXOptionPosition, MarketSnapshot, Position, SwapPosition, Valuation,
+    FXForwardPosition, FXOptionPosition, InterestRateFuturePosition, MarketSnapshot,
+    Position, SwapPosition, Valuation,
 )
 from app.interfaces.pricing import PricingEngine
+from app.pricing.curve_rates import continuous_zero, discount_factor
+from app.pricing.surface_vol import option_vol_from_snapshot
 
 _N = NormalDist()
 def _cdf(x: float) -> float: return _N.cdf(x)
@@ -13,7 +16,12 @@ def _pdf(x: float) -> float: return math.exp(-0.5*x*x)/math.sqrt(2*math.pi)
 
 
 class BuiltinPricingEngine(PricingEngine):
-    """Deterministic reference pricer used for tests and cross-validation."""
+    """Deterministic reference pricer used for tests and cross-validation.
+
+    Bonds / swaps / IR futures revalue from ``MarketSnapshot.curves`` and
+    ``key_rates`` when present (continuous zeros); otherwise fall back to
+    scalar ``rates[ccy]`` and annual bond compounding.
+    """
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
         if isinstance(position, EquityPosition):
@@ -28,15 +36,9 @@ class BuiltinPricingEngine(PricingEngine):
         if isinstance(position, EuropeanOptionPosition):
             return self._equity_option(position, market)
         if isinstance(position, BondPosition):
-            y = market.rates.get(position.currency, position.yield_rate) if market else position.yield_rate
-            pv = position.face_value*position.quantity/((1+y)**position.maturity_years)
-            return Valuation(position_id=position.id, market_value=pv, dv01=-position.duration*pv*0.0001)
+            return self._bond(position, market)
         if isinstance(position, SwapPosition):
-            m = market.rates.get(position.currency, position.market_swap_rate) if market else position.market_swap_rate
-            sign = -1.0 if position.pay_fixed else 1.0
-            annuity = position.notional*position.duration
-            pv = sign*(m-position.fixed_rate)*annuity
-            return Valuation(position_id=position.id, market_value=pv, dv01=sign*annuity*0.0001)
+            return self._swap(position, market)
         if isinstance(position, FXForwardPosition):
             s = market.fx_spots.get(position.pair, position.spot) if market else position.spot
             rd = market.rates.get(position.pair[-3:], position.domestic_rate) if market else position.domestic_rate
@@ -46,11 +48,50 @@ class BuiltinPricingEngine(PricingEngine):
             return Valuation(position_id=position.id, market_value=pv, fx_delta=position.notional_base*s)
         if isinstance(position, FXOptionPosition):
             return self._fx_option(position, market)
+        if isinstance(position, InterestRateFuturePosition):
+            return self._ir_future(position, market)
         raise TypeError(f"Unsupported position: {type(position)!r}")
+
+    def _bond(self, p: BondPosition, market: MarketSnapshot | None) -> Valuation:
+        df = discount_factor(
+            market, p.currency, p.maturity_years, fallback_yield=p.yield_rate
+        )
+        if df is not None:
+            pv = p.face_value * p.quantity * df
+        else:
+            y = market.rates.get(p.currency, p.yield_rate) if market else p.yield_rate
+            pv = p.face_value * p.quantity / ((1 + y) ** p.maturity_years)
+        return Valuation(position_id=p.id, market_value=pv, dv01=-p.duration * pv * 0.0001)
+
+    def _swap(self, p: SwapPosition, market: MarketSnapshot | None) -> Valuation:
+        # pay_fixed=True → standard payer: PV rises when the market swap rate rises.
+        # Curve / key-rate zeros at maturity mark the floating/par rate when attached.
+        m = continuous_zero(
+            market,
+            p.currency,
+            p.maturity_years,
+            fallback=p.market_swap_rate,
+        )
+        sign = 1.0 if p.pay_fixed else -1.0
+        annuity = p.notional * p.duration
+        pv = sign * (m - p.fixed_rate) * annuity
+        return Valuation(position_id=p.id, market_value=pv, dv01=sign * annuity * 0.0001)
 
     def _equity_option(self, p: EuropeanOptionPosition, market: MarketSnapshot | None) -> Valuation:
         s = market.equity_spots.get(p.symbol,p.spot) if market else p.spot
-        sigma = market.equity_vols.get(p.symbol,p.volatility) if market else p.volatility
+        fallback = market.equity_vols.get(p.symbol, p.volatility) if market else p.volatility
+        sigma = (
+            option_vol_from_snapshot(
+                market,
+                name=p.symbol,
+                maturity_years=p.maturity_years,
+                strike=p.strike,
+                spot=s,
+                fallback=fallback,
+            )
+            if market
+            else fallback
+        )
         r = market.rates.get("USD",p.risk_free_rate) if market else p.risk_free_rate
         k,t,q = p.strike,p.maturity_years,p.dividend_yield
         sqrt_t=math.sqrt(t); d1=(math.log(s/k)+(r-q+0.5*sigma*sigma)*t)/(sigma*sqrt_t); d2=d1-sigma*sqrt_t
@@ -62,7 +103,19 @@ class BuiltinPricingEngine(PricingEngine):
 
     def _fx_option(self, p: FXOptionPosition, market: MarketSnapshot | None) -> Valuation:
         s = market.fx_spots.get(p.pair,p.spot) if market else p.spot
-        sigma = market.fx_vols.get(p.pair,p.volatility) if market else p.volatility
+        fallback = market.fx_vols.get(p.pair, p.volatility) if market else p.volatility
+        sigma = (
+            option_vol_from_snapshot(
+                market,
+                name=p.pair,
+                maturity_years=p.maturity_years,
+                strike=p.strike,
+                spot=s,
+                fallback=fallback,
+            )
+            if market
+            else fallback
+        )
         rd = market.rates.get(p.pair[-3:],p.domestic_rate) if market else p.domestic_rate
         rf = market.rates.get(p.pair[:3],p.foreign_rate) if market else p.foreign_rate
         t,k=p.maturity_years,p.strike; sqrt_t=math.sqrt(t)
@@ -71,3 +124,17 @@ class BuiltinPricingEngine(PricingEngine):
         else: unit=k*math.exp(-rd*t)*_cdf(-d2)-s*math.exp(-rf*t)*_cdf(-d1); d=math.exp(-rf*t)*(_cdf(d1)-1)
         gamma=math.exp(-rf*t)*_pdf(d1)/(s*sigma*sqrt_t); vega=s*math.exp(-rf*t)*_pdf(d1)*sqrt_t
         return Valuation(position_id=p.id,market_value=p.notional_base*unit,fx_delta=p.notional_base*d*s,gamma=p.notional_base*gamma*s*s,vega=p.notional_base*vega*0.01)
+
+    def _ir_future(self, p: InterestRateFuturePosition, market: MarketSnapshot | None) -> Valuation:
+        # Long STIR future: profits when the forward rate falls vs the quoted futures rate.
+        # Units: pv01 is $ per contract per 1bp; rates are decimals.
+        # Prefer projection curve / key rates at maturity when attached.
+        fwd = continuous_zero(
+            market,
+            p.currency,
+            p.maturity_years,
+            fallback=p.forward_rate,
+            prefer_projection=True,
+        )
+        mv = p.quantity * p.pv01 * (p.quoted_rate - fwd) * 10000.0
+        return Valuation(position_id=p.id, market_value=mv, dv01=-p.quantity * p.pv01)

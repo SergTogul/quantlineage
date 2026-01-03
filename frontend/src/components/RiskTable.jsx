@@ -1,11 +1,95 @@
-import { limitStatus, money, percent, threatClass, topContributors } from '../lib/risk.mjs'
+import { useState } from 'react'
+import { limitDrilldown } from '../api'
+import {
+  breachedLimits, limitDrilldownSummary, limitStatus, limitStatusClass, money, percent, threatClass, topContributors,
+} from '../lib/risk.mjs'
 
 export function Contributors({items}) {
-  return <div className="card"><h3>Top Risk Contributors</h3><table><tbody>{topContributors(items).map(x => <tr key={x.position_id}><td>{x.label}</td><td>{x.contribution_pct.toFixed(1)}%</td><td>{money(x.risk_amount)}</td></tr>)}</tbody></table></div>
+  return <div className="card"><h3>Component VaR Contributors</h3><div className="muted">Parametric component VaR by trade</div><table><tbody>{topContributors(items).map(x => <tr key={x.position_id}><td>{x.label}</td><td>{x.contribution_pct.toFixed(1)}%</td><td>{money(x.risk_amount)}</td></tr>)}</tbody></table></div>
 }
 
-export function Limits({items}) {
-  return <div className="card"><h3>Limits</h3><table><tbody>{items.map(x => <tr key={x.metric}><td>{x.metric}</td><td>{x.utilization_pct.toFixed(0)}%</td><td className={`status ${limitStatus(x).toLowerCase()}`}>{limitStatus(x)}</td></tr>)}</tbody></table></div>
+export function Limits({items, portfolio}) {
+  const breaches = breachedLimits(items)
+  const [drilldown, setDrilldown] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function loadBreachDrilldown() {
+    if (!portfolio) return
+    setLoading(true)
+    setError('')
+    try {
+      const report = await limitDrilldown(portfolio, { breaches_only: true, top_n: 5 })
+      setDrilldown(limitDrilldownSummary(report))
+    } catch (e) {
+      setError(e.message || 'Drill-down failed')
+      setDrilldown(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="card">
+      <h3>Limits</h3>
+      <table>
+        <tbody>
+          {items.map((x) => (
+            <tr key={x.metric}>
+              <td>{x.metric}</td>
+              <td>{x.utilization_pct.toFixed(0)}%</td>
+              <td className={`status ${limitStatusClass(x)}`}>{limitStatus(x)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {breaches.length > 0 && portfolio && (
+        <div className="limit-drilldown">
+          <div className="card-title-row">
+            <div className="muted">{breaches.length} breach{breaches.length === 1 ? '' : 'es'} — drill into contributors</div>
+            <button type="button" onClick={loadBreachDrilldown} disabled={loading}>
+              {loading ? 'Loading…' : 'Drill down breaches'}
+            </button>
+          </div>
+          {error && <div className="error">{error}</div>}
+          {drilldown && (
+            drilldown.items.length === 0
+              ? <div className="muted foot">No breach drill-down rows returned</div>
+              : (
+                <div className="limit-drilldown-body">
+                  <div className="muted foot">
+                    Scope {drilldown.hierarchy_level}: {drilldown.hierarchy_node}
+                  </div>
+                  {drilldown.items.map((row) => (
+                    <div key={`${row.hierarchy_node}-${row.metric}`} className="limit-drilldown-item">
+                      <strong>{row.metric}</strong>
+                      <span className={`status ${limitStatusClass(row)}`}>
+                        {limitStatus(row)} · {row.utilization_pct.toFixed(0)}%
+                      </span>
+                      {(row.contributors || []).length === 0
+                        ? <div className="muted">No contributors</div>
+                        : (
+                          <table>
+                            <tbody>
+                              {row.contributors.map((c) => (
+                                <tr key={c.position_id}>
+                                  <td>{c.label}</td>
+                                  <td>{c.contribution_pct.toFixed(1)}%</td>
+                                  <td>{money(c.risk_amount)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              )
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function Stress({items}) {

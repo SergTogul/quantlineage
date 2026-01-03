@@ -1,30 +1,65 @@
 from __future__ import annotations
+
 from collections import defaultdict
+
 from app.domain.models import (
-    BondPosition, EquityFuturePosition, EquityPosition, EuropeanOptionPosition,
-    FXForwardPosition, FXOptionPosition, Portfolio, RiskFactorExposure, SwapPosition,
+    BondPosition,
+    EquityFuturePosition,
+    EquityPosition,
+    EuropeanOptionPosition,
+    FXForwardPosition,
+    FXOptionPosition,
+    InterestRateFuturePosition,
+    Portfolio,
+    RiskFactorExposure,
+    SwapPosition,
 )
 from app.interfaces.pricing import PricingEngine
 from app.market.snapshot import MarketDataProvider, PositionMarketDataProvider
+from app.risk.factor_types import (
+    EquitySpot,
+    EquityVol,
+    FXSpot,
+    FXVol,
+    RateZero,
+    RiskFactor,
+    factor_sort_key,
+)
 
 
 class RiskFactorEngine:
     def __init__(self, market_data: MarketDataProvider | None = None):
         self.market_data = market_data or PositionMarketDataProvider()
 
-    def calculate(self, portfolio: Portfolio, pricing: PricingEngine) -> list[RiskFactorExposure]:
+    def calculate_typed(
+        self, portfolio: Portfolio, pricing: PricingEngine
+    ) -> list[tuple[RiskFactor, float]]:
+        """Aggregate exposures keyed by typed :class:`RiskFactor` instances."""
         market = self.market_data.snapshot(portfolio)
-        agg: dict[tuple[str,str,str], float] = defaultdict(float)
+        agg: dict[RiskFactor, float] = defaultdict(float)
         for p in portfolio.positions:
             v = pricing.value(p, market)
             if isinstance(p, (EquityPosition, EquityFuturePosition, EuropeanOptionPosition)):
-                agg[(p.symbol,"equity",p.symbol)] += v.delta
-                if v.vega: agg[(f"{p.symbol}:VOL","vol",p.symbol)] += v.vega
-            elif isinstance(p, (BondPosition, SwapPosition)):
-                ccy = p.currency
+                agg[EquitySpot(p.symbol)] += v.delta
+                if v.vega:
+                    agg[EquityVol(underlying=p.symbol)] += v.vega
+            elif isinstance(p, (BondPosition, SwapPosition, InterestRateFuturePosition)):
                 tenor = f"{round(p.maturity_years)}Y"
-                agg[(f"{ccy}:RATE","rate",tenor)] += v.dv01
+                agg[RateZero(currency=p.currency, tenor=tenor)] += v.dv01
             elif isinstance(p, (FXForwardPosition, FXOptionPosition)):
-                agg[(p.pair,"fx",p.pair)] += v.fx_delta
-                if v.vega: agg[(f"{p.pair}:VOL","vol",p.pair)] += v.vega
-        return [RiskFactorExposure(factor=k[0], factor_type=k[1], bucket=k[2], exposure=x) for k,x in sorted(agg.items())]
+                agg[FXSpot(p.pair)] += v.fx_delta
+                if v.vega:
+                    agg[FXVol(pair=p.pair)] += v.vega
+        return sorted(agg.items(), key=lambda item: factor_sort_key(item[0]))
+
+    def calculate(self, portfolio: Portfolio, pricing: PricingEngine) -> list[RiskFactorExposure]:
+        """API-facing exposures; ``factor`` remains a stable string key."""
+        return [
+            RiskFactorExposure(
+                factor=factor.key,
+                factor_type=factor.factor_type,
+                bucket=factor.bucket,
+                exposure=exposure,
+            )
+            for factor, exposure in self.calculate_typed(portfolio, pricing)
+        ]

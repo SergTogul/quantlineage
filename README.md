@@ -37,6 +37,7 @@ QuantLib currently handles the original equity option/bond/swap path. New produc
 - Before/after hedge scenario comparison
 - Risk limits and breaches
 - Portfolio → desk → strategy → book → trade hierarchy
++ Firm → Portfolio → Desk → Strategy → Book → Trade hierarchy (position desk/strategy optional; defaults from portfolio)
 - P&L attribution across position, equity, vol, rate and FX changes
 - Deterministic natural-language query router ready to sit behind an LLM tool layer
 
@@ -65,9 +66,11 @@ POST /risk/query
 
 ## Run backend
 
+Requires **Python 3.12+** (`numpy>=2.3`). On macOS 13 where Homebrew Python 3.12 may not build, install via [uv](https://github.com/astral-sh/uv): `uv python install 3.12`.
+
 ```bash
 cd backend
-python -m venv .venv
+python3.12 -m venv .venv   # or: uv python install 3.12 && ~/.local/share/uv/python/.../python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 RISKFORGE_PRICING_ENGINE=quantlib uvicorn app.main:app --reload
@@ -78,6 +81,41 @@ For development/testing without QuantLib:
 ```bash
 RISKFORGE_PRICING_ENGINE=builtin uvicorn app.main:app --reload
 ```
+
+## Persistence (M5.1 / M5.6 / M5.7)
+
+SQLAlchemy + Alembic live under `backend/app/persistence/`. When `RISKFORGE_DATABASE_URL` is set, FastAPI lifespan wires SQLAlchemy for portfolios, market snapshots, scenario definitions, limit definitions, and risk runs (M5.6); otherwise in-memory / sample defaults are used. Unit tests use SQLite; Compose provides Postgres; CI runs `postgres-smoke` via `scripts/smoke_postgres.sh`.
+
+**Postgres DSN (Compose / local):**
+
+```text
+postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+```
+
+Inside Compose, services use host `postgres` instead of `localhost` via `RISKFORGE_DATABASE_URL`.
+
+```bash
+# Start Postgres
+docker compose up -d postgres
+
+# Apply migrations (required before API/worker against Postgres)
+export RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+cd backend && alembic upgrade head
+
+# Or via Compose image:
+# docker compose run --rm backend alembic upgrade head
+
+# Minimal seed / repo smoke (same script as CI postgres-smoke job)
+./scripts/smoke_postgres.sh
+
+# API + out-of-process worker + frontend (M5.7)
+docker compose up -d backend worker frontend
+```
+
+**Durable worker (M5.7):** Compose `worker` runs `python -m app.worker`, claiming `QUEUED` risk runs from shared Postgres via `claim_queued` (`SELECT … FOR UPDATE SKIP LOCKED` → `RUNNING`). Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP only enqueues. Without that flag (local uvicorn default), the API still executes runs in-process via `ThreadPoolExecutor`. Compose defaults to one worker for the demo; additional Postgres-backed replicas will not double-claim the same row. SQLite unit tests use a non-skip-locked FIFO claim (single-writer). Redis/RQ is not required for claim safety.
+
+SQLite (dev / CI default when `RISKFORGE_DATABASE_URL` is unset): `sqlite:///:memory:` for tests, or set a file URL and run `alembic upgrade head`.
+See `docs/adr/005-sqlalchemy-persistence.md`.
 
 ## Run frontend
 
@@ -95,7 +133,13 @@ PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin pytest -q
 
 cd ../frontend
 npm test
+
+cd ../e2e
+npm install && npm run install:browsers
+npm test
 ```
+
+Playwright boots the builtin-engine API and Vite app, then covers dashboard smoke, Scenario Builder, Reverse Stress, and Risk Query. See `e2e/README.md`.
 
 The backend native-kernel tests compile and execute C++20 with `g++` when a compiler is available. QuantLib runtime tests skip only when the QuantLib wheel is absent.
 
@@ -103,10 +147,32 @@ The backend native-kernel tests compile and execute C++20 with `g++` when a comp
 
 ```bash
 cd backend/native
-g++ -std=c++20 -O3 -shared -fPIC src/risk_kernel_capi.cpp -o libriskkernel.so
+g++ -std=c++20 -O3 -shared -fPIC -pthread -I include \
+  src/risk_kernel_capi.cpp -o libriskkernel.so
 ```
 
 Load it with `app.compute.kernel.NativeScenarioKernel`. No pybind11 is required for this MVP seam.
+
+Optional worker count for the C++ stdlib shock-partition thread pool (M6.4;
+`std::jthread` when available, else `std::thread`+join; not OpenMP):
+
+```bash
+export RISKFORGE_KERNEL_THREADS=4   # 1 = serial; unset = hardware_concurrency
+```
+
+Historical VaR **LINEAR** / **DELTA_GAMMA** approximate P&L can use the kernel behind:
+
+```bash
+export RISKFORGE_SCENARIO_KERNEL=native   # default: python (NumPy)
+export RISKFORGE_SCENARIO_KERNEL_LIB=/abs/path/to/libriskkernel.so  # optional
+```
+
+`FULL_REVALUATION` never uses this kernel (full PricingEngine revaluation). See
+`backend/native/README.md`. Parity tests: `backend/tests/test_historical_scenario_kernel.py`.
+
+Reproducible scenario-aggregation microbenchmarks (Python / NumPy / ctypes / C++) live under
+`benchmarks/` — see `benchmarks/README.md`. Those timings are environment-specific and are
+**not** production SLAs.
 
 ## Design rule
 

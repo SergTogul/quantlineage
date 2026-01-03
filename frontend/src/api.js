@@ -25,6 +25,68 @@ export function evaluateCustomScenario(portfolio, scenario) {
 export function reverseStress(portfolio, factor, target_loss_pct) {
   return json('/risk/stress/reverse',{method:'POST',body:JSON.stringify({portfolio,factor,target_loss_pct})})
 }
+/** Multi-factor reverse stress → MultiFactorReverseStressResult. */
+export function reverseStressMulti(portfolio, target_loss_pct, options = {}) {
+  return json('/risk/stress/reverse/multi', {
+    method: 'POST',
+    body: JSON.stringify({
+      portfolio,
+      target_loss_pct,
+      factors: options.factors,
+      weights: options.weights,
+      max_shock: options.max_shock,
+      max_shocks: options.max_shocks,
+    }),
+  })
+}
+/**
+ * Before/after hedge comparison → HedgeComparisonReport (object, not list).
+ * Use hedgeComparisonSummary() from risk.mjs to normalize for display.
+ */
+export function compareHedge(portfolio, hedged_portfolio, scenarios, methodology = 'DELTA_GAMMA') {
+  return json('/risk/stress/compare', {
+    method: 'POST',
+    body: JSON.stringify({ portfolio, hedged_portfolio, scenarios, methodology }),
+  })
+}
 export function askRisk(portfolio, question) {
   return json('/risk/query',{method:'POST',body:JSON.stringify({portfolio,question})})
+}
+/**
+ * Limit breach drill-down → LimitDrilldownReport.
+ * Use limitDrilldownSummary() from risk.mjs to normalize for display.
+ */
+export function limitDrilldown(portfolio, options = {}) {
+  return json('/risk/limits/drilldown', {
+    method: 'POST',
+    body: JSON.stringify({
+      portfolio,
+      metric: options.metric,
+      hierarchy: options.hierarchy,
+      limits: options.limits,
+      top_n: options.top_n,
+      breaches_only: options.breaches_only,
+    }),
+  })
+}
+
+/**
+ * Enqueue async risk run → RiskRunView (202). Prefer `/api/v1` after M7.2.
+ * Poll with getRiskRun(id) until COMPLETED / FAILED.
+ */
+export function createRiskRun(portfolio, options = {}) {
+  return json('/risk/runs', {
+    method: 'POST',
+    body: JSON.stringify({
+      portfolio,
+      run_type: options.run_type ?? 'summary',
+      request: options.request ?? {},
+      market_snapshot_id: options.market_snapshot_id ?? null,
+    }),
+  })
+}
+
+/** GET risk-run status / results by id → RiskRunView. */
+export function getRiskRun(runId) {
+  return json(`/risk/runs/${encodeURIComponent(runId)}`)
 }

@@ -1,5 +1,11 @@
-import math
-from app.domain.models import BondPosition, EquityPosition, EuropeanOptionPosition, SwapPosition
+import pytest
+from app.domain.models import (
+    BondPosition,
+    EquityPosition,
+    EuropeanOptionPosition,
+    InterestRateFuturePosition,
+    SwapPosition,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 
 p = BuiltinPricingEngine()
@@ -31,8 +37,21 @@ def test_bond_dv01_negative_for_long_bond():
     assert p.value(x).dv01 < 0
 
 
-def test_pay_fixed_swap_rises_when_market_rate_falls():
+def test_pay_fixed_swap_rises_when_market_rate_rises():
+    """pay_fixed=True is standard payer economics (aligned with QuantLib)."""
     x = SwapPosition(type="swap", id="s", notional=1_000_000, maturity_years=5, fixed_rate=.04, market_swap_rate=.04, pay_fixed=True, duration=4)
     base = p.value(x).market_value
-    shocked = p.value(x.model_copy(update={"market_swap_rate": .03})).market_value
+    shocked = p.value(x.model_copy(update={"market_swap_rate": .05})).market_value
     assert shocked > base
+
+
+def test_ir_future_long_loses_when_forward_rises():
+    x = InterestRateFuturePosition(
+        type="ir_future", id="ed", quantity=10, pv01=25.0,
+        quoted_rate=0.04, forward_rate=0.04, maturity_years=0.25,
+    )
+    base = p.value(x)
+    assert base.market_value == 0.0
+    assert base.dv01 == -250.0
+    higher = p.value(x.model_copy(update={"forward_rate": 0.05}))
+    assert higher.market_value == pytest.approx(-10 * 25 * 0.01 * 10000)
