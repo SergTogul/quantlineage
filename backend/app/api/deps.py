@@ -25,11 +25,23 @@ from app.persistence.wiring import (
     load_market_snapshot,
     load_portfolio,
 )
+from app.pricing.factory import create_pricing_engine
+from app.risk.historical import HistoricalRiskEngine
 from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
 from app.sample import SAMPLE_PORTFOLIO
+from app.services.portfolio_service import PortfolioService
 from app.services.risk_run_worker import RiskRunWorker
 
 _DEFAULT_SCENARIO_IDS = {s.id for s in DEFAULT_SCENARIOS if s.id}
+
+# Process-wide PortfolioService (pricing via factory; M7.1 DI for routers).
+portfolio_service = PortfolioService(create_pricing_engine(), HistoricalRiskEngine())
+
+
+def get_portfolio_service() -> PortfolioService:
+    """Deterministic portfolio/risk service used by HTTP routers."""
+    return portfolio_service
+
 
 
 def get_session_factory(request: Request) -> sessionmaker[Session] | None:

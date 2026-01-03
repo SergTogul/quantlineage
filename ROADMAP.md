@@ -13,7 +13,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 4 — Hierarchy, Attribution & Limits | **COMPLETE** (2026-09-02 Lead Architect formal acceptance) |
 | Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA `postgres-persistence-smoke` green; M5.5 non-blocking polish remains) |
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
-| Milestone 7 — API Productionization | NOT STARTED (`/api/v1` mostly open; risk-runs alias only) |
+| Milestone 7 — API Productionization | **PARTIAL** (M7.1 DONE — router split; paths still unversioned except risk-runs `/api/v1` alias) |
 | Milestone 8 — Risk Terminal UI | PARTIAL (firm-root hierarchy; thin hedge/multi/risk-run helpers; risk-run poll card; no change-attr/ES panels) |
 | Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE — full CI green on GHA; M9.1–M9.5/M9.7/M9.10 still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
@@ -51,7 +51,7 @@ Trade (domain/models.py)
       ├─ HistoricalRiskEngine / VaRAnalytics  [LINEAR / DELTA_GAMMA / FULL_REVALUATION]
       ├─ StressEngine / ReverseStress / Compare
       ├─ Hierarchy / Attribution / Limits / Factors / Query
-  → PortfolioService → FastAPI (main.py, unversioned /risk/*)
+  → PortfolioService → FastAPI (app/api/* routers; unversioned /risk/*; risk-runs also /api/v1)
   → React SPA (single page cards) / optional NativeScenarioKernel (LINEAR/Δ-Γ via RISKFORGE_SCENARIO_KERNEL)
 ```
 
@@ -60,7 +60,7 @@ Trade (domain/models.py)
 1. Caps/floors/swaptions still deferred; EquityVol/FXVol bumps do not rewrite surface grids; QL uses `BlackConstantVol` at point σ (not full surface engine); Builtin vs QL bond day-count gap
 2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 valuation LRU only (curve/scenario memo open — non-blocking polish)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
-4. `/api/v1` versioning still mostly open (M7); formal `Scenario` not yet the stress HTTP wire type
+4. M7.1 router decomposition DONE; `/api/v1` versioning (M7.2/M7.6) still open except risk-runs alias; formal `Scenario` not yet the stress HTTP wire type
 5. UI is one scroll dashboard: nav, heatmaps, hedge-compare page, risk-change attribution, ES contributions still missing (risk-run start/poll card landed M8.9)
 6. M9.9 **DONE** — full CI green on GHA runners (run 33673245125); static analysis (Ruff/mypy/ESLint) not started; E2E lags new endpoints
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
@@ -69,7 +69,7 @@ Trade (domain/models.py)
 
 | Check | Result |
 |-------|--------|
-| Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **426 passed**, 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
+| Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **445 passed** (2026-09-02 M7.1), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
 | Frontend `npm test` | **26 passed**, 0 failed |
 | Frontend `npm run build` | **OK** (vite; 22 modules) |
 | M5 milestone | **COMPLETE** — M5.1/M9.9 GHA green (run 33673245125); M5.5 remains non-blocking polish |
@@ -563,11 +563,16 @@ Lead Architect suite verify 2026-09-02: native path covered by green full backen
 
 ## Milestone 7 — API Productionization
 
-Status: NOT STARTED (risk-runs forward alias under `/api/v1/risk` only; rest of surface unversioned)
+Status: **PARTIAL** (M7.1 DONE 2026-09-02; paths remain unversioned except risk-runs `/api/v1` alias)
 
 ### Tasks
 
-- [ ] M7.1 Router decomposition — NOT STARTED (monolithic `main.py`; only `api/risk_runs.py` extracted)
+- [x] M7.1 Router decomposition — DONE (2026-09-02, Backend/API)
+  - `main.py` is wiring-only (lifespan, CORS, `include_router`)
+  - Routers: `api/health.py`, `portfolio.py`, `market.py`, `risk.py`, `stress.py`, `attribution.py`, `limits.py`, `risk_runs.py`
+  - `get_portfolio_service` / `portfolio_service` in `api/deps.py` (PricingEngine via factory unchanged)
+  - Public paths unchanged (`/health`, `/portfolio`, `/market/*`, `/risk/*`; risk-runs dual-mounted)
+  - Evidence: `tests/test_api_router_decomposition.py`; full suite **445 passed**
 - [ ] M7.2 API versioning `/api/v1/` — NOT STARTED (unversioned `/risk/*` remain canonical; risk-runs dual-mounted)
 - [ ] M7.3 Typed request/response models — PARTIAL
 - [ ] M7.4 OpenAPI examples — NOT STARTED
@@ -576,7 +581,13 @@ Status: NOT STARTED (risk-runs forward alias under `/api/v1/risk` only; rest of 
 - [ ] M7.6 Complete `/api/v1` migration for all risk routes (beyond risk-runs alias)
   - Why/evidence: M2–M5 acceptance residuals all point at M7.2; only `include_router(..., prefix="/api/v1/risk")` for runs today
 
+### Progress update (2026-09-02, Backend/API — M7.1)
+
+- Decomposed monolithic route handlers into charter-aligned APIRouter modules.
+- Milestone 7 remains **PARTIAL** — do not claim COMPLETE until M7.2–M7.6 land with evidence.
+
 ---
+
 
 ## Milestone 8 — Risk Terminal UI
 
