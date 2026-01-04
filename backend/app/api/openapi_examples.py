@@ -738,3 +738,20 @@ CRITICAL_OPENAPI_PATHS: tuple[tuple[str, str], ...] = (
     ("post", "/risk/runs"),
     ("get", "/risk/runs/{run_id}"),
 )
+
+# M7.3: OpenAPI component schema names expected for response_model= on critical paths.
+# For array responses, ``items_schema`` is the element model name.
+TYPED_RESPONSE_SCHEMAS: tuple[tuple[str, str, str, str | None], ...] = (
+    # method, path, schema_name, items_schema (None = object body)
+    ("post", "/risk/var", "VaRReport", None),
+    ("post", "/risk/es", "ESContributionReport", None),
+    ("post", "/risk/what-if", "WhatIfReport", None),
+    ("post", "/risk/stress", "StressResult", "StressResult"),
+    ("post", "/risk/stress/reverse", "ReverseStressResult", None),
+    ("post", "/risk/stress/reverse/multi", "MultiFactorReverseStressResult", None),
+    ("post", "/risk/stress/compare", "HedgeComparisonReport", None),
+    ("post", "/risk/change-attribution", "RiskChangeAttributionReport", None),
+    ("post", "/risk/limits/drilldown", "LimitDrilldownReport", None),
+    ("post", "/risk/runs", "RiskRunView", None),
+    ("get", "/risk/runs/{run_id}", "RiskRunView", None),
+)

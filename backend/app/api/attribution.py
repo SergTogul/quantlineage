@@ -8,7 +8,12 @@ from fastapi import APIRouter, Body, Depends
 
 from app.api.deps import get_portfolio_service
 from app.api.openapi_examples import CHANGE_ATTR_BODY_EXAMPLES, RESP_CHANGE_ATTR
-from app.domain.models import AttributionRequest, Portfolio, RiskChangeAttributionRequest
+from app.domain.models import (
+    AttributionRequest,
+    Portfolio,
+    RiskChangeAttributionReport,
+    RiskChangeAttributionRequest,
+)
 from app.services.portfolio_service import PortfolioService
 
 router = APIRouter(prefix="/risk", tags=["attribution"])
@@ -32,6 +37,7 @@ def risk_attribution_demo(
 
 @router.post(
     "/change-attribution",
+    response_model=RiskChangeAttributionReport,
     summary="Risk-metric change waterfall",
     responses=RESP_CHANGE_ATTR,
 )
@@ -41,6 +47,6 @@ def risk_change_attribution(
         Body(openapi_examples=CHANGE_ATTR_BODY_EXAMPLES),
     ],
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> RiskChangeAttributionReport:
     """Risk-metric change waterfall (VaR/ES drivers) — separate from P&L Explain (M4.4)."""
     return service.risk_change_attribution(request)
