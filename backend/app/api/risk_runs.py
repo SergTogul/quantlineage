@@ -5,9 +5,16 @@ Dual-mounted at ``/risk/runs`` and ``/api/v1/risk/runs`` (M7.2).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from app.api.deps import get_risk_run_worker
+from app.api.openapi_examples import (
+    RESP_RISK_RUN_CREATE,
+    RESP_RISK_RUN_GET,
+    RISK_RUN_CREATE_BODY_EXAMPLES,
+)
 from app.domain.models import RiskRunCreateRequest, RiskRunView
 from app.services.risk_run_service import RiskRunNotFound
 from app.services.risk_run_worker import RiskRunWorker
@@ -21,9 +28,13 @@ router = APIRouter(tags=["risk-runs"])
     status_code=status.HTTP_202_ACCEPTED,
     summary="Enqueue an async risk computation",
     response_description="Run accepted; poll GET /risk/runs/{id} for status/results.",
+    responses=RESP_RISK_RUN_CREATE,
 )
 def create_risk_run(
-    body: RiskRunCreateRequest,
+    body: Annotated[
+        RiskRunCreateRequest,
+        Body(openapi_examples=RISK_RUN_CREATE_BODY_EXAMPLES),
+    ],
     worker: RiskRunWorker = Depends(get_risk_run_worker),
 ) -> RiskRunView:
     """Create a QUEUED risk run and execute it on an in-process worker thread.
@@ -48,6 +59,7 @@ def create_risk_run(
     "/runs/{run_id}",
     response_model=RiskRunView,
     summary="Get risk-run status and results",
+    responses=RESP_RISK_RUN_GET,
 )
 def get_risk_run(
     run_id: str,
