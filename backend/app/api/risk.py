@@ -14,7 +14,15 @@ from app.api.openapi_examples import (
     RESP_WHAT_IF,
     WHAT_IF_BODY_EXAMPLES,
 )
-from app.domain.models import Portfolio, RiskQueryRequest, VaRMethodology, WhatIfRequest
+from app.domain.models import (
+    ESContributionReport,
+    Portfolio,
+    RiskQueryRequest,
+    VaRMethodology,
+    VaRReport,
+    WhatIfRequest,
+    WhatIfReport,
+)
 from app.services.portfolio_service import PortfolioService
 
 router = APIRouter(prefix="/risk", tags=["risk"])
@@ -39,6 +47,7 @@ def risk_factors(
 
 @router.post(
     "/var",
+    response_model=VaRReport,
     summary="Historical / parametric VaR report",
     responses=RESP_VAR,
 )
@@ -49,12 +58,13 @@ def risk_var(
     ],
     methodology: VaRMethodology = Query(default=VaRMethodology.DELTA_GAMMA),
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> VaRReport:
     return service.var_report(portfolio, methodology=methodology)
 
 
 @router.post(
     "/es",
+    response_model=ESContributionReport,
     summary="Expected Shortfall contributions",
     responses=RESP_ES,
 )
@@ -65,7 +75,7 @@ def risk_es(
     ],
     methodology: VaRMethodology = Query(default=VaRMethodology.DELTA_GAMMA),
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> ESContributionReport:
     """Historical Expected Shortfall contributions by position / book / desk / strategy / factor (M2.5)."""
     return service.es_contributions(portfolio, methodology=methodology)
 
@@ -82,6 +92,7 @@ def risk_var_compare(
 
 @router.post(
     "/what-if",
+    response_model=WhatIfReport,
     summary="Hypothetical trade what-if / incremental risk",
     responses=RESP_WHAT_IF,
 )
@@ -95,7 +106,7 @@ def risk_what_if(
         description="Optional override; defaults to request.methodology (DELTA_GAMMA).",
     ),
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> WhatIfReport:
     """Hypothetical add/remove/modify without mutating persisted portfolio (M2.9).
 
     Mounted at ``/risk/what-if`` and ``/api/v1/risk/what-if`` (M7.2 dual-mount).

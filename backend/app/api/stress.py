@@ -23,10 +23,14 @@ from app.api.openapi_examples import (
 )
 from app.domain.models import (
     CustomStressRequest,
+    HedgeComparisonReport,
     MultiFactorReverseStressRequest,
+    MultiFactorReverseStressResult,
     Portfolio,
     ReverseStressRequest,
+    ReverseStressResult,
     ScenarioComparisonRequest,
+    StressResult,
     StressScenario,
 )
 from app.services.portfolio_service import PortfolioService
@@ -36,6 +40,7 @@ router = APIRouter(prefix="/risk", tags=["stress"])
 
 @router.post(
     "/stress",
+    response_model=list[StressResult],
     summary="Baseline stress P&L",
     responses=RESP_STRESS,
 )
@@ -46,7 +51,7 @@ def risk_stress(
     ],
     scenarios: list[StressScenario] = Depends(get_baseline_stress_scenarios),
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> list[StressResult]:
     """Baseline stress P&L over DI DEFAULT scenarios (M5.9 follow-up)."""
     return service.stresses(portfolio, scenarios)
 
@@ -87,6 +92,7 @@ def risk_stress_evaluate_custom(
 
 @router.post(
     "/stress/reverse",
+    response_model=ReverseStressResult,
     summary="Single-factor reverse stress",
     responses=RESP_REVERSE,
 )
@@ -96,7 +102,7 @@ def risk_stress_reverse(
         Body(openapi_examples=REVERSE_BODY_EXAMPLES),
     ],
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> ReverseStressResult:
     return service.reverse_stress(
         request.portfolio,
         request.target_loss_pct,
@@ -107,6 +113,7 @@ def risk_stress_reverse(
 
 @router.post(
     "/stress/reverse/multi",
+    response_model=MultiFactorReverseStressResult,
     summary="Multi-factor reverse stress",
     responses=RESP_REVERSE_MULTI,
 )
@@ -116,7 +123,7 @@ def risk_stress_reverse_multi(
         Body(openapi_examples=REVERSE_MULTI_BODY_EXAMPLES),
     ],
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> MultiFactorReverseStressResult:
     return service.reverse_stress_multi(
         request.portfolio,
         request.target_loss_pct,
@@ -129,6 +136,7 @@ def risk_stress_reverse_multi(
 
 @router.post(
     "/stress/compare",
+    response_model=HedgeComparisonReport,
     summary="Hedge comparison (VaR/ES + scenario P&L)",
     responses=RESP_HEDGE_COMPARE,
 )
@@ -138,7 +146,7 @@ def risk_stress_compare(
         Body(openapi_examples=HEDGE_COMPARE_BODY_EXAMPLES),
     ],
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> HedgeComparisonReport:
     return service.compare_scenarios(
         request.portfolio,
         request.hedged_portfolio,
