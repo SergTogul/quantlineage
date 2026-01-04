@@ -122,7 +122,9 @@ def test_api_v1_alias_matches_unversioned(client, tiny_portfolio):
 def test_get_missing_run_404(client):
     resp = client.get("/risk/runs/does-not-exist")
     assert resp.status_code == 404
-    assert "not found" in resp.json()["detail"].lower()
+    body = resp.json()
+    assert body["code"] == "not_found"
+    assert "not found" in body["message"].lower()
 
 
 def test_unsupported_run_type_400(client, tiny_portfolio):
@@ -134,7 +136,7 @@ def test_unsupported_run_type_400(client, tiny_portfolio):
         },
     )
     assert resp.status_code == 400
-    assert "unsupported run_type" in resp.json()["detail"]
+    assert "unsupported run_type" in resp.json()["message"]
 
 
 def test_validation_rejects_empty_run_type(client, tiny_portfolio):
