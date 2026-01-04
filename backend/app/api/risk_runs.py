@@ -1,6 +1,6 @@
 """Async risk-run HTTP routes (M5.4).
 
-Mounted at ``/risk/runs`` until M7.2 moves the surface under ``/api/v1/risk/runs``.
+Dual-mounted at ``/risk/runs`` and ``/api/v1/risk/runs`` (M7.2).
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ def create_risk_run(
 ) -> RiskRunView:
     """Create a QUEUED risk run and execute it on an in-process worker thread.
 
-    Routes remain under ``/risk/*`` until M7.2 API versioning (``/api/v1``).
+    Available at ``/risk/runs`` and ``/api/v1/risk/runs`` (M7.2 dual-mount).
     Persistence: in-memory by default; SQLAlchemy when RISKFORGE_DATABASE_URL
     is set at app lifespan (M5.6). When RISKFORGE_EXTERNAL_WORKER=1 (Compose
     backend), the run stays QUEUED until ``python -m app.worker`` polls it (M5.7).

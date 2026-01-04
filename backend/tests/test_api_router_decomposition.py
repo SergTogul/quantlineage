@@ -23,7 +23,7 @@ _ROUTER_MODULES = (
     "app.api.risk_runs",
 )
 
-# Critical paths must remain registered (M7.2 versions under /api/v1 later).
+# Critical paths must remain registered (M7.2 also dual-mounts under /api/v1).
 _CRITICAL_PATHS = (
     ("GET", "/health"),
     ("GET", "/portfolio"),
@@ -45,6 +45,9 @@ _CRITICAL_PATHS = (
     ("POST", "/risk/runs"),
     ("GET", "/risk/runs/{run_id}"),
     ("POST", "/api/v1/risk/runs"),
+    ("GET", "/api/v1/health"),
+    ("GET", "/api/v1/portfolio"),
+    ("POST", "/api/v1/risk/summary"),
 )
 
 
