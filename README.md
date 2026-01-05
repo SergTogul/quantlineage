@@ -43,27 +43,35 @@ QuantLib currently handles the original equity option/bond/swap path. New produc
 
 ## Main API endpoints
 
+**Canonical prefix:** `/api/v1` (M7.6). Legacy unversioned paths remain dual-mounted
+and deprecated until the published sunset — see
+[`docs/api/v1_canonical_and_legacy_sunset.md`](docs/api/v1_canonical_and_legacy_sunset.md).
+
 ```text
-GET  /health
-GET  /portfolio
-POST /market/snapshot
-POST /risk/summary
-POST /risk/factors
-POST /risk/var
-POST /risk/hierarchy
-POST /risk/attribution
-POST /risk/attribution/demo
-POST /risk/contributors
-POST /risk/limits
-POST /risk/stress
-GET  /risk/stress/scenarios
-POST /risk/stress/evaluate
-POST /risk/stress/evaluate/custom
-POST /risk/stress/reverse
-POST /risk/stress/compare
-POST /risk/query
+GET  /api/v1/health
+GET  /api/v1/portfolio
+POST /api/v1/market/snapshot
+POST /api/v1/risk/summary
+POST /api/v1/risk/factors
+POST /api/v1/risk/var
+POST /api/v1/risk/hierarchy
+POST /api/v1/risk/attribution
+POST /api/v1/risk/attribution/demo
+POST /api/v1/risk/contributors
+POST /api/v1/risk/limits
+POST /api/v1/risk/stress
+GET  /api/v1/risk/stress/scenarios
+POST /api/v1/risk/stress/evaluate
+POST /api/v1/risk/stress/evaluate/custom
+POST /api/v1/risk/stress/reverse
+POST /api/v1/risk/stress/compare
+POST /api/v1/risk/query
+POST /api/v1/risk/runs
+GET  /api/v1/risk/runs/{run_id}
 ```
 
+Unversioned aliases (e.g. `/health`, `/risk/summary`) still work but return
+`Deprecation` / `Sunset` / `Link` headers pointing at the `/api/v1` successor.
 ## Run backend
 
 Requires **Python 3.12+** (`numpy>=2.3`). On macOS 13 where Homebrew Python 3.12 may not build, install via [uv](https://github.com/astral-sh/uv): `uv python install 3.12`.

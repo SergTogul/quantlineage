@@ -1,4 +1,4 @@
-"""RiskForge FastAPI application — wiring only (M7.1–M7.2 dual-mount; M7.5 errors)."""
+"""RiskForge FastAPI application — wiring only (M7.1–M7.2 dual-mount; M7.5–M7.6)."""
 
 from contextlib import asynccontextmanager
 
@@ -9,6 +9,7 @@ from app.api.attribution import router as attribution_router
 from app.api.deps import portfolio_service
 from app.api.errors import register_exception_handlers
 from app.api.health import router as health_router
+from app.api.legacy_deprecation import LegacyDeprecationMiddleware
 from app.api.limits import router as limits_router
 from app.api.market import router as market_router
 from app.api.portfolio import router as portfolio_router
@@ -76,11 +77,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# M7.6: Deprecation/Sunset/Link on legacy dual-mount only (canonical = /api/v1).
+app.add_middleware(LegacyDeprecationMiddleware)
 
 # M7.5: one error envelope for legacy and /api/v1 mounts.
 register_exception_handlers(app)
 
-# M7.1/M7.2: same handlers at legacy paths and /api/v1/... (UI may keep legacy).
+# M7.1/M7.2: same handlers at legacy paths and /api/v1/... (UI may keep legacy until M8).
 for _router in _DOMAIN_ROUTERS:
     app.include_router(_router)
     app.include_router(_router, prefix=API_V1_PREFIX)
