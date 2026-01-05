@@ -13,7 +13,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 4 — Hierarchy, Attribution & Limits | **COMPLETE** (2026-09-02 Lead Architect formal acceptance) |
 | Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA `postgres-persistence-smoke` green; M5.5 non-blocking polish remains) |
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
-| Milestone 7 — API Productionization | **PARTIAL** (M7.1–M7.5 DONE — dual-mount + typed models + OpenAPI examples + error model; M7.6 legacy sunset open) |
+| Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | PARTIAL (firm-root hierarchy; thin hedge/multi/risk-run helpers; risk-run poll card; no change-attr/ES panels) |
 | Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE — full CI green on GHA; M9.1–M9.5/M9.7/M9.10 still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
@@ -51,7 +51,7 @@ Trade (domain/models.py)
       ├─ HistoricalRiskEngine / VaRAnalytics  [LINEAR / DELTA_GAMMA / FULL_REVALUATION]
       ├─ StressEngine / ReverseStress / Compare
       ├─ Hierarchy / Attribution / Limits / Factors / Query
-  → PortfolioService → FastAPI (app/api/* routers; dual-mount legacy + /api/v1)
+  → PortfolioService → FastAPI (app/api/* routers; canonical `/api/v1` + deprecated legacy dual-mount)
   → React SPA (single page cards) / optional NativeScenarioKernel (LINEAR/Δ-Γ via RISKFORGE_SCENARIO_KERNEL)
 ```
 
@@ -60,7 +60,7 @@ Trade (domain/models.py)
 1. Caps/floors/swaptions still deferred; EquityVol/FXVol bumps do not rewrite surface grids; QL uses `BlackConstantVol` at point σ (not full surface engine); Builtin vs QL bond day-count gap
 2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 valuation LRU only (curve/scenario memo open — non-blocking polish)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
-4. M7.1–M7.5 DONE (router split + dual-mount `/api/v1` + typed response models + OpenAPI examples + `{code,message,details}` errors); M7.6 legacy sunset still open; formal `Scenario` not yet the stress HTTP wire type
+4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
 5. UI is one scroll dashboard: nav, heatmaps, hedge-compare page, risk-change attribution, ES contributions still missing (risk-run start/poll card landed M8.9)
 6. M9.9 **DONE** — full CI green on GHA runners (run 33673245125); static analysis (Ruff/mypy/ESLint) not started; E2E lags new endpoints
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
@@ -69,7 +69,7 @@ Trade (domain/models.py)
 
 | Check | Result |
 |-------|--------|
-| Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **513 passed** (2026-09-02 M7.3), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
+| Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **519 passed** (2026-09-02 M7.6), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
 | Frontend `npm test` | **26 passed**, 0 failed |
 | Frontend `npm run build` | **OK** (vite; 22 modules) |
 | M5 milestone | **COMPLETE** — M5.1/M9.9 GHA green (run 33673245125); M5.5 remains non-blocking polish |
@@ -77,6 +77,7 @@ Trade (domain/models.py)
 | M5.5 | **PARTIAL** (valuation LRU; curve/scenario memo open) |
 | M6.1–M6.7 | **DONE** (harness, baseline, risk-path wire, parallel pool, ABI+Historical parity, QL concurrency ADR) |
 | M6 milestone | **PARTIAL** — no rubber-stamp COMPLETE / no product VaR wall-time SLA |
+| M7 milestone | **COMPLETE** (2026-09-02) — M7.1–M7.6; legacy dual-mount remains until sunset removal gate |
 
 ---
 
@@ -240,7 +241,7 @@ Methodology-selectable VaR/ES with contribution reconciliation; what-if without 
 | Frontend `npm test` | **10 passed** |
 | Frontend `npm run build` | **OK** |
 | M2.5 API gap closed | `POST /risk/es` wired to `PortfolioService.es_contributions()` |
-| Known residual | Dual-mount `/api/v1` landed in M7.2; M7.6 legacy sunset still open |
+| Known residual | Dual-mount `/api/v1` + M7.6 sunset plan DONE; legacy paths remain until removal gate |
 
 ---
 
@@ -306,7 +307,7 @@ Flagship stress with typed multi-factor shocks, honest crisis labeling, reconcil
 | Frontend `npm run build` | **OK** |
 | Breaking API shape | `POST /risk/stress/compare` returns `HedgeComparisonReport` object (not bare `ScenarioComparison[]`); legacy per-scenario fields live under `scenarios[]` |
 | Multi-factor reverse limitations | Adverse orthant only; monotonicity assumed not proven; ray + coordinate descent is not a certified global optimum; assumptions echoed on result |
-| Known residual | Hedge-compare UI still absent (M8.5); dual-mount `/api/v1` (M7.2 DONE; M7.6 sunset open); formal `Scenario` not yet stress HTTP wire type (M3.8) |
+| Known residual | Hedge-compare UI still absent (M8.5); dual-mount + M7.6 sunset DONE (legacy still served); formal `Scenario` not yet stress HTTP wire type (M3.8) |
 | Hierarchy | Left untouched in M3 acceptance — M4.2 later fixed hierarchy↔stress via lazy import (no residual circular-import gap) |
 
 ### Follow-on tasks (discovered during M1–M5)
@@ -372,7 +373,7 @@ Firm→trade hierarchy with additive MV/Greek/stress reconciliation; P&L Explain
 | Known residual — risk-change attribution | Correlation residual is plug-to-total; not a structural corr model; linear/Greek market path when snapshot present |
 | Known residual — limits UI | Full limits / drill-down UX still M8; API + thin frontend helpers only |
 | Known residual — key-rate contributors | `limit_drilldown.contributors_for_metric` maps `key_rate_dv01` → position `dv01` (parallel), not tenor KR DV01 (M4.7) |
-| Known residual | Dual-mount `/api/v1` (M7.2 DONE; M7.6 sunset open); RiskRun persistence wiring still M5 |
+| Known residual | Dual-mount + M7.6 sunset DONE (legacy still served); RiskRun persistence wiring still M5 |
 | Hierarchy ↔ stress | Circular import fixed in M4.2 via lazy stress import — no open hierarchy/stress residual |
 
 ### Follow-on tasks (discovered during M1–M5)
@@ -495,7 +496,7 @@ Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRu
 
 ### Follow-on (post-COMPLETE; do not use to skip blocking items above)
 
-- [ ] M5.8 API versioning of risk-runs only under `/api/v1` (superseded by M7.2 full dual-mount; M7.6 may sunset legacy)
+- [x] M5.8 API versioning of risk-runs only under `/api/v1` — **superseded** by M7.2 full dual-mount; M7.6 documents `/api/v1` as canonical + legacy sunset (removal still gated)
 - [x] M5.9 Persist stress/scenario HTTP payloads via scenario_definitions DI once M5.6 closes — **DONE 2026-09-02**
   - ``GET /risk/stress/scenarios`` and ``POST /risk/stress/evaluate`` load via ``get_default_stress_scenarios`` → ``scenario_definition_repo`` (memory or SQLAlchemy seed)
   - ``POST /risk/stress`` uses ``get_baseline_stress_scenarios`` (DEFAULT-id filter on the same DI list; empty/missing → in-code ``DEFAULT_SCENARIOS``)
@@ -563,7 +564,7 @@ Lead Architect suite verify 2026-09-02: native path covered by green full backen
 
 ## Milestone 7 — API Productionization
 
-Status: **PARTIAL** (M7.1–M7.5 DONE 2026-09-02; M7.6 legacy sunset still open — do not claim COMPLETE)
+Status: **COMPLETE** (2026-09-02 — M7.1–M7.6 DONE; legacy unversioned paths remain dual-mounted until sunset removal gate)
 
 ### Tasks
 
@@ -594,33 +595,42 @@ Status: **PARTIAL** (M7.1–M7.5 DONE 2026-09-02; M7.6 legacy sunset still open 
   - Centralized in `app/api/errors.py` via `register_exception_handlers` (legacy + `/api/v1` share handlers)
   - Successful response schemas and PricingEngine seams unchanged; 500 message opaque (no exception leak)
   - Evidence: `tests/test_api_error_model.py`; risk-run `detail` assertions updated to `message`
-- [ ] M7.6 Complete `/api/v1` migration for all risk routes (beyond dual-mount)
-  - Why/evidence: dual-mount lands in M7.2; M7.6 = prefer/document `/api/v1` as canonical and plan legacy sunset
+- [x] M7.6 Complete `/api/v1` migration for all risk routes (beyond dual-mount) — DONE (2026-09-02, Backend/API)
+  - `/api/v1` documented as canonical (README + `docs/api/v1_canonical_and_legacy_sunset.md` + ADR 008)
+  - Dual-mount kept (non-breaking); legacy responses add `Deprecation` / `Sunset` / `Link` (successor-version)
+  - SPA still on unversioned paths by design — Frontend (08) migrates `api.js` as M8 follow-up
+  - Planned earliest legacy removal: **2027-03-02**, gated on UI migration + Lead Architect approval
+  - Evidence: `tests/test_api_legacy_deprecation.py`; dual-mount parity still covered by M7.2 tests
 
 ### Progress update (2026-09-02, Backend/API — M7.1)
 
 - Decomposed monolithic route handlers into charter-aligned APIRouter modules.
-- Milestone 7 remains **PARTIAL** — do not claim COMPLETE until M7.2–M7.6 land with evidence.
+- Milestone 7 remained **PARTIAL** until M7.2–M7.6 landed with evidence.
 
 ### Progress update (2026-09-02, Backend/API — M7.2)
 
 - Dual-mounted all public routers under `/api/v1` while preserving legacy unversioned paths.
-- Milestone 7 remains **PARTIAL** until M7.3–M7.6 criteria are met with evidence.
+- Milestone 7 remained **PARTIAL** until M7.3–M7.6 criteria were met with evidence.
 
 ### Progress update (2026-09-02, Backend/API — M7.5)
 
 - Centralized `{code, message, details}` error handlers on the FastAPI app (covers both mounts).
-- Milestone 7 remains **PARTIAL** — M7.3 typed models and M7.6 legacy sunset still open.
+- Milestone 7 remained **PARTIAL** until M7.3 typed models and M7.6 legacy sunset landed.
 
 ### Progress update (2026-09-02, Backend/API — M7.4)
 
 - Added OpenAPI request/response/error examples for critical risk endpoints (illustrative numbers only).
-- Milestone 7 remains **PARTIAL** — M7.3 typed models and M7.6 legacy sunset still open.
+- Milestone 7 remained **PARTIAL** until M7.3 typed models and M7.6 legacy sunset landed.
 
 ### Progress update (2026-09-02, Backend/API — M7.3)
 
 - Wired domain `response_model=` on critical VaR/ES/what-if/stress/reverse/multi/hedge/change-attr/limits-drilldown routes.
-- Milestone 7 remains **PARTIAL** — M7.6 `/api/v1` canonical + legacy sunset still open.
+- Milestone 7 remained **PARTIAL** until M7.6 `/api/v1` canonical + legacy sunset landed.
+
+### Progress update (2026-09-02, Backend/API — M7.6)
+
+- Documented `/api/v1` as canonical; published deprecate→remove sunset plan; added legacy-only Deprecation/Sunset/Link headers.
+- Milestone 7 marked **COMPLETE** (legacy paths intentionally still served until removal gate).
 
 ---
 
@@ -628,6 +638,11 @@ Status: **PARTIAL** (M7.1–M7.5 DONE 2026-09-02; M7.6 legacy sunset still open 
 ## Milestone 8 — Risk Terminal UI
 
 Status: PARTIAL (prototype SPA; firm-root hierarchy card + thin compare/multi API client helpers)
+
+### Follow-up from M7.6 (Backend → Frontend)
+
+- Migrate `frontend/src/api.js` from unversioned paths to `/api/v1/...` (low risk; bodies unchanged).
+- Keep E2E / helper tests green; ignore legacy Deprecation headers after cut-over.
 
 ### Tasks
 
@@ -712,8 +727,8 @@ Status: NOT STARTED
 - [ ] M12.1 Recruiter/interviewer README — PARTIAL (current README is MVP-oriented)
 - [ ] M12.2 Architecture documentation — PARTIAL (agent docs; no system diagrams package)
 - [ ] M12.3 ADRs under `docs/adr/` — PARTIAL
-  - Landed (2026-09-02, evidence-backed only): `001`–`006` plus `007-quantlib-concurrency.md` (M6.6)
-  - Not written yet (insufficient decided evidence / still open): e.g. RiskRun domain/API lifecycle (M5.2+), API versioning, VaR methodology modes, caching — do not invent ADRs ahead of code
+  - Landed (2026-09-02, evidence-backed only): `001`–`006` plus `007-quantlib-concurrency.md` (M6.6) and `008-api-v1-canonical-and-legacy-sunset.md` (M7.6)
+  - Not written yet (insufficient decided evidence / still open): e.g. RiskRun domain/API lifecycle (M5.2+), VaR methodology modes, caching — do not invent ADRs ahead of code
   - Native kernel risk-path wiring (M6.3) documented via env flag + native/README; no separate ADR unless Lead requests
 - [ ] M12.4 Methodology documentation — NOT STARTED
   - Must include honest multi-factor reverse-stress assumptions (M3.9) and VaR methodology modes

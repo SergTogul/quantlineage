@@ -71,7 +71,9 @@ export function limitDrilldown(portfolio, options = {}) {
 }
 
 /**
- * Enqueue async risk run → RiskRunView (202). Prefer `/api/v1` after M7.2.
+ * Enqueue async risk run → RiskRunView (202).
+ * Prefer `/api/v1/risk/runs` when migrating the SPA (M7.6 / Agent 08 follow-up);
+ * legacy `/risk/runs` remains dual-mounted until sunset.
  * Poll with getRiskRun(id) until COMPLETED / FAILED.
  */
 export function createRiskRun(portfolio, options = {}) {
