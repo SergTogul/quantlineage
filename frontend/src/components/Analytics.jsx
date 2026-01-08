@@ -108,7 +108,7 @@ export function RiskRuns({ portfolio }) {
   return (
     <div className="card">
       <h3>Risk Runs</h3>
-      <div className="muted">Async POST/GET /risk/runs — poll until COMPLETED or FAILED</div>
+      <div className="muted">Async POST/GET /api/v1/risk/runs — poll until COMPLETED or FAILED</div>
       <div className="inline-form risk-run-form">
         <select
           value={runType}
