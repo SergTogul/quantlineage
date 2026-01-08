@@ -59,12 +59,12 @@ and error envelopes (`{code, message, details}`) are unchanged on both mounts.
 | Phase | When | Action |
 |-------|------|--------|
 | **Deprecate** (this task) | 2026-09-02 (M7.6) | Document `/api/v1` as canonical; dual-mount kept; Deprecation/Sunset/Link on legacy |
-| **Migrate clients** | M8 Frontend follow-up | Point SPA `frontend/src/api.js` (and any other callers) at `/api/v1`; keep parity tests green |
+| **Migrate clients** | **DONE** 2026-09-02 (M8 Frontend) | SPA `frontend/src/api.js` uses `/api/v1`; legacy dual-mount kept for other callers |
 | **Remove legacy** | On/after **2027-03-02**, only with Lead Architect approval | Drop unversioned dual-mount; require `/api/v1` |
 
 Removal is **not** automatic on the Sunset date. Gates before unmounting legacy:
 
-1. Frontend Risk UX (Agent 08) migrated `api.js` (and E2E) to `/api/v1`.
+1. Frontend Risk UX (Agent 08) migrated `api.js` to `/api/v1` (**DONE** 2026-09-02). E2E / scripts / Compose smoke may still use legacy until updated.
 2. No remaining in-repo callers on unversioned paths (scripts, Compose smoke, docs examples updated).
 3. Lead Architect signs off on a breaking-change note in ROADMAP / release notes.
 
@@ -75,10 +75,8 @@ Removal is **not** automatic on the Sunset date. Gates before unmounting legacy:
 3. Optionally assert that canonical responses lack `Deprecation` / `Sunset`.
 4. After migration, ignore legacy paths; they will be removed in a later milestone.
 
-**Frontend note (M7.6):** The SPA may continue calling unversioned paths until
-Agent 08 migrates `api.js`. That is intentional and non-blocking for Milestone 7
-COMPLETE. Track as an M8 follow-up (low risk; prefer when touching API client
-tests).
+**Frontend note:** SPA `api.js` migrated to `/api/v1` (2026-09-02, M8). Legacy
+unversioned dual-mount remains until the removal gate above.
 
 ## Related
 

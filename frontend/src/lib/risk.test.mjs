@@ -4,6 +4,7 @@ import {
   topFactors, varMethod, hierarchyTradeCount, hierarchyCountByLevel, hierarchyPortfolio,
   hierarchySummary, hedgeComparisonSummary, reverseStressMultiSummary, scenarioPayload,
   attributionSummary, breachedLimits, limitDrilldownSummary,
+  spyFlatHedgePortfolio, defaultHedgeScenarios,
   riskRunStatus, riskRunStatusClass, isRiskRunTerminal, riskRunSummary, RISK_RUN_POLL_MS,
 } from './risk.mjs'
 
@@ -128,12 +129,14 @@ test('hedgeComparisonSummary normalizes HedgeComparisonReport object', () => {
     hedged_var_99: 88,
     base_expected_shortfall_99: 140,
     hedged_expected_shortfall_99: 132,
+    methodology: 'DELTA_GAMMA',
     scenarios: [{ scenario: 'Crash', base_pnl: -10, hedged_pnl: -5, improvement: 5 }],
     factor_exposure_changes: [{ factor: 'SPX', before: 1, after: 0.5, delta: -0.5 }],
   }
   const s = hedgeComparisonSummary(report)
   assert.equal(s.hedge_cost, 50)
   assert.equal(s.var_improvement, 12)
+  assert.equal(s.methodology, 'DELTA_GAMMA')
   assert.equal(s.scenarios.length, 1)
   assert.equal(s.factor_exposure_changes.length, 1)
 })
@@ -143,7 +146,34 @@ test('hedgeComparisonSummary shims legacy list shape', () => {
   const s = hedgeComparisonSummary(legacy)
   assert.equal(s.hedge_cost, null)
   assert.deepEqual(s.scenarios, legacy)
+  assert.equal(s.methodology, null)
   assert.equal(hedgeComparisonSummary(null), null)
+})
+
+test('spyFlatHedgePortfolio zeros SPY equity qty only (request helper)', () => {
+  const portfolio = {
+    id: 'demo',
+    name: 'Demo',
+    positions: [
+      { id: 'eq-1', type: 'equity', symbol: 'SPY', quantity: 100 },
+      { id: 'opt-1', type: 'equity_option', symbol: 'SPY', quantity: 10 },
+      { id: 'eq-2', type: 'equity', symbol: 'QQQ', quantity: 50 },
+    ],
+  }
+  const hedged = spyFlatHedgePortfolio(portfolio)
+  assert.equal(hedged.positions[0].quantity, 0)
+  assert.equal(hedged.positions[1].quantity, 10)
+  assert.equal(hedged.positions[2].quantity, 50)
+  assert.equal(portfolio.positions[0].quantity, 100)
+  assert.equal(spyFlatHedgePortfolio(null), null)
+  assert.deepEqual(spyFlatHedgePortfolio({ id: 'x' }).positions, [])
+})
+
+test('defaultHedgeScenarios is Crash equity −20% request payload', () => {
+  const s = defaultHedgeScenarios()
+  assert.equal(s.length, 1)
+  assert.equal(s[0].name, 'Crash')
+  assert.equal(s[0].equity_shock, -0.2)
 })
 
 test('reverseStressMultiSummary parses multi-factor result', () => {

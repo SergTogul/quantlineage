@@ -21,8 +21,8 @@ a single canonical prefix without breaking existing callers in this milestone.
 4. **Do not remove** legacy paths in M7.6. Planned earliest removal window:
    **2027-03-02**, gated on Frontend migration + Lead Architect sign-off
    (see ``docs/api/v1_canonical_and_legacy_sunset.md``).
-5. **SPA migration** to ``/api/v1`` is a Frontend (Agent 08) follow-up; leaving
-   the UI on legacy for M7.6 is acceptable and documented.
+5. **SPA migration** to ``/api/v1`` is a Frontend (Agent 08) follow-up (**DONE**
+   2026-09-02). Legacy dual-mount remains until the removal gate.
 
 ## Alternatives considered
 

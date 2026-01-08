@@ -1,3 +1,6 @@
+/** Canonical API prefix (M7.6 / M8). Bodies unchanged vs legacy dual-mount. */
+export const API_V1 = '/api/v1'
+
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 async function json(url, options = {}) {
@@ -7,27 +10,27 @@ async function json(url, options = {}) {
 }
 
 export async function loadDashboard() {
-  const portfolio = await json('/portfolio')
+  const portfolio = await json(`${API_V1}/portfolio`)
   const body = JSON.stringify(portfolio)
   const [summary, stress, threats, contributors, limits, factors, varReport, hierarchy, attribution] = await Promise.all([
-    json('/risk/summary', {method:'POST', body}), json('/risk/stress', {method:'POST', body}),
-    json('/risk/stress/evaluate', {method:'POST', body}), json('/risk/contributors', {method:'POST', body}),
-    json('/risk/limits', {method:'POST', body}), json('/risk/factors', {method:'POST', body}),
-    json('/risk/var', {method:'POST', body}), json('/risk/hierarchy', {method:'POST', body}),
-    json('/risk/attribution/demo', {method:'POST', body}),
+    json(`${API_V1}/risk/summary`, {method:'POST', body}), json(`${API_V1}/risk/stress`, {method:'POST', body}),
+    json(`${API_V1}/risk/stress/evaluate`, {method:'POST', body}), json(`${API_V1}/risk/contributors`, {method:'POST', body}),
+    json(`${API_V1}/risk/limits`, {method:'POST', body}), json(`${API_V1}/risk/factors`, {method:'POST', body}),
+    json(`${API_V1}/risk/var`, {method:'POST', body}), json(`${API_V1}/risk/hierarchy`, {method:'POST', body}),
+    json(`${API_V1}/risk/attribution/demo`, {method:'POST', body}),
   ])
   return {portfolio, summary, stress, threats, contributors, limits, factors, varReport, hierarchy, attribution}
 }
 
 export function evaluateCustomScenario(portfolio, scenario) {
-  return json('/risk/stress/evaluate/custom',{method:'POST',body:JSON.stringify({portfolio,scenarios:[scenario]})})
+  return json(`${API_V1}/risk/stress/evaluate/custom`,{method:'POST',body:JSON.stringify({portfolio,scenarios:[scenario]})})
 }
 export function reverseStress(portfolio, factor, target_loss_pct) {
-  return json('/risk/stress/reverse',{method:'POST',body:JSON.stringify({portfolio,factor,target_loss_pct})})
+  return json(`${API_V1}/risk/stress/reverse`,{method:'POST',body:JSON.stringify({portfolio,factor,target_loss_pct})})
 }
 /** Multi-factor reverse stress → MultiFactorReverseStressResult. */
 export function reverseStressMulti(portfolio, target_loss_pct, options = {}) {
-  return json('/risk/stress/reverse/multi', {
+  return json(`${API_V1}/risk/stress/reverse/multi`, {
     method: 'POST',
     body: JSON.stringify({
       portfolio,
@@ -44,20 +47,20 @@ export function reverseStressMulti(portfolio, target_loss_pct, options = {}) {
  * Use hedgeComparisonSummary() from risk.mjs to normalize for display.
  */
 export function compareHedge(portfolio, hedged_portfolio, scenarios, methodology = 'DELTA_GAMMA') {
-  return json('/risk/stress/compare', {
+  return json(`${API_V1}/risk/stress/compare`, {
     method: 'POST',
     body: JSON.stringify({ portfolio, hedged_portfolio, scenarios, methodology }),
   })
 }
 export function askRisk(portfolio, question) {
-  return json('/risk/query',{method:'POST',body:JSON.stringify({portfolio,question})})
+  return json(`${API_V1}/risk/query`,{method:'POST',body:JSON.stringify({portfolio,question})})
 }
 /**
  * Limit breach drill-down → LimitDrilldownReport.
  * Use limitDrilldownSummary() from risk.mjs to normalize for display.
  */
 export function limitDrilldown(portfolio, options = {}) {
-  return json('/risk/limits/drilldown', {
+  return json(`${API_V1}/risk/limits/drilldown`, {
     method: 'POST',
     body: JSON.stringify({
       portfolio,
@@ -72,12 +75,11 @@ export function limitDrilldown(portfolio, options = {}) {
 
 /**
  * Enqueue async risk run → RiskRunView (202).
- * Prefer `/api/v1/risk/runs` when migrating the SPA (M7.6 / Agent 08 follow-up);
- * legacy `/risk/runs` remains dual-mounted until sunset.
+ * Canonical: POST /api/v1/risk/runs (legacy dual-mount remains until sunset).
  * Poll with getRiskRun(id) until COMPLETED / FAILED.
  */
 export function createRiskRun(portfolio, options = {}) {
-  return json('/risk/runs', {
+  return json(`${API_V1}/risk/runs`, {
     method: 'POST',
     body: JSON.stringify({
       portfolio,
@@ -90,5 +92,5 @@ export function createRiskRun(portfolio, options = {}) {
 
 /** GET risk-run status / results by id → RiskRunView. */
 export function getRiskRun(runId) {
-  return json(`/risk/runs/${encodeURIComponent(runId)}`)
+  return json(`${API_V1}/risk/runs/${encodeURIComponent(runId)}`)
 }

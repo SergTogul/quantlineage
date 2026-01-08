@@ -89,6 +89,7 @@ export function hedgeComparisonSummary(report) {
       hedged_var_99: null,
       base_expected_shortfall_99: null,
       hedged_expected_shortfall_99: null,
+      methodology: null,
       scenarios: report,
       factor_exposure_changes: [],
     }
@@ -101,9 +102,30 @@ export function hedgeComparisonSummary(report) {
     hedged_var_99: report.hedged_var_99,
     base_expected_shortfall_99: report.base_expected_shortfall_99,
     hedged_expected_shortfall_99: report.hedged_expected_shortfall_99,
+    methodology: report.methodology ?? null,
     scenarios: report.scenarios || [],
     factor_exposure_changes: report.factor_exposure_changes || [],
   }
+}
+
+/**
+ * Request helper: clone portfolio with SPY equity quantity set to 0 (flat hedge demo).
+ * Does not compute risk — only builds the hedged_portfolio body for compare API.
+ */
+export function spyFlatHedgePortfolio(portfolio) {
+  if (!portfolio) return null
+  const positions = (portfolio.positions || []).map((p) => {
+    if (p?.symbol === 'SPY' && p?.type === 'equity') {
+      return { ...p, quantity: 0 }
+    }
+    return { ...p }
+  })
+  return { ...portfolio, positions }
+}
+
+/** Default stress scenarios for hedge-compare UI (API request payload only). */
+export function defaultHedgeScenarios() {
+  return [{ name: 'Crash', equity_shock: -0.2 }]
 }
 
 /** Thin display parse for MultiFactorReverseStressResult. */
