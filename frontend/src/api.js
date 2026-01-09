@@ -94,3 +94,41 @@ export function createRiskRun(portfolio, options = {}) {
 export function getRiskRun(runId) {
   return json(`${API_V1}/risk/runs/${encodeURIComponent(runId)}`)
 }
+
+/**
+ * Risk-metric change waterfall → RiskChangeAttributionReport (M8.10).
+ * Body: RiskChangeAttributionRequest (previous/current portfolio ± markets).
+ */
+export function changeAttribution(request) {
+  return json(`${API_V1}/risk/change-attribution`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+/**
+ * Expected Shortfall contributions → ESContributionReport (M8.11).
+ * Methodology is a query param (LINEAR | DELTA_GAMMA | FULL_REVALUATION).
+ */
+export function esContributions(portfolio, methodology = 'DELTA_GAMMA') {
+  const q = new URLSearchParams({ methodology })
+  return json(`${API_V1}/risk/es?${q}`, {
+    method: 'POST',
+    body: JSON.stringify(portfolio),
+  })
+}
+
+/**
+ * Side-by-side VaR methodologies → VaRMethodologyComparison (M8.12).
+ * Optional observations query (defaults server-side).
+ */
+export function compareVarMethodologies(portfolio, observations) {
+  const q =
+    observations != null && observations !== ''
+      ? `?observations=${encodeURIComponent(observations)}`
+      : ''
+  return json(`${API_V1}/risk/var/compare${q}`, {
+    method: 'POST',
+    body: JSON.stringify(portfolio),
+  })
+}
