@@ -6,6 +6,8 @@ import {
   attributionSummary, breachedLimits, limitDrilldownSummary,
   spyFlatHedgePortfolio, defaultHedgeScenarios,
   riskRunStatus, riskRunStatusClass, isRiskRunTerminal, riskRunSummary, RISK_RUN_POLL_MS,
+  spyScaledPortfolio, demoChangeAttributionRequest, riskChangeAttributionSummary,
+  esContributionSummary, ES_CONTRIBUTION_DIMENSIONS, varCompareSummary,
 } from './risk.mjs'
 
 test('money formats institutional-scale values',()=>{assert.equal(money(3_410_000),'$3.41M');assert.equal(money(-81_300),'-$81.3K')})
@@ -327,4 +329,117 @@ test('riskRunSummary passes RiskRunView fields through (no risk math)', () => {
   assert.equal(riskRunSummary(null), null)
   assert.equal(riskRunSummary({ id: 'x', status: 'FAILED', run_type: 'var', error_message: 'boom', results: [] }).error_message, 'boom')
   assert.equal(riskRunSummary({ id: 'x', status: 'QUEUED', run_type: 'var' }).result_count, 0)
+})
+
+test('spyScaledPortfolio scales SPY equity qty only (request helper)', () => {
+  const portfolio = {
+    id: 'demo',
+    positions: [
+      { id: 'eq-1', type: 'equity', symbol: 'SPY', quantity: 100 },
+      { id: 'opt-1', type: 'equity_option', symbol: 'SPY', quantity: 10 },
+      { id: 'eq-2', type: 'equity', symbol: 'QQQ', quantity: 50 },
+    ],
+  }
+  const scaled = spyScaledPortfolio(portfolio, 1.5)
+  assert.equal(scaled.positions[0].quantity, 150)
+  assert.equal(scaled.positions[1].quantity, 10)
+  assert.equal(scaled.positions[2].quantity, 50)
+  assert.equal(portfolio.positions[0].quantity, 100)
+  assert.equal(spyScaledPortfolio(null), null)
+})
+
+test('demoChangeAttributionRequest builds previous→SPY×scale current', () => {
+  const portfolio = {
+    id: 'demo',
+    positions: [{ id: 'eq-1', type: 'equity', symbol: 'SPY', quantity: 100 }],
+  }
+  const req = demoChangeAttributionRequest(portfolio, {
+    metric: 'expected_shortfall_99',
+    methodology: 'LINEAR',
+    scale: 2,
+  })
+  assert.equal(req.previous_portfolio, portfolio)
+  assert.equal(req.current_portfolio.positions[0].quantity, 200)
+  assert.equal(req.metric, 'expected_shortfall_99')
+  assert.equal(req.methodology, 'LINEAR')
+  assert.equal(demoChangeAttributionRequest(null), null)
+  assert.equal(demoChangeAttributionRequest(portfolio).metric, 'var_99')
+  assert.equal(demoChangeAttributionRequest(portfolio).methodology, 'DELTA_GAMMA')
+})
+
+test('riskChangeAttributionSummary passes drivers / delta_risk through', () => {
+  const report = {
+    metric: 'var_99',
+    previous_risk: 100,
+    current_risk: 130,
+    total_change: 30,
+    explained_change: 28,
+    residual: 2,
+    items: [
+      { driver: 'New trades', delta_risk: 20 },
+      { driver: 'Equity moves', delta_risk: 8 },
+      { driver: 'Correlation / residual', delta_risk: 2 },
+    ],
+  }
+  const s = riskChangeAttributionSummary(report)
+  assert.equal(s.metric, 'var_99')
+  assert.equal(s.total_change, 30)
+  assert.equal(s.residual, 2)
+  assert.deepEqual(s.drivers, ['New trades', 'Equity moves', 'Correlation / residual'])
+  assert.equal(s.items[0].delta_risk, 20)
+  assert.equal(riskChangeAttributionSummary(null), null)
+})
+
+test('esContributionSummary slices dimension and recon error', () => {
+  const report = {
+    portfolio_id: 'demo',
+    methodology: 'DELTA_GAMMA',
+    confidence: 0.99,
+    portfolio_var: 100,
+    portfolio_es: 140,
+    by_position: [
+      { key: 'a', label: 'A', component_es: 80, contribution_pct: 57.1 },
+      { key: 'b', label: 'B', component_es: 60, contribution_pct: 42.9 },
+    ],
+    by_book: [{ key: 'Equity', label: 'Equity', component_es: 140, contribution_pct: 100 }],
+    by_strategy: [],
+    by_desk: [],
+    by_risk_factor: [{ key: 'equity', label: 'Equity', component_es: 120, contribution_pct: 85.7 }],
+    reconciliation_error_position: 0.01,
+    reconciliation_error_book: 0,
+    reconciliation_error_strategy: 0,
+    reconciliation_error_desk: 0,
+    reconciliation_error_risk_factor: 0.5,
+  }
+  const pos = esContributionSummary(report, 'by_position', 1)
+  assert.equal(pos.dimension, 'by_position')
+  assert.equal(pos.items.length, 1)
+  assert.equal(pos.item_count, 2)
+  assert.equal(pos.portfolio_es, 140)
+  assert.equal(pos.reconciliation_error, 0.01)
+  const factor = esContributionSummary(report, 'by_risk_factor')
+  assert.equal(factor.items[0].key, 'equity')
+  assert.equal(factor.reconciliation_error, 0.5)
+  assert.equal(esContributionSummary(null), null)
+  assert.equal(esContributionSummary(report, 'bogus').dimension, 'by_position')
+  assert.ok(ES_CONTRIBUTION_DIMENSIONS.includes('by_desk'))
+})
+
+test('varCompareSummary passes methodology rows through', () => {
+  const report = {
+    portfolio_id: 'demo',
+    observations: 40,
+    results: [
+      { methodology: 'LINEAR', var_95: 10, var_99: 15, expected_shortfall_99: 20, runtime_ms: 1.2 },
+      { methodology: 'DELTA_GAMMA', var_95: 11, var_99: 16, expected_shortfall_99: 21, runtime_ms: 1.5 },
+      { methodology: 'FULL_REVALUATION', var_95: 12, var_99: 17, expected_shortfall_99: 22, runtime_ms: 8 },
+    ],
+  }
+  const s = varCompareSummary(report)
+  assert.equal(s.portfolio_id, 'demo')
+  assert.equal(s.observations, 40)
+  assert.equal(s.results.length, 3)
+  assert.equal(s.results[2].methodology, 'FULL_REVALUATION')
+  assert.equal(varCompareSummary(null), null)
+  assert.equal(varCompareSummary({ portfolio_id: 'x' }).results.length, 0)
 })

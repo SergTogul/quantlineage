@@ -5,3 +5,9 @@
 .limit-drilldown{margin-top:14px;padding-top:12px;border-top:1px solid #233040}.limit-drilldown .card-title-row{align-items:center}.limit-drilldown button{padding:8px 12px;font-size:12px}.limit-drilldown button:disabled{opacity:.6;cursor:default}.limit-drilldown .error{margin-top:10px;padding:10px;font-size:13px}.limit-drilldown-item{margin-top:12px;display:grid;gap:6px}.limit-drilldown-item strong{font-size:13px}
 .risk-run-form{margin-top:12px}.risk-run-form select{max-width:140px}.risk-run-status{margin-top:14px;padding-top:12px;border-top:1px solid #233040}.risk-run-error{margin-top:10px;padding:10px;font-size:13px}button:disabled{opacity:.6;cursor:default}
 .hedge-compare-result{margin-top:14px;padding-top:12px;border-top:1px solid #233040}.hedge-compare-result table{margin-top:12px}.risk-run-form select[aria-label="hedge methodology"]{max-width:180px}
+.risk-panel-result{margin-top:14px;padding-top:12px;border-top:1px solid #233040}.risk-panel-result table{margin-top:12px}
+.risk-run-form select[aria-label="change attribution metric"],
+.risk-run-form select[aria-label="change attribution methodology"],
+.risk-run-form select[aria-label="es methodology"],
+.risk-run-form select[aria-label="es dimension"]{max-width:180px}
+.risk-run-form label{font-size:11px;color:#8ea0b5}.risk-run-form label input{max-width:100px}

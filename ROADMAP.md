@@ -14,7 +14,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA `postgres-persistence-smoke` green; M5.5 non-blocking polish remains) |
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
-| Milestone 8 — Risk Terminal UI | PARTIAL (SPA on `/api/v1`; hedge-compare card; firm-root hierarchy; risk-run poll; no change-attr/ES/VaR-compare panels) |
+| Milestone 8 — Risk Terminal UI | PARTIAL (SPA on `/api/v1`; hedge-compare; risk-run poll; change-attr/ES/VaR-compare panels; no nav/heatmaps) |
 | Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE — full CI green on GHA; M9.1–M9.5/M9.7/M9.10 still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
@@ -637,7 +637,7 @@ Status: **COMPLETE** (2026-09-02 — M7.1–M7.6 DONE; legacy unversioned paths 
 
 ## Milestone 8 — Risk Terminal UI
 
-Status: PARTIAL (SPA on `/api/v1`; hedge-compare card; firm-root hierarchy + thin helpers; risk-run poll)
+Status: PARTIAL (SPA on `/api/v1`; hedge-compare; firm-root hierarchy; risk-run poll; change-attr / ES / VaR-compare panels)
 
 ### Follow-up from M7.6 (Backend → Frontend)
 
@@ -662,12 +662,18 @@ Status: PARTIAL (SPA on `/api/v1`; hedge-compare card; firm-root hierarchy + thi
   - Dashboard `RiskRuns` card: run_type select, start, poll QUEUED→RUNNING→COMPLETED/FAILED
   - Display helpers: `riskRunStatus` / `riskRunStatusClass` / `isRiskRunTerminal` / `riskRunSummary` (no client risk math)
   - Evidence: `frontend/src/lib/risk.test.mjs`
-- [ ] M8.10 Risk change attribution UI panel
-  - Why/evidence: `POST /risk/change-attribution` + `Attribution` P&L panel exist; **no** risk-change waterfall UI / API client
-- [ ] M8.11 ES contributions UI panel
-  - Why/evidence: `POST /risk/es` wired (M2.5); frontend has no ES contribution consumer
-- [ ] M8.12 VaR methodology compare UI (`POST /risk/var/compare`)
-  - Why/evidence: M2.4 API exists; terminal does not surface Linear / Δ-Γ / Full-reval comparison
+- [x] M8.10 Risk change attribution UI panel — DONE (2026-09-02)
+  - `changeAttribution` → `POST /api/v1/risk/change-attribution`; `demoChangeAttributionRequest` / `spyScaledPortfolio` / `riskChangeAttributionSummary`
+  - Dashboard card: metric + methodology selects; SPY×1.5 demo; waterfall table (API display only)
+  - Evidence: `frontend/src/lib/risk.test.mjs`
+- [x] M8.11 ES contributions UI panel — DONE (2026-09-02)
+  - `esContributions` → `POST /api/v1/risk/es`; `esContributionSummary` / dimension slice
+  - Dashboard card: methodology + dimension selects; component ES / contrib % table
+  - Evidence: `frontend/src/lib/risk.test.mjs`
+- [x] M8.12 VaR methodology compare UI (`POST /risk/var/compare`) — DONE (2026-09-02)
+  - `compareVarMethodologies` → `POST /api/v1/risk/var/compare`; `varCompareSummary`
+  - Dashboard card: optional observations; LINEAR / Δ-Γ / Full-reval table + runtime_ms
+  - Evidence: `frontend/src/lib/risk.test.mjs`
 
 ---
 
