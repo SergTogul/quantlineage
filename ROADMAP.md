@@ -14,7 +14,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA `postgres-persistence-smoke` green; M5.5 non-blocking polish remains) |
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
-| Milestone 8 — Risk Terminal UI | PARTIAL (SPA on `/api/v1`; hedge-compare; risk-run poll; change-attr/ES/VaR-compare panels; no nav/heatmaps) |
+| Milestone 8 — Risk Terminal UI | PARTIAL (SPA on `/api/v1`; main nav; hedge-compare; risk-run poll; analytics panels; no heatmaps) |
 | Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE — full CI green on GHA; M9.1–M9.5/M9.7/M9.10 still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
@@ -637,7 +637,7 @@ Status: **COMPLETE** (2026-09-02 — M7.1–M7.6 DONE; legacy unversioned paths 
 
 ## Milestone 8 — Risk Terminal UI
 
-Status: PARTIAL (SPA on `/api/v1`; hedge-compare; firm-root hierarchy; risk-run poll; change-attr / ES / VaR-compare panels)
+Status: PARTIAL (SPA on `/api/v1`; main nav M8.1; hedge-compare; firm-root hierarchy; risk-run poll; change-attr / ES / VaR-compare panels; heatmaps still open)
 
 ### Follow-up from M7.6 (Backend → Frontend)
 
@@ -646,7 +646,10 @@ Status: PARTIAL (SPA on `/api/v1`; hedge-compare; firm-root hierarchy; risk-run 
 
 ### Tasks
 
-- [ ] M8.1 Main application navigation — NOT STARTED (single scroll page)
+- [x] M8.1 Main application navigation — DONE (2026-09-02)
+  - Sticky terminal sidebar (`AppNav`) + hash routing (`#overview` … `#risk-runs`)
+  - Section map matches Frontend charter targets; panels grouped (overview / portfolio / factors / VaR&ES / stress / scenario / P&L / limits / runs)
+  - Pure helpers in `lib/nav.mjs`; evidence `lib/nav.test.mjs` (no client risk math)
 - [ ] M8.2 Overview dashboard — PARTIAL
 - [ ] M8.3 Risk heatmaps — NOT STARTED
 - [ ] M8.4 Scenario Builder — PARTIAL

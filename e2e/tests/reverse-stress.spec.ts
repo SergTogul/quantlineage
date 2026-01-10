@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('Reverse Stress', () => {
   test('solves for required equity shock', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/#stress')
     await expect(page.getByRole('heading', { name: 'Global Macro Demo' })).toBeVisible()
 
     const card = page.locator('.card', { has: page.getByRole('heading', { name: 'Reverse Stress' }) })
