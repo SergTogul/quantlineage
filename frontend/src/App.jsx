@@ -8,6 +8,9 @@ import {
   VaRAnalytics, VaRCompare,
 } from './components/Analytics'
 import { HedgeCompare, ReverseStress, RiskQuery, ScenarioBuilder } from './components/ScenarioBuilder'
+import {
+  FactorExposureHeatmap, HierarchyRiskHeatmap, LimitUtilizationHeatmap, StressPnlHeatmap,
+} from './components/Heatmaps'
 import { money, stressSummary } from './lib/risk.mjs'
 import { hashForSection, navSectionById, sectionFromHash } from './lib/nav.mjs'
 import './styles.css'
@@ -93,6 +96,7 @@ export default function App() {
         <SectionFrame id="portfolio">
           <div className="grid">
             <Hierarchy node={hierarchy} />
+            <HierarchyRiskHeatmap node={hierarchy} />
             <div className="card wide">
               <h3>Positions</h3>
               <table>
@@ -118,7 +122,10 @@ export default function App() {
     case 'risk-factors':
       body = (
         <SectionFrame id="risk-factors">
-          <div className="grid"><RiskFactors items={factors} /></div>
+          <div className="grid">
+            <RiskFactors items={factors} />
+            <FactorExposureHeatmap items={factors} />
+          </div>
         </SectionFrame>
       )
       break
@@ -139,6 +146,7 @@ export default function App() {
       body = (
         <SectionFrame id="stress">
           <div className="grid">
+            <StressPnlHeatmap items={stress} />
             <Stress items={stress} />
             <ThreatScenarios report={threats} />
             <ReverseStress portfolio={portfolio} />
@@ -167,7 +175,10 @@ export default function App() {
     case 'limits':
       body = (
         <SectionFrame id="limits">
-          <div className="grid"><Limits items={limits} portfolio={portfolio} /></div>
+          <div className="grid">
+            <LimitUtilizationHeatmap items={limits} />
+            <Limits items={limits} portfolio={portfolio} />
+          </div>
         </SectionFrame>
       )
       break
@@ -184,6 +195,8 @@ export default function App() {
           {metrics}
           <div className="grid">
             <RiskFactors items={factors} />
+            <FactorExposureHeatmap items={factors} />
+            <HierarchyRiskHeatmap node={hierarchy} />
             <VaRAnalytics report={varReport} />
             <Contributors items={contributors} />
             <Limits items={limits} portfolio={portfolio} />

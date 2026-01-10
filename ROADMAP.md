@@ -14,7 +14,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA `postgres-persistence-smoke` green; M5.5 non-blocking polish remains) |
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
-| Milestone 8 — Risk Terminal UI | PARTIAL (SPA on `/api/v1`; main nav; hedge-compare; risk-run poll; analytics panels; no heatmaps) |
+| Milestone 8 — Risk Terminal UI | PARTIAL (SPA on `/api/v1`; main nav; heatmaps; hedge-compare; risk-run poll; analytics panels; overview/scenario/drill-down/P&L/limits still open) |
 | Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE — full CI green on GHA; M9.1–M9.5/M9.7/M9.10 still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
@@ -61,7 +61,7 @@ Trade (domain/models.py)
 2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 valuation LRU only (curve/scenario memo open — non-blocking polish)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
-5. UI is one scroll dashboard: nav, heatmaps, risk-change attribution, ES contributions, VaR methodology compare still missing (hedge-compare card + risk-run poll landed)
+5. UI still PARTIAL: overview dashboard, scenario builder polish, hierarchy drill-down, P&L explain, full limits UX open (nav + heatmaps + hedge-compare + risk-run poll + change-attr / ES / VaR-compare landed)
 6. M9.9 **DONE** — full CI green on GHA runners (run 33673245125); static analysis (Ruff/mypy/ESLint) not started; E2E lags new endpoints
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
 
@@ -637,7 +637,7 @@ Status: **COMPLETE** (2026-09-02 — M7.1–M7.6 DONE; legacy unversioned paths 
 
 ## Milestone 8 — Risk Terminal UI
 
-Status: PARTIAL (SPA on `/api/v1`; main nav M8.1; hedge-compare; firm-root hierarchy; risk-run poll; change-attr / ES / VaR-compare panels; heatmaps still open)
+Status: PARTIAL (SPA on `/api/v1`; main nav M8.1; heatmaps M8.3; hedge-compare; firm-root hierarchy; risk-run poll; change-attr / ES / VaR-compare panels; overview / scenario / drill-down / P&L / limits still open)
 
 ### Follow-up from M7.6 (Backend → Frontend)
 
@@ -651,7 +651,10 @@ Status: PARTIAL (SPA on `/api/v1`; main nav M8.1; hedge-compare; firm-root hiera
   - Section map matches Frontend charter targets; panels grouped (overview / portfolio / factors / VaR&ES / stress / scenario / P&L / limits / runs)
   - Pure helpers in `lib/nav.mjs`; evidence `lib/nav.test.mjs` (no client risk math)
 - [ ] M8.2 Overview dashboard — PARTIAL
-- [ ] M8.3 Risk heatmaps — NOT STARTED
+- [x] M8.3 Risk heatmaps — DONE (2026-09-02)
+  - Display-only color scales in `lib/heatmap.mjs` (diverging / sequential / utilization); unit tests in `heatmap.test.mjs`
+  - Hierarchy VaR/ES/NAV tiles (`POST /risk/hierarchy`), factor×bucket matrix (`/risk/factors`), stress P&L tiles (`/risk/stress`), limit utilization tiles (`/risk/limits`)
+  - Placed under Portfolio / Risk Factors / Stress / Limits (+ overview teaser); no client risk formulas
 - [ ] M8.4 Scenario Builder — PARTIAL
 - [x] M8.5 Before/after hedge workflow — DONE (2026-09-02)
   - `compareHedge` → `POST /api/v1/risk/stress/compare`; `hedgeComparisonSummary` / `spyFlatHedgePortfolio` / `defaultHedgeScenarios`
