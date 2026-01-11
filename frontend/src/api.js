@@ -74,6 +74,25 @@ export function limitDrilldown(portfolio, options = {}) {
 }
 
 /**
+ * P&L Explain → AttributionReport (M4.3 / M8.7).
+ * Body: AttributionRequest (previous/current portfolio ± markets, optional dt_years).
+ */
+export function explainPnL(request) {
+  return json(`${API_V1}/risk/attribution`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+/** Illustrative market-move demo → AttributionReport via POST /risk/attribution/demo. */
+export function explainPnLDemo(portfolio) {
+  return json(`${API_V1}/risk/attribution/demo`, {
+    method: 'POST',
+    body: JSON.stringify(portfolio),
+  })
+}
+
+/**
  * Enqueue async risk run → RiskRunView (202).
  * Canonical: POST /api/v1/risk/runs (legacy dual-mount remains until sunset).
  * Poll with getRiskRun(id) until COMPLETED / FAILED.

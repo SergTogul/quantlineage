@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react'
 import {
-  changeAttribution, compareVarMethodologies, createRiskRun, esContributions, getRiskRun,
+  changeAttribution, compareVarMethodologies, createRiskRun, esContributions, explainPnL,
+  explainPnLDemo, getRiskRun,
 } from '../api'
 import {
-  money, topFactors, varMethod, hierarchySummary, attributionSummary,
+  money, topFactors, varMethod, hierarchySummary, hierarchyNodeAtPath, hierarchyChildRows,
+  hierarchyNodeMetrics, attributionSummary,
   isRiskRunTerminal, riskRunStatus, riskRunStatusClass, riskRunSummary, RISK_RUN_POLL_MS,
-  demoChangeAttributionRequest, riskChangeAttributionSummary,
+  demoChangeAttributionRequest, riskChangeAttributionSummary, demoPnLAttributionRequest,
   esContributionSummary, ES_CONTRIBUTION_DIMENSIONS, varCompareSummary,
 } from '../lib/risk.mjs'
 
 const RISK_RUN_TYPES = ['summary', 'var', 'stress', 'factors', 'limits', 'hierarchy', 'contributors']
 const VAR_METHODS = ['LINEAR', 'DELTA_GAMMA', 'FULL_REVALUATION']
 const CHANGE_ATTR_METRICS = ['var_99', 'var_95', 'expected_shortfall_99']
+const PNL_MODES = [
+  { id: 'position', label: 'SPY×1.5 position change (/attribution)' },
+  { id: 'market_demo', label: 'Illustrative market move (/attribution/demo)' },
+]
 
 const ES_DIM_LABELS = {
   by_position: 'Position',
@@ -23,50 +29,224 @@ const ES_DIM_LABELS = {
 
 export function RiskFactors({items}) { return <div className="card"><h3>Risk Factors</h3><table><thead><tr><th>Factor</th><th>Bucket</th><th>Exposure</th></tr></thead><tbody>{topFactors(items).map(x=><tr key={`${x.factor}-${x.bucket}`}><td>{x.factor}<div className="muted">{x.factor_type}</div></td><td>{x.bucket}</td><td>{money(x.exposure)}</td></tr>)}</tbody></table></div> }
 export function VaRAnalytics({report}) { const h=varMethod(report,'historical'),p=varMethod(report,'parametric'); return <div className="card"><h3>VaR / Expected Shortfall</h3><table><thead><tr><th>Method</th><th>99% VaR</th><th>ES</th></tr></thead><tbody>{[h,p].filter(Boolean).map(x=><tr key={x.method}><td>{x.method}</td><td>{money(x.var)}</td><td>{money(x.expected_shortfall)}</td></tr>)}</tbody></table><div className="muted foot">{report.contributions.length} component-risk contributions calculated</div></div> }
-export function Hierarchy({node}) {
-  const s = hierarchySummary(node)
-  if (!s) return <div className="card"><h3>Portfolio Hierarchy</h3><div className="muted">No hierarchy loaded</div></div>
-  const title = s.firmName && s.portfolioName ? `${s.firmName} → ${s.portfolioName}` : s.rootName
+
+/**
+ * M8.6: Firm→trade hierarchy drill-down. Metrics from selected API node only.
+ */
+export function Hierarchy({ node }) {
+  const [path, setPath] = useState([])
+  const resolved = hierarchyNodeAtPath(node, path)
+  const selected = resolved?.node
+  const metrics = hierarchyNodeMetrics(selected)
+  const children = hierarchyChildRows(selected)
+  const summary = hierarchySummary(node)
+
+  if (!node || !resolved) {
+    return <div className="card wide"><h3>Portfolio Hierarchy</h3><div className="muted">No hierarchy loaded</div></div>
+  }
+
   return (
-    <div className="card">
+    <div className="card wide">
       <h3>Portfolio Hierarchy</h3>
-      <div className="hierarchy">
-        <strong>{title}</strong>
-        <span>{s.desks} desks · {s.strategies} strategies · {s.books} books · {s.trades} trades</span>
-        <span>NAV {money(s.market_value ?? 0)} · 99% VaR {money(s.var_99 ?? 0)} · ES {money(s.expected_shortfall_99 ?? 0)}</span>
-        <span>Δ {money(s.delta ?? 0)} · ν {money(s.vega ?? 0)} · DV01 {money(s.dv01 ?? 0)}</span>
+      <div className="muted">
+        Drill Firm → Portfolio → Desk → Strategy → Book → Trade — node metrics from API
+        {summary ? ` · book has ${summary.desks} desks / ${summary.trades} trades` : ''}
       </div>
+      <nav className="hierarchy-crumb" aria-label="Hierarchy path">
+        {resolved.trail.map((n, i) => {
+          const atEnd = i === resolved.trail.length - 1
+          const crumbPath = path.slice(0, i)
+          return (
+            <span key={`${n.level}-${n.name}-${i}`}>
+              {i > 0 && <span className="hierarchy-crumb-sep">→</span>}
+              {atEnd
+                ? <strong>{n.name}</strong>
+                : (
+                  <button type="button" className="hierarchy-crumb-btn" onClick={() => setPath(crumbPath)}>
+                    {n.name}
+                  </button>
+                )}
+              <span className="muted hierarchy-crumb-level">{n.level}</span>
+            </span>
+          )
+        })}
+      </nav>
+      {metrics && (
+        <div className="hierarchy-metrics">
+          <span>NAV <strong>{money(metrics.market_value ?? 0)}</strong></span>
+          <span>99% VaR <strong>{money(metrics.var_99 ?? 0)}</strong></span>
+          <span>ES <strong>{money(metrics.expected_shortfall_99 ?? 0)}</strong></span>
+          <span>Δ {money(metrics.delta ?? 0)}</span>
+          <span>ν {money(metrics.vega ?? 0)}</span>
+          <span>DV01 {money(metrics.dv01 ?? 0)}</span>
+          {metrics.path ? <span className="muted">{metrics.path}</span> : null}
+        </div>
+      )}
+      {children.length === 0
+        ? <div className="muted foot">Leaf node — no children</div>
+        : (
+          <table className="hierarchy-children">
+            <thead>
+              <tr>
+                <th>Child</th>
+                <th>Level</th>
+                <th>NAV</th>
+                <th>99% VaR</th>
+                <th>ES</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {children.map((c) => (
+                <tr key={`${c.level}-${c.name}-${c.index}`}>
+                  <td>{c.name}</td>
+                  <td className="muted">{c.level}</td>
+                  <td>{money(c.market_value ?? 0)}</td>
+                  <td>{money(c.var_99 ?? 0)}</td>
+                  <td>{money(c.expected_shortfall_99 ?? 0)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="hierarchy-drill-btn"
+                      onClick={() => setPath([...path, c.index])}
+                    >
+                      {c.child_count === 0 ? 'Select' : 'Drill'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
     </div>
   )
 }
 
-export function Attribution({report}) {
+/**
+ * M8.7: P&L Explain wired to POST /risk/attribution (and optional /attribution/demo).
+ * Displays AttributionReport from API only — no client risk math.
+ */
+export function Attribution({ portfolio, initialReport = null }) {
+  const [mode, setMode] = useState('position')
+  const [scale, setScale] = useState(1.5)
+  const [dtYears, setDtYears] = useState(0)
+  const [report, setReport] = useState(initialReport)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [source, setSource] = useState(initialReport ? 'dashboard' : null)
+
   const s = attributionSummary(report)
-  if (!s) return <div className="card"><h3>P&amp;L Explain</h3><div className="muted">No attribution loaded</div></div>
+
+  async function run() {
+    if (!portfolio) return
+    setLoading(true)
+    setError('')
+    try {
+      if (mode === 'market_demo') {
+        const next = await explainPnLDemo(portfolio)
+        setReport(next)
+        setSource('demo')
+      } else {
+        const request = demoPnLAttributionRequest(portfolio, {
+          scale: Number(scale) || 1.5,
+          dt_years: Number(dtYears) || 0,
+        })
+        const next = await explainPnL(request)
+        setReport(next)
+        setSource('attribution')
+      }
+    } catch (e) {
+      setError(e.message || 'Attribution failed')
+      setReport(null)
+      setSource(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="card">
+    <div className="card wide">
       <h3>P&amp;L Explain</h3>
-      <div className="muted">Illustrative previous market snapshot → current marks</div>
-      {s.items.length === 0
-        ? <div className="muted foot">No drivers returned</div>
-        : (
-          <table>
-            <thead><tr><th>Driver</th><th>P&amp;L</th></tr></thead>
-            <tbody>{s.items.map((x) => (
-              <tr key={x.driver}>
-                <td>{x.driver}</td>
-                <td className={x.pnl < 0 ? 'negative' : 'positive'}>{money(x.pnl)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        )}
-      <div className="attribution-total">
-        <span>Total change <strong>{money(s.total_change)}</strong></span>
-        <span>Explained {money(s.explained_change ?? 0)}</span>
-        <span className={`attribution-residual ${(s.residual ?? 0) < 0 ? 'negative' : 'positive'}`}>
-          Residual <strong>{money(s.residual ?? 0)}</strong>
-        </span>
+      <div className="muted">
+        Market / trade-flow bridge from AttributionEngine — POST /api/v1/risk/attribution
+        (demo endpoint optional for illustrative marks)
       </div>
+      <div className="inline-form risk-run-form pnl-explain-form">
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value)}
+          aria-label="pnl explain mode"
+          disabled={loading}
+        >
+          {PNL_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
+        {mode === 'position' && (
+          <>
+            <label className="muted">
+              SPY scale
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={scale}
+                onChange={(e) => setScale(e.target.value)}
+                aria-label="pnl spy scale"
+                disabled={loading}
+              />
+            </label>
+            <label className="muted">
+              dt years
+              <input
+                type="number"
+                step="0.001"
+                min="0"
+                value={dtYears}
+                onChange={(e) => setDtYears(e.target.value)}
+                aria-label="pnl dt years"
+                disabled={loading}
+              />
+            </label>
+          </>
+        )}
+        <button type="button" onClick={run} disabled={!portfolio || loading}>
+          {loading ? 'Explaining…' : 'Run P&L explain'}
+        </button>
+      </div>
+      {error && <div className="error risk-run-error">{error}</div>}
+      {!s && !error && <div className="muted foot">No attribution loaded — run explain to call the API</div>}
+      {s && (
+        <div className="risk-panel-result">
+          <div className="attribution-mv">
+            <span>Base MV <strong>{money(s.base_market_value ?? 0)}</strong></span>
+            <span>Current MV <strong>{money(s.current_market_value ?? 0)}</strong></span>
+            {source && (
+              <span className="muted">
+                via {source === 'demo' ? '/attribution/demo' : source === 'dashboard' ? 'dashboard load' : '/attribution'}
+              </span>
+            )}
+          </div>
+          {s.items.length === 0
+            ? <div className="muted foot">No drivers returned</div>
+            : (
+              <table>
+                <thead><tr><th>Driver</th><th>P&amp;L</th></tr></thead>
+                <tbody>{s.items.map((x) => (
+                  <tr key={x.driver}>
+                    <td>{x.driver}</td>
+                    <td className={x.pnl < 0 ? 'negative' : 'positive'}>{money(x.pnl)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            )}
+          <div className="attribution-total">
+            <span>Total change <strong>{money(s.total_change)}</strong></span>
+            <span>Explained {money(s.explained_change ?? 0)}</span>
+            <span className={`attribution-residual ${(s.residual ?? 0) < 0 ? 'negative' : 'positive'}`}>
+              Residual <strong>{money(s.residual ?? 0)}</strong>
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
