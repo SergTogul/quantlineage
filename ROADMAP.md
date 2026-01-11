@@ -14,7 +14,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA `postgres-persistence-smoke` green; M5.5 non-blocking polish remains) |
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
-| Milestone 8 — Risk Terminal UI | PARTIAL (SPA on `/api/v1`; main nav; heatmaps; hedge-compare; risk-run poll; analytics panels; overview/scenario/drill-down/P&L/limits still open) |
+| Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
 | Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE — full CI green on GHA; M9.1–M9.5/M9.7/M9.10 still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
@@ -61,7 +61,7 @@ Trade (domain/models.py)
 2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 valuation LRU only (curve/scenario memo open — non-blocking polish)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
-5. UI still PARTIAL: overview dashboard, scenario builder polish, hierarchy drill-down, P&L explain, full limits UX open (nav + heatmaps + hedge-compare + risk-run poll + change-attr / ES / VaR-compare landed)
+5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
 6. M9.9 **DONE** — full CI green on GHA runners (run 33673245125); static analysis (Ruff/mypy/ESLint) not started; E2E lags new endpoints
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
 
@@ -70,7 +70,7 @@ Trade (domain/models.py)
 | Check | Result |
 |-------|--------|
 | Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **519 passed** (2026-09-02 M7.6), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
-| Frontend `npm test` | **26 passed**, 0 failed |
+| Frontend `npm test` | **56 passed**, 0 failed |
 | Frontend `npm run build` | **OK** (vite; 22 modules) |
 | M5 milestone | **COMPLETE** — M5.1/M9.9 GHA green (run 33673245125); M5.5 remains non-blocking polish |
 | M5.6 / M5.7 / M5.9 | **DONE** (DI; Postgres `SKIP LOCKED` claim + Compose worker; stress scenario_definitions HTTP) |
@@ -371,7 +371,7 @@ Firm→trade hierarchy with additive MV/Greek/stress reconciliation; P&L Explain
 | Integration unblock during acceptance | Renamed Alembic scripts dir `backend/alembic` → `backend/migrations` (avoids shadowing installed `alembic` package; `alembic.ini` + `test_persistence.py` updated) |
 | Known residual — P&L Explain | Taylor residual absorbs higher-order / duration–DV01 gaps; not a full-reval explain |
 | Known residual — risk-change attribution | Correlation residual is plug-to-total; not a structural corr model; linear/Greek market path when snapshot present |
-| Known residual — limits UI | Full limits / drill-down UX still M8; API + thin frontend helpers only |
+| Known residual — limits UI | Closed under M8.8 (status strip + value/limit table + per-metric/breach drill-down) |
 | Known residual — key-rate contributors | `limit_drilldown.contributors_for_metric` maps `key_rate_dv01` → position `dv01` (parallel), not tenor KR DV01 (M4.7) |
 | Known residual | Dual-mount + M7.6 sunset DONE (legacy still served); RiskRun persistence wiring still M5 |
 | Hierarchy ↔ stress | Circular import fixed in M4.2 via lazy stress import — no open hierarchy/stress residual |
@@ -637,7 +637,7 @@ Status: **COMPLETE** (2026-09-02 — M7.1–M7.6 DONE; legacy unversioned paths 
 
 ## Milestone 8 — Risk Terminal UI
 
-Status: PARTIAL (SPA on `/api/v1`; main nav M8.1; heatmaps M8.3; hedge-compare; firm-root hierarchy; risk-run poll; change-attr / ES / VaR-compare panels; overview / scenario / drill-down / P&L / limits still open)
+Status: **COMPLETE** (2026-09-02 Frontend/Risk UX — remaining PARTIAL items closed)
 
 ### Follow-up from M7.6 (Backend → Frontend)
 
@@ -650,19 +650,31 @@ Status: PARTIAL (SPA on `/api/v1`; main nav M8.1; heatmaps M8.3; hedge-compare; 
   - Sticky terminal sidebar (`AppNav`) + hash routing (`#overview` … `#risk-runs`)
   - Section map matches Frontend charter targets; panels grouped (overview / portfolio / factors / VaR&ES / stress / scenario / P&L / limits / runs)
   - Pure helpers in `lib/nav.mjs`; evidence `lib/nav.test.mjs` (no client risk math)
-- [ ] M8.2 Overview dashboard — PARTIAL
+- [x] M8.2 Overview dashboard — DONE (2026-09-02)
+  - Dedicated `Overview` view: KPI strip via `overviewKpis` from `/risk/summary` + threat evaluate; section collage (`overviewCollage`) entry points with API teasers; hierarchy/factor heatmap teasers (not nav leftovers dump)
+  - Evidence: `components/Overview.jsx`; `overviewKpis` / `overviewCollage` in `lib/risk.mjs` + `risk.test.mjs`
 - [x] M8.3 Risk heatmaps — DONE (2026-09-02)
   - Display-only color scales in `lib/heatmap.mjs` (diverging / sequential / utilization); unit tests in `heatmap.test.mjs`
   - Hierarchy VaR/ES/NAV tiles (`POST /risk/hierarchy`), factor×bucket matrix (`/risk/factors`), stress P&L tiles (`/risk/stress`), limit utilization tiles (`/risk/limits`)
   - Placed under Portfolio / Risk Factors / Stress / Limits (+ overview teaser); no client risk formulas
-- [ ] M8.4 Scenario Builder — PARTIAL
+- [x] M8.4 Scenario Builder — DONE (2026-09-02)
+  - Presets (equity crash / rates hike / vol spike / FX); form validation; loading/error; API shock preview; `evaluateCustomScenario` → `/risk/stress/evaluate/custom`
+  - Evidence: `ScenarioBuilder.jsx`; `SCENARIO_PRESETS` / `validateScenarioForm` / `scenarioPayload` tests
 - [x] M8.5 Before/after hedge workflow — DONE (2026-09-02)
   - `compareHedge` → `POST /api/v1/risk/stress/compare`; `hedgeComparisonSummary` / `spyFlatHedgePortfolio` / `defaultHedgeScenarios`
   - Dashboard `HedgeCompare` card: methodology select, SPY-flat demo hedge, VaR/ES before→after, scenario table, factor exposure deltas (API display only)
   - Evidence: `frontend/src/lib/risk.test.mjs`
-- [ ] M8.6 Risk drill-down — PARTIAL (Hierarchy card walks Firm→Portfolio; counts desks/strategies/books/trades; displays root NAV/VaR/ES/Greeks from API)
-- [ ] M8.7 P&L Explain UI — PARTIAL (demo only)
-- [ ] M8.8 Limits UI — PARTIAL (`limitStatus` prefers API `WARNING`/`OK`/`BREACH` — **done** in `risk.mjs`; full limits/drill-down UX still open)
+- [x] M8.6 Risk drill-down — DONE (2026-09-02)
+  - Interactive Firm→Portfolio→Desk→Strategy→Book→Trade breadcrumb + child table; selected-node NAV/VaR/ES/Greeks from API tree only (`hierarchyNodeAtPath` / `hierarchyChildRows` / `hierarchyNodeMetrics`)
+  - Evidence: `Analytics.jsx` Hierarchy; `risk.test.mjs`
+- [x] M8.7 P&L Explain UI — DONE (2026-09-02)
+  - Interactive panel: SPY×scale → `POST /risk/attribution` (`explainPnL` + `demoPnLAttributionRequest`); optional illustrative marks via `/attribution/demo`
+  - Shows base/current MV, drivers, explained, residual (API display only)
+  - Evidence: `api.js` `explainPnL`/`explainPnLDemo`; `Attribution` in `Analytics.jsx`; tests for request helper
+- [x] M8.8 Limits UI — DONE (2026-09-02)
+  - Status strip (OK/WARNING/BREACH counts); value/limit/util/warn-at table; per-metric Drill + breach drill-down via `/risk/limits/drilldown`
+  - `limitStatus` prefers API status (prior); `limitStatusCounts` helper
+  - Evidence: `RiskTable.jsx` Limits; `risk.test.mjs`
 - [x] M8.9 Risk-run UI — DONE (start)
   - Thin `createRiskRun` / `getRiskRun` in `api.js` (`POST/GET /api/v1/risk/runs`)
   - Dashboard `RiskRuns` card: run_type select, start, poll QUEUED→RUNNING→COMPLETED/FAILED
@@ -680,6 +692,12 @@ Status: PARTIAL (SPA on `/api/v1`; main nav M8.1; heatmaps M8.3; hedge-compare; 
   - `compareVarMethodologies` → `POST /api/v1/risk/var/compare`; `varCompareSummary`
   - Dashboard card: optional observations; LINEAR / Δ-Γ / Full-reval table + runtime_ms
   - Evidence: `frontend/src/lib/risk.test.mjs`
+
+### Acceptance / residual notes (honest)
+
+- Frontend `npm test` **56 passed**; `npm run build` OK (2026-09-02 M8 close pass).
+- No client risk math; all panels display API payloads.
+- Residual (non-blocking for M8): formal `Scenario` HTTP wire still M3.8; multi-factor reverse UI remains Stress-section single-factor (+ API exists); P&L illustrative market path still uses `/attribution/demo` (position-change path uses real `/attribution`); E2E coverage for new panels still M9.10.
 
 ---
 

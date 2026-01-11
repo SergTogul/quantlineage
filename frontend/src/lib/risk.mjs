@@ -77,6 +77,62 @@ export function hierarchySummary(node) {
   }
 }
 
+/**
+ * Resolve a node by child-index path from the root (display navigation only).
+ * pathIndices = [0, 1] → root.children[0].children[1].
+ */
+export function hierarchyNodeAtPath(root, pathIndices = []) {
+  if (!root) return null
+  let node = root
+  const trail = [root]
+  const resolved = []
+  for (const i of pathIndices) {
+    const kids = node.children || []
+    const idx = Number(i)
+    if (!Number.isInteger(idx) || idx < 0 || idx >= kids.length) break
+    node = kids[idx]
+    trail.push(node)
+    resolved.push(idx)
+  }
+  return { node, trail, pathIndices: resolved }
+}
+
+/** Child rows for hierarchy drill table — API fields only. */
+export function hierarchyChildRows(node) {
+  return (node?.children || []).map((c, index) => ({
+    index,
+    name: c.name,
+    level: c.level,
+    path: c.path || '',
+    market_value: c.market_value,
+    var_99: c.var_99,
+    expected_shortfall_99: c.expected_shortfall_99,
+    child_count: (c.children || []).length,
+  }))
+}
+
+/** Selected-node metrics strip for drill-down (no aggregation). */
+export function hierarchyNodeMetrics(node) {
+  if (!node) return null
+  return {
+    name: node.name,
+    level: node.level,
+    path: node.path || '',
+    market_value: node.market_value,
+    var_95: node.var_95,
+    var_99: node.var_99,
+    expected_shortfall_99: node.expected_shortfall_99,
+    delta: node.delta,
+    gamma: node.gamma,
+    vega: node.vega,
+    dv01: node.dv01,
+    fx_delta: node.fx_delta,
+    stress: node.stress || [],
+    limits: node.limits || [],
+    child_count: (node.children || []).length,
+  }
+}
+
 /** Normalize HedgeComparisonReport (object). Legacy list → scenarios-only shim. */
 export function hedgeComparisonSummary(report) {
   if (!report) return null
@@ -183,6 +239,162 @@ export function limitDrilldownSummary(report) {
 
 export function scenarioPayload(form){
   return {id:'ui_custom',name:form.name||'Custom Scenario',kind:'custom',equity_shock:Number(form.equity)/100,vol_shock:Number(form.vol)/100,rates_shift_bps:Number(form.rates),fx_shock:Number(form.fx)/100,max_loss_pct:Number(form.limit)/100}
+}
+
+/** Default Scenario Builder form (display units: % / bp). */
+export function defaultScenarioForm() {
+  return { name: 'Custom Crash', equity: -20, vol: 50, rates: 100, fx: -5, limit: 10 }
+}
+
+/**
+ * Named shock presets for Scenario Builder — request payloads only (no risk math).
+ * Form fields use display units matching scenarioPayload().
+ */
+export const SCENARIO_PRESETS = Object.freeze([
+  Object.freeze({
+    id: 'equity_crash',
+    label: 'Equity crash',
+    form: Object.freeze({ name: 'Equity Crash', equity: -20, vol: 50, rates: 0, fx: -5, limit: 10 }),
+  }),
+  Object.freeze({
+    id: 'rates_hike',
+    label: 'Rates hike',
+    form: Object.freeze({ name: 'Rates Hike', equity: -5, vol: 15, rates: 100, fx: 0, limit: 8 }),
+  }),
+  Object.freeze({
+    id: 'vol_spike',
+    label: 'Vol spike',
+    form: Object.freeze({ name: 'Vol Spike', equity: -8, vol: 80, rates: 25, fx: -2, limit: 10 }),
+  }),
+  Object.freeze({
+    id: 'fx_shock',
+    label: 'FX shock',
+    form: Object.freeze({ name: 'FX Shock', equity: 0, vol: 10, rates: 0, fx: -10, limit: 5 }),
+  }),
+])
+
+/** Validate Scenario Builder form before API call (display checks only). */
+export function validateScenarioForm(form) {
+  const name = String(form?.name || '').trim()
+  if (!name) return { ok: false, error: 'Scenario name is required' }
+  const nums = ['equity', 'vol', 'rates', 'fx', 'limit']
+  for (const k of nums) {
+    if (!Number.isFinite(Number(form?.[k]))) {
+      return { ok: false, error: `${k} must be a number` }
+    }
+  }
+  if (Number(form.limit) <= 0) return { ok: false, error: 'Loss limit % must be > 0' }
+  return { ok: true, error: null }
+}
+
+/**
+ * Overview KPI strip from risk/summary + stress/evaluate (API display only).
+ */
+export function overviewKpis(summary, threats) {
+  const ts = stressSummary(threats)
+  return {
+    market_value: summary?.market_value ?? null,
+    var_99: summary?.var_99 ?? null,
+    expected_shortfall_99: summary?.expected_shortfall_99 ?? null,
+    worst_threat_loss: ts.worst?.loss ?? 0,
+    threat_breaches: ts.breaches ?? 0,
+    worst_threat_name: ts.worst?.scenario ?? null,
+  }
+}
+
+/**
+ * Section collage / entry points for Overview — teaser stats from loaded API payloads.
+ * No risk math; navigation ids match NAV_SECTIONS.
+ */
+export function overviewCollage({ summary, threats, limits, hierarchy, stress, factors } = {}) {
+  const ts = stressSummary(threats)
+  const hs = hierarchySummary(hierarchy)
+  const limCounts = limitStatusCounts(limits)
+  const worstStressRow = worstStress(stress || [])
+  const topFactor = topFactors(factors || [], 1)[0]
+  return [
+    {
+      id: 'portfolio',
+      label: 'Portfolio',
+      hint: 'Hierarchy & positions',
+      teaser: hs
+        ? `${hs.desks} desks · ${hs.trades} trades · NAV ${money(hs.market_value ?? 0)}`
+        : 'Open firm → trade tree',
+    },
+    {
+      id: 'risk-factors',
+      label: 'Risk Factors',
+      hint: 'Exposures & heatmaps',
+      teaser: topFactor
+        ? `Top: ${topFactor.factor} (${money(topFactor.exposure)})`
+        : 'Factor × bucket matrix',
+    },
+    {
+      id: 'var-es',
+      label: 'VaR & ES',
+      hint: 'Analytics & attribution',
+      teaser: summary
+        ? `99% VaR ${money(summary.var_99)} · ES ${money(summary.expected_shortfall_99)}`
+        : 'VaR / ES analytics',
+    },
+    {
+      id: 'stress',
+      label: 'Stress',
+      hint: 'Scenarios & reverse stress',
+      teaser: worstStressRow
+        ? `Worst: ${worstStressRow.scenario} ${money(worstStressRow.pnl)}`
+        : 'Library & reverse stress',
+    },
+    {
+      id: 'scenario-builder',
+      label: 'Scenario Builder',
+      hint: 'Shocks & hedge compare',
+      teaser: 'Custom equity / rates / FX / vol shocks',
+    },
+    {
+      id: 'pnl-explain',
+      label: 'P&L Explain',
+      hint: 'Attribution',
+      teaser: 'POST /risk/attribution drivers',
+    },
+    {
+      id: 'limits',
+      label: 'Limits',
+      hint: 'Utilization & status',
+      teaser: `${limCounts.BREACH} breach · ${limCounts.WARNING} warn · ${limCounts.OK} ok`,
+    },
+    {
+      id: 'risk-runs',
+      label: 'Risk Runs',
+      hint: 'Async run status',
+      teaser: ts.breaches != null
+        ? `${ts.breaches} threat breach${ts.breaches === 1 ? '' : 'es'} on book`
+        : 'Start & poll async runs',
+    },
+  ]
+}
+
+/** Count limits by OK / WARNING / BREACH (uses limitStatus). */
+export function limitStatusCounts(items) {
+  const counts = { OK: 0, WARNING: 0, BREACH: 0 }
+  for (const x of items || []) {
+    const s = limitStatus(x)
+    counts[s] = (counts[s] || 0) + 1
+  }
+  return counts
+}
+
+/**
+ * AttributionRequest for POST /risk/attribution — SPY quantity scale demo.
+ * Markets omitted so the API builds snapshots (same pattern as change-attr).
+ */
+export function demoPnLAttributionRequest(portfolio, options = {}) {
+  if (!portfolio) return null
+  return {
+    previous_portfolio: portfolio,
+    current_portfolio: spyScaledPortfolio(portfolio, options.scale ?? 1.5),
+    dt_years: options.dt_years ?? 0,
+  }
 }
 
 /** Default poll interval for non-terminal risk runs (display only). */

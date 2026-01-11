@@ -2,11 +2,14 @@ import test from 'node:test'; import assert from 'node:assert/strict'
 import {
   money, topContributors, worstStress, limitStatus, limitStatusClass, percent, threatClass, stressSummary,
   topFactors, varMethod, hierarchyTradeCount, hierarchyCountByLevel, hierarchyPortfolio,
-  hierarchySummary, hedgeComparisonSummary, reverseStressMultiSummary, scenarioPayload,
-  attributionSummary, breachedLimits, limitDrilldownSummary,
+  hierarchySummary, hierarchyNodeAtPath, hierarchyChildRows, hierarchyNodeMetrics,
+  hedgeComparisonSummary, reverseStressMultiSummary, scenarioPayload,
+  attributionSummary, breachedLimits, limitDrilldownSummary, limitStatusCounts,
   spyFlatHedgePortfolio, defaultHedgeScenarios,
   riskRunStatus, riskRunStatusClass, isRiskRunTerminal, riskRunSummary, RISK_RUN_POLL_MS,
   spyScaledPortfolio, demoChangeAttributionRequest, riskChangeAttributionSummary,
+  demoPnLAttributionRequest, overviewKpis, overviewCollage,
+  SCENARIO_PRESETS, defaultScenarioForm, validateScenarioForm,
   esContributionSummary, ES_CONTRIBUTION_DIMENSIONS, varCompareSummary,
 } from './risk.mjs'
 
@@ -442,4 +445,89 @@ test('varCompareSummary passes methodology rows through', () => {
   assert.equal(s.results[2].methodology, 'FULL_REVALUATION')
   assert.equal(varCompareSummary(null), null)
   assert.equal(varCompareSummary({ portfolio_id: 'x' }).results.length, 0)
+})
+
+test('hierarchyNodeAtPath drills by child indices', () => {
+  const at = hierarchyNodeAtPath(firmTree, [0, 0])
+  assert.equal(at.node.level, 'desk')
+  assert.equal(at.node.name, 'Rates Desk')
+  assert.equal(at.trail.length, 3)
+  assert.deepEqual(at.pathIndices, [0, 0])
+  assert.equal(hierarchyNodeAtPath(firmTree, [0, 9]).pathIndices.length, 1)
+  assert.equal(hierarchyNodeAtPath(null), null)
+})
+
+test('hierarchyChildRows and hierarchyNodeMetrics are display-only', () => {
+  const rows = hierarchyChildRows(firmTree)
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].name, 'Multi Desk Book')
+  assert.equal(rows[0].level, 'portfolio')
+  const m = hierarchyNodeMetrics(firmTree)
+  assert.equal(m.name, 'Acme Capital')
+  assert.equal(m.var_99, 100)
+  assert.equal(m.child_count, 1)
+  assert.equal(hierarchyNodeMetrics(null), null)
+  assert.deepEqual(hierarchyChildRows(null), [])
+})
+
+test('scenario presets and validation', () => {
+  assert.ok(SCENARIO_PRESETS.length >= 4)
+  const form = defaultScenarioForm()
+  assert.equal(validateScenarioForm(form).ok, true)
+  assert.equal(validateScenarioForm({ ...form, name: '' }).ok, false)
+  assert.equal(validateScenarioForm({ ...form, limit: 0 }).ok, false)
+  assert.equal(validateScenarioForm({ ...form, equity: 'x' }).ok, false)
+  const crash = SCENARIO_PRESETS.find((p) => p.id === 'equity_crash')
+  const payload = scenarioPayload(crash.form)
+  assert.equal(payload.equity_shock, -0.2)
+  assert.equal(payload.vol_shock, 0.5)
+})
+
+test('overviewKpis and overviewCollage use API teasers', () => {
+  const summary = { market_value: 1e6, var_99: 50_000, expected_shortfall_99: 70_000 }
+  const threats = { severe_count: 1, breach_count: 2, evaluations: [{ scenario: 'Crash', loss: 12_000 }] }
+  const k = overviewKpis(summary, threats)
+  assert.equal(k.var_99, 50_000)
+  assert.equal(k.threat_breaches, 2)
+  assert.equal(k.worst_threat_name, 'Crash')
+  const cards = overviewCollage({
+    summary,
+    threats,
+    limits: [
+      { metric: 'var_99', status: 'BREACH', breached: true, utilization_pct: 110 },
+      { metric: 'vega', status: 'OK', breached: false, utilization_pct: 40 },
+    ],
+    hierarchy: firmTree,
+    stress: [{ scenario: 'A', pnl: -9 }, { scenario: 'B', pnl: -2 }],
+    factors: [{ factor: 'SPX', exposure: -100, factor_type: 'equity', bucket: 'spot' }],
+  })
+  assert.equal(cards.length, 8)
+  assert.equal(cards[0].id, 'portfolio')
+  assert.match(cards[0].teaser, /desks/)
+  assert.match(cards[6].teaser, /1 breach/)
+  assert.equal(cards[2].id, 'var-es')
+})
+
+test('limitStatusCounts tallies OK/WARNING/BREACH', () => {
+  const counts = limitStatusCounts([
+    { status: 'OK' },
+    { status: 'WARNING' },
+    { status: 'BREACH' },
+    { status: 'BREACH' },
+  ])
+  assert.deepEqual(counts, { OK: 1, WARNING: 1, BREACH: 2 })
+  assert.deepEqual(limitStatusCounts(null), { OK: 0, WARNING: 0, BREACH: 0 })
+})
+
+test('demoPnLAttributionRequest builds AttributionRequest body', () => {
+  const portfolio = {
+    id: 'demo',
+    name: 'Demo',
+    positions: [{ id: 'eq-1', type: 'equity', symbol: 'SPY', quantity: 100 }],
+  }
+  const req = demoPnLAttributionRequest(portfolio, { scale: 2, dt_years: 0.01 })
+  assert.equal(req.previous_portfolio, portfolio)
+  assert.equal(req.current_portfolio.positions[0].quantity, 200)
+  assert.equal(req.dt_years, 0.01)
+  assert.equal(demoPnLAttributionRequest(null), null)
 })

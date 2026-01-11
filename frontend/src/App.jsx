@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { loadDashboard } from './api'
-import MetricCard from './components/MetricCard'
 import AppNav from './components/AppNav'
+import Overview from './components/Overview'
 import { Contributors, Limits, Stress, ThreatScenarios } from './components/RiskTable'
 import {
   Attribution, ESContributions, Hierarchy, RiskChangeAttribution, RiskFactors, RiskRuns,
@@ -11,7 +11,6 @@ import { HedgeCompare, ReverseStress, RiskQuery, ScenarioBuilder } from './compo
 import {
   FactorExposureHeatmap, HierarchyRiskHeatmap, LimitUtilizationHeatmap, StressPnlHeatmap,
 } from './components/Heatmaps'
-import { money, stressSummary } from './lib/risk.mjs'
 import { hashForSection, navSectionById, sectionFromHash } from './lib/nav.mjs'
 import './styles.css'
 
@@ -77,17 +76,6 @@ export default function App() {
   const {
     portfolio, summary, stress, threats, contributors, limits, factors, varReport, hierarchy, attribution,
   } = data
-  const ts = stressSummary(threats)
-
-  const metrics = (
-    <section className="metrics">
-      <MetricCard label="Market Value" value={money(summary.market_value)} />
-      <MetricCard label="99% VaR" value={money(summary.var_99)} />
-      <MetricCard label="99% Expected Shortfall" value={money(summary.expected_shortfall_99)} />
-      <MetricCard label="Worst Threat Loss" value={money(ts.worst?.loss || 0)} />
-      <MetricCard label="Threat Breaches" value={String(ts.breaches)} />
-    </section>
-  )
 
   let body
   switch (section) {
@@ -168,7 +156,9 @@ export default function App() {
     case 'pnl-explain':
       body = (
         <SectionFrame id="pnl-explain">
-          <div className="grid"><Attribution report={attribution} /></div>
+          <div className="grid">
+            <Attribution portfolio={portfolio} initialReport={attribution} />
+          </div>
         </SectionFrame>
       )
       break
@@ -192,16 +182,15 @@ export default function App() {
     default:
       body = (
         <SectionFrame id="overview">
-          {metrics}
-          <div className="grid">
-            <RiskFactors items={factors} />
-            <FactorExposureHeatmap items={factors} />
-            <HierarchyRiskHeatmap node={hierarchy} />
-            <VaRAnalytics report={varReport} />
-            <Contributors items={contributors} />
-            <Limits items={limits} portfolio={portfolio} />
-            <RiskRuns portfolio={portfolio} />
-          </div>
+          <Overview
+            summary={summary}
+            threats={threats}
+            limits={limits}
+            hierarchy={hierarchy}
+            stress={stress}
+            factors={factors}
+            onNavigate={selectSection}
+          />
         </SectionFrame>
       )
   }
