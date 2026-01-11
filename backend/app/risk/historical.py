@@ -15,9 +15,6 @@ from app.market.snapshot import PositionMarketDataProvider
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.scenarios import historical_shocked_snapshots
 
-# KERNEL_PNL_* are defined in ``app.compute.kernel`` (M6.5 docs) and re-exported
-# here so Historical VaR callers / tests keep a stable import path.
-
 
 def _aggregate_greeks(vals: list[Valuation]) -> tuple[float, float, float, float, float, float]:
     mv = sum(v.market_value for v in vals)
