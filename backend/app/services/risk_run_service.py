@@ -10,7 +10,7 @@ No quant formulas live here.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Callable, Mapping
 
 from app.domain.models import RiskRun, RiskRunStatus, VaRMethodology
@@ -86,10 +86,10 @@ def elapsed_seconds(run: RiskRun, *, now: datetime | None = None) -> float | Non
         return max(0.0, float(run.duration))
     if run.status != RiskRunStatus.RUNNING or run.started_at is None:
         return None
-    clock = now or datetime.now(timezone.utc)
+    clock = now or datetime.now(UTC)
     started = run.started_at
     if started.tzinfo is None:
-        started = started.replace(tzinfo=timezone.utc)
+        started = started.replace(tzinfo=UTC)
     return max(0.0, (clock - started).total_seconds())
 
 
@@ -103,7 +103,7 @@ class RiskRunService:
         clock: Clock | None = None,
     ) -> None:
         self._repo = repo
-        self._clock: Clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock: Clock = clock or (lambda: datetime.now(UTC))
 
     def enqueue(
         self,

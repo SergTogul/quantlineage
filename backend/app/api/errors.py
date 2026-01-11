@@ -62,7 +62,7 @@ def _from_structured_detail(detail: dict[str, Any], status_code: int) -> ErrorBo
     """Interpret ``HTTPException.detail`` when callers pass a dict."""
     code = detail.get("code")
     message = detail.get("message")
-    details = detail.get("details", None)
+    details = detail.get("details")
     if isinstance(code, str) and isinstance(message, str):
         if details is not None and not isinstance(details, (dict, list)):
             details = {"value": details}

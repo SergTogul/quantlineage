@@ -76,8 +76,8 @@ def test_key_rate_shift_only_moves_target_tenor_with_triangular_weights():
 
 
 def test_snapshot_attaches_usd_curves_and_key_rates():
-    from app.market.curves import attach_standard_usd_curves
     from app.domain.models import MarketSnapshot
+    from app.market.curves import attach_standard_usd_curves
 
     base = MarketSnapshot(rates={"USD": 0.04})
     snap = attach_standard_usd_curves(base, ois_rate=0.04, sofr_rate=0.041)

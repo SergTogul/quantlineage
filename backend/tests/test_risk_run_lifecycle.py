@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -82,7 +82,7 @@ def test_terminal_states_have_no_outbound():
 
 
 def test_elapsed_seconds_helpers():
-    started = datetime(2026, 9, 2, 12, 0, 0, tzinfo=timezone.utc)
+    started = datetime(2026, 9, 2, 12, 0, 0, tzinfo=UTC)
     finished = started + timedelta(seconds=42.5)
     queued = RiskRun(id="q", portfolio_id="p", status=RiskRunStatus.QUEUED)
     assert elapsed_seconds(queued) is None

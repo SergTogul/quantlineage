@@ -11,7 +11,7 @@ DI can serve the same contracts when ``RISKFORGE_DATABASE_URL`` is unset (M5.6).
 from __future__ import annotations
 
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Sequence
 
 from app.domain.models import (
@@ -31,15 +31,15 @@ from app.persistence.repositories import (
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _as_utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 class InMemoryMarketSnapshotRepository(MarketSnapshotRepository):
@@ -257,7 +257,7 @@ class InMemoryRiskRunRepository(RiskRunRepository):
                 for r in self._runs.values()
                 if r.status == status
             ]
-        matched.sort(key=lambda r: (_as_utc(r.created_at) or datetime.min.replace(tzinfo=timezone.utc), r.id))
+        matched.sort(key=lambda r: (_as_utc(r.created_at) or datetime.min.replace(tzinfo=UTC), r.id))
         return matched[: max(0, int(limit))]
 
     def claim_queued(self, *, limit: int = 1) -> list[RiskRun]:
@@ -269,7 +269,7 @@ class InMemoryRiskRunRepository(RiskRunRepository):
             matched = [r for r in self._runs.values() if r.status == RiskRunStatus.QUEUED]
             matched.sort(
                 key=lambda r: (
-                    _as_utc(r.created_at) or datetime.min.replace(tzinfo=timezone.utc),
+                    _as_utc(r.created_at) or datetime.min.replace(tzinfo=UTC),
                     r.id,
                 )
             )

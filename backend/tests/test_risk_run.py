@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -16,7 +16,7 @@ from app.domain.models import (
     RiskRunStatus,
     VaRMethodology,
 )
-from app.persistence.risk_run_mapping import apply_risk_run_to_row, row_to_risk_run, risk_run_to_row
+from app.persistence.risk_run_mapping import apply_risk_run_to_row, risk_run_to_row, row_to_risk_run
 from app.persistence.session import session_scope
 from app.persistence.sqlalchemy_repos import (
     SqlAlchemyMarketSnapshotRepository,
@@ -25,8 +25,7 @@ from app.persistence.sqlalchemy_repos import (
 )
 from app.persistence.testing import make_sqlite_session_factory
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 def _ts(hour: int = 12, minute: int = 0) -> datetime:

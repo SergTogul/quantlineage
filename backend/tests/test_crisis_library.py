@@ -42,7 +42,6 @@ from app.risk.scenario_model import (
 )
 from app.risk.stress import HYPOTHETICAL_THREAT_SCENARIOS, THREAT_SCENARIOS
 
-
 REQUIRED_CRISIS_IDS = {
     "lehman_2008",
     "covid_2020_03",
@@ -91,7 +90,7 @@ def test_crisis_descriptions_never_claim_exact_replay():
         # Affirmative (bad): "exact replay of …" without a preceding "not"/"never"
         assert "tick-for-tick" not in lower
         if "exact replay" in lower:
-            assert "not an exact replay" in lower or "not a" in lower and "replay" in lower
+            assert "not an exact replay" in lower or ("not a" in lower and "replay" in lower)
         assert "approx" in defn.name.lower() or "approximation" in defn.description.lower()
         assert_honest_historical_labeling(crisis_scenario(defn, _base()))
 

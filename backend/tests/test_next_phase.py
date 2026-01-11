@@ -1,6 +1,8 @@
 import math
+
 from fastapi.testclient import TestClient
-from app.domain.models import AttributionRequest, Portfolio, StressScenario
+
+from app.domain.models import AttributionRequest, StressScenario
 from app.main import app
 from app.market.snapshot import PositionMarketDataProvider, shock_snapshot
 from app.pricing.builtin import BuiltinPricingEngine

@@ -213,6 +213,7 @@ def test_service_exposes_es_contributions():
 
 def test_es_api_endpoint_default_methodology():
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     client = TestClient(app)
@@ -233,6 +234,7 @@ def test_es_api_endpoint_default_methodology():
 
 def test_es_api_methodology_query_param():
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     client = TestClient(app)

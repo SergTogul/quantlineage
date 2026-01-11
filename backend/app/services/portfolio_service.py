@@ -31,6 +31,7 @@ from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.market.snapshot import PositionMarketDataProvider
 from app.risk.attribution import AttributionEngine
+from app.risk.es import ESContributionAnalytics
 from app.risk.factors import RiskFactorEngine
 from app.risk.hierarchy import HierarchyEngine
 from app.risk.historical import HistoricalRiskEngine
@@ -46,7 +47,6 @@ from app.risk.stress import (
     ScenarioComparisonEngine,
     StressEngine,
 )
-from app.risk.es import ESContributionAnalytics
 from app.risk.var import VaRAnalytics
 
 

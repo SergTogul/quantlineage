@@ -10,7 +10,6 @@ import pytest
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
-
 # Expected router modules after M7.1 (charter 07 layout; paths stay unversioned).
 _ROUTER_MODULES = (
     "app.api.health",

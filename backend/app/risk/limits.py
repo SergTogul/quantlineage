@@ -11,7 +11,6 @@ from __future__ import annotations
 from app.domain.models import LimitResult, LimitStatus, Portfolio, RiskLimit
 from app.interfaces.pricing import PricingEngine
 
-
 DEFAULT_WARNING_THRESHOLD_PCT = 80.0
 
 # Firm / desk VaR & ES plus concentration, Greeks, FX, and stress loss.

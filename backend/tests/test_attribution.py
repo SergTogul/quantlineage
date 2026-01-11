@@ -32,9 +32,9 @@ from app.risk.attribution import (
     DRIVER_VEGA,
     AttributionEngine,
 )
+from app.risk.historical import HistoricalRiskEngine
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
-from app.risk.historical import HistoricalRiskEngine
 
 pricing = BuiltinPricingEngine()
 engine = AttributionEngine()

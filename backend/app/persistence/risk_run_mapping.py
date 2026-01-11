@@ -8,7 +8,7 @@ Field aliases:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.domain.models import (
@@ -31,8 +31,8 @@ def _as_utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def row_to_risk_run(row: RiskRunRow) -> RiskRun:
@@ -45,7 +45,7 @@ def row_to_risk_run(row: RiskRunRow) -> RiskRun:
         id=row.id,
         portfolio_id=row.portfolio_id,
         market_snapshot_id=row.market_snapshot_id,
-        created_at=_as_utc(row.created_at) or datetime.now(timezone.utc),
+        created_at=_as_utc(row.created_at) or datetime.now(UTC),
         started_at=_as_utc(row.started_at),
         completed_at=_as_utc(row.finished_at),
         pricing_engine_version=row.pricing_engine_version,

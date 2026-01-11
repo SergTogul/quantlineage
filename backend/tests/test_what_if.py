@@ -6,7 +6,7 @@ import math
 
 from fastapi.testclient import TestClient
 
-from app.domain.models import EquityPosition, Portfolio, VaRMethodology, WhatIfRequest
+from app.domain.models import EquityPosition, VaRMethodology, WhatIfRequest
 from app.main import app
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
