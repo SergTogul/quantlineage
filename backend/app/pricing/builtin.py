@@ -1,10 +1,20 @@
 from __future__ import annotations
+
 import math
 from statistics import NormalDist
+
 from app.domain.models import (
-    BondPosition, EquityFuturePosition, EquityPosition, EuropeanOptionPosition,
-    FXForwardPosition, FXOptionPosition, InterestRateFuturePosition, MarketSnapshot,
-    Position, SwapPosition, Valuation,
+    BondPosition,
+    EquityFuturePosition,
+    EquityPosition,
+    EuropeanOptionPosition,
+    FXForwardPosition,
+    FXOptionPosition,
+    InterestRateFuturePosition,
+    MarketSnapshot,
+    Position,
+    SwapPosition,
+    Valuation,
 )
 from app.interfaces.pricing import PricingEngine
 from app.pricing.curve_rates import continuous_zero, discount_factor

@@ -15,7 +15,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
-| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE; M9.10 E2E breadth improved 2026-09-02; M9.1–M9.5/M9.7 + reverse-multi E2E still open) |
+| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.7 + M9.9 DONE; M9.10 E2E breadth improved; M9.1–M9.5 + reverse-multi E2E still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
 | Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
@@ -62,7 +62,7 @@ Trade (domain/models.py)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
-6. M9.9 **DONE** — full CI green on GHA runners (run 33673245125); static analysis (Ruff/mypy/ESLint) not started; M9.10 E2E covers ES / change-attribution / VaR-compare / hedge-compare / overview (reverse-multi still needs UI)
+6. M9.7 **DONE** (staged) — CI `lint-static-analysis` runs Ruff + mypy + ESLint; rule/type debt documented (not full-strict); M9.9 prior green; M9.10 E2E covers ES / change-attribution / VaR-compare / hedge-compare / overview (reverse-multi still needs UI)
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
@@ -703,7 +703,7 @@ Status: **COMPLETE** (2026-09-02 Frontend/Risk UX — remaining PARTIAL items cl
 
 ## Milestone 9 — Testing, CI & Engineering Quality
 
-Status: PARTIAL (M9.6 + M9.9 DONE; M9.10 breadth improved; M9.1–M9.5/M9.7 open — do **not** mark COMPLETE)
+Status: PARTIAL (M9.6 + M9.7 + M9.9 DONE; M9.10 breadth improved; M9.1–M9.5 open — do **not** mark COMPLETE)
 
 ### Tasks
 
@@ -713,7 +713,12 @@ Status: PARTIAL (M9.6 + M9.9 DONE; M9.10 breadth improved; M9.1–M9.5/M9.7 open
 - [ ] M9.4 Golden quant tests — PARTIAL (M1.8 `test_quantlib_golden.py`; expand instrument coverage)
 - [ ] M9.5 Stress invariants — PARTIAL
 - [x] M9.6 CI GitHub Actions — workflow at `.github/workflows/ci.yml` (backend pytest Py3.12 + QuantLib-preferred / builtin fallback, frontend `npm test`/`npm run build`, optional native g++ smoke, **`postgres-smoke` service job** via `scripts/smoke_postgres.sh`). Runner validation deferred to **M9.9**.
-- [ ] M9.7 Static analysis (Ruff/mypy/ESLint) — NOT STARTED
+- [x] M9.7 Static analysis (Ruff/mypy/ESLint) — **DONE** (staged gate, 2026-09-02)
+  - CI job `lint-static-analysis` runs `ruff check app tests`, `mypy app`, and `npm run lint` (`eslint src --max-warnings 0`).
+  - Config: `backend/pyproject.toml`, `backend/requirements-dev.txt`, `frontend/eslint.config.js`.
+  - **Honest staging (not full-strict):** Ruff selects E/F/I/B/UP/SIM/RUF with documented ignores (E501 line length, B008 FastAPI `Depends`, pyupgrade/SIM/RUF style debt, finance γ/Δ unicode). mypy runs with `disable_error_code` for known debt (`arg-type`, `assignment`, `var-annotated`, `no-redef`, `misc`) — still catches other errors; pay down by removing codes. ESLint: recommended + react/hooks; `prop-types` off (no TS yet).
+  - Trivial fixes: Ruff autofix (imports/unused), F821 lambda closure in `risk_run_worker.py`, Analytics `useEffect` deps for exhaustive-deps.
+  - Follow-up (non-blocking for M9.7): enable ignored Ruff rules gradually; clear mypy `disable_error_code`; add Vitest/TS when M9.1 advances.
   - [ ] M9.8 Containers — PARTIAL (compose: `postgres` + `backend` + `worker` + `frontend`; worker claims via Postgres `SKIP LOCKED` — see M5.7; Redis/RQ optional)
 
 - [x] M9.9 Validate CI on GitHub-hosted runners (fix workflow green; document QuantLib install path) — **DONE** (2026-09-02)
@@ -731,7 +736,13 @@ Status: PARTIAL (M9.6 + M9.9 DONE; M9.10 breadth improved; M9.1–M9.5/M9.7 open
 - Owner: QA & Quant Validation (Lead Architect coordinated; no product/UI feature ownership)
 - Landed Playwright coverage for M8 panels that were ROADMAP-called-out gaps (ES, change-attribution, hedge-compare) plus VaR-compare and overview collage navigation
 - Fixed risk-runs E2E to target `#risk-runs` (panel left Overview under M8.1/M8.9)
-- Milestone 9 remains **PARTIAL** — M9.1/M9.3–M9.5/M9.7 and reverse-multi E2E still open; static analysis not started
+- Milestone 9 remains **PARTIAL** — M9.1/M9.3–M9.5 and reverse-multi E2E still open; M9.7 static analysis staged gate landed (see M9.7 notes)
+
+### Progress update (2026-09-02, DevOps — M9.7 static analysis)
+
+- Owner: DevOps / Platform
+- Landed CI `lint-static-analysis` (Ruff + mypy + ESLint) with staged configs; local `ruff`/`mypy`/`npm run lint` green before push
+- Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.1–M9.5, Playwright-in-CI, reverse-multi E2E still open)
 
 ---
 

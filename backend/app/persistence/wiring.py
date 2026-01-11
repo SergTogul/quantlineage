@@ -15,6 +15,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.domain.models import MarketSnapshot, Portfolio, RiskLimit, StressScenario
 from app.market.snapshot import PositionMarketDataProvider
+
+# Import models so metadata is populated before create_all.
+from app.persistence import models as _models  # noqa: F401
 from app.persistence.base import Base
 from app.persistence.config import get_configured_database_url, get_database_settings
 from app.persistence.memory_repos import (
@@ -37,9 +40,6 @@ from app.persistence.sqlalchemy_repos import (
 from app.risk.limits import DEFAULT_LIMITS
 from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
 from app.sample import SAMPLE_PORTFOLIO
-
-# Import models so metadata is populated before create_all.
-from app.persistence import models as _models  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

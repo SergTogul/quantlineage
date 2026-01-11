@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from types import MappingProxyType
 from typing import Annotated, Any, Literal, Union
@@ -1166,7 +1166,7 @@ class RiskResultRef(BaseModel):
 
 
 def _utcnow_domain() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class RiskRun(BaseModel):

@@ -260,12 +260,15 @@ export function RiskRuns({ portfolio }) {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
 
+  const runId = run?.id
+  const runStatus = run?.status
+
   useEffect(() => {
-    if (!run?.id || isRiskRunTerminal(run)) return undefined
+    if (!runId || isRiskRunTerminal({ status: runStatus })) return undefined
     let cancelled = false
     const tick = async () => {
       try {
-        const next = await getRiskRun(run.id)
+        const next = await getRiskRun(runId)
         if (!cancelled) {
           setRun(next)
           setError('')
@@ -279,7 +282,7 @@ export function RiskRuns({ portfolio }) {
       cancelled = true
       clearInterval(timer)
     }
-  }, [run?.id, run?.status])
+  }, [runId, runStatus])
 
   async function start() {
     if (!portfolio) return

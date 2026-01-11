@@ -5,11 +5,10 @@ from __future__ import annotations
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.persistence.base import Base
-from app.persistence.session import create_engine_from_url
-
 # Import models so metadata is populated before create_all.
 from app.persistence import models as _models  # noqa: F401
+from app.persistence.base import Base
+from app.persistence.session import create_engine_from_url
 
 
 def make_sqlite_engine(url: str = "sqlite:///:memory:") -> Engine:

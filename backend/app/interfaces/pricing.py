@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from app.domain.models import MarketSnapshot, Portfolio, Position, StressScenario, Valuation
 from app.market.snapshot import PositionMarketDataProvider, shock_snapshot
 

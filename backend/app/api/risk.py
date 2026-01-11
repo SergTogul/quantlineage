@@ -20,8 +20,8 @@ from app.domain.models import (
     RiskQueryRequest,
     VaRMethodology,
     VaRReport,
-    WhatIfRequest,
     WhatIfReport,
+    WhatIfRequest,
 )
 from app.services.portfolio_service import PortfolioService
 

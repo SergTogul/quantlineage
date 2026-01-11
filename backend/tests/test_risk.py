@@ -1,7 +1,7 @@
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.limits import DEFAULT_LIMITS
-from app.risk.stress import StressEngine, DEFAULT_SCENARIOS
+from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
 

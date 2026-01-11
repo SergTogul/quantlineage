@@ -1,8 +1,6 @@
 # RiskForge CI — honest gates matching README / BUILD_NOTES commands.
 #
-# M9.9 status: workflow + scripts/smoke_postgres.sh are authored and locally
-# proven against Compose Postgres. GitHub-hosted runner green evidence is
-# still required before marking M9.9 / M5.1 COMPLETE (needs origin remote + push).
+# Jobs: backend-pytest, postgres-smoke, frontend-test-build, lint (M9.7).
 name: CI
 
 on:
@@ -156,3 +154,50 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  # M9.7: Ruff + mypy (backend) and ESLint (frontend). Staged rule sets — see
+  # backend/pyproject.toml and frontend/eslint.config.js; ROADMAP documents debt.
+  lint:
+    name: lint-static-analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend lint tools
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          ruff --version
+          mypy --version
+
+      - name: Ruff (backend)
+        working-directory: backend
+        run: ruff check app tests
+
+      - name: mypy (backend)
+        working-directory: backend
+        run: mypy app
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: ESLint (frontend)
+        working-directory: frontend
+        run: npm run lint

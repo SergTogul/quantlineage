@@ -9,8 +9,8 @@ from app.domain.models import (
     MarketSnapshot,
     Portfolio,
     RiskContribution,
-    VaRMethodResult,
     VaRMethodology,
+    VaRMethodResult,
     VaRReport,
 )
 from app.interfaces.pricing import PricingEngine

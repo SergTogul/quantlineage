@@ -44,9 +44,11 @@ from app.risk.scenario_model import (
     FactorShock,
     Scenario,
     ScenarioCategory,
-    apply_scenario as apply_formal_scenario,
     scenario_from_market_scenario,
     scenario_from_stress,
+)
+from app.risk.scenario_model import (
+    apply_scenario as apply_formal_scenario,
 )
 from app.risk.scenarios import FactorChange, MarketScenario
 

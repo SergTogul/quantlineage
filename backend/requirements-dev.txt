@@ -1,0 +1,5 @@
+# Dev/CI static analysis tools (M9.7).
+# Local: pip install -r requirements.txt && pip install -r requirements-dev.txt
+# Lint-only CI does not need runtime deps (mypy uses ignore_missing_imports).
+ruff>=0.8,<1
+mypy>=1.13,<2

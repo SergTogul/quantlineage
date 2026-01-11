@@ -1,4 +1,5 @@
 import pytest
+
 from app.domain.models import (
     BondPosition,
     EquityPosition,
