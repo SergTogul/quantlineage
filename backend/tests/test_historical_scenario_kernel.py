@@ -5,7 +5,7 @@ Conventions
 - Sign: positive P&L = gain; VaR uses loss = -P&L
 - Kernel ABI: equity/FX relative returns; vol in *points* (relative × 100);
   rates in bp × DV01
-- Tolerances: ``KERNEL_PNL_ABS_TOL`` / ``KERNEL_PNL_REL_TOL`` (see historical.py)
+- Tolerances: ``KERNEL_PNL_ABS_TOL`` / ``KERNEL_PNL_REL_TOL`` (``app.compute.kernel``)
 - FULL_REVALUATION must not use the scenario kernel (pricing revaluation only)
 """
 
@@ -20,6 +20,8 @@ import numpy as np
 import pytest
 
 from app.compute.kernel import (
+    KERNEL_PNL_ABS_TOL,
+    KERNEL_PNL_REL_TOL,
     Exposure,
     NativeScenarioKernel,
     PythonScenarioKernel,
@@ -30,8 +32,6 @@ from app.compute.kernel import (
 from app.domain.models import VaRMethodology
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import (
-    KERNEL_PNL_ABS_TOL,
-    KERNEL_PNL_REL_TOL,
     HistoricalRiskEngine,
     approximate_pnl_series,
     full_revaluation_pnl_series,
