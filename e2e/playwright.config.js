@@ -1,16 +1,33 @@
 const { defineConfig, devices } = require('@playwright/test')
+const fs = require('node:fs')
 const path = require('node:path')
 
 const root = path.resolve(__dirname, '..')
 const backend = path.join(root, 'backend')
 const frontend = path.join(root, 'frontend')
-const uvicorn = path.join(backend, '.venv', 'bin', 'uvicorn')
+const venvUvicorn = path.join(backend, '.venv', 'bin', 'uvicorn')
+const isCI = !!process.env.CI
+
+// Local macOS often needs the installed Google Chrome channel (bundled Chromium
+// can be unavailable on older hosts). GHA ubuntu-latest uses Playwright Chromium.
+const useChromeChannel = !isCI && process.env.PLAYWRIGHT_USE_CHROMIUM !== '1'
+
+function backendServerCommand() {
+  if (process.env.RISKFORGE_E2E_UVICORN) {
+    return `${process.env.RISKFORGE_E2E_UVICORN} app.main:app --host 127.0.0.1 --port 8000`
+  }
+  if (fs.existsSync(venvUvicorn)) {
+    return `"${venvUvicorn}" app.main:app --host 127.0.0.1 --port 8000`
+  }
+  // CI / hosts without backend/.venv: uvicorn must be on PATH (pip install).
+  return 'python -m uvicorn app.main:app --host 127.0.0.1 --port 8000'
+}
 
 module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  forbidOnly: isCI,
+  retries: isCI ? 1 : 0,
   workers: 1,
   reporter: [['list']],
   timeout: 60_000,
@@ -20,14 +37,21 @@ module.exports = defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  // Bundled Chromium is unavailable on macOS 13; use the installed Google Chrome channel.
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome' } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(useChromeChannel ? { channel: 'chrome' } : {}),
+      },
+    },
+  ],
   webServer: [
     {
-      command: `"${uvicorn}" app.main:app --host 127.0.0.1 --port 8000`,
+      command: backendServerCommand(),
       cwd: backend,
       url: 'http://127.0.0.1:8000/health',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: !isCI,
       timeout: 120_000,
       env: {
         ...process.env,
@@ -39,7 +63,7 @@ module.exports = defineConfig({
       command: 'npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
       cwd: frontend,
       url: 'http://127.0.0.1:5173',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: !isCI,
       timeout: 120_000,
       env: {
         ...process.env,

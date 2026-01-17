@@ -15,7 +15,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
-| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.7 + M9.9 DONE; M9.10 E2E breadth improved; M9.1–M9.5 + reverse-multi E2E still open) |
+| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.7 + M9.9 DONE; Playwright-in-CI landed; M9.1–M9.5 + reverse-multi E2E still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
 | Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
@@ -62,7 +62,7 @@ Trade (domain/models.py)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
-6. M9.7 **DONE** (staged) — CI `lint-static-analysis` runs Ruff + mypy + ESLint; rule/type debt documented (not full-strict); M9.9 prior green; M9.10 E2E covers ES / change-attribution / VaR-compare / hedge-compare / overview (reverse-multi still needs UI)
+6. M9.7 **DONE** (staged) — CI `lint-static-analysis` runs Ruff + mypy + ESLint; rule/type debt documented (not full-strict); M9.9 prior green; M9.2 Playwright **GHA job** `e2e-playwright` landed (local Chrome channel unchanged); M9.10 breadth improved (reverse-multi still needs UI); M9.1 Vitest/RTL still open
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
@@ -703,12 +703,12 @@ Status: **COMPLETE** (2026-09-02 Frontend/Risk UX — remaining PARTIAL items cl
 
 ## Milestone 9 — Testing, CI & Engineering Quality
 
-Status: PARTIAL (M9.6 + M9.7 + M9.9 DONE; M9.10 breadth improved; M9.1–M9.5 open — do **not** mark COMPLETE)
+Status: PARTIAL (M9.6 + M9.7 + M9.9 DONE; Playwright-in-CI DONE; M9.10 breadth improved; M9.1–M9.5 open — do **not** mark COMPLETE)
 
 ### Tasks
 
 - [ ] M9.1 Frontend testing stack (Vitest/RTL/MSW) — PARTIAL (node:test helpers only)
-- [ ] M9.2 E2E Playwright — PARTIAL (10 specs: prior critical paths + M8 panel breadth in `m8-panels.spec.ts`)
+- [ ] M9.2 E2E Playwright — PARTIAL (10 specs local; **GHA job** `e2e-playwright` DONE 2026-09-02 — Chromium on ubuntu-latest; local macOS still uses Chrome channel)
 - [ ] M9.3 Backend property tests (Hypothesis) — PARTIAL (landed under M1.8 `test_quant_properties.py`; broaden beyond pricing Greeks)
 - [ ] M9.4 Golden quant tests — PARTIAL (M1.8 `test_quantlib_golden.py`; expand instrument coverage)
 - [ ] M9.5 Stress invariants — PARTIAL
@@ -730,7 +730,8 @@ Status: PARTIAL (M9.6 + M9.7 + M9.9 DONE; M9.10 breadth improved; M9.1–M9.5 op
 - [ ] M9.10 E2E coverage for post-M2/M3/M4/M5 endpoints — PARTIAL (2026-09-02 QA breadth pass)
   - Done: ES contributions (`POST /risk/es`), change-attribution waterfall, VaR methodology compare, hedge-compare (`POST /risk/stress/compare`), overview collage → VaR & ES nav; risk-runs hash fix (`/#risk-runs`) after M8 sectioning
   - Evidence: `e2e/tests/m8-panels.spec.ts` + updated `e2e/tests/risk-runs.spec.ts`; local `cd e2e && npm test` → **10 passed** (2026-09-02)
-  - Still open: multi-factor reverse stress E2E (API exists; **no UI panel** — Frontend handoff before QA can close); Playwright not yet a GHA CI job
+  - CI: `.github/workflows/ci.yml` job `e2e-playwright` (Playwright Chromium; builtin API + Vite via `webServer`) — closes “Playwright not yet a GHA CI job”
+  - Still open: multi-factor reverse stress E2E (API exists; **no UI panel** — Frontend handoff before QA can close)
 
 ### Progress update (2026-09-02, QA — M9.10 E2E breadth)
 
@@ -743,7 +744,15 @@ Status: PARTIAL (M9.6 + M9.7 + M9.9 DONE; M9.10 breadth improved; M9.1–M9.5 op
 
 - Owner: DevOps / Platform
 - Landed CI `lint-static-analysis` (Ruff + mypy + ESLint) with staged configs; GHA green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 (SHA `8d7a6f2`)
-- Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.1–M9.5, Playwright-in-CI, reverse-multi E2E still open)
+- Follow-up SHA `8d7a6f2`: restore Historical VaR kernel test imports after Ruff F401 cleanup; `FloatArray` PEP 695 alias + numpy in `requirements-dev.txt` so lint-job mypy matches CI
+- Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.1–M9.5, reverse-multi E2E still open; Playwright-in-CI closed below)
+
+### Progress update (2026-09-02, DevOps/QA — Playwright in GHA)
+
+- Owner: DevOps / Platform (+ QA coordination)
+- Landed CI job `e2e-playwright`: pip backend (QuantLib optional) + `frontend`/`e2e` `npm ci` + `playwright install --with-deps chromium` + `CI=true npm test`
+- `e2e/playwright.config.js`: CI uses bundled Chromium and `python -m uvicorn` when `.venv` absent; local macOS keeps Chrome channel + `.venv` uvicorn
+- Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.1 Vitest/RTL, M9.3–M9.5 broaden, M9.8 Redis optional, reverse-multi E2E still open)
 
 ---
 
