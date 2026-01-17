@@ -5,7 +5,8 @@
   "scripts": {
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "install:browsers": "playwright install chrome"
+    "install:browsers": "playwright install chrome",
+    "install:browsers:ci": "playwright install --with-deps chromium"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
