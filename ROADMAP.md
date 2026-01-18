@@ -15,7 +15,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
-| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.2 + M9.6 + M9.7 + M9.9 DONE; M9.1 / M9.3–M9.5 / M9.8 + reverse-multi E2E still open) |
+| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.1 + M9.2 + M9.6 + M9.7 + M9.9 DONE; M9.3–M9.5 / M9.8 + reverse-multi E2E still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
 | Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
@@ -62,7 +62,7 @@ Trade (domain/models.py)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
-6. M9.7 **DONE** (staged) — CI `lint-static-analysis` green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 (SHA `8d7a6f2`); M9.9 prior green; M9.2 Playwright **DONE** — `e2e-playwright` GHA green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (SHA `2f45e14`, job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499); M9.10 breadth improved (reverse-multi still needs UI); M9.1 Vitest/RTL still open
+6. M9.7 **DONE** (staged) — CI `lint-static-analysis` green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 (SHA `8d7a6f2`); M9.9 prior green; M9.2 Playwright **DONE** — `e2e-playwright` GHA green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857; **M9.1 Vitest/RTL/MSW DONE** (dual-run node:test + Vitest; representative RTL/MSW slice — see M9.1); M9.10 reverse-multi still needs UI
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
@@ -703,11 +703,16 @@ Status: **COMPLETE** (2026-09-02 Frontend/Risk UX — remaining PARTIAL items cl
 
 ## Milestone 9 — Testing, CI & Engineering Quality
 
-Status: PARTIAL (M9.2 + M9.6 + M9.7 + M9.9 DONE; M9.10 breadth improved; M9.1 / M9.3–M9.5 / M9.8 + reverse-multi E2E open — do **not** mark COMPLETE)
+Status: PARTIAL (M9.1 + M9.2 + M9.6 + M9.7 + M9.9 DONE; M9.10 breadth improved; M9.3–M9.5 / M9.8 + reverse-multi E2E open — do **not** mark COMPLETE)
 
 ### Tasks
 
-- [ ] M9.1 Frontend testing stack (Vitest/RTL/MSW) — PARTIAL (node:test helpers only)
+- [x] M9.1 Frontend testing stack (Vitest/RTL/MSW) — **DONE** (2026-09-02, staged)
+  - Stack: Vitest 4 + jsdom + Testing Library + MSW 2; config in `frontend/vite.config.js` + `frontend/src/test/{setup,mswServer}.js`.
+  - Dual-run: `npm test` = `test:node` (existing `src/lib/*.test.mjs` via node:test) **and** `test:vitest` (component suite). Lib helpers not mass-migrated overnight.
+  - Representative RTL slice: `MetricCard`, `AppNav`, `ScenarioBuilder` (validation + MSW success/error for `POST .../stress/evaluate/custom`; fixtures only — no client risk math).
+  - Local evidence: `cd frontend && npm test` → **56** node:test + **6** Vitest passed; `npm run lint` OK; `npm run build` OK.
+  - Residual (non-blocking): migrate `risk.test.mjs` / `heatmap.test.mjs` / `nav.test.mjs` onto Vitest; broaden RTL/MSW to more panels.
 - [x] M9.2 E2E Playwright — **DONE** (2026-09-02)
   - Local: 10 Playwright specs (`cd e2e && npm test`); macOS uses Chrome channel.
   - CI: job `e2e-playwright` (Chromium on ubuntu-latest; builtin API + Vite `webServer`) landed SHA `7f01407`.
@@ -766,6 +771,14 @@ Status: PARTIAL (M9.2 + M9.6 + M9.7 + M9.9 DONE; M9.10 breadth improved; M9.1 / 
 - GHA run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (head SHA `2f45e14`, title: Document honest Playwright CI status pending runner proof.)
 - Job `e2e-playwright` **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499 (including step `Run Playwright E2E`). Sibling jobs also green: `backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`.
 - **M9.2 DONE** on this evidence. Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.1 Vitest/RTL, M9.3–M9.5 broaden, M9.8 Redis optional, M9.10 reverse-multi E2E still open). Do **not** start M9.1 in this task.
+
+### Progress update (2026-09-02, QA — M9.1 Vitest/RTL/MSW)
+
+- Owner: QA & Quant Validation (+ Frontend harness only)
+- Landed Vitest + RTL + MSW alongside existing node:test helpers (dual-run `npm test`).
+- Representative component coverage: MetricCard, AppNav, ScenarioBuilder (MSW fixtures for custom stress evaluate).
+- Local: `cd frontend && npm test` → 56 + 6 passed; lint + production build OK. CI `frontend-test-build` uses unchanged `npm test` entrypoint.
+- **M9.1 DONE** (staged). Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.3–M9.5 broaden, M9.8 Redis optional, M9.10 reverse-multi E2E / Frontend multi-factor reverse UI still open).
 
 ---
 
