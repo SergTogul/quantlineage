@@ -9,7 +9,7 @@ import globals from "globals";
  */
 export default [
   {
-    ignores: ["dist/**", "runtime-dist/**", "node_modules/**"],
+    ignores: ["dist/**", "runtime-dist/**", "node_modules/**", "coverage/**"],
   },
   js.configs.recommended,
   {
