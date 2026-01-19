@@ -15,7 +15,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
-| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.1–M9.3 + M9.5–M9.7 + M9.9 DONE; M9.4 / M9.8 + reverse-multi E2E still open) |
+| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.1–M9.7 + M9.9 DONE; M9.8 Redis optional + M9.10 reverse-multi E2E still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
 | Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
@@ -62,7 +62,7 @@ Trade (domain/models.py)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
-6. M9.7 **DONE** (staged); M9.2 Playwright **DONE**; **M9.1 Vitest/RTL/MSW DONE** (`bd46a1a`); **M9.3 Hypothesis portfolio/VaR + M9.5 stress invariants DONE** (staged — `tests/test_m9_risk_properties.py`); M9.4 golden expand + M9.8 Redis + M9.10 reverse-multi UI/E2E still open
+6. M9.7 **DONE** (staged); M9.2 Playwright **DONE**; **M9.1 Vitest/RTL/MSW DONE** (`bd46a1a`); **M9.3/M9.5 Hypothesis DONE**; **M9.4 QuantLib golden expand DONE** (`test_quantlib_golden.py`); M9.8 Redis optional + M9.10 reverse-multi UI/E2E still open
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
@@ -703,7 +703,7 @@ Status: **COMPLETE** (2026-09-02 Frontend/Risk UX — remaining PARTIAL items cl
 
 ## Milestone 9 — Testing, CI & Engineering Quality
 
-Status: PARTIAL (M9.1–M9.3 + M9.5–M9.7 + M9.9 DONE; M9.10 breadth improved; M9.4 / M9.8 + reverse-multi E2E open — do **not** mark COMPLETE)
+Status: PARTIAL (M9.1–M9.7 + M9.9 DONE; M9.10 breadth improved; M9.8 Redis optional + reverse-multi E2E open — do **not** mark COMPLETE)
 
 ### Tasks
 
@@ -722,7 +722,11 @@ Status: PARTIAL (M9.1–M9.3 + M9.5–M9.7 + M9.9 DONE; M9.10 breadth improved; 
   - Beyond M1.8 pricing Greeks: `backend/tests/test_m9_risk_properties.py` — VaR/ES ordering, MV aggregation, component-VaR Euler reconciliation under Hypothesis.
   - Local: `pytest tests/test_m9_risk_properties.py` → **6 passed**.
   - Residual (non-blocking): more methodologies / FULL_REVAL property space; keep M1.8 Greeks suite as baseline.
-- [ ] M9.4 Golden quant tests — PARTIAL (M1.8 `test_quantlib_golden.py`; expand instrument coverage)
+- [x] M9.4 Golden quant tests — **DONE** (2026-09-02, expand)
+  - Expanded `backend/tests/test_quantlib_golden.py` (~49 cases): equity/FX options vs analytic BS/GK; CIP equity-future & FX-forward algebra (rel=1e-12); IR STIR algebra; continuous Actual365Fixed ZC bond golden (closes annual-compound day-count gap as documented); IRS payer/receiver + ATM residual; edge eval dates (weekend/leap/year-end); PricingEngine seam check.
+  - Tolerances/reference documented in module docstring (QuantLib AnalyticEuropeanEngine / FlatForward; algebraic CIP/STIR identities shared with Builtin).
+  - Local: `RISKFORGE_PRICING_ENGINE=quantlib pytest tests/test_quantlib_golden.py` → **49 passed**; full backend suite → **564 passed**.
+  - Residual (non-blocking): very short ``T ≲ 0.05`` option date-rounding bands remain in `test_quantlib_pricing.py`; IRS NPV not identical to Builtin annuity model.
 - [x] M9.5 Stress invariants — **DONE** (2026-09-02, staged)
   - Hypothesis: stress pnl == Σ by_position; empty scenario list → []; long-equity equity-shock monotonicity (same file as M9.3).
   - Complements prior zero-shock / empty-scenario attribution tests.
@@ -792,6 +796,13 @@ Status: PARTIAL (M9.1–M9.3 + M9.5–M9.7 + M9.9 DONE; M9.10 breadth improved; 
 - Added `backend/tests/test_m9_risk_properties.py`: portfolio VaR/ES ordering, MV aggregation, component-VaR reconciliation; stress pnl sum / empty list / long-equity shock monotonicity (Hypothesis).
 - Local: `cd backend && pytest tests/test_m9_risk_properties.py tests/test_quant_properties.py tests/test_component_var.py` → **20 passed**.
 - **M9.3 + M9.5 DONE** (staged). Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.4 golden expand, M9.8 Redis optional, M9.10 reverse-multi UI/E2E still open).
+
+### Progress update (2026-09-02, QA — M9.4 QuantLib golden expand)
+
+- Owner: QA & Quant Validation (PricingEngine seams preserved; no adapter code changes)
+- Expanded `test_quantlib_golden.py` with IRS/FX/futures/bond continuous DF goldens, edge evaluation dates, documented tolerances (analytic BS/GK, CIP/STIR algebra, Actual365Fixed continuous bond vs annual-compound gap).
+- Local: `RISKFORGE_PRICING_ENGINE=quantlib pytest tests/test_quantlib_golden.py` → **49 passed**; full `pytest` → **564 passed**, 1 warning.
+- **M9.4 DONE**. Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.8 Redis optional; M9.10 reverse-multi UI/E2E still open — Frontend multi-factor reverse panel required before QA E2E close).
 
 ---
 
