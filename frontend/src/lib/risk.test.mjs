@@ -11,6 +11,8 @@ import {
   demoPnLAttributionRequest, overviewKpis, overviewCollage,
   SCENARIO_PRESETS, defaultScenarioForm, validateScenarioForm,
   esContributionSummary, ES_CONTRIBUTION_DIMENSIONS, varCompareSummary,
+  defaultReverseMultiForm, validateReverseMultiForm, reverseMultiRequestBody,
+  selectedReverseMultiFactors, formatFactorShock, REVERSE_MULTI_FACTORS,
 } from './risk.mjs'
 
 test('money formats institutional-scale values',()=>{assert.equal(money(3_410_000),'$3.41M');assert.equal(money(-81_300),'-$81.3K')})
@@ -185,17 +187,64 @@ test('reverseStressMultiSummary parses multi-factor result', () => {
   const result = {
     converged: true,
     target_loss_pct: 0.1,
+    target_loss: 500,
     achieved_loss_pct: 0.099,
     pnl: -500,
+    base_market_value: 5000,
+    objective_l2: 0.4,
     shocks: [{ factor: 'equity', required_shock: -0.2, shock_unit: 'relative', weight: 1, max_shock: 0.8 }],
     factors: ['equity'],
+    method: 'ray_search_coordinate_descent',
+    iterations: 3,
     message: null,
+    assumptions: ['Adverse orthant'],
   }
   const s = reverseStressMultiSummary(result)
   assert.equal(s.converged, true)
   assert.equal(s.shocks.length, 1)
   assert.equal(s.factors[0], 'equity')
+  assert.equal(s.method, 'ray_search_coordinate_descent')
+  assert.equal(s.iterations, 3)
+  assert.equal(s.assumptions[0], 'Adverse orthant')
   assert.equal(reverseStressMultiSummary(null), null)
+})
+
+test('defaultReverseMultiForm selects equity+vol', () => {
+  const form = defaultReverseMultiForm()
+  assert.deepEqual(selectedReverseMultiFactors(form), ['equity', 'vol'])
+  assert.equal(REVERSE_MULTI_FACTORS.length, 4)
+})
+
+test('validateReverseMultiForm requires two factors and positive target', () => {
+  const form = defaultReverseMultiForm()
+  assert.equal(validateReverseMultiForm(form).ok, true)
+  form.factors.vol = false
+  assert.match(validateReverseMultiForm(form).error, /at least two/i)
+  form.factors.vol = true
+  form.target_loss_pct = 0
+  assert.match(validateReverseMultiForm(form).error, /Target loss/i)
+})
+
+test('reverseMultiRequestBody maps display % to API fractions', () => {
+  const form = defaultReverseMultiForm()
+  form.weights.equity = '0.7'
+  form.weights.vol = '0.3'
+  const body = reverseMultiRequestBody(form)
+  assert.equal(body.target_loss_pct, 0.05)
+  assert.equal(body.max_shock, 0.8)
+  assert.deepEqual(body.factors, ['equity', 'vol'])
+  assert.deepEqual(body.weights, { equity: 0.7, vol: 0.3 })
+})
+
+test('reverseMultiRequestBody omits weights when blank', () => {
+  const body = reverseMultiRequestBody(defaultReverseMultiForm())
+  assert.equal(body.weights, undefined)
+})
+
+test('formatFactorShock uses wire unit from API', () => {
+  assert.equal(formatFactorShock({ required_shock: -0.14, shock_unit: 'relative' }), '-14.0%')
+  assert.equal(formatFactorShock({ required_shock: 125, shock_unit: 'bp' }), '125 bp')
+  assert.equal(formatFactorShock(null), '—')
 })
 
 test('attributionSummary passes M4.3 driver labels through unchanged', () => {
