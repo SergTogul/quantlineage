@@ -25,6 +25,11 @@ header{display:flex;justify-content:space-between;align-items:end;margin-bottom:
 .risk-run-form select[aria-label="es methodology"],
 .risk-run-form select[aria-label="es dimension"]{max-width:180px}
 .risk-run-form label{font-size:11px;color:#8ea0b5}.risk-run-form label input{max-width:100px}
+.reverse-multi-factors{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 4px}
+.reverse-multi-factor{display:flex;align-items:center;gap:6px;font-size:13px;color:#b6c4d5;cursor:pointer}
+.reverse-multi-factor input{width:auto;margin:0;accent-color:#78d5a5}
+.reverse-multi-form{flex-wrap:wrap}.reverse-multi-form label input{max-width:90px}
+.reverse-multi-assumptions{margin:10px 0 0;padding-left:18px;font-size:12px;line-height:1.45}
 .heatmap-controls{margin-top:10px;margin-bottom:4px}.heatmap-legend{display:flex;align-items:center;gap:6px;font-size:11px;color:#8ea0b5;flex-wrap:wrap;justify-content:flex-end}.heatmap-swatch{width:14px;height:14px;border-radius:3px;border:1px solid #33445a;display:inline-block}
 .heatmap-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:14px}
 .heatmap-tile{display:grid;gap:4px;padding:12px;border-radius:8px;border:1px solid #243141;min-height:72px}
