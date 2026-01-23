@@ -3,8 +3,8 @@ import { expect, test } from '@playwright/test'
 /**
  * M9.10 — E2E breadth for Milestone 8 panels that call post-M2/M3/M4 APIs.
  * Asserts UI → live API → rendered results (no client-side risk math).
- * Multi-factor reverse stress UI landed; residual live E2E close tracked under M9.10
- * (`e2e/tests/reverse-stress.spec.ts` structural status assertions).
+ * Multi-factor reverse stress live E2E: `e2e/tests/reverse-stress.spec.ts`
+ * (fill controls + Converged/Not converged status — no invented PnL numbers).
  */
 
 test.describe('M8 VaR & ES panels', () => {
