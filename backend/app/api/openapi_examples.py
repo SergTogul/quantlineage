@@ -483,6 +483,40 @@ EXAMPLE_HEDGE_COMPARE_RESPONSE: dict[str, Any] = {
 
 STRESS_BODY_EXAMPLES = PORTFOLIO_BODY_EXAMPLES
 
+# Formal Scenario wire (M3.8) — illustrative; amounts are bump units, not goldens.
+EXAMPLE_FORMAL_SCENARIO: dict[str, Any] = {
+    "id": "formal-equity-vol",
+    "name": "Equity −10% + vol +25%",
+    "category": "factor",
+    "description": "Illustrative formal Scenario wire",
+    "shocks": [
+        {"factor_type": "equity", "key": "SPY", "amount": -0.10, "bucket": "SPY"},
+        {
+            "factor_type": "vol",
+            "key": "SPY:VOL",
+            "amount": 0.25,
+            "bucket": "SPY",
+            "expiry": "GENERIC",
+            "moneyness": "ATM",
+        },
+    ],
+    "max_loss_pct": 0.05,
+    "severity": None,
+    "metadata": {},
+}
+
+EXAMPLE_FORMAL_CUSTOM_STRESS_REQUEST: dict[str, Any] = {
+    "portfolio": EXAMPLE_PORTFOLIO,
+    "scenarios": [EXAMPLE_FORMAL_SCENARIO],
+}
+
+FORMAL_CUSTOM_STRESS_BODY_EXAMPLES: dict[str, dict[str, Any]] = {
+    "formal_equity_vol": _ex(
+        "Custom stress with formal Scenario wire (M3.8)",
+        EXAMPLE_FORMAL_CUSTOM_STRESS_REQUEST,
+    ),
+}
+
 REVERSE_BODY_EXAMPLES: dict[str, dict[str, Any]] = {
     "equity_target_loss": _ex(
         "Single-factor reverse stress", EXAMPLE_REVERSE_REQUEST

@@ -9,7 +9,9 @@ Shock application rule (charter): transform a base ``MarketSnapshot`` via
 scenario code.
 
 Legacy ``StressScenario`` (flat scalar/dict fields) remains the wire/API shape
-for existing stress endpoints. Use the adapters in this module to convert
+for existing stress endpoints. M3.8 adds formal ``ScenarioWire`` under
+``/api/v1/risk/stress/formal/*`` and ``GET .../scenarios/formal`` (see
+``app.api.scenario_wire``). Use the adapters in this module to convert
 without rewriting ``StressEngine`` / what-if / VaR paths.
 """
 
