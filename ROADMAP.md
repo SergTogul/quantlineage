@@ -751,7 +751,8 @@ Status: PARTIAL (M9.1–M9.7 + M9.9–M9.10 DONE; M9.8 Redis/RQ optional still o
   - Frontend UI: Stress-section **Multi-Factor Reverse Stress** → `POST /api/v1/risk/stress/reverse/multi` (helpers + Vitest/RTL/MSW)
   - QA E2E close: `e2e/tests/reverse-stress.spec.ts` — navigate `#stress`, fill target/max-shock/weights + factor toggles, assert Status Converged/Not converged + factor table rows; client validation for fewer than two factors; **no invented PnL/shock numbers**
   - Local evidence: `cd e2e && npm test` → **12 passed** (2026-09-02 QA); Chrome channel locally; CI stays Chromium via `CI=true` (`e2e/playwright.config.js`)
-  - CI: `.github/workflows/ci.yml` job `e2e-playwright` — prior GHA green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499); M9.2 gate unchanged (channel vs ubuntu preserved)
+  - CI close: push SHA `a61c29a` — run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 ; job `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 (also fixed Frontend `8409b7e` regression: single-factor heading strict-mode collision)
+  - Prior M9.2 gate: https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499)
   - Milestone 9 remains **PARTIAL** solely on **M9.8** (Redis/RQ optional; compose stack already has postgres/backend/worker/frontend)
 
 ### Progress update (2026-09-02, QA — M9.10 E2E breadth)
@@ -819,6 +820,7 @@ Status: PARTIAL (M9.1–M9.7 + M9.9–M9.10 DONE; M9.8 Redis/RQ optional still o
 - Owner: QA & Quant Validation
 - Closed reverse-multi live E2E gap: fill controls (target loss %, max shock %, weights, factor checkboxes), assert Status Converged/Not converged + shock table factor rows; validation path for fewer than two factors; fixed single-factor card selector (`exact: true`) after Multi-Factor heading collision.
 - Local: `cd e2e && npm test` → **12 passed** (no unexpected skips). Spec/selectors only — no UI product changes.
+- GHA: run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 (head `a61c29a`); `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 — also clears the `8409b7e` single-factor heading strict-mode failure.
 - **M9.10 DONE**. Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.8 Redis/RQ optional still open). Next: Lead Architect decide M9.8 deferral vs implement; then M3.8 / M6 SLA / M10.
 
 ---
