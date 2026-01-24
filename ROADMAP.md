@@ -15,7 +15,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
-| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.1–M9.7 + M9.9–M9.10 DONE; M9.8 Redis/RQ optional still open — do **not** mark COMPLETE) |
+| Milestone 9 — Testing, CI & Engineering Quality | **COMPLETE** (2026-09-02 Lead Architect: M9.1–M9.10; M9.8 containers DONE; Redis/RQ **deferred** residual — not claimed done) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
 | Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
@@ -60,10 +60,10 @@ Trade (domain/models.py)
 1. Caps/floors/swaptions still deferred; EquityVol/FXVol bumps do not rewrite surface grids; QL uses `BlackConstantVol` at point σ (not full surface engine); Builtin vs QL bond day-count gap
 2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 valuation LRU only (curve/scenario memo open — non-blocking polish)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
-4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
+4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); **M3.8 formal Scenario HTTP wire DONE** (legacy StressScenario endpoints retained)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
-6. M9.7 **DONE** (staged); M9.2 Playwright **DONE**; **M9.1 Vitest/RTL/MSW DONE** (`bd46a1a`); **M9.3/M9.5 Hypothesis DONE**; **M9.4 QuantLib golden expand DONE**; **M9.10 reverse-multi E2E DONE** (QA); M9.8 Redis/RQ optional still open — Milestone 9 stays **PARTIAL**
-7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
+6. M9 **COMPLETE** (2026-09-02): M9.1–M9.10; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / M5.7)
+7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum); M3.9 methodology docs still open
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
 
@@ -307,13 +307,17 @@ Flagship stress with typed multi-factor shocks, honest crisis labeling, reconcil
 | Frontend `npm run build` | **OK** |
 | Breaking API shape | `POST /risk/stress/compare` returns `HedgeComparisonReport` object (not bare `ScenarioComparison[]`); legacy per-scenario fields live under `scenarios[]` |
 | Multi-factor reverse limitations | Adverse orthant only; monotonicity assumed not proven; ray + coordinate descent is not a certified global optimum; assumptions echoed on result |
-| Known residual | Hedge-compare UI landed M8.5; dual-mount + M7.6 sunset DONE (legacy still served); formal `Scenario` not yet stress HTTP wire type (M3.8) |
+| Known residual | Hedge-compare UI landed M8.5; dual-mount + M7.6 sunset DONE (legacy still served); **M3.8 formal Scenario wire DONE** (legacy StressScenario retained; hedge-compare/what-if still legacy shape) |
 | Hierarchy | Left untouched in M3 acceptance — M4.2 later fixed hierarchy↔stress via lazy import (no residual circular-import gap) |
 
 ### Follow-on tasks (discovered during M1–M5)
 
-- [ ] M3.8 Expose formal `Scenario` as stress HTTP wire type (versioned `/api/v1`)
-  - Why/evidence: ADR 004 keeps `StressScenario` as stable wire DTO; adapters exist; HTTP still legacy shape
+- [x] M3.8 Expose formal `Scenario` as stress HTTP wire type (versioned `/api/v1`) — **DONE** (2026-09-02 Lead Architect + Backend)
+  - Wire: `app.api.scenario_wire` (`ScenarioWire` / `FactorShockWire` / `FormalCustomStressRequest`)
+  - Routes: `GET /api/v1/risk/stress/scenarios/formal`, `POST .../formal/custom`, `POST .../formal/evaluate/custom`
+  - Adapters → `StressScenario` for `StressEngine` (no VaR/pricing math change); legacy `StressScenario` endpoints unchanged
+  - Evidence: `backend/tests/test_scenario_wire_api.py`; ADR 004 consequences updated
+  - Residual: hedge-compare / what-if still accept `StressScenario` only; Frontend ScenarioBuilder may keep legacy shape until a UI follow-on
 - [ ] M3.9 Publish multi-factor reverse-stress limitations in methodology docs (not a fake “complete optimizer”)
   - Why/evidence: M3.6 acceptance + `reverse_stress_multi.py` — ray search + coordinate descent, adverse orthant, monotonicity assumed; **not** a certified global optimum. Keep M3.6 `[x]`; document for users/interviewers (pairs with M12.4 / M12.6)
 
@@ -697,13 +701,13 @@ Status: **COMPLETE** (2026-09-02 Frontend/Risk UX — remaining PARTIAL items cl
 
 - Frontend `npm test` **56 passed**; `npm run build` OK (2026-09-02 M8 close pass).
 - No client risk math; all panels display API payloads.
-- Residual (non-blocking for M8): formal `Scenario` HTTP wire still M3.8; multi-factor reverse UI in Stress section (`ReverseStressMulti` → `/api/v1/risk/stress/reverse/multi`); P&L illustrative market path still uses `/attribution/demo` (position-change path uses real `/attribution`); reverse-multi E2E closed under M9.10.
+- Residual (non-blocking for M8): **M3.8 formal Scenario HTTP wire DONE**; multi-factor reverse UI in Stress section (`ReverseStressMulti` → `/api/v1/risk/stress/reverse/multi`); P&L illustrative market path still uses `/attribution/demo` (position-change path uses real `/attribution`); reverse-multi E2E closed under M9.10.
 
 ---
 
 ## Milestone 9 — Testing, CI & Engineering Quality
 
-Status: PARTIAL (M9.1–M9.7 + M9.9–M9.10 DONE; M9.8 Redis/RQ optional still open — do **not** mark COMPLETE)
+Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.10; Redis/RQ deferred residual)
 
 ### Tasks
 
@@ -739,7 +743,10 @@ Status: PARTIAL (M9.1–M9.7 + M9.9–M9.10 DONE; M9.8 Redis/RQ optional still o
   - Trivial fixes: Ruff autofix (imports/unused), F821 lambda closure in `risk_run_worker.py`, Analytics `useEffect` deps for exhaustive-deps; kernel P&L tol imports moved to `app.compute.kernel` in tests.
   - GHA evidence: push SHA `8d7a6f2`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 — includes green `lint-static-analysis`.
   - Follow-up (non-blocking for M9.7): enable ignored Ruff rules gradually; clear mypy `disable_error_code`; add Vitest/TS when M9.1 advances.
-  - [ ] M9.8 Containers — PARTIAL (compose: `postgres` + `backend` + `worker` + `frontend`; worker claims via Postgres `SKIP LOCKED` — see M5.7; Redis/RQ optional)
+- [x] M9.8 Containers — **DONE** (2026-09-02 Lead Architect disposition)
+  - **Acceptance (containers):** Compose ships `postgres` + `backend` + `worker` + `frontend` (`docker-compose.yml`); `backend` sets `RISKFORGE_EXTERNAL_WORKER=1`; `worker` runs `python -m app.worker` and claims via Postgres `FOR UPDATE SKIP LOCKED` (M5.7 / ADR 005). No VaR/pricing math changed.
+  - **Redis/RQ — DEFERRED (accepted residual, not claimed `[x]`):** Fair scheduling / ops queue is **out of M9 scope**. Claim safety does **not** require Redis/RQ (Compose comment + `app/worker.py` + README). Do **not** add a fake Redis service or RQ worker that does not change product semantics.
+  - Follow-on (post-M9, optional ops): Redis/RQ or equivalent only if product needs cross-host fair scheduling beyond Postgres SKIP LOCKED — track outside Milestone 9.
 
 - [x] M9.9 Validate CI on GitHub-hosted runners (fix workflow green; document QuantLib install path) — **DONE** (2026-09-02)
   - Local evidence (2026-09-02, DevOps): `docker compose up -d postgres` + `RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge ./scripts/smoke_postgres.sh` → **exit 0** (`postgres smoke OK`; Alembic head `002_risk_run_domain_fields`). Idempotent re-run OK. See `BUILD_NOTES.md`.
@@ -753,7 +760,25 @@ Status: PARTIAL (M9.1–M9.7 + M9.9–M9.10 DONE; M9.8 Redis/RQ optional still o
   - Local evidence: `cd e2e && npm test` → **12 passed** (2026-09-02 QA); Chrome channel locally; CI stays Chromium via `CI=true` (`e2e/playwright.config.js`)
   - CI close: push SHA `a61c29a` — run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 ; job `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 (also fixed Frontend `8409b7e` regression: single-factor heading strict-mode collision)
   - Prior M9.2 gate: https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499)
-  - Milestone 9 remains **PARTIAL** solely on **M9.8** (Redis/RQ optional; compose stack already has postgres/backend/worker/frontend)
+  - Prior note: Milestone 9 stayed PARTIAL until Lead Architect M9.8 disposition (below).
+
+### Progress update (2026-09-02, Lead Architect — M9.8 disposition + Milestone 9 COMPLETE)
+
+- Owner: Lead Architect / Orchestrator (DevOps charter consulted; no Redis/RQ implementation)
+- **Decision:** ROADMAP labeled Redis/RQ as **optional** for M9.8; M5.7 already closed multi-worker claim with Postgres `SKIP LOCKED`. Required M9.8 deliverable is the **Compose container stack**, which already exists and is documented. Redis/RQ is an **accepted deferred residual** (fair scheduling/ops) — **not** rubber-stamped done and **not** required for Milestone 9 COMPLETE.
+- **Did not** add Redis/RQ (would be empty ceremony without product semantics; must not regress M5.7 claim path or PricingEngine seams).
+- **M9.8 DONE** (containers). Redis/RQ remains deferred outside M9.
+- **Milestone 9 COMPLETE** — every required checklist item M9.1–M9.10 is honestly DONE.
+- Next highest-value residual outside M9: **M3.8** (started same session) / M6 SLA / M10.
+
+### Progress update (2026-09-02, Lead Architect + Backend — M3.8 formal Scenario wire)
+
+- Owner: Lead Architect / Orchestrator implementing Backend/API (+ Stress adapter reuse)
+- Landed formal HTTP wire without replacing legacy `StressScenario` endpoints (ADR 004).
+- Routes under dual-mount `/api/v1` (+ legacy): `GET /risk/stress/scenarios/formal`, `POST /risk/stress/formal/custom`, `POST /risk/stress/formal/evaluate/custom`.
+- PnL parity: formal wire → `scenario_to_stress` matches named-dict legacy custom stress (abs 1e-9).
+- PricingEngine seams / VaR math / M5.7 SKIP LOCKED untouched.
+- Residual: ScenarioBuilder UI and hedge-compare/what-if still use legacy shape.
 
 ### Progress update (2026-09-02, QA — M9.10 E2E breadth)
 

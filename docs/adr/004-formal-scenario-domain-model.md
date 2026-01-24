@@ -43,7 +43,11 @@ existing stress/what-if endpoints.
 ## Consequences
 
 - M3.2+ multi-factor engine and crisis library should build on ``Scenario``.
-- Backend/API may later expose formal Scenario DTOs under versioned routes;
-  until then adapters keep legacy endpoints working.
+- **M3.8 (2026-09-02):** formal ``ScenarioWire`` / ``FactorShockWire`` exposed on
+  versioned routes ``GET /api/v1/risk/stress/scenarios/formal``,
+  ``POST /api/v1/risk/stress/formal/custom``,
+  ``POST /api/v1/risk/stress/formal/evaluate/custom`` (see ``app.api.scenario_wire``).
+  Adapters project to ``StressScenario`` for ``StressEngine``; legacy endpoints
+  unchanged. Hedge-compare / what-if remain on ``StressScenario`` until a follow-on.
 - Declared ``severity`` on a definition is optional metadata; realized severity
   still comes from ``classify_severity(loss_pct_nav)`` after revaluation.
