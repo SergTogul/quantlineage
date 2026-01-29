@@ -51,7 +51,7 @@ cd frontend && npm test && npm run lint
 - Frontend: **61** node:test + **9** Vitest passed; ESLint OK
 - QuantLib: 1.43
 - C++: `risk_kernel_ok` + shared lib OK
-- GHA HEAD: success run 33701266538 (pre-hardening); post-push URL TBD below after watch
+- GHA HEAD: success run 33701266538 (pre-hardening); post-hardening **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33703670779 (SHA `16c91cc`; all five jobs green)
 
 ## Known limitations / risks
 - Local Playwright under Cursor sandbox aborts Chrome (`kill EPERM`); trust GHA `e2e-playwright` + prior green evidence for E2E.
