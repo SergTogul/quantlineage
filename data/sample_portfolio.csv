@@ -1,7 +1,0 @@
-type,id,instrument,quantity
- equity,eq-nvda,NVDA,1200
- equity,eq-spy,SPY,900
- european_option,opt-spy-put,SPY 540 Put,500
- european_option,opt-nvda-call,NVDA 130 Call,-350
- bond,bond-ust10,UST 10Y,1
- swap,swap-usd5y,USD 5Y Pay Fixed,1
