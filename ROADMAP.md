@@ -16,7 +16,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
 | Milestone 9 — Testing, CI & Engineering Quality | **COMPLETE** (2026-09-02 Lead Architect: M9.1–M9.10; M9.8 containers DONE; Redis/RQ **deferred** residual — not claimed done) |
-| Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
+| Milestone 10 — Demo Data & Reproducibility | **PARTIAL** (M10.1 DONE; M10.2–M10.3 open) |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
 | Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
 | Milestone 13 — Final Portfolio Demo | NOT STARTED |
@@ -860,13 +860,23 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.
 
 ## Milestone 10 — Demo Data & Reproducibility
 
-Status: NOT STARTED
+Status: **PARTIAL** (2026-09-02 — M10.1 DONE; do **not** mark COMPLETE)
 
 ### Tasks
 
-- [ ] M10.1 Demo portfolios (Equity Vol / Rates Macro / Cross-Asset) — PARTIAL (one in-code SAMPLE_PORTFOLIO)
+- [x] M10.1 Demo portfolios (Equity Vol / Rates Macro / Cross-Asset) — **DONE** (2026-09-02)
+  - In-code books: `equity-vol`, `rates-macro`, `global-macro` (Cross-Asset theme; default `SAMPLE_PORTFOLIO`)
+  - Catalog: `DEMO_PORTFOLIOS` + `GET /api/v1/portfolios` (+ `GET /portfolios/{id}`); SQLAlchemy seeds all three
+  - No live market vendor feeds; marks remain synthetic/embedded
 - [ ] M10.2 Demo historical market dataset — NOT STARTED (`data/sample_portfolio.csv` unused orphan)
 - [ ] M10.3 Deterministic demo scripts — NOT STARTED
+
+### Progress update (2026-09-02, Lead Architect / Market Data — M10.1)
+
+- Owner: Lead Architect (+ Market Data seams for snapshot-from-positions; no PricingEngine changes)
+- Landed three themed demo portfolios with composition invariants, list/get catalog API, persistence seed of all demos.
+- Default `GET /portfolio` still serves Cross-Asset `global-macro` (`SAMPLE_PORTFOLIO`) — E2E heading "Global Macro Demo" preserved.
+- Milestone 10 remains **PARTIAL** — do **not** invent COMPLETE (M10.2 historical dataset + M10.3 demo scripts still open).
 
 ---
 
