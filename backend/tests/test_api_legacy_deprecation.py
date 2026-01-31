@@ -16,6 +16,8 @@ from app.api.legacy_deprecation import (
 def test_m76_is_legacy_api_path_helpers() -> None:
     assert is_legacy_api_path("/health")
     assert is_legacy_api_path("/portfolio")
+    assert is_legacy_api_path("/portfolios")
+    assert is_legacy_api_path("/portfolios/equity-vol")
     assert is_legacy_api_path("/market/snapshot")
     assert is_legacy_api_path("/risk/summary")
     assert is_legacy_api_path("/risk/runs/abc")
@@ -31,6 +33,7 @@ def test_m76_is_legacy_api_path_helpers() -> None:
     [
         ("/health", "/api/v1/health"),
         ("/portfolio", "/api/v1/portfolio"),
+        ("/portfolios", "/api/v1/portfolios"),
         ("/risk/stress/scenarios", "/api/v1/risk/stress/scenarios"),
     ],
 )
