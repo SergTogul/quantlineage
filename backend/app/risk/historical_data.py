@@ -1,4 +1,4 @@
-"""Historical market dataset abstraction (M2.1).
+"""Historical market dataset abstraction (M2.1) + demo file replay (M10.2).
 
 Separates **historical factor observations** from scenario generation
 (``app.risk.scenarios``, M2.2) and portfolio valuation / VaR aggregation
@@ -9,19 +9,38 @@ Units (MVP aggregate factors — not tenor-specific key rates):
 - vol moves: relative change of vol level (0.07 ≈ +7% of current vol)
 - rate moves: parallel shifts in basis points (1.0 = +1bp)
 
+M10.2 ships a **demo** CSV under ``data/demo_historical_factors.csv`` (synthetic
+replay of ``SyntheticHistoricalDataset(seed=7, observations=750)`` — **no live
+vendor feeds**). Load via ``load_demo_historical_dataset()`` or
+``create_historical_dataset("demo")`` / env ``RISKFORGE_HISTORICAL_DATASET``.
+
 This module does **not** depend on ``MarketSnapshot.key_rates`` or key-rate DV01
 semantics (those remain open Critical M1 items).
 """
 
 from __future__ import annotations
 
+import csv
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import numpy as np
 from numpy.typing import NDArray
 
 type FloatArray = NDArray[np.floating]
+
+DEMO_HISTORICAL_DATASET_ID = "demo-historical-factors"
+DEMO_HISTORICAL_CSV_NAME = "demo_historical_factors.csv"
+HISTORICAL_DATASET_ENV = "RISKFORGE_HISTORICAL_DATASET"
+
+_REQUIRED_CSV_COLUMNS = (
+    "equity_return",
+    "vol_move",
+    "rate_move_bps",
+    "fx_return",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +89,18 @@ class ArrayHistoricalDataset:
 
 
 @dataclass(frozen=True, slots=True)
+class FileHistoricalDataset:
+    """Factor observations loaded from a CSV (demo / replay / fixtures)."""
+
+    series: FactorObservationSeries
+    dataset_id: str = "file"
+    source_path: str | None = None
+
+    def factor_observations(self) -> FactorObservationSeries:
+        return self.series
+
+
+@dataclass(frozen=True, slots=True)
 class SyntheticHistoricalDataset:
     """Deterministic synthetic factor history (MVP stand-in for a market dataset).
 
@@ -100,9 +131,132 @@ class SyntheticHistoricalDataset:
         )
 
 
+def _repo_root() -> Path:
+    # backend/app/risk/historical_data.py → parents[3] = repo root
+    return Path(__file__).resolve().parents[3]
+
+
+def demo_historical_dataset_path() -> Path:
+    """Path to the packaged M10.2 demo factor-return CSV (repo ``data/``)."""
+    return _repo_root() / "data" / DEMO_HISTORICAL_CSV_NAME
+
+
+def load_factor_observations_csv(path: str | Path) -> FactorObservationSeries:
+    """Load aligned aggregate factor moves from a CSV.
+
+    Required columns: ``equity_return``, ``vol_move``, ``rate_move_bps``,
+    ``fx_return``. Optional ``date`` is ignored by the risk engines (kept for
+    human replay / documentation).
+    """
+    csv_path = Path(path)
+    with csv_path.open(newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        if reader.fieldnames is None:
+            raise ValueError(f"CSV has no header: {csv_path}")
+        fields = {name.strip() for name in reader.fieldnames}
+        missing = [c for c in _REQUIRED_CSV_COLUMNS if c not in fields]
+        if missing:
+            raise ValueError(
+                f"missing required column(s) {missing} in {csv_path}; "
+                f"need {_REQUIRED_CSV_COLUMNS}"
+            )
+        equity: list[float] = []
+        vol: list[float] = []
+        rates: list[float] = []
+        fx: list[float] = []
+        for row in reader:
+            equity.append(float(row["equity_return"]))
+            vol.append(float(row["vol_move"]))
+            rates.append(float(row["rate_move_bps"]))
+            fx.append(float(row["fx_return"]))
+    if not equity:
+        raise ValueError(f"CSV has no data rows: {csv_path}")
+    return FactorObservationSeries(
+        equity_returns=np.asarray(equity, dtype=float),
+        vol_moves=np.asarray(vol, dtype=float),
+        rate_moves_bps=np.asarray(rates, dtype=float),
+        fx_returns=np.asarray(fx, dtype=float),
+    )
+
+
+def load_csv_historical_dataset(
+    path: str | Path,
+    *,
+    dataset_id: str = "file",
+) -> FileHistoricalDataset:
+    """Wrap ``load_factor_observations_csv`` as a ``HistoricalMarketDataset``."""
+    csv_path = Path(path).resolve()
+    return FileHistoricalDataset(
+        series=load_factor_observations_csv(csv_path),
+        dataset_id=dataset_id,
+        source_path=str(csv_path),
+    )
+
+
+def load_demo_historical_dataset() -> FileHistoricalDataset:
+    """Load the packaged demo historical factor dataset (M10.2).
+
+    Usage::
+
+        from app.risk.historical_data import load_demo_historical_dataset
+        from app.risk.historical import HistoricalRiskEngine
+
+        engine = HistoricalRiskEngine(dataset=load_demo_historical_dataset())
+    """
+    path = demo_historical_dataset_path()
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"demo historical dataset not found at {path}; "
+            "expected repo data/demo_historical_factors.csv"
+        )
+    return load_csv_historical_dataset(path, dataset_id=DEMO_HISTORICAL_DATASET_ID)
+
+
+def create_historical_dataset(
+    source: str | None = None,
+    *,
+    seed: int = 7,
+    observations: int = 750,
+) -> HistoricalMarketDataset:
+    """Resolve a historical factor source for risk engines / API DI.
+
+    ``source`` (or env ``RISKFORGE_HISTORICAL_DATASET``) may be:
+
+    - ``demo`` (factory default) — packaged ``data/demo_historical_factors.csv``
+    - ``synthetic`` — seeded RNG (``SyntheticHistoricalDataset``)
+    - path to a ``.csv`` file with the required factor columns
+
+    ``HistoricalRiskEngine()`` with ``dataset=None`` still defaults to
+    ``SyntheticHistoricalDataset`` for backward-compatible ctor behavior.
+    """
+    raw = source if source is not None else os.getenv(HISTORICAL_DATASET_ENV, "demo")
+    resolved = (raw or "demo").strip()
+    key = resolved.lower()
+    if key in {"demo", "demo-historical", DEMO_HISTORICAL_DATASET_ID}:
+        return load_demo_historical_dataset()
+    if key in {"synthetic", "rng", "random"}:
+        return SyntheticHistoricalDataset(seed=seed, observations=observations)
+    path = Path(resolved).expanduser()
+    if path.suffix.lower() == ".csv" or path.is_file():
+        return load_csv_historical_dataset(path)
+    raise ValueError(
+        f"Unknown historical dataset source: {resolved!r}; "
+        f"use 'demo', 'synthetic', or a path to a factor CSV"
+    )
+
+
 __all__ = [
+    "DEMO_HISTORICAL_CSV_NAME",
+    "DEMO_HISTORICAL_DATASET_ID",
+    "HISTORICAL_DATASET_ENV",
     "ArrayHistoricalDataset",
     "FactorObservationSeries",
+    "FileHistoricalDataset",
     "HistoricalMarketDataset",
     "SyntheticHistoricalDataset",
+    "create_historical_dataset",
+    "demo_historical_dataset_path",
+    "load_csv_historical_dataset",
+    "load_demo_historical_dataset",
+    "load_factor_observations_csv",
 ]

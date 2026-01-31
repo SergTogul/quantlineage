@@ -41,6 +41,11 @@ QuantLib currently handles the original equity option/bond/swap path. New produc
 - P&L attribution across position, equity, vol, rate and FX changes
 - Deterministic natural-language query router ready to sit behind an LLM tool layer
 
+## Demo data (M10)
+
+- **Portfolios (M10.1):** in-code themes via `GET /api/v1/portfolios` (`backend/app/sample.py`).
+- **Historical factors (M10.2):** packaged CSV `data/demo_historical_factors.csv` (synthetic replay — **no live vendors**). Load with `load_demo_historical_dataset()` or set `RISKFORGE_HISTORICAL_DATASET=demo|synthetic|/path/to.csv`. Details: [`data/README.md`](data/README.md).
+
 ## Main API endpoints
 
 **Canonical prefix:** `/api/v1` (M7.6). Legacy unversioned paths remain dual-mounted
