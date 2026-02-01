@@ -45,6 +45,7 @@ QuantLib currently handles the original equity option/bond/swap path. New produc
 
 - **Portfolios (M10.1):** in-code themes via `GET /api/v1/portfolios` (`backend/app/sample.py`).
 - **Historical factors (M10.2):** packaged CSV `data/demo_historical_factors.csv` (synthetic replay — **no live vendors**). Load with `load_demo_historical_dataset()` or set `RISKFORGE_HISTORICAL_DATASET=demo|synthetic|/path/to.csv`. Details: [`data/README.md`](data/README.md).
+- **Deterministic scripts (M10.3):** `python -m app.demo.run_demo_risk` (or `scripts/run_demo_risk.py`) emits byte-stable VaR/stress JSON for all demo books; frozen sample: [`data/demo_risk_artifact.json`](data/demo_risk_artifact.json).
 
 ## Main API endpoints
 
