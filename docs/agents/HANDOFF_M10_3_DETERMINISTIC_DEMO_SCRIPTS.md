@@ -56,6 +56,7 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_PRICING_CA
 - QuantLib: not required for M10.3 artifact path (builtin default)
 - C++: N/A (kernel forced to python)
 - Milestone 10: **COMPLETE**
+- Push: SHA `bca5427d3fdd85b06b5a87c76763518744916e30` on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
 
 ## Known limitations / risks
 - Artifact omits VaR contributions and stress `by_position` (size); use API for drill-down
