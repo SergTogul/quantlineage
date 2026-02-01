@@ -60,12 +60,13 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 ```
 
 ## Results
-- Backend: focused + affected suite **77 passed** (builtin); QuantLib smoke green
+- Backend: focused + affected suite **77 passed** (builtin); QuantLib smoke **32 passed**
 - Frontend: unchanged
 - QuantLib: smoke green
 - C++: N/A
 - Build: N/A
 - Milestone 10: **PARTIAL** (M10.1–M10.2 DONE; M10.3 open)
+- Push: SHA `0ab59cb` on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
 
 ## Known limitations / risks
 - Aggregate factors only (no per-tenor key-rate history in the CSV)
