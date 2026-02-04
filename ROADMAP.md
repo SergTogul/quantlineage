@@ -165,8 +165,10 @@ Critical review items closed with code evidence:
   - Why/evidence: `MarketSnapshot.bump` only scales `equity_vols`/`fx_vols`; `test_surface_vol_pricing.py` documents the gap — stress/vega paths can diverge when grids are attached
 - [ ] M1.11 QuantLib full surface / smile engine (replace point `BlackConstantVol`)
   - Why/evidence: `quantlib.py` builds `BlackConstantVol` from `surface_vol.option_vol_from_snapshot` σ; not a QL `BlackVarianceSurface` (or equiv.)
-- [ ] M1.12 Align Builtin vs QuantLib ZC bond day-count / compounding conventions
-  - Why/evidence: `test_quantlib_golden.py` bond case uses `rel=5e-2` vs simple-compound reference; document or close the convention gap
+- [x] M1.12 Align Builtin vs QuantLib ZC bond day-count / compounding conventions — **DONE** (2026-09-02)
+  - Builtin scalar (no curve) now uses continuous compounding on Actual365Fixed year fraction ``max(1, round(T*365))/365``, matching QuantLib ``ZeroCouponBond`` + ``FlatForward(Continuous, Actual365Fixed)``.
+  - Tight Builtin↔QL parity + continuous golden: **rel=1e-10** (`test_quantlib_golden.py`); curve-path still discounts at domain pillar ``maturity_years`` (`test_curve_pricing.py`).
+  - Historical annual ``face/(1+y)^T`` retired as a reference (was **rel=5e-2** gap).
 - [ ] M1.13 Curve bootstrap from market instruments (replace flat-zero scaffolds)
   - Why: accepted M1.4 limitation; deposits/futures/swaps bootstrap still open
 
@@ -378,14 +380,15 @@ Firm→trade hierarchy with additive MV/Greek/stress reconciliation; P&L Explain
 | Known residual — P&L Explain | Taylor residual absorbs higher-order / duration–DV01 gaps; not a full-reval explain |
 | Known residual — risk-change attribution | Correlation residual is plug-to-total; not a structural corr model; linear/Greek market path when snapshot present |
 | Known residual — limits UI | Closed under M8.8 (status strip + value/limit table + per-metric/breach drill-down) |
-| Known residual — key-rate contributors | `limit_drilldown.contributors_for_metric` maps `key_rate_dv01` → position `dv01` (parallel), not tenor KR DV01 (M4.7) |
+| Known residual — key-rate contributors | Closed under M4.7 (tenor KR on LimitEngine binding pillar) |
 | Known residual | Dual-mount + M7.6 sunset DONE (legacy still served); RiskRun persistence wiring still M5 |
 | Hierarchy ↔ stress | Circular import fixed in M4.2 via lazy stress import — no open hierarchy/stress residual |
 
 ### Follow-on tasks (discovered during M1–M5)
 
-- [ ] M4.7 Key-rate DV01 limit drill-down contributors use tenor KR DV01 (not parallel `dv01`)
-  - Why/evidence: `limit_drilldown.py` `_GREEK_METRICS` / `attr = "dv01" if metric == "key_rate_dv01"`; misleading when curves/key_rates are present
+- [x] M4.7 Key-rate DV01 limit drill-down contributors use tenor KR DV01 (not parallel `dv01`) — DONE
+  - `contributors_for_metric("key_rate_dv01")` uses `SensitivityEngine` on the LimitEngine binding pillar (`max_T |portfolio KR_T|`); abs position KR ranked; without key_rates/curves falls back to parallel like `_key_rate_dv01_abs`
+  - Evidence: `tests/test_limit_drilldown.py` (binding-tenor vs parallel ranking, signed KR reconcile, fallback)
 
 ---
 
@@ -935,7 +938,7 @@ Note: M3.9 published `docs/methodology/multi_factor_reverse_stress.md` ahead of 
   - Must include honest multi-factor reverse-stress assumptions (M3.9) and VaR methodology modes
 - [ ] M12.5 Performance report — PARTIAL (`BUILD_NOTES.md` caveated microbench)
 - [ ] M12.6 Known engine / pricing limitations catalog (recruiter-facing)
-  - Why: surface bump vs grid (M1.10), BlackConstantVol (M1.11), bond day-count (M1.12), KR drill-down (M4.7), multi-factor reverse (M3.9) — prevent over-claiming completeness
+  - Why: surface bump vs grid (M1.10), BlackConstantVol (M1.11), multi-factor reverse (M3.9) — prevent over-claiming completeness
 
 ---
 

@@ -25,12 +25,22 @@ def _cdf(x: float) -> float: return _N.cdf(x)
 def _pdf(x: float) -> float: return math.exp(-0.5*x*x)/math.sqrt(2*math.pi)
 
 
+def _act365_fixed_years(maturity_years: float) -> float:
+    """Actual/365 Fixed year fraction matching QuantLib ZeroCouponBond.
+
+    Mirrors ``QuantLibPricingEngine._maturity_date``: NullCalendar advance of
+    ``max(1, round(T * 365))`` days, then ``days / 365`` (Actual365Fixed).
+    """
+    return max(1, round(float(maturity_years) * 365.0)) / 365.0
+
+
 class BuiltinPricingEngine(PricingEngine):
     """Deterministic reference pricer used for tests and cross-validation.
 
     Bonds / swaps / IR futures revalue from ``MarketSnapshot.curves`` and
-    ``key_rates`` when present (continuous zeros); otherwise fall back to
-    scalar ``rates[ccy]`` and annual bond compounding.
+    ``key_rates`` when present (continuous zeros). Scalar bond fallback (no
+    curve) uses continuous compounding on Actual365Fixed year fraction —
+    same convention as QuantLib ``FlatForward`` + ``ZeroCouponBond``.
     """
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
@@ -67,10 +77,13 @@ class BuiltinPricingEngine(PricingEngine):
             market, p.currency, p.maturity_years, fallback_yield=p.yield_rate
         )
         if df is not None:
+            # Curve path: continuous DF at domain ``maturity_years`` (pillar T).
             pv = p.face_value * p.quantity * df
         else:
+            # Scalar path: continuous Actual365Fixed (QL ZeroCouponBond parity).
             y = market.rates.get(p.currency, p.yield_rate) if market else p.yield_rate
-            pv = p.face_value * p.quantity / ((1 + y) ** p.maturity_years)
+            t = _act365_fixed_years(p.maturity_years)
+            pv = p.face_value * p.quantity * math.exp(-y * t)
         return Valuation(position_id=p.id, market_value=pv, dv01=-p.duration * pv * 0.0001)
 
     def _swap(self, p: SwapPosition, market: MarketSnapshot | None) -> Valuation:
