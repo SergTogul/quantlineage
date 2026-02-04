@@ -3,7 +3,8 @@
 Conventions
 -----------
 - Continuous zeros from ``MarketSnapshot.curves`` / ``key_rates`` (Actual/365-style).
-- Without curves/key_rates, bonds keep annual compounding on scalar ``rates[ccy]``.
+- Without curves/key_rates, bonds use continuous compounding on Actual365Fixed
+  year fraction ``max(1, round(T*365))/365`` (M1.12; matches QuantLib ZCB).
 - Tenor ``RateZero`` bumps must change PV for maturity-matched instruments and
   leave off-pillar bumps ~flat (true isolation vs parallel).
 """
@@ -53,11 +54,12 @@ def _swap_5y() -> SwapPosition:
     )
 
 
-def test_bond_falls_back_to_annual_scalar_rates_without_curves():
+def test_bond_falls_back_to_continuous_act365_without_curves():
     pos = _bond_10y()
     market = MarketSnapshot(id="flat", rates={"USD": 0.05})
     pv = builtin.value(pos, market).market_value
-    assert pv == pytest.approx(1_000_000.0 / ((1.05) ** 10), rel=1e-12)
+    # 10Y → round(10*365)/365 = 10 exactly; continuous DF.
+    assert pv == pytest.approx(1_000_000.0 * math.exp(-0.05 * 10.0), rel=1e-12)
 
 
 def test_bond_uses_continuous_df_when_usd_curves_attached():
