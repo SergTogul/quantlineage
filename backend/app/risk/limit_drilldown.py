@@ -1,8 +1,11 @@
-"""Limit breach drill-down (M4.6).
+"""Limit breach drill-down (M4.6 / M4.7).
 
 Consumes ``LimitResult`` from ``LimitEngine`` and enriches each selected row with
 hierarchy node identity plus the biggest position-level contributors for that
 metric. Does not reimplement limit evaluation or touch P&L attribution.
+
+``key_rate_dv01`` contributors use tenor key-rate DV01 on the same binding
+pillar as ``LimitEngine`` (max |portfolio KR|), not parallel Valuation.dv01.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from app.domain.models import (
     LimitMetric,
     LimitResult,
     LimitScope,
+    MarketSnapshot,
     Portfolio,
     Position,
     RiskLimit,
@@ -31,7 +35,8 @@ from app.risk.var import VaRAnalytics
 LabelFn = Callable[[Position], str]
 
 # Metrics where position contributions are defined for drill-down.
-_GREEK_METRICS = frozenset({"dv01", "key_rate_dv01", "vega", "fx_delta"})
+# key_rate_dv01 is handled separately (tenor KR via SensitivityEngine).
+_GREEK_METRICS = frozenset({"dv01", "vega", "fx_delta"})
 _VAR_METRICS = frozenset({"var_99", "var_95"})
 _ES_METRICS = frozenset({"expected_shortfall_99"})
 
@@ -51,6 +56,56 @@ def _stress_loss_amounts(
         p.id: max(0.0, -float(worst.by_position.get(p.id, 0.0)))
         for p in portfolio.positions
     }
+
+
+def _key_rate_dv01_amounts(
+    portfolio: Portfolio,
+    pricing: PricingEngine,
+    market: MarketSnapshot | None = None,
+) -> dict[str, float]:
+    """Abs position KR DV01 on the LimitEngine binding pillar.
+
+    ``LimitEngine`` takes ``max_T |portfolio KR_T|``. Contributors use that same
+    tenor ``T*`` so signed position KR sum to portfolio KR (within FD tolerance).
+    When no key-rate measures exist, fall back to abs parallel ``dv01`` (same as
+    ``_key_rate_dv01_abs``).
+    """
+    from app.risk.factor_types import RateZero
+    from app.risk.sensitivities import SensitivityEngine
+
+    sens = SensitivityEngine()
+    measures = sens.calculate(
+        portfolio, pricing, measures=("key_rate_dv01",), market=market
+    )
+    if not measures:
+        return {
+            p.id: abs(float(pricing.value(p, market).dv01 or 0.0))
+            for p in portfolio.positions
+        }
+
+    binding = max(measures, key=lambda m: abs(m.value))
+    factor = binding.factor
+    if not isinstance(factor, RateZero):
+        return {
+            p.id: abs(float(pricing.value(p, market).dv01 or 0.0))
+            for p in portfolio.positions
+        }
+
+    # Same market the portfolio KR used (engine snapshots when market is None).
+    snap = market if market is not None else sens.market_data.snapshot(portfolio)
+    bp = sens.rate_bump_bps
+    amounts: dict[str, float] = {}
+    for p in portfolio.positions:
+        up = pricing.value(
+            p, SensitivityEngine._bump_key_rate(snap, factor.currency, factor.tenor, bp)
+        ).market_value
+        down = pricing.value(
+            p, SensitivityEngine._bump_key_rate(snap, factor.currency, factor.tenor, -bp)
+        ).market_value
+        # Match SensitivityEngine._central_scaled(up, down, bp, 1.0) → per-bp.
+        kr = (up - down) / (2.0 * bp)
+        amounts[p.id] = abs(kr)
+    return amounts
 
 
 def _default_ref(portfolio: Portfolio) -> HierarchyRef:
@@ -93,6 +148,7 @@ def contributors_for_metric(
     top_n: int = 5,
     label_fn: LabelFn | None = None,
     var_engine: VaRAnalytics | None = None,
+    market: MarketSnapshot | None = None,
 ) -> list[Contributor]:
     """Biggest position contributors for a limit metric (abs share of total)."""
     labels = {p.id: (label_fn(p) if label_fn else p.id) for p in portfolio.positions}
@@ -101,14 +157,20 @@ def contributors_for_metric(
 
     if metric == "single_position_pct":
         amounts = {
-            p.id: abs(pricing.value(p).market_value) for p in portfolio.positions
+            p.id: abs(pricing.value(p, market).market_value) for p in portfolio.positions
         }
         return _rank_amounts(amounts, labels, top_n)
 
+    if metric == "key_rate_dv01":
+        return _rank_amounts(
+            _key_rate_dv01_amounts(portfolio, pricing, market=market),
+            labels,
+            top_n,
+        )
+
     if metric in _GREEK_METRICS:
-        attr = "dv01" if metric == "key_rate_dv01" else metric
         amounts = {
-            p.id: abs(getattr(pricing.value(p), attr, 0.0) or 0.0)
+            p.id: abs(getattr(pricing.value(p, market), metric, 0.0) or 0.0)
             for p in portfolio.positions
         }
         return _rank_amounts(amounts, labels, top_n)

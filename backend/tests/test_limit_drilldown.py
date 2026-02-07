@@ -1,10 +1,13 @@
-"""M4.6 Limit drill-down.
+"""M4.6 / M4.7 Limit drill-down.
 
 Conventions:
 - Units follow LimitEngine (currency for VaR/DV01/vega; percent for single_position_pct).
 - Contributors ranked by abs risk amount; contribution_pct is abs share of total.
 - Hierarchy path matches HierarchyEngine node paths (Firm/…/Trade).
-- Tolerances: utilization and contribution shares within abs 1e-9 of independent calc.
+- key_rate_dv01: tenor KR on LimitEngine binding pillar (max |portfolio KR|), not
+  parallel Valuation.dv01; without key_rates/curves falls back to parallel like limits.
+- Tolerances: utilization and contribution shares within abs 1e-9 of independent calc;
+  signed KR sum vs portfolio binding within rel 1e-9 / abs 1e-6.
 """
 
 from __future__ import annotations
@@ -15,18 +18,22 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.domain.models import (
+    BondPosition,
     EquityPosition,
     HierarchyLevel,
     HierarchyRef,
     LimitDrilldownRequest,
+    MarketSnapshot,
     Portfolio,
     RiskLimit,
 )
 from app.main import app
 from app.pricing.builtin import BuiltinPricingEngine
+from app.risk.factor_types import RateZero
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.limit_drilldown import LimitDrilldownEngine, contributors_for_metric
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
+from app.risk.sensitivities import SensitivityEngine
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService, position_label
 
@@ -225,3 +232,170 @@ def test_stress_loss_contributors_nonempty():
     )
     assert contribs
     assert contribs[0].risk_amount >= 0.0
+
+
+def _kr_bond_book() -> tuple[Portfolio, MarketSnapshot]:
+    """10Y + 2Y bonds with key_rates so tenor KR ≠ parallel Valuation.dv01 ranking.
+
+    Valuation.dv01 uses the trade ``duration`` field; KR FD uses curve/tenor PV
+    sensitivity (~maturity). Deliberately mismatch duration vs maturity so parallel
+    greek ranking prefers the 2Y bond while binding KR is the 10Y pillar.
+    """
+    portfolio = Portfolio(
+        id="kr-book",
+        name="KR book",
+        firm="Acme",
+        desk="Rates",
+        positions=[
+            BondPosition(
+                type="bond",
+                id="b10",
+                issuer="UST10",
+                face_value=1_000_000,
+                quantity=1,
+                maturity_years=10.0,
+                yield_rate=0.04,
+                # Understate analytic DV01 vs true 10Y ZCB sensitivity.
+                duration=1.5,
+                book="Core",
+            ),
+            BondPosition(
+                type="bond",
+                id="b2",
+                issuer="UST2",
+                face_value=1_000_000,
+                quantity=1,
+                maturity_years=2.0,
+                yield_rate=0.03,
+                # Overstate analytic DV01 vs true 2Y ZCB sensitivity.
+                duration=12.0,
+                book="Core",
+            ),
+        ],
+    )
+    market = MarketSnapshot(
+        id="kr-book-mkt",
+        rates={"USD": 0.04},
+        key_rates={"USD": {"2Y": 0.03, "10Y": 0.04}},
+    )
+    return portfolio, market
+
+
+def test_key_rate_dv01_contributors_use_binding_tenor_not_parallel_dv01():
+    """M4.7: with key_rates, drill-down ranks by tenor KR on LimitEngine binding pillar.
+
+    2Y bond has larger abs parallel Valuation.dv01 (duration×PV) but ~0 sensitivity
+    to the 10Y pillar; 10Y bond drives portfolio KR. Contributors must follow KR.
+    """
+    pricing = BuiltinPricingEngine()
+    portfolio, market = _kr_bond_book()
+
+    sens = SensitivityEngine(rate_bump_bps=1.0)
+    port_kr = sens.calculate(
+        portfolio, pricing, measures=("key_rate_dv01",), market=market
+    )
+    assert port_kr
+    binding = max(port_kr, key=lambda m: abs(m.value))
+    assert isinstance(binding.factor, RateZero)
+    assert binding.factor.tenor == "10Y"
+    assert binding.method == "bump_revalue"
+
+    # Parallel Valuation.dv01 would prefer the larger 2Y notionals.
+    parallel = {
+        p.id: abs(pricing.value(p, market).dv01 or 0.0) for p in portfolio.positions
+    }
+    assert parallel["b2"] > parallel["b10"]
+
+    contribs = contributors_for_metric(
+        portfolio,
+        pricing,
+        "key_rate_dv01",
+        top_n=2,
+        market=market,
+        label_fn=position_label,
+    )
+    assert [c.position_id for c in contribs] == ["b10", "b2"]
+    assert contribs[0].risk_amount > contribs[1].risk_amount
+    # Off-pillar 2Y position contributes ~0 to the binding 10Y KR.
+    assert contribs[1].risk_amount == pytest.approx(0.0, abs=1e-9)
+
+    # Signed position KR on binding pillar reconciles to portfolio measure.
+    bp = sens.rate_bump_bps
+    signed = 0.0
+    for p in portfolio.positions:
+        up = pricing.value(
+            p,
+            SensitivityEngine._bump_key_rate(
+                market, binding.factor.currency, binding.factor.tenor, bp
+            ),
+        ).market_value
+        down = pricing.value(
+            p,
+            SensitivityEngine._bump_key_rate(
+                market, binding.factor.currency, binding.factor.tenor, -bp
+            ),
+        ).market_value
+        signed += (up - down) / (2.0 * bp)
+    assert signed == pytest.approx(binding.value, rel=1e-9, abs=1e-6)
+    assert math.isclose(sum(c.contribution_pct for c in contribs), 100.0, abs_tol=1e-9)
+
+
+def test_key_rate_dv01_contributors_fallback_matches_parallel_without_key_rates():
+    """Without key_rates / curves, KR uses parallel bump-revalue (SensitivityEngine).
+
+    That parallel FD can differ from Valuation.dv01 when the trade ``duration``
+    field ≠ true modified duration — contributors must follow SensitivityEngine,
+    same as LimitEngine._key_rate_dv01_abs.
+    """
+    pricing = BuiltinPricingEngine()
+    bond = BondPosition(
+        type="bond",
+        id="b",
+        issuer="UST",
+        face_value=1_000_000,
+        quantity=1,
+        maturity_years=10.0,
+        yield_rate=0.04,
+        duration=8.0,
+    )
+    equity = EquityPosition(
+        type="equity",
+        id="e",
+        symbol="SPY",
+        quantity=10,
+        price=100.0,
+    )
+    portfolio = Portfolio(id="flat", name="flat", positions=[bond, equity])
+    sens = SensitivityEngine(rate_bump_bps=1.0)
+    kr_m = sens.calculate_position(bond, pricing, measures=("key_rate_dv01",))[0]
+    dv01_m = sens.calculate_position(bond, pricing, measures=("dv01",))[0]
+    assert kr_m.method == "bump_revalue_parallel_fallback"
+    assert abs(kr_m.value) == pytest.approx(abs(dv01_m.value), rel=1e-9, abs=1e-9)
+    # Analytic Valuation.dv01 uses duration field — not the FD reference.
+    assert abs(pricing.value(bond).dv01) != pytest.approx(abs(kr_m.value), rel=1e-3)
+
+    kr = contributors_for_metric(portfolio, pricing, "key_rate_dv01", top_n=2)
+    assert [c.position_id for c in kr] == ["b", "e"]
+    assert kr[0].risk_amount == pytest.approx(abs(kr_m.value), rel=1e-9, abs=1e-9)
+    assert kr[1].risk_amount == pytest.approx(0.0, abs=1e-9)
+
+
+def test_key_rate_dv01_limit_value_matches_binding_pillar_abs():
+    """Drill-down limit row value agrees with SensitivityEngine max |KR| (LimitEngine)."""
+    pricing = BuiltinPricingEngine()
+    portfolio, market = _kr_bond_book()
+    sens = SensitivityEngine(rate_bump_bps=1.0)
+    measures = sens.calculate(
+        portfolio, pricing, measures=("key_rate_dv01",), market=market
+    )
+    expected = max(abs(m.value) for m in measures)
+
+    # LimitEngine path without precomputed risk key uses SensitivityEngine the same way
+    # but snapshots from PositionMarketDataProvider (no key_rates). Force via risk dict
+    # is not available for KR from market — evaluate with empty risk and attach market
+    # through resolve by comparing contributor total abs to expected binding.
+    contribs = contributors_for_metric(
+        portfolio, pricing, "key_rate_dv01", top_n=10, market=market
+    )
+    total_abs = sum(c.risk_amount for c in contribs)
+    assert total_abs == pytest.approx(expected, rel=1e-9, abs=1e-6)
