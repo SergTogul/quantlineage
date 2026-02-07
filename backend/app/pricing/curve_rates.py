@@ -42,7 +42,7 @@ def curve_from_payload(name: str, payload: Mapping) -> YieldCurve | None:
     )
 
 
-def select_yield_curve(
+def _select_yield_curve_uncached(
     market: MarketSnapshot,
     currency: str,
     *,
@@ -82,6 +82,42 @@ def select_yield_curve(
             },
         )
     return None
+
+
+def select_yield_curve(
+    market: MarketSnapshot,
+    currency: str,
+    *,
+    prefer_projection: bool = False,
+) -> YieldCurve | None:
+    """Pick the best RiskForge curve for ``currency``, or synthesize from key rates.
+
+    When ``RISKFORGE_CURVE_CACHE`` is enabled (default), constructed ``YieldCurve``
+    instances are memoized by currency-relevant market fingerprint.
+    """
+    from app.pricing.curve_cache import (
+        curve_cache_enabled,
+        curve_cache_key,
+        get_curve_construction_cache,
+    )
+
+    if not curve_cache_enabled():
+        return _select_yield_curve_uncached(
+            market, currency, prefer_projection=prefer_projection
+        )
+
+    key = curve_cache_key(market, currency, prefer_projection=prefer_projection)
+    cache = get_curve_construction_cache()
+    hit = cache.get(key)
+    if hit is not None:
+        return hit
+
+    built = _select_yield_curve_uncached(
+        market, currency, prefer_projection=prefer_projection
+    )
+    if built is None:
+        return None
+    return cache.put(key, built)
 
 
 def has_curve_or_key_rates(market: MarketSnapshot | None, currency: str) -> bool:
