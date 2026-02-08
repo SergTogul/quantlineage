@@ -1,4 +1,5 @@
-import test from 'node:test'; import assert from 'node:assert/strict'
+import { test } from 'vitest'
+import assert from 'node:assert/strict'
 import {
   money, topContributors, worstStress, limitStatus, limitStatusClass, percent, threatClass, stressSummary,
   topFactors, varMethod, hierarchyTradeCount, hierarchyCountByLevel, hierarchyPortfolio,

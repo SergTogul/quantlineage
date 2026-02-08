@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "npm run test:node && npm run test:vitest",
-    "test:node": "node --test src/lib/*.test.mjs",
+    "test": "vitest run",
     "test:vitest": "vitest run",
+    "test:node": "vitest run src/lib",
     "test:watch": "vitest",
     "lint": "eslint src --max-warnings 0"
   },
