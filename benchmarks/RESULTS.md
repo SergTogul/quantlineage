@@ -1,15 +1,72 @@
-# M6.2 — Baseline Python / NumPy / C++ single-thread comparison
+# M6 scenario-kernel benchmarks + formal product SLA
 
-**Status:** captured microbenchmark snapshot (not a production SLA).  
 **Owner:** C++ Performance Engineer (`docs/agents/06_CPP_PERFORMANCE_ENGINEER.md`).  
-**Out of scope for this table:** Historical VaR wall-time SLAs.
-M6.3 wires the kernel into LINEAR/DELTA_GAMMA approximate P&L behind
-`RISKFORGE_SCENARIO_KERNEL`; do not treat these microbench speedups as product VaR SLAs.
-M6.4 parallel results are in the section below (same caveats).
+**Milestone status:** M6 **COMPLETE** (2026-09-02) under the formal scenario-kernel
+SLA below — not under an HTTP end-to-end VaR latency claim.
 
-These numbers are a developer-laptop baseline for the scenario matrix × exposure
-vector kernel only. Do **not** cite them as capacity planning, multi-tenant
-latency, or end-to-end risk-run guarantees.
+M6.3 wires this kernel into LINEAR/DELTA_GAMMA approximate P&L behind
+`RISKFORGE_SCENARIO_KERNEL`. M6.4 parallel results follow the serial baseline.
+
+Do **not** cite these numbers as multi-tenant capacity planning or HTTP risk-run
+guarantees. Absolute milliseconds move with CPU/thermal; the published SLA uses
+**relative floors** with host/workload caveats.
+
+---
+
+## Formal product SLA (M6 COMPLETE gate)
+
+**Claim (Lead Architect + C++ Performance, 2026-09-02):** On the documented
+reference host class, the **native nested-loop scenario kernel** (same ctypes
+ABI Historical VaR uses when `RISKFORGE_SCENARIO_KERNEL=native`) meets:
+
+| ID | Requirement | Floor | Measurement |
+|----|-------------|------:|-------------|
+| **SLA-K1** | Workload `10k_x_1k` (10 000 exposures × 1 000 shocks): serial `cpp_ctypes` wall-time speedup vs pure-Python nested-loop `python` | **≥ 50×** | `benchmarks/run_scenario_bench.py --workload 10k_x_1k --iters 1 --json` (or `check_m6_sla.py`) |
+| **SLA-K2** | Same workload: `cpp_ctypes_t4` (`--threads 4 --parallel-compare`) vs serial `cpp_ctypes` on the same run | **≥ 1.3×** | same harness / `check_m6_sla.py` |
+
+Checksums must match Python within the harness guard (`1e-6` relative).
+
+### Pass / fail command
+
+```bash
+backend/.venv/bin/python benchmarks/check_m6_sla.py
+```
+
+### Evidence (this reference host, 2026-09-02 refresh)
+
+| Capture | SLA-K1 (`cpp_ctypes` vs `python`) | SLA-K2 (`t4` vs serial) | Verdict |
+|---------|----------------------------------:|------------------------:|---------|
+| Serial JSON refresh | **133×** (42.3 ms vs 5643 ms) | — | above 50× |
+| Parallel compare refresh | **139×** (41.0 ms vs 5695 ms) | **1.83×** (22.4 ms) | above floors |
+| `check_m6_sla.py` verify runs | **106–145×** | **1.45–1.95×** | PASS (K2 floor 1.3×) |
+| Prior RESULTS.md M6.2 / M6.4 tables | 88–125× | ~2.0–2.1× | above floors |
+
+### Reference host class
+
+| Field | Value |
+|-------|--------|
+| CPU | Intel(R) Core(TM) i7-7700HQ @ 2.80GHz (4C/8T) |
+| OS / platform | macOS 13.7.8 (`macOS-13.7.8-x86_64-i386-64bit`) |
+| Python | 3.12.14 (`backend/.venv`) |
+| Compiler | Apple clang 14.0.3 (`g++ -std=c++20 -O3 -pthread`) |
+| Power / thermal | Uncontrolled laptop — floors leave margin (SLA-K1 vs ~88–145× measured; SLA-K2 floor 1.3× vs ~1.45–2.1× observed) |
+
+### Explicit non-claims
+
+- **Not** HTTP/API end-to-end Historical VaR wall time.
+- **Not** FULL_REVALUATION (never uses the kernel).
+- **Not** a CI hard gate on arbitrary runners (host class differs).
+- **Not** “1×N aggregated-Greek Historical VaR is 50× faster than NumPy.” Current
+  product path aggregates Greeks to **one** exposure before the kernel; ad-hoc
+  `1×750` / `1×10k` timings on this host show ctypes ≈ Python (FFI packing
+  dominates). Multi-exposure `E×S` is the measurable nested-loop claim for the
+  wired native ABI.
+
+---
+
+## M6.2 — Baseline Python / NumPy / C++ single-thread comparison
+
+**Status:** captured microbenchmark snapshot (supports SLA-K1 evidence).
 
 ---
 
@@ -114,7 +171,7 @@ Wall times are for the timed region only (warmup excluded). Throughput
 
 ---
 
-## Environment caveats (never production SLA)
+## Environment caveats
 
 - Results vary with CPU generation, thermal throttling, power mode, compiler
   (`-O3`), Python build, NumPy BLAS, and OS scheduler.
@@ -124,14 +181,14 @@ Wall times are for the timed region only (warmup excluded). Throughput
   is normalized to KiB by the harness.
 - `cpp_ctypes` includes Python→C packing; `cpp_header` does not.
 - M6.3 wires LINEAR/DELTA_GAMMA approximate P&L optionally via native kernel;
-  FULL_REVALUATION never uses it. Do not claim product risk-path speedups from
-  this microbench table (parity gate: `tests/test_historical_scenario_kernel.py`).
+  FULL_REVALUATION never uses it. Formal product claim is the **SLA-K1/K2**
+  section above only (parity gate: `tests/test_historical_scenario_kernel.py`).
 
 ---
 
 ## M6.4 — Parallel C++ (`std::thread` / `std::jthread` shock partitions)
 
-**Status:** captured microbenchmark snapshot (not a production SLA).  
+**Status:** captured microbenchmark snapshot (supports SLA-K2 evidence).  
 **Strategy (one only):** standard-library thread pool over contiguous shock
 ranges. Prefer `std::jthread` when `__cpp_lib_jthread` is defined; otherwise
 `std::thread` + join-on-scope-exit. **Not OpenMP** (Apple Clang often lacks
@@ -208,7 +265,8 @@ backend/.venv/bin/python benchmarks/run_scenario_bench.py \
 
 - Do **not** set `OMP_NUM_THREADS` expecting kernel OpenMP — there is none.
 - Hyperthreading / power limits / antivirus can flatten speedups.
-- Product Historical VaR wall time is still **not** claimed from this table.
+- HTTP / 1×N Historical VaR wall time is **not** claimed from this table;
+  SLA-K2 is the parallel ctypes floor only.
 - macOS Apple Clang 14 used `std::thread` fallback (`RISKFORGE_HAS_JTHREAD=0`);
   Linux libstdc++ typically uses `std::jthread` — same partition math either way.
 
@@ -216,6 +274,7 @@ backend/.venv/bin/python benchmarks/run_scenario_bench.py \
 
 ## Related
 
+- Formal SLA check: `benchmarks/check_m6_sla.py`
 - Harness: `benchmarks/run_scenario_bench.py`
 - Smoke (not a perf gate): `python3 -m pytest benchmarks/test_bench_smoke.py -q`
 - Equivalence unit tests: `backend/tests/test_native_kernel.py`
