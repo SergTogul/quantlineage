@@ -1,11 +1,19 @@
-# Scenario aggregation benchmarks (M6.1 / M6.2 / M6.4)
+# Scenario aggregation benchmarks (M6.1 / M6.2 / M6.4) + formal SLA
 
 Reproducible microbenchmarks for the scenario matrix × exposure vector kernel
 used by the optional native path (`backend/native`, `app.compute.kernel`).
 
-This harness is **not** an end-to-end risk-run, VaR, or API latency benchmark.
-Numbers here are laptop/CI microbenchmarks only — do not treat them as
-production SLAs or capacity planning evidence.
+**Formal product SLA (M6 COMPLETE):** relative floors for the nested-loop native
+kernel on workload `10k_x_1k` — see [`RESULTS.md`](RESULTS.md) (SLA-K1 / SLA-K2).
+Verify with:
+
+```bash
+backend/.venv/bin/python benchmarks/check_m6_sla.py
+```
+
+This harness is **not** an HTTP end-to-end risk-run or API latency benchmark.
+Absolute milliseconds are host-specific; do not treat table cells as multi-tenant
+capacity planning. The published claim is the scoped relative SLA only.
 
 **M6.2 baseline table:** [`RESULTS.md`](RESULTS.md) (Python / NumPy / C++
 single-thread, identical I/O semantics, NumPy strength-reduction caveat).
@@ -99,12 +107,13 @@ python3 -m pytest benchmarks/test_bench_smoke.py -q
 
 ## Environment caveats
 
-- **Not production claims.** Results vary with CPU, thermal throttling, power
+- **Host-specific absolute times.** Results vary with CPU, thermal throttling, power
   mode, compiler version (`-O3`), Python build, NumPy BLAS, and OS scheduler.
+  Formal claim is **SLA-K1/K2** relative floors in [`RESULTS.md`](RESULTS.md).
 - **Single-process microbench.** No concurrent tenants, no QuantLib pricing, no
   DB/API, no risk-run worker. M6.3 risk-path wiring uses
-  `RISKFORGE_SCENARIO_KERNEL` in product code — this harness does not measure
-  Historical VaR end-to-end.
+  `RISKFORGE_SCENARIO_KERNEL` in product code — this harness measures the shared
+  kernel ABI, not HTTP Historical VaR end-to-end.
 - **Parallel C++ (M6.4).** Stdlib shock-partition thread pool only (`std::jthread`
   when `__cpp_lib_jthread` is available, else `std::thread`+join — Apple clang 14
   libc++ typically lacks jthread). Do **not** set `OMP_NUM_THREADS` expecting
@@ -117,7 +126,9 @@ python3 -m pytest benchmarks/test_bench_smoke.py -q
   overhead for Python/ctypes paths and is not allocatable-heap-only.
 - **ctypes marshalling cost.** `cpp_ctypes` includes Python→C array packing;
   `cpp_header` does not. Prefer `cpp_header` for raw kernel throughput and
-  `cpp_ctypes` for realistic FFI overhead.
+  `cpp_ctypes` for realistic FFI overhead. Product Historical VaR currently
+  aggregates to 1 exposure before the kernel — 1×N timings are FFI-bound; see
+  RESULTS.md non-claims.
 - **NumPy path algebra.** The NumPy impl sums exposures then scales by shocks
   (valid because the kernel is linear in exposures). That is an algebraic
   strength reduction (`O(E+S)` after the sum vs nested `O(E×S)` loops), so
@@ -127,8 +138,6 @@ python3 -m pytest benchmarks/test_bench_smoke.py -q
 - **Compiler required.** Without `g++`, pass `--skip-native --skip-cpp` to run
   Python/NumPy only. Shared builds need `-I backend/native/include -pthread`.
 - **Do not fight M5.4.** This directory must not depend on risk-run HTTP APIs.
-- **Do not claim VaR SLAs from this harness.** Risk-path native opt-in is
-  `RISKFORGE_SCENARIO_KERNEL` in product code, not the bench tree.
 
 ## Ownership
 
