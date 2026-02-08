@@ -12,7 +12,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 3 — Stress & Threat Engine V3 | **COMPLETE** (2026-09-02) |
 | Milestone 4 — Hierarchy, Attribution & Limits | **COMPLETE** (2026-09-02 Lead Architect formal acceptance) |
 | Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA green; M5.5 caching polish **DONE**) |
-| Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
+| Milestone 6 — C++ Performance Engine | **PARTIAL** (accepted 2026-09-02 — M6.1–M6.7 DONE; no product VaR wall-time SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
 | Milestone 9 — Testing, CI & Engineering Quality | **COMPLETE** (2026-09-02 Lead Architect: M9.1–M9.10; M9.8 containers DONE; Redis/RQ **deferred** residual — not claimed done) |
@@ -59,7 +59,7 @@ Trade (domain/models.py)
 
 1. Caps/floors/swaptions still deferred; EquityVol/FXVol bumps do not rewrite surface grids; QL uses `BlackConstantVol` at point σ (not full surface engine); Builtin vs QL bond day-count gap
 2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 caching polish **DONE** (valuation LRU + curve-construction + scenario memo)
-3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
+3. M6 **accepted PARTIAL** (2026-09-02 Lead Architect): M6.1–M6.7 DONE (kernel wire, parallel pool, parity, ADR 007); FULL_REVALUATION stays Python; **no product VaR/risk-path wall-time SLA** — microbench tables in `benchmarks/RESULTS.md` are not capacity/SLA evidence
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); **M3.8 formal Scenario HTTP wire DONE** (legacy StressScenario endpoints retained)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
 6. M9 **COMPLETE** (2026-09-02): M9.1–M9.10; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / M5.7). **M9.11:** transient GHA `e2e-playwright` failure on multi-factor reverse UI land must stay fixed (testid + exact heading) — see M9.11 below
@@ -76,7 +76,7 @@ Trade (domain/models.py)
 | M5.6 / M5.7 / M5.9 | **DONE** (DI; Postgres `SKIP LOCKED` claim + Compose worker; stress scenario_definitions HTTP) |
 | M5.5 | **DONE** (valuation LRU + curve-construction cache + scenario-result memo) |
 | M6.1–M6.7 | **DONE** (harness, baseline, risk-path wire, parallel pool, ABI+Historical parity, QL concurrency ADR) |
-| M6 milestone | **PARTIAL** — no rubber-stamp COMPLETE / no product VaR wall-time SLA |
+| M6 milestone | **PARTIAL** (accepted disposition) — no product VaR wall-time SLA; do not rubber-stamp COMPLETE |
 | M7 milestone | **COMPLETE** (2026-09-02) — M7.1–M7.6; legacy dual-mount remains until sunset removal gate |
 
 ---
@@ -518,9 +518,25 @@ Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRu
 
 ## Milestone 6 — C++ Performance Engine
 
-Status: **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA claimed)
+Status: **PARTIAL** (accepted disposition 2026-09-02 — M6.1–M6.7 DONE; no product VaR/risk-path wall-time SLA)
 
-Lead Architect suite verify 2026-09-02: native path covered by green full backend suite (includes `test_native_kernel` / Historical VaR kernel tests). M6.5/M6.6 closed same day (parity edge cases + ADR 007). Milestone stays **PARTIAL** — do not claim COMPLETE or product VaR wall-time wins.
+Lead Architect suite verify 2026-09-02: native path covered by green full backend suite (includes `test_native_kernel` / Historical VaR kernel tests). M6.5/M6.6 closed same day (parity edge cases + ADR 007).
+
+### Formal SLA disposition (2026-09-02) — **accepted PARTIAL** (Option B)
+
+**Verdict:** Do **not** mark Milestone 6 COMPLETE. Engineering deliverables M6.1–M6.7 are DONE; the remaining COMPLETE gate was a **product** VaR / end-to-end risk-path wall-time SLA. No product owner has set that SLA.
+
+**Evidence reviewed (C++ Performance — reference only):**
+
+| Source | What it proves | What it does **not** prove |
+|--------|----------------|----------------------------|
+| `benchmarks/RESULTS.md` (M6.2 / M6.4) | Developer-laptop microbench for scenario matrix × exposure kernel; host/workload caveats documented | Historical VaR wall time, multi-tenant latency, capacity planning, or CI perf gate |
+| `benchmarks/README.md` / `BUILD_NOTES.md` | Harness is reproducible; explicitly “not production SLAs” | Product risk-run latency |
+| Risk-path wire + parity (`RISKFORGE_SCENARIO_KERNEL`, M6.3–M6.7) | Optional native LINEAR/DELTA_GAMMA aggregation; NumPy ↔ native VaR/ES within published tolerances | End-to-end speedup vs default NumPy path under production load |
+
+**Decision (Option B — preferred):** Explicitly accept **no product VaR wall-time SLA** for this milestone. Keep status **PARTIAL**. Do not invent a numeric SLA from laptop microbench numbers. Do not start M11/M12 from this residual.
+
+**Re-open COMPLETE only when:** a product owner publishes a concrete wall-time (or throughput) target for a named risk path + workload + host class, with measurement method and pass/fail evidence recorded in ROADMAP/`benchmarks/` (or dedicated perf docs). Until then, PARTIAL is the honest milestone state.
 
 ### Tasks
 
@@ -567,8 +583,15 @@ Lead Architect suite verify 2026-09-02: native path covered by green full backen
   - NumPy vs pure-Python kernel ABI + NumPy vs native on LINEAR/DELTA_GAMMA P&L and VaR/ES
   - Explicit tolerances: `KERNEL_PNL_ABS_TOL=1e-9`, `KERNEL_PNL_REL_TOL=1e-12` (`historical.py`)
   - FULL_REVALUATION remains kernel-free even when `RISKFORGE_SCENARIO_KERNEL=native`
-  - **No product risk-path speedup claimed yet** — microbench table in `benchmarks/RESULTS.md`
-    remains separate from Historical VaR wall time
+  - **No product risk-path speedup claimed** — microbench table in `benchmarks/RESULTS.md`
+    remains separate from Historical VaR wall time; see Formal SLA disposition above
+
+### Progress update (2026-09-02, Lead Architect — M6 SLA disposition)
+
+- Owner: Lead Architect / Orchestrator (C++ Performance consulted for evidence references only)
+- **Option B accepted:** no product VaR / risk-path wall-time SLA; Milestone 6 remains **PARTIAL**
+- M6.1–M6.7 stay DONE; COMPLETE not claimed; M11/M12 not started
+- Handoff: `docs/agents/HANDOFF_M6_SLA.md`
 
 ---
 
@@ -891,7 +914,7 @@ Status: **COMPLETE** (2026-09-02 — M10.1–M10.3 DONE)
 - Owner: Backend/API (+ Lead Architect coordination); no Frontend / Market Data changes
 - Deterministic offline demo harness; no live vendors; PricingEngine seams untouched
 - **Milestone 10 COMPLETE** — M10.1–M10.3 all DONE per checklist above
-- Next residuals (ROADMAP): **M6 SLA** (accepted PARTIAL until product VaR wall-time SLA); M11/M12 **POSTPONED** — do not start; M3.9 methodology doc DONE
+- Next residuals (ROADMAP): **M6 SLA disposition closed** (accepted PARTIAL — no product VaR wall-time SLA); M11/M12 **POSTPONED** — do not start; M3.9 methodology doc DONE
 
 ### Progress update (2026-09-02, Market Data — M10.2)
 
