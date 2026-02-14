@@ -62,7 +62,7 @@ Trade (domain/models.py)
 3. M6 **COMPLETE** (2026-09-02 Lead Architect + C++ Performance): M6.1–M6.7 DONE; formal **scenario-kernel SLA** SLA-K1 ≥50× / SLA-K2 ≥1.3× on `10k_x_1k` (reference host; `benchmarks/RESULTS.md` + `benchmarks/check_m6_sla.py`); FULL_REVALUATION stays Python; **not** an HTTP end-to-end VaR latency claim
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); **M3.8 formal Scenario HTTP wire DONE** (legacy StressScenario endpoints retained)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
-6. M9 **COMPLETE** (2026-09-02): M9.1–M9.10; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / M5.7). **M9.11:** transient GHA `e2e-playwright` failure on multi-factor reverse UI land must stay fixed (testid + exact heading) — see M9.11 below
+6. M9 **COMPLETE** (2026-09-02): M9.1–M9.10; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / M5.7). **M9.11:** transient GHA `e2e-playwright` failure on multi-factor reverse UI land must stay fixed (testid + exact heading) — see M9.11 below. **M9.12:** local mypy lint regression fixed on master (`11339c6`); GHA URL confirmation blocked by invalid `gh` keyring token (see M9.12)
 7. Multi-factor reverse stress = ray + coordinate descent (**not** a certified global optimum); M3.9 methodology doc published at `docs/methodology/multi_factor_reverse_stress.md`. **M11 / M12 POSTPONED** — do not implement until Lead/user unblocks
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
@@ -817,6 +817,13 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.
   - Older historical failure (M9.7 land): https://github.com/SergTogul/riskforge-mvp/actions/runs/33680821074 (`backend-pytest` + `lint-static-analysis`) — subsequently fixed; not reopened.
   - Local evidence (this triage): backend `pytest -q` **571 passed** (QuantLib); frontend `npm test` **61+9 passed**; `ruff`/`mypy`/`eslint` OK; native kernel compile OK.
   - HEAD at triage start: SHA `f74b528` — full CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33701266538 (all five jobs green). Hardening push SHA `16c91cc` — CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33703670779 (all five jobs green, including `e2e-playwright`).
+
+- [ ] M9.12 CI lint mypy regression (PortfolioService HistoricalRiskEngine narrowing) — **FIX PUSHED; GHA CONFIRM PENDING** (2026-09-02 DevOps/QA)
+  - **Local root cause (reproduced with CI commands):** `lint-static-analysis` / `mypy app` failed on `backend/app/services/portfolio_service.py` — ternary `isinstance(...)` did not narrow `risk: RiskEngine`, so `.seed` / `.observations` were attr-defined errors.
+  - **Fix:** SHA `11339c6` on `master` — statement-level `isinstance(risk, HistoricalRiskEngine)` before accessing attrs (PricingEngine seams untouched).
+  - **Local evidence before push:** backend `pytest -q` **619 passed** (QuantLib 1.43); `ruff`/`mypy` OK; frontend `npm test` **70 passed** + lint + build OK; native `risk_kernel_ok` + shared lib OK.
+  - **Push:** `git push` succeeded (`8d3d67a..11339c6`). Expected CI run URL: https://github.com/SergTogul/riskforge-mvp/actions (filter SHA `11339c6`).
+  - **Blocked:** `gh run list` / `gh run watch` return `Forbidden` — `gh auth status` reports *The token in keyring is invalid* (account still active). Git HTTPS push/fetch still works via credential helper. **Do not spam `gh auth login`.** Operator must repair keyring token once offline; then record green run URL here and check the box.
 
 ### Progress update (2026-09-02, Lead Architect — M9.8 disposition + Milestone 9 COMPLETE)
 
