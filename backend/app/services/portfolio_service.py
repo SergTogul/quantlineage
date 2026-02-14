@@ -86,13 +86,13 @@ class PortfolioService:
         self.multi_reverse_stress_engine = MultiFactorReverseStressEngine()
         self.limit_engine = LimitEngine()
         # Share historical factor source with HistoricalRiskEngine when injected (M10.2).
-        shared_dataset = risk.dataset if isinstance(risk, HistoricalRiskEngine) else None
+        # isinstance must be a statement so mypy narrows risk before .seed/.observations.
         hist_kwargs: dict = {}
-        if shared_dataset is not None:
+        if isinstance(risk, HistoricalRiskEngine):
             hist_kwargs = {
                 "seed": risk.seed,
                 "observations": risk.observations,
-                "dataset": shared_dataset,
+                "dataset": risk.dataset,
             }
         self.var_engine = VaRAnalytics(**hist_kwargs) if hist_kwargs else VaRAnalytics()
         self.limit_drilldown_engine = LimitDrilldownEngine(
