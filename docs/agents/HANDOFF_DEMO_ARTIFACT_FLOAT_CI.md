@@ -49,10 +49,14 @@ cd frontend && npm test && npm run lint && npm run build
 - Frontend: **70** Vitest; ESLint OK; Vite build OK
 - Push: `926ed55` → `origin/master`
 
+## Results (GHA)
+- **success** — https://github.com/SergTogul/riskforge-mvp/actions/runs/33709089560
+- Jobs: backend-pytest, lint-static-analysis, frontend-test-build, e2e-playwright, postgres-persistence-smoke — all success
+- Head SHA: `926ed55181e558e995e529a5c02afd9b875afac4`
+
 ## Known limitations / risks
 - Artifact is demo-grade (8 dp), not a production risk report.
-- Local e2e may fail if Vite is not started / port conflict; GHA e2e was already green on the failing run.
 
 ## Follow-up / next owner
-- Confirm GHA green on SHA `926ed55` via `gh run watch` / Actions URL
-- Blocking?: no for product code; watch CI for confirmation only
+- None; CI green on the fix SHA. Handoff doc commit is `3009b9c` (docs only).
+- Blocking?: **no**
