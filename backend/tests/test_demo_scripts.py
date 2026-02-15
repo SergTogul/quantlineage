@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from app.demo.run_demo_risk import (
+    DEMO_ARTIFACT_FLOAT_DECIMALS,
     DEMO_ARTIFACT_SCHEMA_VERSION,
     build_demo_risk_artifact,
     default_artifact_path,
@@ -96,6 +97,20 @@ def test_committed_artifact_matches_rebuild():
     assert golden.is_file(), "expected committed M10.3 artifact under data/"
     rebuilt = dumps_demo_artifact(build_demo_risk_artifact())
     assert golden.read_text(encoding="utf-8") == rebuilt
+
+
+def test_stabilize_floats_collapses_platform_ulp():
+    """Known CI ULP pairs must dump identically after rounding."""
+    left = {
+        "pnl": 4861.095921907545,
+        "nested": [-85855.66340861515, 105124.17243726869],
+    }
+    right = {
+        "pnl": 4861.095921907533,
+        "nested": [-85855.66340861516, 105124.17243726872],
+    }
+    assert dumps_demo_artifact(left) == dumps_demo_artifact(right)
+    assert DEMO_ARTIFACT_FLOAT_DECIMALS == 8
 
 
 def test_scripts_entrypoint_importable():
