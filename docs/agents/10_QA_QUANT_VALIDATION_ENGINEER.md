@@ -13,7 +13,7 @@ Act as the independent correctness gate for numerical, integration, and user-wor
 - API integration tests;
 - frontend/E2E critical paths;
 - test data and tolerance policy;
-- release/milestone verification report.
+- release/workstream verification report.
 
 ## Does not own
 - feature implementation except minimal test fixtures/helpers;

@@ -1,25 +1,25 @@
 # RiskForge Development Roadmap
 
-Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout (still referenced by agent docs); do not recreate Milestone 0 work there—use this file going forward.
+Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout (still referenced by agent docs); do not recreate Workstream 0 work there—use this file going forward.
 
 ## Progress
 
-| Milestone | Status |
+| Workstream | Status |
 |-----------|--------|
-| Milestone 0 — Prototype Foundation | COMPLETE |
-| Milestone 1 — Quant Foundation | **COMPLETE** (2026-09-02) |
-| Milestone 2 — VaR, ES & Portfolio Risk | **COMPLETE** (2026-09-02) |
-| Milestone 3 — Stress & Threat Engine V3 | **COMPLETE** (2026-09-02) |
-| Milestone 4 — Hierarchy, Attribution & Limits | **COMPLETE** (2026-09-02 Lead Architect formal acceptance) |
-| Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA green; M5.5 caching polish **DONE**) |
-| Milestone 6 — C++ Performance Engine | **COMPLETE** (2026-09-02 — M6.1–M6.7 + formal scenario-kernel SLA-K1/K2) |
-| Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
-| Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
-| Milestone 9 — Testing, CI & Engineering Quality | **COMPLETE** (2026-09-02 Lead Architect: M9.1–M9.10; M9.8 containers DONE; Redis/RQ **deferred** residual — not claimed done) |
-| Milestone 10 — Demo Data & Reproducibility | **COMPLETE** (2026-09-02 — M10.1–M10.3) |
-| Milestone 11 — AI Risk Assistant | **POSTPONED** (product decision 2026-09-02 — do not start until Lead/user unblocks) |
-| Milestone 12 — Documentation & Portfolio Presentation | **POSTPONED** (product decision 2026-09-02 — do not start until Lead/user unblocks; M3.9 methodology doc landed ahead of M12.4) |
-| Milestone 13 — Final Portfolio Demo | NOT STARTED |
+| Workstream 0 — Prototype Foundation | COMPLETE |
+| Workstream 1 — Quant Foundation | **COMPLETE** (2026-09-02) |
+| Workstream 2 — VaR, ES & Portfolio Risk | **COMPLETE** (2026-09-02) |
+| Workstream 3 — Stress & Threat Engine V3 | **COMPLETE** (2026-09-02) |
+| Workstream 4 — Hierarchy, Attribution & Limits | **COMPLETE** (2026-09-02 Lead Architect formal acceptance) |
+| Workstream 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: GHA green; caching polish **DONE**) |
+| Workstream 6 — C++ Performance Engine | **COMPLETE** (2026-09-02 — + formal scenario-kernel SLA-K1/K2) |
+| Workstream 7 — API Productionization | **COMPLETE** (2026-09-02 — dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
+| Workstream 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
+| Workstream 9 — Testing, CI & Engineering Quality | **COMPLETE** (2026-09-02 Lead Architect: ; containers DONE; Redis/RQ **deferred** residual — not claimed done) |
+| Workstream 10 — Demo Data & Reproducibility | **COMPLETE** (2026-09-02 — ) |
+| Workstream 11 — AI Risk Assistant | **POSTPONED** (product decision 2026-09-02 — do not start until Lead/user unblocks) |
+| Workstream 12 — Documentation & Portfolio Presentation | **POSTPONED** (product decision 2026-09-02 — do not start until Lead/user unblocks; methodology doc landed ahead of ) |
+| Workstream 13 — Final Portfolio Demo | **COMPLETE** (2026-09-03 — ) |
 
 ### Baseline verification (2026-09-02, local macOS — Lead Architect acceptance)
 
@@ -31,8 +31,8 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Frontend `npm run build` | **OK** |
 | C++ via `test_native_kernel` | **passed** (g++/Apple clang 14; earlier same-day baseline; not re-run in this acceptance pass) |
 | Manual `g++` of `kernel_test.cpp` without `-I include` | fails include path (docs/README must use `-I include`) |
-| Milestone 1 status | **COMPLETE** — see M1 evidence + documented limitations |
-| Concurrent M2 note | Suite count includes M2.3/M2.4 tests landed during same-day work; M1 acceptance does not claim Milestone 2 complete |
+| Workstream 1 status | **COMPLETE** — see evidence + documented limitations |
+| Concurrent note | Suite count includes tests landed during same-day work; acceptance does not claim Workstream 2 complete |
 | `TASKS.md` | missing |
 | Prior stub `ROADMAP.md` | replaced by this file |
 
@@ -40,58 +40,58 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 
 ```text
 Trade (domain/models.py)
-  → PricingEngine (interfaces/pricing.py)
-      ├─ QuantLibPricingEngine  [equity, EQ option, ZC bond, IRS, EQ future, FX fwd/opt, IR future]
-      └─ BuiltinPricingEngine   [same instrument set]
-      ├─ curve_rates / QL ZeroCurve   when MarketSnapshot.curves|key_rates attached
-      └─ surface_vol lookup           when MarketSnapshot.vol_surfaces attached
-  → MarketSnapshot (frozen + recursive MappingProxy; model_copy re-freezes; typed bump/apply/diff)
-  → Risk engines
-      ├─ SensitivityEngine  [bump-revalue; key-rate DV01 when curves/key_rates present]
-      ├─ HistoricalRiskEngine / VaRAnalytics  [LINEAR / DELTA_GAMMA / FULL_REVALUATION]
-      ├─ StressEngine / ReverseStress / Compare
-      ├─ Hierarchy / Attribution / Limits / Factors / Query
-  → PortfolioService → FastAPI (app/api/* routers; canonical `/api/v1` + deprecated legacy dual-mount)
-  → React SPA (single page cards) / optional NativeScenarioKernel (LINEAR/Δ-Γ via RISKFORGE_SCENARIO_KERNEL)
+ → PricingEngine (interfaces/pricing.py)
+ ├─ QuantLibPricingEngine [equity, EQ option, ZC bond, IRS, EQ future, FX fwd/opt, IR future]
+ └─ BuiltinPricingEngine [same instrument set]
+ ├─ curve_rates / QL ZeroCurve when MarketSnapshot.curves|key_rates attached
+ └─ surface_vol lookup when MarketSnapshot.vol_surfaces attached
+ → MarketSnapshot (frozen + recursive MappingProxy; model_copy re-freezes; typed bump/apply/diff)
+ → Risk engines
+ ├─ SensitivityEngine [bump-revalue; key-rate DV01 when curves/key_rates present]
+ ├─ HistoricalRiskEngine / VaRAnalytics [LINEAR / DELTA_GAMMA / FULL_REVALUATION]
+ ├─ StressEngine / ReverseStress / Compare
+ ├─ Hierarchy / Attribution / Limits / Factors / Query
+ → PortfolioService → FastAPI (app/api/* routers; canonical `/api/v1` + deprecated legacy dual-mount)
+ → React SPA (single page cards) / optional NativeScenarioKernel (LINEAR/Δ-Γ via RISKFORGE_SCENARIO_KERNEL)
 ```
 
-### Highest-risk gaps (post–M1–M5 progress)
+### Highest-risk gaps (post– progress)
 
-1. Caps/floors/swaptions still deferred; EquityVol/FXVol bumps do not rewrite surface grids; QL uses `BlackConstantVol` at point σ (not full surface engine)
-2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 caching polish **DONE** (valuation LRU + curve-construction + scenario memo)
-3. M6 **COMPLETE** (2026-09-02 Lead Architect + C++ Performance): M6.1–M6.7 DONE; formal **scenario-kernel SLA** SLA-K1 ≥50× / SLA-K2 ≥1.3× on `10k_x_1k` (reference host; `benchmarks/RESULTS.md` + `benchmarks/check_m6_sla.py`); FULL_REVALUATION stays Python; **not** an HTTP end-to-end VaR latency claim
-4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); **M3.8 formal Scenario HTTP wire DONE** (legacy StressScenario endpoints retained)
-5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
-6. M9 **COMPLETE** (2026-09-02): M9.1–M9.10; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / M5.7). **M9.11:** transient GHA `e2e-playwright` failure on multi-factor reverse UI land must stay fixed (testid + exact heading) — see M9.11 below. **M9.12:** local mypy lint regression fixed on master (`11339c6`); GHA URL confirmation blocked by invalid `gh` keyring token (see M9.12)
-7. Multi-factor reverse stress = ray + coordinate descent (**not** a certified global optimum); M3.9 methodology doc published at `docs/methodology/multi_factor_reverse_stress.md`. **M11 / M12 POSTPONED** — do not implement until Lead/user unblocks
+1. Caps/floors and vanilla European swaptions have a scoped flat Black-76 pricing slice; EquityVol/FXVol bumps now rewrite attached surface grids; QL still uses `BlackConstantVol` at point σ for equity/FX options (not full surface engine)
+2. **COMPLETE** (2026-09-02): GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); caching polish **DONE** (valuation LRU + curve-construction + scenario memo)
+3. **COMPLETE** (2026-09-02 Lead Architect + C++ Performance): DONE; formal **scenario-kernel SLA** SLA-K1 ≥50× / SLA-K2 ≥1.3× on `10k_x_1k` (reference host; `benchmarks/RESULTS.md` + `benchmarks/check_m6_sla.py`); FULL_REVALUATION stays Python; **not** an HTTP end-to-end VaR latency claim
+4. **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); ** formal Scenario HTTP wire DONE** (legacy StressScenario endpoints retained)
+5. **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
+6. **COMPLETE** (2026-09-02): ; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / ). transient GHA `e2e-playwright` failure on multi-factor reverse UI land must stay fixed (testid + exact heading) — see below. local mypy lint regression fixed on master (`11339c6`); GHA URL confirmation blocked by invalid `gh` keyring token (see )
+7. Multi-factor reverse stress = ray + coordinate descent (**not** a certified global optimum); methodology doc published at `docs/methodology/multi_factor_reverse_stress.md`. ** POSTPONED** — do not implement until Lead/user unblocks
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
 
 | Check | Result |
 |-------|--------|
-| Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **519 passed** (2026-09-02 M7.6), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
+| Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **519 passed** (2026-09-02 ), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
 | Frontend `npm test` | **56 passed**, 0 failed |
 | Frontend `npm run build` | **OK** (vite; 22 modules) |
-| M5 milestone | **COMPLETE** — M5.1/M9.9 GHA green (run 33673245125); M5.5 caching polish **DONE** |
-| M5.6 / M5.7 / M5.9 | **DONE** (DI; Postgres `SKIP LOCKED` claim + Compose worker; stress scenario_definitions HTTP) |
-| M5.5 | **DONE** (valuation LRU + curve-construction cache + scenario-result memo) |
-| M6.1–M6.7 | **DONE** (harness, baseline, risk-path wire, parallel pool, ABI+Historical parity, QL concurrency ADR) |
-| M6 milestone | **COMPLETE** (2026-09-02) — formal scenario-kernel SLA-K1/K2 recorded; not HTTP VaR wall-time |
-| M7 milestone | **COMPLETE** (2026-09-02) — M7.1–M7.6; legacy dual-mount remains until sunset removal gate |
+| workstream | **COMPLETE** — GHA green (run 33673245125); caching polish **DONE** |
+| | **DONE** (DI; Postgres `SKIP LOCKED` claim + Compose worker; stress scenario_definitions HTTP) |
+| | **DONE** (valuation LRU + curve-construction cache + scenario-result memo) |
+| | **DONE** (harness, baseline, risk-path wire, parallel pool, ABI+Historical parity, QL concurrency ADR) |
+| workstream | **COMPLETE** (2026-09-02) — formal scenario-kernel SLA-K1/K2 recorded; not HTTP VaR wall-time |
+| workstream | **COMPLETE** (2026-09-02) — ; legacy dual-mount remains until sunset removal gate |
 
 ---
 
-## Milestone 0 — Prototype Foundation
+## Workstream 0 — Prototype Foundation
 
 Status: COMPLETE
 
 Working MVP: PricingEngine seam, QuantLib + builtin adapters (partial QL coverage), MarketSnapshot + shock, 7 instruments, synthetic VaR/ES + component VaR, stress/threat/custom/reverse/hedge-compare, hierarchy, attribution, limits, NL keyword query, Python + optional C++ scenario kernel, FastAPI, React terminal, backend/frontend/e2e tests.
 
-Deficiencies discovered are assigned to later milestones (do not redo M0).
+Deficiencies discovered are assigned to later workstreams (do not redo ).
 
 ---
 
-## Milestone 1 — Quant Foundation
+## Workstream 1 — Quant Foundation
 
 Status: **COMPLETE** (Lead Architect acceptance 2026-09-02)
 
@@ -103,50 +103,50 @@ Critical review items closed with code evidence:
 
 ### Tasks
 
-- [x] M1.1 Local production dependency verification
-  - Evidence (2026-09-02 acceptance): QuantLib 1.43; backend **160 passed** with `RISKFORGE_PRICING_ENGINE=quantlib`; frontend `npm test` **10 passed**; `npm run build` OK
-- [x] M1.2 Complete QuantLib instrument coverage
-  - EquityFuture / FXForward / FXOption: native QL paths (no Builtin fallback); tight parity tests
-  - InterestRateFuture: domain + Builtin/QL adapters (algebraic STIR mark; full QL FRA still deferred)
-  - Caps/floors/swaptions: **deferred** (documented limitation) until richer IR vol / exercise modeling
-  - Builtin `pay_fixed=True` aligned to standard payer economics (matches QuantLib)
-- [x] M1.3 Formal market-data domain
-  - Frozen `MarketSnapshot` with recursive deep-freeze; bump/apply/diff/content_hash; sub-market views
-  - RateZero: `PARALLEL`/`ALL` vs specific tenors (no silent parallel on tenor bumps)
-  - Pricing consumes attached curves/key_rates (bonds/swaps) and vol surfaces (EQ/FX options) when present; scalars remain fallback
-  - Evidence: `tests/test_market_snapshot.py`; ADR 002
-- [x] M1.4 Yield curves
-  - USD OIS/SOFR scaffolds, key tenors, linear zeros, triangular key-rate shocks; attach → `curves`/`key_rates`
-  - Builtin `discount_factor` / `continuous_zero`; QuantLib `_curve_handle` / `ZeroCurve` when attached
-  - Limitation (accepted for M1): flat zeros / no market-instrument bootstrap yet
-  - Evidence: `tests/test_curves.py`, `tests/test_curve_pricing.py`
-- [x] M1.5 Volatility surfaces
-  - Equity/FX expiry × moneyness grids; parallel / expiry-bucket / skew / term shocks; bilinear lookup
-  - `attach_vol_surface`; Builtin + QuantLib option paths via `surface_vol.option_vol_from_snapshot`
-  - Limitation: flat/scaffolding grids only — no SABR/local-vol calibration
-  - Evidence: `tests/test_vol_surfaces.py`, `tests/test_surface_vol_pricing.py`
-- [x] M1.6 Typed risk-factor taxonomy
-  - Evidence: typed `RiskFactor` in `backend/app/risk/factor_types.py`; `RiskFactorEngine` migrated (API still string keys); `test_factor_types.py`
-- [x] M1.7 Unified bump-and-revalue sensitivity engine
-  - delta/gamma/vega/DV01/FX delta; key-rate DV01 uses true tenor bump + `method=bump_revalue` when tenor available
-  - Honest parallel fallback (`bump_revalue_parallel_fallback`) only when no `key_rates`/curve pillar for that tenor
-  - Flag `KEY_RATE_CURVES_CONSUMED_BY_PRICING=True`
-  - Evidence: `tests/test_sensitivities.py` (isolation + swap tenor + missing-fallback cases)
-- [x] M1.8 Quant correctness tests
-  - Hypothesis properties + FD Greek reconciliation (`test_quant_properties.py`); QuantLib golden BS/GK + Builtin cross-check (`test_quantlib_golden.py`); `hypothesis>=6.112,<7` in `requirements.txt`
-  - Conventions: cash delta/gamma/vega; discounted European intrinsic; `pay_fixed=True` = payer
+- [x] Local production dependency verification
+ - Evidence (2026-09-02 acceptance): QuantLib 1.43; backend **160 passed** with `RISKFORGE_PRICING_ENGINE=quantlib`; frontend `npm test` **10 passed**; `npm run build` OK
+- [x] Complete QuantLib instrument coverage
+ - EquityFuture / FXForward / FXOption: native QL paths (no Builtin fallback); tight parity tests
+ - InterestRateFuture: domain + Builtin/QL adapters (algebraic STIR mark; full QL FRA still deferred)
+ - Caps/floors/swaptions: **deferred** (documented limitation) until richer IR vol / exercise modeling
+ - Builtin `pay_fixed=True` aligned to standard payer economics (matches QuantLib)
+- [x] Formal market-data domain
+ - Frozen `MarketSnapshot` with recursive deep-freeze; bump/apply/diff/content_hash; sub-market views
+ - RateZero: `PARALLEL`/`ALL` vs specific tenors (no silent parallel on tenor bumps)
+ - Pricing consumes attached curves/key_rates (bonds/swaps) and vol surfaces (EQ/FX options) when present; scalars remain fallback
+ - Evidence: `tests/test_market_snapshot.py`; ADR 002
+- [x] Yield curves
+ - USD OIS/SOFR scaffolds, key tenors, linear zeros, triangular key-rate shocks; attach → `curves`/`key_rates`
+ - Builtin `discount_factor` / `continuous_zero`; QuantLib `_curve_handle` / `ZeroCurve` when attached
+ - Limitation (accepted for ): flat zeros / no market-instrument bootstrap yet
+ - Evidence: `tests/test_curves.py`, `tests/test_curve_pricing.py`
+- [x] Volatility surfaces
+ - Equity/FX expiry × moneyness grids; parallel / expiry-bucket / skew / term shocks; bilinear lookup
+ - `attach_vol_surface`; Builtin + QuantLib option paths via `surface_vol.option_vol_from_snapshot`
+ - Limitation: flat/scaffolding grids only — no SABR/local-vol calibration
+ - Evidence: `tests/test_vol_surfaces.py`, `tests/test_surface_vol_pricing.py`
+- [x] Typed risk-factor taxonomy
+ - Evidence: typed `RiskFactor` in `backend/app/risk/factor_types.py`; `RiskFactorEngine` migrated (API still string keys); `test_factor_types.py`
+- [x] Unified bump-and-revalue sensitivity engine
+ - delta/gamma/vega/DV01/FX delta; key-rate DV01 uses true tenor bump + `method=bump_revalue` when tenor available
+ - Honest parallel fallback (`bump_revalue_parallel_fallback`) only when no `key_rates`/curve pillar for that tenor
+ - Flag `KEY_RATE_CURVES_CONSUMED_BY_PRICING=True`
+ - Evidence: `tests/test_sensitivities.py` (isolation + swap tenor + missing-fallback cases)
+- [x] Quant correctness tests
+ - Hypothesis properties + FD Greek reconciliation (`test_quant_properties.py`); QuantLib golden BS/GK + Builtin cross-check (`test_quantlib_golden.py`); `hypothesis>=6.112,<7` in `requirements.txt`
+ - Conventions: cash delta/gamma/vega; discounted European intrinsic; `pay_fixed=True` = payer
 
 ### Acceptance Criteria
 
 - [x] QuantLib adapters for EquityFuture, FXForward, FXOption behind `PricingEngine` with reference comparison tests
-- [x] Domain models for IR future; cap/floor/swaption **documented deferral** under M1.2
+- [x] Domain models for IR future; cap/floor/swaption **documented deferral** under
 - [x] Immutable market domain with bump/diff (deep freeze of nested curve/surface payloads; `model_copy` re-freezes)
 - [x] USD OIS/SOFR curve scaffolding; equity/FX vol surface scaffolding
 - [x] Typed `RiskFactor` abstraction used by risk vectors
 - [x] Sensitivity engine for delta/gamma/vega/DV01/honest key-rate DV01/FX delta
 - [x] Property/golden tests green under QuantLib
 
-### Documented M1 limitations (not blockers)
+### Documented limitations (not blockers)
 
 - Caps/floors/swaptions not priced
 - Curves are flat-zero scaffolds (no bootstrap from deposits/futures/swaps)
@@ -157,78 +157,82 @@ Critical review items closed with code evidence:
 - QuantLib options use `BlackConstantVol` at surface-lookup σ, not a QL surface/interpolation engine
 - Builtin ZC bond uses simple compound `(1+y)^T`; QL uses continuous/`Actual365Fixed` — golden tests allow ~5% relative band
 
-### Follow-on tasks (discovered during M1–M5; do not reopen M1 acceptance)
+### Follow-on tasks (discovered during ; do not reopen acceptance)
 
-- [ ] M1.9 Caps / floors / swaptions pricing (IR vol + exercise)
-  - Why: deferred under M1.2; needs richer IR vol / exercise modeling before domain+adapters
-- [ ] M1.10 Surface-aware EquityVol / FXVol bumps rewrite attached `vol_surfaces` grids
-  - Why/evidence: `MarketSnapshot.bump` only scales `equity_vols`/`fx_vols`; `test_surface_vol_pricing.py` documents the gap — stress/vega paths can diverge when grids are attached
-- [ ] M1.11 QuantLib full surface / smile engine (replace point `BlackConstantVol`)
-  - Why/evidence: `quantlib.py` builds `BlackConstantVol` from `surface_vol.option_vol_from_snapshot` σ; not a QL `BlackVarianceSurface` (or equiv.)
-- [x] M1.12 Align Builtin vs QuantLib ZC bond day-count / compounding conventions — **DONE** (2026-09-02)
-  - Builtin scalar (no curve) now uses continuous compounding on Actual365Fixed year fraction ``max(1, round(T*365))/365``, matching QuantLib ``ZeroCouponBond`` + ``FlatForward(Continuous, Actual365Fixed)``.
-  - Tight Builtin↔QL parity + continuous golden: **rel=1e-10** (`test_quantlib_golden.py`); curve-path still discounts at domain pillar ``maturity_years`` (`test_curve_pricing.py`).
-  - Historical annual ``face/(1+y)^T`` retired as a reference (was **rel=5e-2** gap).
-- [ ] M1.13 Curve bootstrap from market instruments (replace flat-zero scaffolds)
-  - Why: accepted M1.4 limitation; deposits/futures/swaps bootstrap still open
+- [x] Caps / floors / swaptions pricing (IR vol + exercise) — **DONE** (2026-09-03 scoped vanilla slice)
+ - Caps/floors: `CapFloorPosition` domain model plus Builtin and QuantLib flat-forward Black-76 optionlet-strip valuation
+ - Swaptions: `SwaptionPosition` domain model plus Builtin and QuantLib flat-forward Black-76 option on generated annuity; European payer/receiver only
+ - Evidence: `backend/tests/test_ir_options_pricing.py`; no-fallback parity in `backend/tests/test_quantlib_pricing.py`; handoffs `docs/agents/HANDOFF_SWAPTIONS.md` and `docs/agents/HANDOFF_VOL_SURFACE_BUMPS.md`
+ - Residual limitations: no IR vol cube/smile, Bermudan/callable structures, physical/cash settlement variations, or explicit calendar/date schedules
+- [x] Surface-aware EquityVol / FXVol bumps rewrite attached `vol_surfaces` grids — **DONE** (2026-09-03)
+ - `MarketSnapshot.bump` / `apply` now rewrite matching attached `vol_surfaces` grids as well as scalar ATM marks for generic, expiry-bucket, skew, and term vol shocks
+ - Evidence: `backend/tests/test_market_snapshot.py`, `backend/tests/test_surface_vol_pricing.py`; handoff `docs/agents/HANDOFF_VOL_SURFACE_BUMPS.md`
+- [ ] QuantLib full surface / smile engine (replace point `BlackConstantVol`)
+ - Why/evidence: `quantlib.py` builds `BlackConstantVol` from `surface_vol.option_vol_from_snapshot` σ; not a QL `BlackVarianceSurface` (or equiv.)
+- [x] Align Builtin vs QuantLib ZC bond day-count / compounding conventions — **DONE** (2026-09-02)
+ - Builtin scalar (no curve) now uses continuous compounding on Actual365Fixed year fraction ``max(1, round(T*365))/365``, matching QuantLib ``ZeroCouponBond`` + ``FlatForward(Continuous, Actual365Fixed)``.
+ - Tight Builtin↔QL parity + continuous golden: **rel=1e-10** (`test_quantlib_golden.py`); curve-path still discounts at domain pillar ``maturity_years`` (`test_curve_pricing.py`).
+ - Historical annual ``face/(1+y)^T`` retired as a reference (was **rel=5e-2** gap).
+- [ ] Curve bootstrap from market instruments (replace flat-zero scaffolds)
+ - Why: accepted limitation; deposits/futures/swaps bootstrap still open
 
 ---
 
-## Milestone 2 — VaR, ES & Portfolio Risk
+## Workstream 2 — VaR, ES & Portfolio Risk
 
 Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance)
 
 ### Tasks
 
-- [x] M2.1 Historical market dataset abstraction
-  - `backend/app/risk/historical_data.py`: `FactorObservationSeries`, `HistoricalMarketDataset` protocol, `SyntheticHistoricalDataset`, `ArrayHistoricalDataset`
-  - Separates factor observations from scenario generation (M2.2) and valuation (`HistoricalRiskEngine` / `VaRAnalytics`)
-  - Aggregate equity/FX returns, vol moves, parallel rate bp moves only — no key-rate / tenor dependency required for aggregate path
-  - `HistoricalRiskEngine` + `VaRAnalytics` consume dataset; default synthetic preserves prior seeded RNG
-  - Evidence: `tests/test_historical_data.py` (7) + risk regression green (2026-09-02)
-- [x] M2.2 Historical scenario generation
-  - `backend/app/risk/scenarios.py`: `AggregateFactorChange` → typed `MarketScenario` / `FactorChange` → shocked `MarketSnapshot[]`
-  - Expands aggregate observation moves onto factors present in a base snapshot; applies via `MarketSnapshot.apply` (bump units); `to_stress_scenario` bridges `shock_snapshot`
-  - Does **not** alter Δ-Γ VaR (`HistoricalRiskEngine` / `VaRAnalytics`); empty scenario preserves `content_hash`
-  - Evidence: `tests/test_scenarios.py`
-- [x] M2.3 Full-revaluation Historical VaR
-  - Explicit `VaRMethodology`: `LINEAR` | `DELTA_GAMMA` (default, legacy Δ-Γ) | `FULL_REVALUATION`
-  - `FULL_REVALUATION` reprices via `PricingEngine` on M2.2 `historical_shocked_snapshots`
-  - Methodology on `RiskSummary` / `VaRReport`; query param on `/risk/summary`, `/risk/var`
-  - Evidence: `tests/test_var_methodology.py`
-- [x] M2.4 VaR comparison (Linear / Δ-Γ / Full reval)
-  - `backend/app/risk/var_compare.py`: `compare_methodologies()` — shared dataset, times each mode (delegates P&L to M2.3 `HistoricalRiskEngine`)
-  - DTOs: `VaRMethodologyMetrics`, `VaRMethodologyComparison`; service + `POST /risk/var/compare`
-  - Returns per methodology: VaR95, VaR99, ES99, `runtime_ms`, methodology label
-  - Evidence: `tests/test_var_compare.py`
-- [x] M2.5 Expected Shortfall contributions
-  - `backend/app/risk/es.py`: historical tail-conditional ES by position / book / strategy / desk / risk factor
-  - LINEAR/DELTA_GAMMA: additive Greek factor P&L; FULL_REVALUATION: factor-isolated reval + `interaction` residual
-  - DTOs: `ESContribution`, `ESContributionReport`; `PortfolioService.es_contributions()`; `POST /risk/es` (optional `methodology` query)
-  - Position-level `component_es` also on `RiskContribution` in `VaRReport`
-  - Reconciliation: contribution sum ≈ portfolio ES (abs 1e-6 / rel 1e-8)
-  - Evidence: `tests/test_es_contributions.py` (service + API)
-- [x] M2.6 Component VaR
-  - Euler / covariance allocation of **parametric** VaR on methodology P&L series (`LINEAR` | `DELTA_GAMMA` | `FULL_REVALUATION`)
-  - `CVaR_i = VaR · Cov(X_i, X) / Var(X)`; Σ CVaR = parametric VaR (not historical quantile VaR)
-  - Shared helpers in `backend/app/risk/marginal_var.py`; `VaRAnalytics.report` contributions
-  - Evidence: `tests/test_component_var.py` — reconciliation under Δ-Γ and full reval; single-position / zero-shock edges
-- [x] M2.7 Marginal VaR
-  - `MVaR_i = ∂VaR/∂w_i|_{w=1} = z · Cov(X_i, X) / σ`; at current holdings `MVaR_i = CVaR_i`
-  - `RiskContribution.marginal_var` (default 0.0, append-only); FD helper `finite_difference_marginal_var`
-  - Methodology documented in `marginal_var.py` module docstring
-  - Evidence: `tests/test_marginal_var.py`
-- [x] M2.8 Incremental VaR
-  - `backend/app/risk/incremental_var.py`: `apply_what_if_changes`, `incremental_var`, `what_if_analysis`
-  - Methodology: IVaR = VaR(P′) − VaR(P) (same for VaR95 / ES99); positive ⇒ risk-increasing; input portfolio never mutated
-  - Delegates P&L/quantiles to `HistoricalRiskEngine`; default methodology `DELTA_GAMMA`
-  - Evidence: `tests/test_incremental_var.py`
-- [x] M2.9 What-if API `POST /risk/what-if` (M7.2 will version under `/api/v1`)
-  - DTOs: `WhatIfRequest` / `WhatIfReport` (+ incremental metrics, factor exposure & stress loss diffs)
-  - Supports add/remove/modify hypothetical trades without mutating persisted/sample portfolio
-  - Returns before risk, after risk, incremental risk, changed factor exposures, changed stress losses
-  - Optional methodology via body or query override
-  - Evidence: `tests/test_what_if.py`
+- [x] Historical market dataset abstraction
+ - `backend/app/risk/historical_data.py`: `FactorObservationSeries`, `HistoricalMarketDataset` protocol, `SyntheticHistoricalDataset`, `ArrayHistoricalDataset`
+ - Separates factor observations from scenario generation and valuation (`HistoricalRiskEngine` / `VaRAnalytics`)
+ - Aggregate equity/FX returns, vol moves, parallel rate bp moves only — no key-rate / tenor dependency required for aggregate path
+ - `HistoricalRiskEngine` + `VaRAnalytics` consume dataset; default synthetic preserves prior seeded RNG
+ - Evidence: `tests/test_historical_data.py` (7) + risk regression green (2026-09-02)
+- [x] Historical scenario generation
+ - `backend/app/risk/scenarios.py`: `AggregateFactorChange` → typed `MarketScenario` / `FactorChange` → shocked `MarketSnapshot[]`
+ - Expands aggregate observation moves onto factors present in a base snapshot; applies via `MarketSnapshot.apply` (bump units); `to_stress_scenario` bridges `shock_snapshot`
+ - Does **not** alter Δ-Γ VaR (`HistoricalRiskEngine` / `VaRAnalytics`); empty scenario preserves `content_hash`
+ - Evidence: `tests/test_scenarios.py`
+- [x] Full-revaluation Historical VaR
+ - Explicit `VaRMethodology`: `LINEAR` | `DELTA_GAMMA` (default, legacy Δ-Γ) | `FULL_REVALUATION`
+ - `FULL_REVALUATION` reprices via `PricingEngine` on `historical_shocked_snapshots`
+ - Methodology on `RiskSummary` / `VaRReport`; query param on `/risk/summary`, `/risk/var`
+ - Evidence: `tests/test_var_methodology.py`
+- [x] VaR comparison (Linear / Δ-Γ / Full reval)
+ - `backend/app/risk/var_compare.py`: `compare_methodologies` — shared dataset, times each mode (delegates P&L to `HistoricalRiskEngine`)
+ - DTOs: `VaRMethodologyMetrics`, `VaRMethodologyComparison`; service + `POST /risk/var/compare`
+ - Returns per methodology: VaR95, VaR99, ES99, `runtime_ms`, methodology label
+ - Evidence: `tests/test_var_compare.py`
+- [x] Expected Shortfall contributions
+ - `backend/app/risk/es.py`: historical tail-conditional ES by position / book / strategy / desk / risk factor
+ - LINEAR/DELTA_GAMMA: additive Greek factor P&L; FULL_REVALUATION: factor-isolated reval + `interaction` residual
+ - DTOs: `ESContribution`, `ESContributionReport`; `PortfolioService.es_contributions`; `POST /risk/es` (optional `methodology` query)
+ - Position-level `component_es` also on `RiskContribution` in `VaRReport`
+ - Reconciliation: contribution sum ≈ portfolio ES (abs 1e-6 / rel 1e-8)
+ - Evidence: `tests/test_es_contributions.py` (service + API)
+- [x] Component VaR
+ - Euler / covariance allocation of **parametric** VaR on methodology P&L series (`LINEAR` | `DELTA_GAMMA` | `FULL_REVALUATION`)
+ - `CVaR_i = VaR · Cov(X_i, X) / Var(X)`; Σ CVaR = parametric VaR (not historical quantile VaR)
+ - Shared helpers in `backend/app/risk/marginal_var.py`; `VaRAnalytics.report` contributions
+ - Evidence: `tests/test_component_var.py` — reconciliation under Δ-Γ and full reval; single-position / zero-shock edges
+- [x] Marginal VaR
+ - `MVaR_i = ∂VaR/∂w_i|_{w=1} = z · Cov(X_i, X) / σ`; at current holdings `MVaR_i = CVaR_i`
+ - `RiskContribution.marginal_var` (default 0.0, append-only); FD helper `finite_difference_marginal_var`
+ - Methodology documented in `marginal_var.py` module docstring
+ - Evidence: `tests/test_marginal_var.py`
+- [x] Incremental VaR
+ - `backend/app/risk/incremental_var.py`: `apply_what_if_changes`, `incremental_var`, `what_if_analysis`
+ - Methodology: IVaR = VaR(P′) − VaR(P) (same for VaR95 / ES99); positive ⇒ risk-increasing; input portfolio never mutated
+ - Delegates P&L/quantiles to `HistoricalRiskEngine`; default methodology `DELTA_GAMMA`
+ - Evidence: `tests/test_incremental_var.py`
+- [x] What-if API `POST /risk/what-if` ( will version under `/api/v1`)
+ - DTOs: `WhatIfRequest` / `WhatIfReport` (+ incremental metrics, factor exposure & stress loss diffs)
+ - Supports add/remove/modify hypothetical trades without mutating persisted/sample portfolio
+ - Returns before risk, after risk, incremental risk, changed factor exposures, changed stress losses
+ - Optional methodology via body or query override
+ - Evidence: `tests/test_what_if.py`
 
 ### Acceptance Criteria
 
@@ -238,62 +242,62 @@ Methodology-selectable VaR/ES with contribution reconciliation; what-if without 
 
 | Check | Result |
 |-------|--------|
-| M2.1–M2.9 checklist | All `[x]` with file/test evidence in ROADMAP |
+| checklist | All `[x]` with file/test evidence in ROADMAP |
 | Backend pytest (`RISKFORGE_PRICING_ENGINE=quantlib`) | **219 passed**, 1 Starlette/httpx deprecation warning |
 | Frontend `npm test` | **10 passed** |
 | Frontend `npm run build` | **OK** |
-| M2.5 API gap closed | `POST /risk/es` wired to `PortfolioService.es_contributions()` |
-| Known residual | Dual-mount `/api/v1` + M7.6 sunset plan DONE; legacy paths remain until removal gate |
+| API gap closed | `POST /risk/es` wired to `PortfolioService.es_contributions` |
+| Known residual | Dual-mount `/api/v1` + sunset plan DONE; legacy paths remain until removal gate |
 
 ---
 
-## Milestone 3 — Stress & Threat Engine V3
+## Workstream 3 — Stress & Threat Engine V3
 
 Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance)
 
 ### Tasks
 
-- [x] M3.1 Formal Scenario domain model
-  - `backend/app/risk/scenario_model.py`: `Scenario` with id/name/category/description/`FactorShock[]`/threshold/severity/metadata
-  - Shocks reference typed `RiskFactor` (`factor_types.py`); apply via `MarketSnapshot.apply`
-  - Adapters to/from legacy `StressScenario` and M2.2 `MarketScenario` (existing stress APIs unchanged)
-  - Severity bands aligned with StressEngine threat levels; ADR 004
-  - Evidence: `tests/test_scenario_model.py`
-- [x] M3.2 Multi-factor scenario engine
-  - `backend/app/risk/scenario_engine.py`: `ScenarioEngine` / `apply_scenario` / `expand_scenario` / `shocked_snapshots`
-  - Primary path: formal `Scenario` / `FactorShock` via M3.1 `scenario_model.apply_scenario`
-  - Also accepts legacy `StressScenario`, M2.2 `MarketScenario` / `FactorChange`, and `(RiskFactor, amount)` pairs
-  - Combined equity + rates + FX + vol → shocked `MarketSnapshot` via `MarketSnapshot.apply` / `bump`
-  - Canonical expansion for `StressScenario` (`scenario_from_stress`); caller order for explicit lists; independent scenarios
-  - `shock_snapshot` delegates to engine (StressScenario APIs unchanged); re-exported from `stress.py`
-  - Evidence: `tests/test_scenario_engine.py`
-- [x] M3.3 Historical crisis library
-  - `backend/app/risk/crisis_library.py`: documented presets (Lehman 2008, COVID Mar-2020, 2022 rates, Euro 2011, Volmageddon 2018, China 2015, dot-com-style)
-  - Formal `Scenario` category `HISTORICAL_APPROXIMATION` for all crisis presets; observation series → `HISTORICAL_REPLAY`
-  - Honest disclaimers; never present approximations as exact replays; wired into `THREAT_SCENARIOS`
-  - Evidence: `tests/test_crisis_library.py`
-- [x] M3.4 Scenario contribution decomposition
-  - `backend/app/risk/scenario_attribution.py`: hierarchy (portfolio/desk/strategy/book/trade) + risk-factor decomposition
-  - Factor path: isolated full reval per typed `RiskFactor.key` + `interaction` residual
-  - Formal `Scenario` and legacy `StressScenario` inputs; wired into `StressEngine.evaluate` / `contributions`
-  - DTOs: `ScenarioContribution`, `ScenarioContributionBreakdown` on `StressEvaluation.contributions`
-  - Evidence: `tests/test_scenario_attribution.py` (reconciliation abs 1e-6 / rel 1e-8)
-- [x] M3.5 Reverse stress single-factor
-  - `backend/app/risk/reverse_stress.py`: binary-search solver on typed `FactorShock` / formal `Scenario` (REVERSE)
-  - Returns target loss (absolute), wire-compatible `required_shock`, resulting P&L, convergence diagnostics
-  - Units: equity/vol/fx relative; rates in bp (legacy `max_shock=0.80` → 800bp bound)
-  - `ReverseStressEngine` re-exported from `stress.py`; `/risk/stress/reverse` unchanged
-  - Evidence: `tests/test_reverse_stress.py`
-- [x] M3.6 Reverse stress multi-factor
-  - `backend/app/risk/reverse_stress_multi.py`: constrained L2 ray search + coordinate descent
-  - Documented assumptions on result; adverse orthant; reuses M3.5 shock builders (no single-factor rewrite)
-  - API: `POST /risk/stress/reverse/multi`; re-exported from `stress.py`
-  - Evidence: `tests/test_reverse_stress_multi.py`
-- [x] M3.7 Hedge comparison
-  - `ScenarioComparisonEngine` → `HedgeComparisonReport`: hedge_cost, base/hedged VaR & ES, scenario loss, factor exposure deltas
-  - Legacy per-scenario pnl/improvement fields retained inside `scenarios[]`
-  - API: `POST /risk/stress/compare` returns report (not bare list)
-  - Evidence: `tests/test_hedge_comparison.py`
+- [x] Formal Scenario domain model
+ - `backend/app/risk/scenario_model.py`: `Scenario` with id/name/category/description/`FactorShock[]`/threshold/severity/metadata
+ - Shocks reference typed `RiskFactor` (`factor_types.py`); apply via `MarketSnapshot.apply`
+ - Adapters to/from legacy `StressScenario` and `MarketScenario` (existing stress APIs unchanged)
+ - Severity bands aligned with StressEngine threat levels; ADR 004
+ - Evidence: `tests/test_scenario_model.py`
+- [x] Multi-factor scenario engine
+ - `backend/app/risk/scenario_engine.py`: `ScenarioEngine` / `apply_scenario` / `expand_scenario` / `shocked_snapshots`
+ - Primary path: formal `Scenario` / `FactorShock` via `scenario_model.apply_scenario`
+ - Also accepts legacy `StressScenario`, `MarketScenario` / `FactorChange`, and `(RiskFactor, amount)` pairs
+ - Combined equity + rates + FX + vol → shocked `MarketSnapshot` via `MarketSnapshot.apply` / `bump`
+ - Canonical expansion for `StressScenario` (`scenario_from_stress`); caller order for explicit lists; independent scenarios
+ - `shock_snapshot` delegates to engine (StressScenario APIs unchanged); re-exported from `stress.py`
+ - Evidence: `tests/test_scenario_engine.py`
+- [x] Historical crisis library
+ - `backend/app/risk/crisis_library.py`: documented presets (Lehman 2008, COVID Mar-2020, 2022 rates, Euro 2011, Volmageddon 2018, China 2015, dot-com-style)
+ - Formal `Scenario` category `HISTORICAL_APPROXIMATION` for all crisis presets; observation series → `HISTORICAL_REPLAY`
+ - Honest disclaimers; never present approximations as exact replays; wired into `THREAT_SCENARIOS`
+ - Evidence: `tests/test_crisis_library.py`
+- [x] Scenario contribution decomposition
+ - `backend/app/risk/scenario_attribution.py`: hierarchy (portfolio/desk/strategy/book/trade) + risk-factor decomposition
+ - Factor path: isolated full reval per typed `RiskFactor.key` + `interaction` residual
+ - Formal `Scenario` and legacy `StressScenario` inputs; wired into `StressEngine.evaluate` / `contributions`
+ - DTOs: `ScenarioContribution`, `ScenarioContributionBreakdown` on `StressEvaluation.contributions`
+ - Evidence: `tests/test_scenario_attribution.py` (reconciliation abs 1e-6 / rel 1e-8)
+- [x] Reverse stress single-factor
+ - `backend/app/risk/reverse_stress.py`: binary-search solver on typed `FactorShock` / formal `Scenario` (REVERSE)
+ - Returns target loss (absolute), wire-compatible `required_shock`, resulting P&L, convergence diagnostics
+ - Units: equity/vol/fx relative; rates in bp (legacy `max_shock=0.80` → 800bp bound)
+ - `ReverseStressEngine` re-exported from `stress.py`; `/risk/stress/reverse` unchanged
+ - Evidence: `tests/test_reverse_stress.py`
+- [x] Reverse stress multi-factor
+ - `backend/app/risk/reverse_stress_multi.py`: constrained L2 ray search + coordinate descent
+ - Documented assumptions on result; adverse orthant; reuses shock builders (no single-factor rewrite)
+ - API: `POST /risk/stress/reverse/multi`; re-exported from `stress.py`
+ - Evidence: `tests/test_reverse_stress_multi.py`
+- [x] Hedge comparison
+ - `ScenarioComparisonEngine` → `HedgeComparisonReport`: hedge_cost, base/hedged VaR & ES, scenario loss, factor exposure deltas
+ - Legacy per-scenario pnl/improvement fields retained inside `scenarios[]`
+ - API: `POST /risk/stress/compare` returns report (not bare list)
+ - Evidence: `tests/test_hedge_comparison.py`
 
 ### Acceptance Criteria
 
@@ -303,67 +307,67 @@ Flagship stress with typed multi-factor shocks, honest crisis labeling, reconcil
 
 | Check | Result |
 |-------|--------|
-| M3.1–M3.7 checklist | All `[x]` with file/test evidence in ROADMAP; focused suite **78 passed** |
+| checklist | All `[x]` with file/test evidence in ROADMAP; focused suite **78 passed** |
 | Backend pytest (`RISKFORGE_PRICING_ENGINE=quantlib`, QuantLib 1.43) | **282 passed**, 1 Starlette/httpx deprecation warning |
 | Frontend `npm test` | **10 passed** |
 | Frontend `npm run build` | **OK** |
 | Breaking API shape | `POST /risk/stress/compare` returns `HedgeComparisonReport` object (not bare `ScenarioComparison[]`); legacy per-scenario fields live under `scenarios[]` |
 | Multi-factor reverse limitations | Adverse orthant only; monotonicity assumed not proven; ray + coordinate descent is not a certified global optimum; assumptions echoed on result |
-| Known residual | Hedge-compare UI landed M8.5; dual-mount + M7.6 sunset DONE (legacy still served); **M3.8 formal Scenario wire DONE** (legacy StressScenario retained; hedge-compare/what-if still legacy shape) |
-| Hierarchy | Left untouched in M3 acceptance — M4.2 later fixed hierarchy↔stress via lazy import (no residual circular-import gap) |
+| Known residual | Hedge-compare UI landed ; dual-mount + sunset DONE (legacy still served); ** formal Scenario wire DONE** (legacy StressScenario retained; hedge-compare/what-if still legacy shape) |
+| Hierarchy | Left untouched in acceptance — later fixed hierarchy↔stress via lazy import (no residual circular-import gap) |
 
-### Follow-on tasks (discovered during M1–M5)
+### Follow-on tasks (discovered during )
 
-- [x] M3.8 Expose formal `Scenario` as stress HTTP wire type (versioned `/api/v1`) — **DONE** (2026-09-02 Lead Architect + Backend)
-  - Wire: `app.api.scenario_wire` (`ScenarioWire` / `FactorShockWire` / `FormalCustomStressRequest`)
-  - Routes: `GET /api/v1/risk/stress/scenarios/formal`, `POST .../formal/custom`, `POST .../formal/evaluate/custom`
-  - Adapters → `StressScenario` for `StressEngine` (no VaR/pricing math change); legacy `StressScenario` endpoints unchanged
-  - Evidence: `backend/tests/test_scenario_wire_api.py`; ADR 004 consequences updated
-  - Residual: hedge-compare / what-if still accept `StressScenario` only; Frontend ScenarioBuilder may keep legacy shape until a UI follow-on
-- [x] M3.9 Publish multi-factor reverse-stress limitations in methodology docs (not a fake “complete optimizer”) — **DONE** (2026-09-02)
-  - Doc: `docs/methodology/multi_factor_reverse_stress.md` — adverse orthant, L2 box objective, ray + coordinate descent, monotonicity assumed not proven, **not** a certified global optimum
-  - Evidence: `backend/tests/test_m39_methodology_docs.py` (doc exists; covers `ASSUMPTIONS`; rejects over-claim language)
-  - Keep M3.6 `[x]`; full recruiter methodology pack remains under **postponed** M12.4 / M12.6
+- [x] Expose formal `Scenario` as stress HTTP wire type (versioned `/api/v1`) — **DONE** (2026-09-02 Lead Architect + Backend)
+ - Wire: `app.api.scenario_wire` (`ScenarioWire` / `FactorShockWire` / `FormalCustomStressRequest`)
+ - Routes: `GET /api/v1/risk/stress/scenarios/formal`, `POST .../formal/custom`, `POST .../formal/evaluate/custom`
+ - Adapters → `StressScenario` for `StressEngine` (no VaR/pricing math change); legacy `StressScenario` endpoints unchanged
+ - Evidence: `backend/tests/test_scenario_wire_api.py`; ADR 004 consequences updated
+ - Residual: hedge-compare / what-if still accept `StressScenario` only; Frontend ScenarioBuilder may keep legacy shape until a UI follow-on
+- [x] Publish multi-factor reverse-stress limitations in methodology docs (not a fake “complete optimizer”) — **DONE** (2026-09-02)
+ - Doc: `docs/methodology/multi_factor_reverse_stress.md` — adverse orthant, L2 box objective, ray + coordinate descent, monotonicity assumed not proven, **not** a certified global optimum
+ - Evidence: `backend/tests/test_m39_methodology_docs.py` (doc exists; covers `ASSUMPTIONS`; rejects over-claim language)
+ - Keep `[x]`; full recruiter methodology pack remains under **postponed**
 
 ---
 
-## Milestone 4 — Hierarchy, Attribution & Limits
+## Workstream 4 — Hierarchy, Attribution & Limits
 
 Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance)
 
 ### Tasks
 
-- [x] M4.1 First-class hierarchy — DONE (Firm→Portfolio→Desk→Strategy→Book→Trade; position desk/strategy with portfolio defaults; HierarchyRef / portfolio_at / risk_at; MV reconciliation; ES multi-desk rollups)
-- [x] M4.2 Hierarchical risk aggregation — DONE
-  - Each `HierarchyNode` carries NAV, Greeks (`delta`/`gamma`/`vega`/`dv01`/`fx_delta`), `var_95`/`var_99`/`expected_shortfall_99`, default-scenario `stress`, and `limits`
-  - Additive reconciliation (parent == sum children, abs 1e-9): MV, Greeks, stress P&L
-  - Non-additive (node subset): VaR, ES, limits — match `risk.calculate` / `LimitEngine` / `StressEngine.run`
-  - Firm root aligned with M4.1; lazy stress import avoids circular import with scenario_attribution
-  - Evidence: `tests/test_hierarchy.py`
-- [x] M4.3 P&L Explain v2 — DONE
-  - `AttributionEngine.explain`: actual P&L = PV(curr,cm)−PV(prev,pm); market bridge on previous book via Delta/Gamma/Vega/Rates/FX/Theta; trade flow New/Closed trades (incl. size changes)
-  - Reconciliation: `explained_change + residual == total_change` (Taylor residual absorbs higher-order / duration-DV01 gaps)
-  - API compat: `AttributionRequest`/`AttributionReport`/`POST /risk/attribution` + demo; additive optional `dt_years` for theta
-  - Evidence: `tests/test_attribution.py`; regression `test_next_phase.py` attribution cases
-- [x] M4.4 Risk change attribution — DONE
-  - New `backend/app/risk/risk_attribution.py` (separate from P&L `attribution.py`)
-  - Waterfall: closed / position changes / new trades → equity / vol / rates / FX → correlation residual
-  - Metric: `var_99` | `var_95` | `expected_shortfall_99`; market-aware Greeks when snapshot provided
-  - Invariants: identical state → ~0; drivers reconcile to total Δ within abs 1e-6 / rel 1e-8
-  - Service: `PortfolioService.risk_change_attribution`; API `POST /risk/change-attribution` (`RiskChangeAttributionRequest`)
-  - Evidence: `tests/test_risk_attribution.py` (incl. API contract)
-- [x] M4.5 Configurable risk limits — DONE
-  - `LimitEngine`: firm/desk VaR, ES, DV01, key-rate DV01, concentration, vega, FX, stress loss
-  - Status OK / WARNING / BREACH via configurable `warning_threshold_pct` (default 80%)
-  - Hierarchy reuses node stress for `stress_loss`; `breached` kept for API compat
-  - Evidence: `tests/test_limits.py`, `tests/test_risk.py`, `tests/test_hierarchy.py`
-- [x] M4.6 Limit drill-down — DONE
-  - `limit_drilldown.py` consumes `LimitResult` + hierarchy subset + metric contributors
-  - Breach (or selected metric) shows: hierarchy node/path, metric, value, limit, utilization %, top contributors
-  - Contributor rules: VaR/ES → component VaR/ES; Greeks → abs greek; `single_position_pct` → abs MV share; `stress_loss` → worst-scenario position losses
-  - Consumes M4.5 `LimitResult` (status/warning/scope/label preserved on value/limit/utilization/breached)
-  - Optional `POST /risk/limits/drilldown` (`LimitDrilldownRequest` / `LimitDrilldownReport`)
-  - Evidence: `tests/test_limit_drilldown.py`
+- [x] First-class hierarchy — DONE (Firm→Portfolio→Desk→Strategy→Book→Trade; position desk/strategy with portfolio defaults; HierarchyRef / portfolio_at / risk_at; MV reconciliation; ES multi-desk rollups)
+- [x] Hierarchical risk aggregation — DONE
+ - Each `HierarchyNode` carries NAV, Greeks (`delta`/`gamma`/`vega`/`dv01`/`fx_delta`), `var_95`/`var_99`/`expected_shortfall_99`, default-scenario `stress`, and `limits`
+ - Additive reconciliation (parent == sum children, abs 1e-9): MV, Greeks, stress P&L
+ - Non-additive (node subset): VaR, ES, limits — match `risk.calculate` / `LimitEngine` / `StressEngine.run`
+ - Firm root aligned with ; lazy stress import avoids circular import with scenario_attribution
+ - Evidence: `tests/test_hierarchy.py`
+- [x] P&L Explain v2 — DONE
+ - `AttributionEngine.explain`: actual P&L = PV(curr,cm)−PV(prev,pm); market bridge on previous book via Delta/Gamma/Vega/Rates/FX/Theta; trade flow New/Closed trades (incl. size changes)
+ - Reconciliation: `explained_change + residual == total_change` (Taylor residual absorbs higher-order / duration-DV01 gaps)
+ - API compat: `AttributionRequest`/`AttributionReport`/`POST /risk/attribution` + demo; additive optional `dt_years` for theta
+ - Evidence: `tests/test_attribution.py`; regression `test_next_phase.py` attribution cases
+- [x] Risk change attribution — DONE
+ - New `backend/app/risk/risk_attribution.py` (separate from P&L `attribution.py`)
+ - Waterfall: closed / position changes / new trades → equity / vol / rates / FX → correlation residual
+ - Metric: `var_99` | `var_95` | `expected_shortfall_99`; market-aware Greeks when snapshot provided
+ - Invariants: identical state → ~0; drivers reconcile to total Δ within abs 1e-6 / rel 1e-8
+ - Service: `PortfolioService.risk_change_attribution`; API `POST /risk/change-attribution` (`RiskChangeAttributionRequest`)
+ - Evidence: `tests/test_risk_attribution.py` (incl. API contract)
+- [x] Configurable risk limits — DONE
+ - `LimitEngine`: firm/desk VaR, ES, DV01, key-rate DV01, concentration, vega, FX, stress loss
+ - Status OK / WARNING / BREACH via configurable `warning_threshold_pct` (default 80%)
+ - Hierarchy reuses node stress for `stress_loss`; `breached` kept for API compat
+ - Evidence: `tests/test_limits.py`, `tests/test_risk.py`, `tests/test_hierarchy.py`
+- [x] Limit drill-down — DONE
+ - `limit_drilldown.py` consumes `LimitResult` + hierarchy subset + metric contributors
+ - Breach (or selected metric) shows: hierarchy node/path, metric, value, limit, utilization %, top contributors
+ - Contributor rules: VaR/ES → component VaR/ES; Greeks → abs greek; `single_position_pct` → abs MV share; `stress_loss` → worst-scenario position losses
+ - Consumes `LimitResult` (status/warning/scope/label preserved on value/limit/utilization/breached)
+ - Optional `POST /risk/limits/drilldown` (`LimitDrilldownRequest` / `LimitDrilldownReport`)
+ - Evidence: `tests/test_limit_drilldown.py`
 
 ### Acceptance Criteria
 
@@ -373,158 +377,158 @@ Firm→trade hierarchy with additive MV/Greek/stress reconciliation; P&L Explain
 
 | Check | Result |
 |-------|--------|
-| M4.1–M4.6 checklist | All `[x]` with file/test evidence in ROADMAP |
+| checklist | All `[x]` with file/test evidence in ROADMAP |
 | Backend pytest (`RISKFORGE_PRICING_ENGINE=quantlib`, QuantLib 1.43) | **324 passed**, 1 Starlette/httpx deprecation warning |
 | Frontend `npm test` | **22 passed** |
 | Integration unblock during acceptance | Renamed Alembic scripts dir `backend/alembic` → `backend/migrations` (avoids shadowing installed `alembic` package; `alembic.ini` + `test_persistence.py` updated) |
 | Known residual — P&L Explain | Taylor residual absorbs higher-order / duration–DV01 gaps; not a full-reval explain |
 | Known residual — risk-change attribution | Correlation residual is plug-to-total; not a structural corr model; linear/Greek market path when snapshot present |
-| Known residual — limits UI | Closed under M8.8 (status strip + value/limit table + per-metric/breach drill-down) |
-| Known residual — key-rate contributors | Closed under M4.7 (tenor KR on LimitEngine binding pillar) |
-| Known residual | Dual-mount + M7.6 sunset DONE (legacy still served); RiskRun persistence wiring still M5 |
-| Hierarchy ↔ stress | Circular import fixed in M4.2 via lazy stress import — no open hierarchy/stress residual |
+| Known residual — limits UI | Closed under (status strip + value/limit table + per-metric/breach drill-down) |
+| Known residual — key-rate contributors | Closed under (tenor KR on LimitEngine binding pillar) |
+| Known residual | Dual-mount + sunset DONE (legacy still served); RiskRun persistence wiring still |
+| Hierarchy ↔ stress | Circular import fixed in via lazy stress import — no open hierarchy/stress residual |
 
-### Follow-on tasks (discovered during M1–M5)
+### Follow-on tasks (discovered during )
 
-- [x] M4.7 Key-rate DV01 limit drill-down contributors use tenor KR DV01 (not parallel `dv01`) — DONE
-  - `contributors_for_metric("key_rate_dv01")` uses `SensitivityEngine` on the LimitEngine binding pillar (`max_T |portfolio KR_T|`); abs position KR ranked; without key_rates/curves falls back to parallel like `_key_rate_dv01_abs`
-  - Evidence: `tests/test_limit_drilldown.py` (binding-tenor vs parallel ranking, signed KR reconcile, fallback)
+- [x] Key-rate DV01 limit drill-down contributors use tenor KR DV01 (not parallel `dv01`) — DONE
+ - `contributors_for_metric("key_rate_dv01")` uses `SensitivityEngine` on the LimitEngine binding pillar (`max_T |portfolio KR_T|`); abs position KR ranked; without key_rates/curves falls back to parallel like `_key_rate_dv01_abs`
+ - Evidence: `tests/test_limit_drilldown.py` (binding-tenor vs parallel ranking, signed KR reconcile, fallback)
 
 ---
 
-## Milestone 5 — Persistence & Risk-Run Platform
+## Workstream 5 — Persistence & Risk-Run Platform
 
-Status: **COMPLETE** (2026-09-02 DevOps) — GHA `postgres-persistence-smoke` + full CI green; M5.5 caching polish **DONE** (Quant Pricing)
+Status: **COMPLETE** (2026-09-02 DevOps) — GHA `postgres-persistence-smoke` + full CI green; caching polish **DONE** (Quant Pricing)
 
-Task rollup: M5.1–M5.7 / M5.9 **DONE**; M5.5 **DONE** (valuation LRU + curve-construction + scenario memo).
+Task rollup: **DONE**; **DONE** (valuation LRU + curve-construction + scenario memo).
 
 ### Tasks
 
-- [x] M5.1 PostgreSQL persistence (SQLAlchemy + Alembic) — DONE
-  - New package `backend/app/persistence/` (config, session, ORM models, repository ABCs + SQLAlchemy repos)
-  - Tables: portfolios, trades, market_snapshots (meta + JSON data), scenario_definitions, risk_runs, risk_results, limit_definitions
-  - Alembic initial revision `001_initial_persistence` under `backend/migrations/` (not `alembic/`, to avoid package shadowing); SQLite-capable unit tests (no live Postgres required in unit suite)
-  - Compose `postgres` service + `RISKFORGE_DATABASE_URL` (psycopg3); ADR 005
-  - Postgres CI: `postgres-persistence-smoke` job in `.github/workflows/ci.yml` + `scripts/smoke_postgres.sh` (wait-for-pg → Alembic `backend/migrations/` upgrade head → seed wiring). **Local Compose smoke green** (2026-09-02 DevOps). **GHA green** (2026-09-02): https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176) — M9.9 residual **CLOSED**
-- [x] M5.2 RiskRun domain model — DONE
-  - Domain DTOs: `RiskRunStatus`, `RiskResultRef`, `RiskRun` in `domain/models.py`
-  - Lifecycle validation (QUEUED/RUNNING/COMPLETED/FAILED), computed `duration`
-  - Persistence mapping: `completed_at`↔`finished_at`, `error`↔`error_message`, result refs
-  - ORM columns + Alembic `002_risk_run_domain_fields` (append-only; 001 untouched)
-  - Repository `create`/`get`/`set_status` return domain `RiskRun`
-  - Evidence: `tests/test_risk_run.py`, `tests/test_persistence.py`
-- [x] M5.3 Risk run lifecycle (QUEUED/RUNNING/COMPLETED/FAILED) — DONE
-  - `RiskRunService` (`enqueue`/`start`/`complete`/`fail`/`get`/`get_result_payloads`)
-  - Directed transitions only; illegal transitions raise `InvalidRiskRunTransition`
-  - Evidence: `tests/test_risk_run_lifecycle.py`
-- [x] M5.4 Async risk execution APIs — DONE (default in-memory; SQLAlchemy path covered in tests)
-  - `POST/GET /risk/runs` + `/api/v1/risk/runs` (M7.2 dual-mount for all public routers)
-  - In-process `RiskRunWorker` (ThreadPoolExecutor) → `RiskRunService` → `PortfolioService` dispatch
-  - `run_type`: summary, var, stress, factors, limits, hierarchy, contributors
-  - Default: `InMemoryRiskRunRepository`; optional `session_factory` → SQLAlchemy repos + result payloads
-  - DTOs: `RiskRunCreateRequest` / `RiskRunView` (`from_risk_run`)
-  - Evidence: `tests/test_risk_run_api.py`
-  - Residuals deferred: optional Redis/RQ for fair scheduling / ops; M5.6 wires default Postgres DI when ``RISKFORGE_DATABASE_URL`` is set
-  - Multi-worker claim safety landed under **M5.7** (`claim_queued` + `FOR UPDATE SKIP LOCKED`)
-- [x] M5.5 Caching with invalidation tests — **DONE**
-  - `CachedPricingEngine` in `backend/app/pricing/cache.py` wraps any `PricingEngine` (no QuantLib leakage)
-  - Cache key = trade payload hash + `MarketSnapshot.content_hash` + `PricingConfiguration` (engine id / evaluation date / extras)
-  - Factory opt-in via `RISKFORGE_PRICING_CACHE` (default on) + `RISKFORGE_PRICING_CACHE_SIZE`
-  - Correctness: hit/miss, market-bump miss, config miss, LRU eviction, clear — `tests/test_pricing_cache.py`
-  - Curve-construction LRU: `backend/app/pricing/curve_cache.py` memoizes `select_yield_curve` by currency-relevant market fingerprint; `RISKFORGE_CURVE_CACHE` (default on) + `RISKFORGE_CURVE_CACHE_SIZE`; evidence `tests/test_curve_cache.py`
-  - Scenario-result memo: `backend/app/risk/scenario_memo.py` wraps `scenario_engine.apply_scenario` by base id + content hash + shock fingerprint + id tag; `RISKFORGE_SCENARIO_CACHE` (default on) + `RISKFORGE_SCENARIO_CACHE_SIZE`; evidence `tests/test_scenario_memo.py`
-- [x] M5.6 Wire persistence repositories into FastAPI DI / services — **DONE**
-  - Optional DI: ``RISKFORGE_DATABASE_URL`` set → SQLAlchemy session factory + seeded sample portfolio / market snapshot / DEFAULT+THREAT scenarios / DEFAULT_LIMITS + ``RiskRunWorker(session_factory=…)``
-  - Unset → ``SAMPLE_PORTFOLIO`` + in-memory snapshot/scenario/limit repos (pre-seeded) + ``InMemoryRiskRunRepository`` (default tests unchanged)
-  - ``Depends``: ``get_default_portfolio``, ``get_default_market_snapshot``, ``get_market_snapshot_repository``, ``get_scenario_definition_repository``, ``get_limit_definition_repository``, ``get_risk_run_worker``; repos also on ``app.state`` when memory-backed
-  - Worker upserts portfolio on submit when SQLAlchemy-backed (FK to ``portfolios``)
-  - Evidence: `tests/test_persistence_di.py`; ADR 005 updated
-- [x] M5.7 Compose (or process) risk-run worker after M5.4 stabilizes — **DONE**
-  - Compose `worker` service: `python -m app.worker` claims `QUEUED` risk_runs from shared Postgres (`RISKFORGE_DATABASE_URL`)
-  - Same `RiskRunWorker` + SQLAlchemy session factory as API lifespan; portfolio loaded from DB on cache miss
-  - Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` (HTTP enqueues only); unset → in-process ThreadPoolExecutor (tests/local default)
-  - Repo `claim_queued` (memory + SQLAlchemy): QUEUED→RUNNING; **Postgres** uses `SELECT … FOR UPDATE SKIP LOCKED` so concurrent workers do not double-claim; SQLite/unit path is FIFO without skip-locked (documented)
-  - Compose ships one worker by default (demo); Redis/RQ **not** required for claim safety
-  - Evidence: `tests/test_durable_worker.py` (poll + memory exclusive claim + SQLite claim + mocked postgres `skip_locked`)
-  - Residual: multi-worker live stress beyond claim-unit tests optional; GHA Postgres path proven via `postgres-persistence-smoke` (M9.9 **DONE**)
+- [x] PostgreSQL persistence (SQLAlchemy + Alembic) — DONE
+ - New package `backend/app/persistence/` (config, session, ORM models, repository ABCs + SQLAlchemy repos)
+ - Tables: portfolios, trades, market_snapshots (meta + JSON data), scenario_definitions, risk_runs, risk_results, limit_definitions
+ - Alembic initial revision `001_initial_persistence` under `backend/migrations/` (not `alembic/`, to avoid package shadowing); SQLite-capable unit tests (no live Postgres required in unit suite)
+ - Compose `postgres` service + `RISKFORGE_DATABASE_URL` (psycopg3); ADR 005
+ - Postgres CI: `postgres-persistence-smoke` job in `.github/workflows/ci.yml` + `scripts/smoke_postgres.sh` (wait-for-pg → Alembic `backend/migrations/` upgrade head → seed wiring). **Local Compose smoke green** (2026-09-02 DevOps). **GHA green** (2026-09-02): https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176) — residual **CLOSED**
+- [x] RiskRun domain model — DONE
+ - Domain DTOs: `RiskRunStatus`, `RiskResultRef`, `RiskRun` in `domain/models.py`
+ - Lifecycle validation (QUEUED/RUNNING/COMPLETED/FAILED), computed `duration`
+ - Persistence mapping: `completed_at`↔`finished_at`, `error`↔`error_message`, result refs
+ - ORM columns + Alembic `002_risk_run_domain_fields` (append-only; 001 untouched)
+ - Repository `create`/`get`/`set_status` return domain `RiskRun`
+ - Evidence: `tests/test_risk_run.py`, `tests/test_persistence.py`
+- [x] Risk run lifecycle (QUEUED/RUNNING/COMPLETED/FAILED) — DONE
+ - `RiskRunService` (`enqueue`/`start`/`complete`/`fail`/`get`/`get_result_payloads`)
+ - Directed transitions only; illegal transitions raise `InvalidRiskRunTransition`
+ - Evidence: `tests/test_risk_run_lifecycle.py`
+- [x] Async risk execution APIs — DONE (default in-memory; SQLAlchemy path covered in tests)
+ - `POST/GET /risk/runs` + `/api/v1/risk/runs` ( dual-mount for all public routers)
+ - In-process `RiskRunWorker` (ThreadPoolExecutor) → `RiskRunService` → `PortfolioService` dispatch
+ - `run_type`: summary, var, stress, factors, limits, hierarchy, contributors
+ - Default: `InMemoryRiskRunRepository`; optional `session_factory` → SQLAlchemy repos + result payloads
+ - DTOs: `RiskRunCreateRequest` / `RiskRunView` (`from_risk_run`)
+ - Evidence: `tests/test_risk_run_api.py`
+ - Residuals deferred: optional Redis/RQ for fair scheduling / ops; wires default Postgres DI when ``RISKFORGE_DATABASE_URL`` is set
+ - Multi-worker claim safety landed under (`claim_queued` + `FOR UPDATE SKIP LOCKED`)
+- [x] Caching with invalidation tests — **DONE**
+ - `CachedPricingEngine` in `backend/app/pricing/cache.py` wraps any `PricingEngine` (no QuantLib leakage)
+ - Cache key = trade payload hash + `MarketSnapshot.content_hash` + `PricingConfiguration` (engine id / evaluation date / extras)
+ - Factory opt-in via `RISKFORGE_PRICING_CACHE` (default on) + `RISKFORGE_PRICING_CACHE_SIZE`
+ - Correctness: hit/miss, market-bump miss, config miss, LRU eviction, clear — `tests/test_pricing_cache.py`
+ - Curve-construction LRU: `backend/app/pricing/curve_cache.py` memoizes `select_yield_curve` by currency-relevant market fingerprint; `RISKFORGE_CURVE_CACHE` (default on) + `RISKFORGE_CURVE_CACHE_SIZE`; evidence `tests/test_curve_cache.py`
+ - Scenario-result memo: `backend/app/risk/scenario_memo.py` wraps `scenario_engine.apply_scenario` by base id + content hash + shock fingerprint + id tag; `RISKFORGE_SCENARIO_CACHE` (default on) + `RISKFORGE_SCENARIO_CACHE_SIZE`; evidence `tests/test_scenario_memo.py`
+- [x] Wire persistence repositories into FastAPI DI / services — **DONE**
+ - Optional DI: ``RISKFORGE_DATABASE_URL`` set → SQLAlchemy session factory + seeded sample portfolio / market snapshot / DEFAULT+THREAT scenarios / DEFAULT_LIMITS + ``RiskRunWorker(session_factory=…)``
+ - Unset → ``SAMPLE_PORTFOLIO`` + in-memory snapshot/scenario/limit repos (pre-seeded) + ``InMemoryRiskRunRepository`` (default tests unchanged)
+ - ``Depends``: ``get_default_portfolio``, ``get_default_market_snapshot``, ``get_market_snapshot_repository``, ``get_scenario_definition_repository``, ``get_limit_definition_repository``, ``get_risk_run_worker``; repos also on ``app.state`` when memory-backed
+ - Worker upserts portfolio on submit when SQLAlchemy-backed (FK to ``portfolios``)
+ - Evidence: `tests/test_persistence_di.py`; ADR 005 updated
+- [x] Compose (or process) risk-run worker after stabilizes — **DONE**
+ - Compose `worker` service: `python -m app.worker` claims `QUEUED` risk_runs from shared Postgres (`RISKFORGE_DATABASE_URL`)
+ - Same `RiskRunWorker` + SQLAlchemy session factory as API lifespan; portfolio loaded from DB on cache miss
+ - Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` (HTTP enqueues only); unset → in-process ThreadPoolExecutor (tests/local default)
+ - Repo `claim_queued` (memory + SQLAlchemy): QUEUED→RUNNING; **Postgres** uses `SELECT … FOR UPDATE SKIP LOCKED` so concurrent workers do not double-claim; SQLite/unit path is FIFO without skip-locked (documented)
+ - Compose ships one worker by default (demo); Redis/RQ **not** required for claim safety
+ - Evidence: `tests/test_durable_worker.py` (poll + memory exclusive claim + SQLite claim + mocked postgres `skip_locked`)
+ - Residual: multi-worker live stress beyond claim-unit tests optional; GHA Postgres path proven via `postgres-persistence-smoke` ( **DONE**)
 
-### Acceptance Criteria (milestone bar)
+### Acceptance Criteria (workstream bar)
 
-Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRun domain/lifecycle, async run APIs, FastAPI DI for persistence-backed services, compose/process worker with Postgres claim safety (`FOR UPDATE SKIP LOCKED`), and caching with invalidation tests (valuation LRU + curve-construction + scenario memo). Postgres path exercised beyond SQLite (local Compose smoke + GHA `postgres-persistence-smoke`). Milestone **COMPLETE**.
+Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRun domain/lifecycle, async run APIs, FastAPI DI for persistence-backed services, compose/process worker with Postgres claim safety (`FOR UPDATE SKIP LOCKED`), and caching with invalidation tests (valuation LRU + curve-construction + scenario memo). Postgres path exercised beyond SQLite (local Compose smoke + GHA `postgres-persistence-smoke`). Workstream **COMPLETE**.
 
-### Formal acceptance decision (2026-09-02) — **COMPLETE** (cleared after M9.9 GHA green)
+### Formal acceptance decision (2026-09-02) — **COMPLETE** (cleared after GHA green)
 
-**Verdict (initial):** Do **not** rubber-stamp COMPLETE. Tests were green and the risk-run spine (M5.2–M5.4) was done, but DI for snapshots/scenarios/limits and Postgres CI proof were open.
+**Verdict (initial):** Do **not** rubber-stamp COMPLETE. Tests were green and the risk-run spine was done, but DI for snapshots/scenarios/limits and Postgres CI proof were open.
 
-**Update same day (Backend/API M5.6 close):** M5.6 DI blocking gap is **CLOSED**. Remaining blockers were Postgres runner validation (M9.9), M5.7 multi-worker claim, and optional M5.5 cache polish. Milestone stays **IN PROGRESS**.
+**Update same day (Backend/API close):** DI blocking gap is **CLOSED**. Remaining blockers were Postgres runner validation , multi-worker claim, and optional cache polish. Workstream stays **IN PROGRESS**.
 
-**Suite verify same day (Lead Architect):** Full backend **426 passed** + frontend **26 passed** + build OK. M5.9 confirmed **DONE**. Did **not** clear M5.1/M9.9 or (then) M5.7 blockers → milestone remained **IN PROGRESS**.
+**Suite verify same day (Lead Architect):** Full backend **426 passed** + frontend **26 passed** + build OK. confirmed **DONE**. Did **not** clear or (then) blockers → workstream remained **IN PROGRESS**.
 
-**Update same day (Backend/API M5.7 claim safety):** M5.7 multi-worker claim blocker is **CLOSED** via Postgres `FOR UPDATE SKIP LOCKED` on `claim_queued` (Compose single-worker demo unchanged; SQLite fallback documented). Remaining milestone blocker: **M5.1 / M9.9** Postgres runner green. M5.5 remains non-blocking polish.
+**Update same day (Backend/API claim safety):** multi-worker claim blocker is **CLOSED** via Postgres `FOR UPDATE SKIP LOCKED` on `claim_queued` (Compose single-worker demo unchanged; SQLite fallback documented). Remaining workstream blocker: Postgres runner green. remains non-blocking polish.
 
-**Update same day (DevOps M9.9 attempt):** Local `scripts/smoke_postgres.sh` against Compose `postgres:16-alpine` **passed** (Alembic 001→002 + seed portfolio/snapshot/scenarios/limits). CI workflow hardened (psycopg wait + version print). **M9.9 still NOT DONE** — this checkout has **no `git remote` / no `gh` CLI**, so no GitHub Actions run history and no push to obtain runner evidence. Do **not** mark Milestone 5 COMPLETE until a green `postgres-smoke` (and ideally full CI) GHA URL is recorded. M5.5 alone remains non-blocking polish.
+**Update same day (DevOps attempt):** Local `scripts/smoke_postgres.sh` against Compose `postgres:16-alpine` **passed** (Alembic 001→002 + seed portfolio/snapshot/scenarios/limits). CI workflow hardened (psycopg wait + version print). ** still NOT DONE** — this checkout has **no `git remote` / no `gh` CLI**, so no GitHub Actions run history and no push to obtain runner evidence. Do **not** mark Workstream 5 COMPLETE until a green `postgres-smoke` (and ideally full CI) GHA URL is recorded. alone remains non-blocking polish.
 
-**Update same day (DevOps M9.9 close):** Origin https://github.com/SergTogul/riskforge-mvp ; push `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — jobs `postgres-persistence-smoke`, `backend-pytest`, `frontend-test-build` all green. **M9.9 DONE**; **M5.1 residual CLOSED**; Milestone 5 marked **COMPLETE**. M5.5 stays non-blocking polish.
+**Update same day (DevOps close):** Origin https://github.com/SergTogul/riskforge-mvp ; push `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — jobs `postgres-persistence-smoke`, `backend-pytest`, `frontend-test-build` all green. ** DONE**; ** residual CLOSED**; Workstream 5 marked **COMPLETE**. stays non-blocking polish.
 
 | Check (initial formal pass) | Result |
 |-------|--------|
 | QuantLib | 1.43 import OK |
 | Backend pytest (`RISKFORGE_PRICING_ENGINE=quantlib`) | **403 passed**, 1 Starlette/httpx deprecation warning |
 | Frontend `npm test` | **26 passed** |
-| M5.2–M5.4 | **DONE** — domain, lifecycle, async APIs + tests |
-| M5.1 | **PARTIAL** — schema/repos/Alembic/Compose Postgres; Postgres CI job was missing at formal pass |
-| M5.5 | **DONE** — valuation LRU + curve-construction cache + scenario-result memo + invalidation tests |
-| M5.6 (at formal pass) | **PARTIAL** — portfolios + risk_runs DI only |
-| M5.7 (at formal pass) | **PARTIAL** — Compose poll worker + `test_durable_worker.py`; no `SKIP LOCKED` yet |
-| Milestone status | **IN PROGRESS** |
+| | **DONE** — domain, lifecycle, async APIs + tests |
+| | **PARTIAL** — schema/repos/Alembic/Compose Postgres; Postgres CI job was missing at formal pass |
+| | **DONE** — valuation LRU + curve-construction cache + scenario-result memo + invalidation tests |
+| (at formal pass) | **PARTIAL** — portfolios + risk_runs DI only |
+| (at formal pass) | **PARTIAL** — Compose poll worker + `test_durable_worker.py`; no `SKIP LOCKED` yet |
+| Workstream status | **IN PROGRESS** |
 
-### Progress update (2026-09-02, Backend/API — M5.6 close)
+### Progress update (2026-09-02, Backend/API — close)
 
 | Check | Result |
 |-------|--------|
-| M5.6 | **DONE** — FastAPI DI + seeding for portfolios, risk_runs, market_snapshots, scenario_definitions, limit_definitions |
-| M5.1 Postgres CI | **DONE** — Compose local green + GHA `postgres-persistence-smoke` success (run 33673245125) |
-| Backend pytest (builtin, this change) | **410 passed** at formal pass; ~7 native/C++ failures on Apple clang 14 (`std::jthread` / missing `-I include`) were **pre-existing**, unrelated to DI — **resolved** by M6.4 portable stdlib thread pool (`__cpp_lib_jthread` fallback to `std::thread`+join) + compile flags with `-I native/include` |
+| | **DONE** — FastAPI DI + seeding for portfolios, risk_runs, market_snapshots, scenario_definitions, limit_definitions |
+| Postgres CI | **DONE** — Compose local green + GHA `postgres-persistence-smoke` success (run 33673245125) |
+| Backend pytest (builtin, this change) | **410 passed** at formal pass; ~7 native/C++ failures on Apple clang 14 (`std::jthread` / missing `-I include`) were **pre-existing**, unrelated to DI — **resolved** by portable stdlib thread pool (`__cpp_lib_jthread` fallback to `std::thread`+join) + compile flags with `-I native/include` |
 | Evidence | `tests/test_persistence_di.py`; ADR 005 |
 
-### Progress update (2026-09-02, Backend/API — M5.7 claim safety)
+### Progress update (2026-09-02, Backend/API — claim safety)
 
 | Check | Result |
 |-------|--------|
-| M5.7 | **DONE** — `claim_queued` + Postgres `FOR UPDATE SKIP LOCKED`; Compose worker poll uses claim; in-process submit path unchanged |
+| | **DONE** — `claim_queued` + Postgres `FOR UPDATE SKIP LOCKED`; Compose worker poll uses claim; in-process submit path unchanged |
 | SQLite / unit | FIFO claim without skip-locked (documented); mocked postgresql dialect asserts `skip_locked=True` |
 | Evidence | `tests/test_durable_worker.py`; ADR 005; README / Compose comments |
 
 ### Remaining items after COMPLETE
 
-1. ~~**M5.1 / M9.9 (blocking):**~~ **CLOSED 2026-09-02** — GHA run https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 (`postgres-persistence-smoke` green).
-2. ~~**M5.5 (non-blocking polish):**~~ **CLOSED** — curve-construction cache + scenario-result memo (+ prior valuation LRU); does not reopen Milestone 5 COMPLETE.
+1. ~~** (blocking):**~~ **CLOSED 2026-09-02** — GHA run https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 (`postgres-persistence-smoke` green).
+2. ~~** (non-blocking polish):**~~ **CLOSED** — curve-construction cache + scenario-result memo (+ prior valuation LRU); does not reopen Workstream 5 COMPLETE.
 
-~~**M5.6 (blocking):** Wire market_snapshots / scenario_definitions / limit_definitions repositories into FastAPI DI~~ **CLOSED 2026-09-02.**
+~~** (blocking):** Wire market_snapshots / scenario_definitions / limit_definitions repositories into FastAPI DI~~ **CLOSED 2026-09-02.**
 
-~~**M5.7 (blocking for “platform”):** Safe queue claim (`FOR UPDATE SKIP LOCKED` and/or Redis/RQ) or accepted single-worker caveat~~ **CLOSED 2026-09-02** (`claim_queued` + Postgres `SKIP LOCKED`).
+~~** (blocking for “platform”):** Safe queue claim (`FOR UPDATE SKIP LOCKED` and/or Redis/RQ) or accepted single-worker caveat~~ **CLOSED 2026-09-02** (`claim_queued` + Postgres `SKIP LOCKED`).
 
 ### Follow-on (post-COMPLETE; do not use to skip blocking items above)
 
-- [x] M5.8 API versioning of risk-runs only under `/api/v1` — **superseded** by M7.2 full dual-mount; M7.6 documents `/api/v1` as canonical + legacy sunset (removal still gated)
-- [x] M5.9 Persist stress/scenario HTTP payloads via scenario_definitions DI once M5.6 closes — **DONE 2026-09-02**
-  - ``GET /risk/stress/scenarios`` and ``POST /risk/stress/evaluate`` load via ``get_default_stress_scenarios`` → ``scenario_definition_repo`` (memory or SQLAlchemy seed)
-  - ``POST /risk/stress`` uses ``get_baseline_stress_scenarios`` (DEFAULT-id filter on the same DI list; empty/missing → in-code ``DEFAULT_SCENARIOS``)
-  - Empty or unconfigured repo falls back to in-code ``THREAT_SCENARIOS`` for GET/evaluate (no 503 on stress defaults)
-  - Evidence: ``tests/test_stress_scenarios_di.py``
-  - Frontend: dashboard does not call GET scenarios; Stress/Threat cards consume POST results only — no display-helper change
+- [x] API versioning of risk-runs only under `/api/v1` — **superseded** by full dual-mount; documents `/api/v1` as canonical + legacy sunset (removal still gated)
+- [x] Persist stress/scenario HTTP payloads via scenario_definitions DI once closes — **DONE 2026-09-02**
+ - ``GET /risk/stress/scenarios`` and ``POST /risk/stress/evaluate`` load via ``get_default_stress_scenarios`` → ``scenario_definition_repo`` (memory or SQLAlchemy seed)
+ - ``POST /risk/stress`` uses ``get_baseline_stress_scenarios`` (DEFAULT-id filter on the same DI list; empty/missing → in-code ``DEFAULT_SCENARIOS``)
+ - Empty or unconfigured repo falls back to in-code ``THREAT_SCENARIOS`` for GET/evaluate (no 503 on stress defaults)
+ - Evidence: ``tests/test_stress_scenarios_di.py``
+ - Frontend: dashboard does not call GET scenarios; Stress/Threat cards consume POST results only — no display-helper change
 
 ---
 
-## Milestone 6 — C++ Performance Engine
+## Workstream 6 — C++ Performance Engine
 
-Status: **COMPLETE** (2026-09-02 — M6.1–M6.7 DONE + formal scenario-kernel SLA-K1/K2)
+Status: **COMPLETE** (2026-09-02 — DONE + formal scenario-kernel SLA-K1/K2)
 
-Lead Architect suite verify 2026-09-02: native path covered by green full backend suite (includes `test_native_kernel` / Historical VaR kernel tests). M6.5/M6.6 closed same day (parity edge cases + ADR 007).
+Lead Architect suite verify 2026-09-02: native path covered by green full backend suite (includes `test_native_kernel` / Historical VaR kernel tests). closed same day (parity edge cases + ADR 007).
 
 ### Formal product SLA (2026-09-02) — **COMPLETE** (Option B reversed)
 
-**Verdict:** Mark Milestone 6 **COMPLETE**. Engineering deliverables M6.1–M6.7 remain DONE. The prior Option B “accept no product VaR wall-time SLA / stay PARTIAL forever” disposition is **reversed**: Lead Architect + C++ Performance publish a **measurable** product-path scenario-kernel SLA with evidence and a pass/fail check — not an invented HTTP VaR latency number, and not rubber-stamp COMPLETE without floors.
+**Verdict:** Mark Workstream 6 **COMPLETE**. Engineering deliverables remain DONE. The prior Option B “accept no product VaR wall-time SLA / stay PARTIAL forever” disposition is **reversed**: Lead Architect + C++ Performance publish a **measurable** product-path scenario-kernel SLA with evidence and a pass/fail check — not an invented HTTP VaR latency number, and not rubber-stamp COMPLETE without floors.
 
 **Published SLA (reference host class in `benchmarks/RESULTS.md`):**
 
@@ -539,10 +543,10 @@ Lead Architect suite verify 2026-09-02: native path covered by green full backen
 backend/.venv/bin/python benchmarks/check_m6_sla.py
 # or:
 backend/.venv/bin/python benchmarks/run_scenario_bench.py \
-  --workload 10k_x_1k --threads 4 --parallel-compare --iters 1 --json
+ --workload 10k_x_1k --threads 4 --parallel-compare --iters 1 --json
 ```
 
-Recorded evidence: `benchmarks/RESULTS.md` (Formal product SLA + M6.2/M6.4 tables). 2026-09-02 refresh on reference host: SLA-K1 **106–145×**, SLA-K2 **~1.45–1.95×** (prior tables 88–125× / ~2.0×) — all above floors (K2 floor **1.3×** for thermal margin). Checksums within harness `1e-6` rel guard.
+Recorded evidence: `benchmarks/RESULTS.md` (Formal product SLA + tables). 2026-09-02 refresh on reference host: SLA-K1 **106–145×**, SLA-K2 **~1.45–1.95×** (prior tables 88–125× / ~2.0×) — all above floors (K2 floor **1.3×** for thermal margin). Checksums within harness `1e-6` rel guard.
 
 **Evidence reviewed:**
 
@@ -550,312 +554,312 @@ Recorded evidence: `benchmarks/RESULTS.md` (Formal product SLA + M6.2/M6.4 table
 |--------|----------------|----------------------------|
 | `benchmarks/RESULTS.md` SLA-K1/K2 | Relative nested-loop native kernel floors on named workload + host class | HTTP/API Historical VaR wall time; multi-tenant capacity |
 | `benchmarks/check_m6_sla.py` | Reproducible pass/fail against floors | CI hard gate on arbitrary runners |
-| Risk-path wire + parity (M6.3–M6.7) | Optional native LINEAR/DELTA_GAMMA aggregation; NumPy ↔ native VaR/ES within tolerances | That 1×N aggregated-Greek VaR is 50× faster than NumPy (FFI-bound; see RESULTS non-claims) |
+| Risk-path wire + parity | Optional native LINEAR/DELTA_GAMMA aggregation; NumPy ↔ native VaR/ES within tolerances | That 1×N aggregated-Greek VaR is 50× faster than NumPy (FFI-bound; see RESULTS non-claims) |
 
-**Decision:** COMPLETE under the scoped scenario-kernel SLA. Do **not** claim end-to-end HTTP VaR latency. Do not start M11/M12 from this close.
+**Decision:** COMPLETE under the scoped scenario-kernel SLA. Do **not** claim end-to-end HTTP VaR latency. Do not start from this close.
 
 ### Tasks
 
-- [x] M6.1 Benchmark harness under `benchmarks/` — DONE
-  - Repo-root `benchmarks/run_scenario_bench.py` + `benchmarks/README.md` (env caveats; formal SLA in RESULTS)
-  - Workloads: `smoke`, `1k_x_1k`, `10k_x_1k`, optional `50k_x_1k`
-  - Metrics: wall time, throughput (ops/s & scenarios/s), peak RSS, speedup vs Python
-  - Impls: Python reference, NumPy, ctypes (`risk_kernel_capi`), C++ header binary (enhanced `native/src/benchmark.cpp`)
-  - Smoke: `python3 -m pytest benchmarks/test_bench_smoke.py -q` (separate from product unit suite)
-  - Does not touch M5.4 risk-run APIs
-- [x] M6.2 Baseline Python / NumPy / C++ single-thread comparison — DONE
-  - Formal I/O contract + results table: `benchmarks/RESULTS.md` (SLA-K1 evidence)
-  - Workloads captured: `1k_x_1k`, `10k_x_1k` (`OMP_NUM_THREADS=1`)
-  - Documents NumPy strength-reduction caveat (rewrite ≠ nested-loop fair compare)
-- [x] M6.3 Native scenario aggregation wired into risk path — DONE
-  - `approximate_pnl_series` / `HistoricalRiskEngine` LINEAR & DELTA_GAMMA honor
-    `RISKFORGE_SCENARIO_KERNEL=python|native` (+ optional `RISKFORGE_SCENARIO_KERNEL_LIB`)
-  - Default remains NumPy vectorized Python path; methodology / vol-point scaling stay in Python
-  - **FULL_REVALUATION cannot use the kernel** (PricingEngine revaluation only; documented in
-    `historical.py`, `compute/kernel.py`, `native/README.md`)
-  - Evidence: `tests/test_historical_scenario_kernel.py`
-- [x] M6.4 Parallel C++ — DONE
-  - **One strategy only:** C++20 stdlib thread pool over contiguous shock partitions
-    (`std::jthread` when available, else `std::thread`+join; Apple libc++ often lacks
-    jthread). Documented in `backend/native/README.md` — **not OpenMP**; no mixing.
-  - Env `RISKFORGE_KERNEL_THREADS` (+ CLI `--threads`); serial path when `1` or `n_shocks≤1`
-  - Numerical parity: C++ `kernel_test` + `tests/test_native_kernel.py` (parallel ≈ serial)
-  - Harness: `benchmarks/run_scenario_bench.py --threads N --parallel-compare`
-  - Capture: `benchmarks/RESULTS.md` (M6.4 section; SLA-K2 evidence)
-- [x] M6.5 Native/Python parity tests — DONE
-  - ABI: `tests/test_native_kernel.py` (Python ↔ native, parallel ↔ serial, empty/single/zero/NaN/32×64 matrix)
-  - Risk path: `tests/test_historical_scenario_kernel.py` (M6.7 NumPy ↔ native VaR/ES)
-  - C++: `native/tests/kernel_test.cpp` (serial/parallel + flat ABI)
-  - Tolerances documented: `KERNEL_ABI_*` = 1e-12; `KERNEL_PNL_ABS/REL` = 1e-9 / 1e-12
-    (`app.compute.kernel`, `native/README.md`)
-- [x] M6.6 QuantLib concurrency architecture review/ADR — DONE
-  - `docs/adr/007-quantlib-concurrency.md` (RLock in adapter; prefer process isolation for
-    parallel QL reval; native kernels separate from QL globals; matches `quantlib.py` +
-    `risk_run_worker.py` + native README)
+- [x] Benchmark harness under `benchmarks/` — DONE
+ - Repo-root `benchmarks/run_scenario_bench.py` + `benchmarks/README.md` (env caveats; formal SLA in RESULTS)
+ - Workloads: `smoke`, `1k_x_1k`, `10k_x_1k`, optional `50k_x_1k`
+ - Metrics: wall time, throughput (ops/s & scenarios/s), peak RSS, speedup vs Python
+ - Impls: Python reference, NumPy, ctypes (`risk_kernel_capi`), C++ header binary (enhanced `native/src/benchmark.cpp`)
+ - Smoke: `python3 -m pytest benchmarks/test_bench_smoke.py -q` (separate from product unit suite)
+ - Does not touch risk-run APIs
+- [x] Baseline Python / NumPy / C++ single-thread comparison — DONE
+ - Formal I/O contract + results table: `benchmarks/RESULTS.md` (SLA-K1 evidence)
+ - Workloads captured: `1k_x_1k`, `10k_x_1k` (`OMP_NUM_THREADS=1`)
+ - Documents NumPy strength-reduction caveat (rewrite ≠ nested-loop fair compare)
+- [x] Native scenario aggregation wired into risk path — DONE
+ - `approximate_pnl_series` / `HistoricalRiskEngine` LINEAR & DELTA_GAMMA honor
+ `RISKFORGE_SCENARIO_KERNEL=python|native` (+ optional `RISKFORGE_SCENARIO_KERNEL_LIB`)
+ - Default remains NumPy vectorized Python path; methodology / vol-point scaling stay in Python
+ - **FULL_REVALUATION cannot use the kernel** (PricingEngine revaluation only; documented in
+ `historical.py`, `compute/kernel.py`, `native/README.md`)
+ - Evidence: `tests/test_historical_scenario_kernel.py`
+- [x] Parallel C++ — DONE
+ - **One strategy only:** C++20 stdlib thread pool over contiguous shock partitions
+ (`std::jthread` when available, else `std::thread`+join; Apple libc++ often lacks
+ jthread). Documented in `backend/native/README.md` — **not OpenMP**; no mixing.
+ - Env `RISKFORGE_KERNEL_THREADS` (+ CLI `--threads`); serial path when `1` or `n_shocks≤1`
+ - Numerical parity: C++ `kernel_test` + `tests/test_native_kernel.py` (parallel ≈ serial)
+ - Harness: `benchmarks/run_scenario_bench.py --threads N --parallel-compare`
+ - Capture: `benchmarks/RESULTS.md` ( section; SLA-K2 evidence)
+- [x] Native/Python parity tests — DONE
+ - ABI: `tests/test_native_kernel.py` (Python ↔ native, parallel ↔ serial, empty/single/zero/NaN/32×64 matrix)
+ - Risk path: `tests/test_historical_scenario_kernel.py` ( NumPy ↔ native VaR/ES)
+ - C++: `native/tests/kernel_test.cpp` (serial/parallel + flat ABI)
+ - Tolerances documented: `KERNEL_ABI_*` = 1e-12; `KERNEL_PNL_ABS/REL` = 1e-9 / 1e-12
+ (`app.compute.kernel`, `native/README.md`)
+- [x] QuantLib concurrency architecture review/ADR — DONE
+ - `docs/adr/007-quantlib-concurrency.md` (RLock in adapter; prefer process isolation for
+ parallel QL reval; native kernels separate from QL globals; matches `quantlib.py` +
+ `risk_run_worker.py` + native README)
 
-### Follow-on clarification (M1–M5 audit)
+### Follow-on clarification ( audit)
 
-- [x] M6.7 Prove native kernel hot-path equivalence on Historical VaR / scenario aggregation before claiming perf wins — DONE (parity gate)
-  - NumPy vs pure-Python kernel ABI + NumPy vs native on LINEAR/DELTA_GAMMA P&L and VaR/ES
-  - Explicit tolerances: `KERNEL_PNL_ABS_TOL=1e-9`, `KERNEL_PNL_REL_TOL=1e-12` (`historical.py`)
-  - FULL_REVALUATION remains kernel-free even when `RISKFORGE_SCENARIO_KERNEL=native`
-  - Product speed claim is scoped to SLA-K1/K2 (nested-loop `E×S` kernel); see Formal product SLA
-- [x] M6.8 Formal scenario-kernel SLA + check harness — DONE (2026-09-02)
-  - Floors + evidence in `benchmarks/RESULTS.md`; pass/fail: `benchmarks/check_m6_sla.py`
-  - Reverses Option B “accept no SLA”; does **not** invent HTTP VaR wall-time
+- [x] Prove native kernel hot-path equivalence on Historical VaR / scenario aggregation before claiming perf wins — DONE (parity gate)
+ - NumPy vs pure-Python kernel ABI + NumPy vs native on LINEAR/DELTA_GAMMA P&L and VaR/ES
+ - Explicit tolerances: `KERNEL_PNL_ABS_TOL=1e-9`, `KERNEL_PNL_REL_TOL=1e-12` (`historical.py`)
+ - FULL_REVALUATION remains kernel-free even when `RISKFORGE_SCENARIO_KERNEL=native`
+ - Product speed claim is scoped to SLA-K1/K2 (nested-loop `E×S` kernel); see Formal product SLA
+- [x] Formal scenario-kernel SLA + check harness — DONE (2026-09-02)
+ - Floors + evidence in `benchmarks/RESULTS.md`; pass/fail: `benchmarks/check_m6_sla.py`
+ - Reverses Option B “accept no SLA”; does **not** invent HTTP VaR wall-time
 
-### Progress update (2026-09-02, Lead Architect + C++ Performance — M6 SLA COMPLETE)
+### Progress update (2026-09-02, Lead Architect + C++ Performance — SLA COMPLETE)
 
 - Owner: Lead Architect / Orchestrator + C++ Performance Engineer
-- **Option B reversed:** measurable scenario-kernel SLA published; Milestone 6 **COMPLETE**
+- **Option B reversed:** measurable scenario-kernel SLA published; Workstream 6 **COMPLETE**
 - Evidence: SLA-K1 106–145× / SLA-K2 ~1.45–1.95× on reference host (`check_m6_sla.py` PASS; floor 1.3×)
-- M6.1–M6.8 DONE; HTTP end-to-end VaR latency **not** claimed; M11/M12 not started
-- Handoff: `docs/agents/HANDOFF_M6_SLA.md`
+- DONE; HTTP end-to-end VaR latency **not** claimed; not started
+- Handoff: `docs/agents/HANDOFF_SCENARIO_KERNEL_SLA.md`
 
 ---
 
-## Milestone 7 — API Productionization
+## Workstream 7 — API Productionization
 
-Status: **COMPLETE** (2026-09-02 — M7.1–M7.6 DONE; legacy unversioned paths remain dual-mounted until sunset removal gate)
+Status: **COMPLETE** (2026-09-02 — DONE; legacy unversioned paths remain dual-mounted until sunset removal gate)
 
 ### Tasks
 
-- [x] M7.1 Router decomposition — DONE (2026-09-02, Backend/API)
-  - `main.py` is wiring-only (lifespan, CORS, `include_router`)
-  - Routers: `api/health.py`, `portfolio.py`, `market.py`, `risk.py`, `stress.py`, `attribution.py`, `limits.py`, `risk_runs.py`
-  - `get_portfolio_service` / `portfolio_service` in `api/deps.py` (PricingEngine via factory unchanged)
-  - Public paths unchanged (`/health`, `/portfolio`, `/market/*`, `/risk/*`; risk-runs dual-mounted)
-  - Evidence: `tests/test_api_router_decomposition.py`; full suite **445 passed**
-- [x] M7.2 API versioning `/api/v1/` — DONE (2026-09-02, Backend/API)
-  - Dual-mount: every public domain router at legacy path **and** `/api/v1/...`
-  - `risk_runs` unified as `/risk/runs` + `/api/v1/risk/runs` only (no triple/nested prefix)
-  - Legacy clients unchanged; UI may keep unversioned paths
-  - Evidence: `tests/test_api_v1_compatibility.py`; OpenAPI + smoke parity on critical GETs/POSTs; full suite **453 passed**
-- [x] M7.3 Typed request/response models — DONE (2026-09-02, Backend/API)
-  - Wired `response_model=` on critical risk paths using existing domain types (no formula duplication):
-    VaRReport, ESContributionReport, WhatIfReport, list[StressResult], ReverseStressResult,
-    MultiFactorReverseStressResult, HedgeComparisonReport, RiskChangeAttributionReport,
-    LimitDrilldownReport (risk-runs already RiskRunView)
-  - Request bodies already domain-typed; dual-mount unchanged; PricingEngine seams preserved
-  - Evidence: `tests/test_api_typed_models.py` (OpenAPI $ref + live response validation)
-- [x] M7.4 OpenAPI examples — DONE (2026-09-02, Backend/API)
-  - Critical paths: VaR/ES, what-if, stress/reverse/multi, hedge-compare (`HedgeComparisonReport`), change-attribution, limits drill-down, risk-runs
-  - Centralized illustrative payloads in `app/api/openapi_examples.py`; wired via `Body(openapi_examples=...)` + `responses` (incl. M7.5 `{code,message,details}` where documented)
-  - Evidence: `tests/test_api_openapi_examples.py`; full suite green with QuantLib
-- [x] M7.5 Consistent error model — DONE (2026-09-02, Backend/API)
-  - Envelope `{code, message, details}` for HTTPException, request validation (422), and unhandled 500
-  - Centralized in `app/api/errors.py` via `register_exception_handlers` (legacy + `/api/v1` share handlers)
-  - Successful response schemas and PricingEngine seams unchanged; 500 message opaque (no exception leak)
-  - Evidence: `tests/test_api_error_model.py`; risk-run `detail` assertions updated to `message`
-- [x] M7.6 Complete `/api/v1` migration for all risk routes (beyond dual-mount) — DONE (2026-09-02, Backend/API)
-  - `/api/v1` documented as canonical (README + `docs/api/v1_canonical_and_legacy_sunset.md` + ADR 008)
-  - Dual-mount kept (non-breaking); legacy responses add `Deprecation` / `Sunset` / `Link` (successor-version)
-  - SPA migrated to `/api/v1` (M8 Frontend follow-up DONE 2026-09-02)
-  - Planned earliest legacy removal: **2027-03-02**, gated on UI migration + Lead Architect approval
-  - Evidence: `tests/test_api_legacy_deprecation.py`; dual-mount parity still covered by M7.2 tests
+- [x] Router decomposition — DONE (2026-09-02, Backend/API)
+ - `main.py` is wiring-only (lifespan, CORS, `include_router`)
+ - Routers: `api/health.py`, `portfolio.py`, `market.py`, `risk.py`, `stress.py`, `attribution.py`, `limits.py`, `risk_runs.py`
+ - `get_portfolio_service` / `portfolio_service` in `api/deps.py` (PricingEngine via factory unchanged)
+ - Public paths unchanged (`/health`, `/portfolio`, `/market/*`, `/risk/*`; risk-runs dual-mounted)
+ - Evidence: `tests/test_api_router_decomposition.py`; full suite **445 passed**
+- [x] API versioning `/api/v1/` — DONE (2026-09-02, Backend/API)
+ - Dual-mount: every public domain router at legacy path **and** `/api/v1/...`
+ - `risk_runs` unified as `/risk/runs` + `/api/v1/risk/runs` only (no triple/nested prefix)
+ - Legacy clients unchanged; UI may keep unversioned paths
+ - Evidence: `tests/test_api_v1_compatibility.py`; OpenAPI + smoke parity on critical GETs/POSTs; full suite **453 passed**
+- [x] Typed request/response models — DONE (2026-09-02, Backend/API)
+ - Wired `response_model=` on critical risk paths using existing domain types (no formula duplication):
+ VaRReport, ESContributionReport, WhatIfReport, list[StressResult], ReverseStressResult,
+ MultiFactorReverseStressResult, HedgeComparisonReport, RiskChangeAttributionReport,
+ LimitDrilldownReport (risk-runs already RiskRunView)
+ - Request bodies already domain-typed; dual-mount unchanged; PricingEngine seams preserved
+ - Evidence: `tests/test_api_typed_models.py` (OpenAPI $ref + live response validation)
+- [x] OpenAPI examples — DONE (2026-09-02, Backend/API)
+ - Critical paths: VaR/ES, what-if, stress/reverse/multi, hedge-compare (`HedgeComparisonReport`), change-attribution, limits drill-down, risk-runs
+ - Centralized illustrative payloads in `app/api/openapi_examples.py`; wired via `Body(openapi_examples=...)` + `responses` (incl. `{code,message,details}` where documented)
+ - Evidence: `tests/test_api_openapi_examples.py`; full suite green with QuantLib
+- [x] Consistent error model — DONE (2026-09-02, Backend/API)
+ - Envelope `{code, message, details}` for HTTPException, request validation (422), and unhandled 500
+ - Centralized in `app/api/errors.py` via `register_exception_handlers` (legacy + `/api/v1` share handlers)
+ - Successful response schemas and PricingEngine seams unchanged; 500 message opaque (no exception leak)
+ - Evidence: `tests/test_api_error_model.py`; risk-run `detail` assertions updated to `message`
+- [x] Complete `/api/v1` migration for all risk routes (beyond dual-mount) — DONE (2026-09-02, Backend/API)
+ - `/api/v1` documented as canonical (README + `docs/api/v1_canonical_and_legacy_sunset.md` + ADR 008)
+ - Dual-mount kept (non-breaking); legacy responses add `Deprecation` / `Sunset` / `Link` (successor-version)
+ - SPA migrated to `/api/v1` ( Frontend follow-up DONE 2026-09-02)
+ - Planned earliest legacy removal: **2027-03-02**, gated on UI migration + Lead Architect approval
+ - Evidence: `tests/test_api_legacy_deprecation.py`; dual-mount parity still covered by tests
 
-### Progress update (2026-09-02, Backend/API — M7.1)
+### Progress update (2026-09-02, Backend/API — )
 
 - Decomposed monolithic route handlers into charter-aligned APIRouter modules.
-- Milestone 7 remained **PARTIAL** until M7.2–M7.6 landed with evidence.
+- Workstream 7 remained **PARTIAL** until landed with evidence.
 
-### Progress update (2026-09-02, Backend/API — M7.2)
+### Progress update (2026-09-02, Backend/API — )
 
 - Dual-mounted all public routers under `/api/v1` while preserving legacy unversioned paths.
-- Milestone 7 remained **PARTIAL** until M7.3–M7.6 criteria were met with evidence.
+- Workstream 7 remained **PARTIAL** until criteria were met with evidence.
 
-### Progress update (2026-09-02, Backend/API — M7.5)
+### Progress update (2026-09-02, Backend/API — )
 
 - Centralized `{code, message, details}` error handlers on the FastAPI app (covers both mounts).
-- Milestone 7 remained **PARTIAL** until M7.3 typed models and M7.6 legacy sunset landed.
+- Workstream 7 remained **PARTIAL** until typed models and legacy sunset landed.
 
-### Progress update (2026-09-02, Backend/API — M7.4)
+### Progress update (2026-09-02, Backend/API — )
 
 - Added OpenAPI request/response/error examples for critical risk endpoints (illustrative numbers only).
-- Milestone 7 remained **PARTIAL** until M7.3 typed models and M7.6 legacy sunset landed.
+- Workstream 7 remained **PARTIAL** until typed models and legacy sunset landed.
 
-### Progress update (2026-09-02, Backend/API — M7.3)
+### Progress update (2026-09-02, Backend/API — )
 
 - Wired domain `response_model=` on critical VaR/ES/what-if/stress/reverse/multi/hedge/change-attr/limits-drilldown routes.
-- Milestone 7 remained **PARTIAL** until M7.6 `/api/v1` canonical + legacy sunset landed.
+- Workstream 7 remained **PARTIAL** until `/api/v1` canonical + legacy sunset landed.
 
-### Progress update (2026-09-02, Backend/API — M7.6)
+### Progress update (2026-09-02, Backend/API — )
 
 - Documented `/api/v1` as canonical; published deprecate→remove sunset plan; added legacy-only Deprecation/Sunset/Link headers.
-- Milestone 7 marked **COMPLETE** (legacy paths intentionally still served until removal gate).
+- Workstream 7 marked **COMPLETE** (legacy paths intentionally still served until removal gate).
 
 ---
 
-
-## Milestone 8 — Risk Terminal UI
+## Workstream 8 — Risk Terminal UI
 
 Status: **COMPLETE** (2026-09-02 Frontend/Risk UX — remaining PARTIAL items closed)
 
-### Follow-up from M7.6 (Backend → Frontend)
+### Follow-up from (Backend → Frontend)
 
 - [x] Migrate `frontend/src/api.js` from unversioned paths to `/api/v1/...` (DONE 2026-09-02; bodies unchanged; `API_V1` constant).
 - Keep E2E / helper tests green; ignore legacy Deprecation headers after cut-over.
 
 ### Tasks
 
-- [x] M8.1 Main application navigation — DONE (2026-09-02)
-  - Sticky terminal sidebar (`AppNav`) + hash routing (`#overview` … `#risk-runs`)
-  - Section map matches Frontend charter targets; panels grouped (overview / portfolio / factors / VaR&ES / stress / scenario / P&L / limits / runs)
-  - Pure helpers in `lib/nav.mjs`; evidence `lib/nav.test.mjs` (no client risk math)
-- [x] M8.2 Overview dashboard — DONE (2026-09-02)
-  - Dedicated `Overview` view: KPI strip via `overviewKpis` from `/risk/summary` + threat evaluate; section collage (`overviewCollage`) entry points with API teasers; hierarchy/factor heatmap teasers (not nav leftovers dump)
-  - Evidence: `components/Overview.jsx`; `overviewKpis` / `overviewCollage` in `lib/risk.mjs` + `risk.test.mjs`
-- [x] M8.3 Risk heatmaps — DONE (2026-09-02)
-  - Display-only color scales in `lib/heatmap.mjs` (diverging / sequential / utilization); unit tests in `heatmap.test.mjs`
-  - Hierarchy VaR/ES/NAV tiles (`POST /risk/hierarchy`), factor×bucket matrix (`/risk/factors`), stress P&L tiles (`/risk/stress`), limit utilization tiles (`/risk/limits`)
-  - Placed under Portfolio / Risk Factors / Stress / Limits (+ overview teaser); no client risk formulas
-- [x] M8.4 Scenario Builder — DONE (2026-09-02)
-  - Presets (equity crash / rates hike / vol spike / FX); form validation; loading/error; API shock preview; `evaluateCustomScenario` → `/risk/stress/evaluate/custom`
-  - Evidence: `ScenarioBuilder.jsx`; `SCENARIO_PRESETS` / `validateScenarioForm` / `scenarioPayload` tests
-- [x] M8.5 Before/after hedge workflow — DONE (2026-09-02)
-  - `compareHedge` → `POST /api/v1/risk/stress/compare`; `hedgeComparisonSummary` / `spyFlatHedgePortfolio` / `defaultHedgeScenarios`
-  - Dashboard `HedgeCompare` card: methodology select, SPY-flat demo hedge, VaR/ES before→after, scenario table, factor exposure deltas (API display only)
-  - Evidence: `frontend/src/lib/risk.test.mjs`
-- [x] M8.6 Risk drill-down — DONE (2026-09-02)
-  - Interactive Firm→Portfolio→Desk→Strategy→Book→Trade breadcrumb + child table; selected-node NAV/VaR/ES/Greeks from API tree only (`hierarchyNodeAtPath` / `hierarchyChildRows` / `hierarchyNodeMetrics`)
-  - Evidence: `Analytics.jsx` Hierarchy; `risk.test.mjs`
-- [x] M8.7 P&L Explain UI — DONE (2026-09-02)
-  - Interactive panel: SPY×scale → `POST /risk/attribution` (`explainPnL` + `demoPnLAttributionRequest`); optional illustrative marks via `/attribution/demo`
-  - Shows base/current MV, drivers, explained, residual (API display only)
-  - Evidence: `api.js` `explainPnL`/`explainPnLDemo`; `Attribution` in `Analytics.jsx`; tests for request helper
-- [x] M8.8 Limits UI — DONE (2026-09-02)
-  - Status strip (OK/WARNING/BREACH counts); value/limit/util/warn-at table; per-metric Drill + breach drill-down via `/risk/limits/drilldown`
-  - `limitStatus` prefers API status (prior); `limitStatusCounts` helper
-  - Evidence: `RiskTable.jsx` Limits; `risk.test.mjs`
-- [x] M8.9 Risk-run UI — DONE (start)
-  - Thin `createRiskRun` / `getRiskRun` in `api.js` (`POST/GET /api/v1/risk/runs`)
-  - Dashboard `RiskRuns` card: run_type select, start, poll QUEUED→RUNNING→COMPLETED/FAILED
-  - Display helpers: `riskRunStatus` / `riskRunStatusClass` / `isRiskRunTerminal` / `riskRunSummary` (no client risk math)
-  - Evidence: `frontend/src/lib/risk.test.mjs`
-- [x] M8.10 Risk change attribution UI panel — DONE (2026-09-02)
-  - `changeAttribution` → `POST /api/v1/risk/change-attribution`; `demoChangeAttributionRequest` / `spyScaledPortfolio` / `riskChangeAttributionSummary`
-  - Dashboard card: metric + methodology selects; SPY×1.5 demo; waterfall table (API display only)
-  - Evidence: `frontend/src/lib/risk.test.mjs`
-- [x] M8.11 ES contributions UI panel — DONE (2026-09-02)
-  - `esContributions` → `POST /api/v1/risk/es`; `esContributionSummary` / dimension slice
-  - Dashboard card: methodology + dimension selects; component ES / contrib % table
-  - Evidence: `frontend/src/lib/risk.test.mjs`
-- [x] M8.12 VaR methodology compare UI (`POST /risk/var/compare`) — DONE (2026-09-02)
-  - `compareVarMethodologies` → `POST /api/v1/risk/var/compare`; `varCompareSummary`
-  - Dashboard card: optional observations; LINEAR / Δ-Γ / Full-reval table + runtime_ms
-  - Evidence: `frontend/src/lib/risk.test.mjs`
+- [x] Main application navigation — DONE (2026-09-02)
+ - Sticky terminal sidebar (`AppNav`) + hash routing (`#overview` … `#risk-runs`)
+ - Section map matches Frontend charter targets; panels grouped (overview / portfolio / factors / VaR&ES / stress / scenario / P&L / limits / runs)
+ - Pure helpers in `lib/nav.mjs`; evidence `lib/nav.test.mjs` (no client risk math)
+- [x] Overview dashboard — DONE (2026-09-02)
+ - Dedicated `Overview` view: KPI strip via `overviewKpis` from `/risk/summary` + threat evaluate; section collage (`overviewCollage`) entry points with API teasers; hierarchy/factor heatmap teasers (not nav leftovers dump)
+ - Evidence: `components/Overview.jsx`; `overviewKpis` / `overviewCollage` in `lib/risk.mjs` + `risk.test.mjs`
+- [x] Risk heatmaps — DONE (2026-09-02)
+ - Display-only color scales in `lib/heatmap.mjs` (diverging / sequential / utilization); unit tests in `heatmap.test.mjs`
+ - Hierarchy VaR/ES/NAV tiles (`POST /risk/hierarchy`), factor×bucket matrix (`/risk/factors`), stress P&L tiles (`/risk/stress`), limit utilization tiles (`/risk/limits`)
+ - Placed under Portfolio / Risk Factors / Stress / Limits (+ overview teaser); no client risk formulas
+- [x] Scenario Builder — DONE (2026-09-02)
+ - Presets (equity crash / rates hike / vol spike / FX); form validation; loading/error; API shock preview; `evaluateCustomScenario` → `/risk/stress/evaluate/custom`
+ - Evidence: `ScenarioBuilder.jsx`; `SCENARIO_PRESETS` / `validateScenarioForm` / `scenarioPayload` tests
+- [x] Before/after hedge workflow — DONE (2026-09-02)
+ - `compareHedge` → `POST /api/v1/risk/stress/compare`; `hedgeComparisonSummary` / `spyFlatHedgePortfolio` / `defaultHedgeScenarios`
+ - Dashboard `HedgeCompare` card: methodology select, SPY-flat demo hedge, VaR/ES before→after, scenario table, factor exposure deltas (API display only)
+ - Evidence: `frontend/src/lib/risk.test.mjs`
+- [x] Risk drill-down — DONE (2026-09-02)
+ - Interactive Firm→Portfolio→Desk→Strategy→Book→Trade breadcrumb + child table; selected-node NAV/VaR/ES/Greeks from API tree only (`hierarchyNodeAtPath` / `hierarchyChildRows` / `hierarchyNodeMetrics`)
+ - Evidence: `Analytics.jsx` Hierarchy; `risk.test.mjs`
+- [x] P&L Explain UI — DONE (2026-09-02)
+ - Interactive panel: SPY×scale → `POST /risk/attribution` (`explainPnL` + `demoPnLAttributionRequest`); optional illustrative marks via `/attribution/demo`
+ - Shows base/current MV, drivers, explained, residual (API display only)
+ - Evidence: `api.js` `explainPnL`/`explainPnLDemo`; `Attribution` in `Analytics.jsx`; tests for request helper
+- [x] Limits UI — DONE (2026-09-02)
+ - Status strip (OK/WARNING/BREACH counts); value/limit/util/warn-at table; per-metric Drill + breach drill-down via `/risk/limits/drilldown`
+ - `limitStatus` prefers API status (prior); `limitStatusCounts` helper
+ - Evidence: `RiskTable.jsx` Limits; `risk.test.mjs`
+- [x] Risk-run UI — DONE (start)
+ - Thin `createRiskRun` / `getRiskRun` in `api.js` (`POST/GET /api/v1/risk/runs`)
+ - Dashboard `RiskRuns` card: run_type select, start, poll QUEUED→RUNNING→COMPLETED/FAILED
+ - Display helpers: `riskRunStatus` / `riskRunStatusClass` / `isRiskRunTerminal` / `riskRunSummary` (no client risk math)
+ - Evidence: `frontend/src/lib/risk.test.mjs`
+- [x] Risk change attribution UI panel — DONE (2026-09-02)
+ - `changeAttribution` → `POST /api/v1/risk/change-attribution`; `demoChangeAttributionRequest` / `spyScaledPortfolio` / `riskChangeAttributionSummary`
+ - Dashboard card: metric + methodology selects; SPY×1.5 demo; waterfall table (API display only)
+ - Evidence: `frontend/src/lib/risk.test.mjs`
+- [x] ES contributions UI panel — DONE (2026-09-02)
+ - `esContributions` → `POST /api/v1/risk/es`; `esContributionSummary` / dimension slice
+ - Dashboard card: methodology + dimension selects; component ES / contrib % table
+ - Evidence: `frontend/src/lib/risk.test.mjs`
+- [x] VaR methodology compare UI (`POST /risk/var/compare`) — DONE (2026-09-02)
+ - `compareVarMethodologies` → `POST /api/v1/risk/var/compare`; `varCompareSummary`
+ - Dashboard card: optional observations; LINEAR / Δ-Γ / Full-reval table + runtime_ms
+ - Evidence: `frontend/src/lib/risk.test.mjs`
 
 ### Acceptance / residual notes (honest)
 
-- Frontend `npm test` **56 passed**; `npm run build` OK (2026-09-02 M8 close pass).
+- Frontend `npm test` **56 passed**; `npm run build` OK (2026-09-02 close pass).
 - No client risk math; all panels display API payloads.
-- Residual (non-blocking for M8): **M3.8 formal Scenario HTTP wire DONE**; multi-factor reverse UI in Stress section (`ReverseStressMulti` → `/api/v1/risk/stress/reverse/multi`); P&L illustrative market path still uses `/attribution/demo` (position-change path uses real `/attribution`); reverse-multi E2E closed under M9.10.
+- Residual (non-blocking for ): ** formal Scenario HTTP wire DONE**; multi-factor reverse UI in Stress section (`ReverseStressMulti` → `/api/v1/risk/stress/reverse/multi`); P&L illustrative market path still uses `/attribution/demo` (position-change path uses real `/attribution`); reverse-multi E2E closed under .
 
 ---
 
-## Milestone 9 — Testing, CI & Engineering Quality
+## Workstream 9 — Testing, CI & Engineering Quality
 
-Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.10; Redis/RQ deferred residual)
+Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — ; Redis/RQ deferred residual)
 
 ### Tasks
 
-- [x] M9.1 Frontend testing stack (Vitest/RTL/MSW) — **DONE** (2026-09-02, staged; lib migrate closed same day)
-  - Stack: Vitest 4 + jsdom + Testing Library + MSW 2; config in `frontend/vite.config.js` + `frontend/src/test/{setup,mswServer}.js`.
-  - `npm test` = `vitest run` (single runner). Lib helpers migrated off node:test: `risk.test.js` / `nav.test.js` / `heatmap.test.js` (display/request helpers only — no client risk math). `test:node` alias → `vitest run src/lib` for backwards script name.
-  - Representative RTL slice: `MetricCard`, `AppNav`, `ScenarioBuilder` (validation + MSW success/error for `POST .../stress/evaluate/custom`; fixtures only — no client risk math).
-  - Local evidence (lib migrate): `cd frontend && npm test` → **70** Vitest passed; `npm run lint` OK; `npm run build` OK.
-  - Residual (non-blocking): broaden RTL/MSW to more panels (lib `*.mjs` node:test migrate **CLOSED** 2026-09-02).
-- [x] M9.2 E2E Playwright — **DONE** (2026-09-02)
-  - Local: 10 Playwright specs (`cd e2e && npm test`); macOS uses Chrome channel.
-  - CI: job `e2e-playwright` (Chromium on ubuntu-latest; builtin API + Vite `webServer`) landed SHA `7f01407`.
-  - GHA evidence: run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (head SHA `2f45e14`); job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499 — steps include green `Run Playwright E2E`.
-  - Residual breadth (multi-factor reverse E2E) tracked under **M9.10**, not M9.2.
-- [x] M9.3 Backend property tests (Hypothesis) — **DONE** (2026-09-02, staged broaden)
-  - Beyond M1.8 pricing Greeks: `backend/tests/test_m9_risk_properties.py` — VaR/ES ordering, MV aggregation, component-VaR Euler reconciliation under Hypothesis.
-  - Local: `pytest tests/test_m9_risk_properties.py` → **6 passed**.
-  - Residual (non-blocking): more methodologies / FULL_REVAL property space; keep M1.8 Greeks suite as baseline.
-- [x] M9.4 Golden quant tests — **DONE** (2026-09-02, expand)
-  - Expanded `backend/tests/test_quantlib_golden.py` (~49 cases): equity/FX options vs analytic BS/GK; CIP equity-future & FX-forward algebra (rel=1e-12); IR STIR algebra; continuous Actual365Fixed ZC bond golden (closes annual-compound day-count gap as documented); IRS payer/receiver + ATM residual; edge eval dates (weekend/leap/year-end); PricingEngine seam check.
-  - Tolerances/reference documented in module docstring (QuantLib AnalyticEuropeanEngine / FlatForward; algebraic CIP/STIR identities shared with Builtin).
-  - Local: `RISKFORGE_PRICING_ENGINE=quantlib pytest tests/test_quantlib_golden.py` → **49 passed**; full backend suite → **564 passed**.
-  - Residual (non-blocking): very short ``T ≲ 0.05`` option date-rounding bands remain in `test_quantlib_pricing.py`; IRS NPV not identical to Builtin annuity model.
-- [x] M9.5 Stress invariants — **DONE** (2026-09-02, staged)
-  - Hypothesis: stress pnl == Σ by_position; empty scenario list → []; long-equity equity-shock monotonicity (same file as M9.3).
-  - Complements prior zero-shock / empty-scenario attribution tests.
-  - Residual: threat-level / max_loss_pct boundary properties; multi-factor stress contribution invariants.
-- [x] M9.6 CI GitHub Actions — workflow at `.github/workflows/ci.yml` (backend pytest Py3.12 + QuantLib-preferred / builtin fallback, frontend `npm test`/`npm run build`, optional native g++ smoke, **`postgres-smoke` service job** via `scripts/smoke_postgres.sh`). Runner validation deferred to **M9.9**.
-- [x] M9.7 Static analysis (Ruff/mypy/ESLint) — **DONE** (staged gate, 2026-09-02)
-  - CI job `lint-static-analysis` runs `ruff check app tests`, `mypy app`, and `npm run lint` (`eslint src --max-warnings 0`).
-  - Config: `backend/pyproject.toml`, `backend/requirements-dev.txt`, `frontend/eslint.config.js`.
-  - **Honest staging (not full-strict):** Ruff selects E/F/I/B/UP/SIM/RUF with documented ignores (E501 line length, B008 FastAPI `Depends`, pyupgrade/SIM/RUF style debt, finance γ/Δ unicode). mypy runs with `disable_error_code` for known debt (`arg-type`, `assignment`, `var-annotated`, `no-redef`, `misc`) — still catches other errors; pay down by removing codes. ESLint: recommended + react/hooks; `prop-types` off (no TS yet).
-  - Trivial fixes: Ruff autofix (imports/unused), F821 lambda closure in `risk_run_worker.py`, Analytics `useEffect` deps for exhaustive-deps; kernel P&L tol imports moved to `app.compute.kernel` in tests.
-  - GHA evidence: push SHA `8d7a6f2`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 — includes green `lint-static-analysis`.
-  - Follow-up (non-blocking for M9.7): enable ignored Ruff rules gradually; clear mypy `disable_error_code`; add Vitest/TS when M9.1 advances.
-- [x] M9.8 Containers — **DONE** (2026-09-02 Lead Architect disposition)
-  - **Acceptance (containers):** Compose ships `postgres` + `backend` + `worker` + `frontend` (`docker-compose.yml`); `backend` sets `RISKFORGE_EXTERNAL_WORKER=1`; `worker` runs `python -m app.worker` and claims via Postgres `FOR UPDATE SKIP LOCKED` (M5.7 / ADR 005). No VaR/pricing math changed.
-  - **Redis/RQ — DEFERRED (accepted residual, not claimed `[x]`):** Fair scheduling / ops queue is **out of M9 scope**. Claim safety does **not** require Redis/RQ (Compose comment + `app/worker.py` + README). Do **not** add a fake Redis service or RQ worker that does not change product semantics.
-  - Follow-on (post-M9, optional ops): Redis/RQ or equivalent only if product needs cross-host fair scheduling beyond Postgres SKIP LOCKED — track outside Milestone 9.
+- [x] Frontend testing stack (Vitest/RTL/MSW) — **DONE** (2026-09-02, staged; lib migrate closed same day)
+ - Stack: Vitest 4 + jsdom + Testing Library + MSW 2; config in `frontend/vite.config.js` + `frontend/src/test/{setup,mswServer}.js`.
+ - `npm test` = `vitest run` (single runner). Lib helpers migrated off node:test: `risk.test.js` / `nav.test.js` / `heatmap.test.js` (display/request helpers only — no client risk math). `test:node` alias → `vitest run src/lib` for backwards script name.
+ - Representative RTL slice: `MetricCard`, `AppNav`, `ScenarioBuilder` (validation + MSW success/error for `POST .../stress/evaluate/custom`; fixtures only — no client risk math).
+ - Local evidence (lib migrate): `cd frontend && npm test` → **70** Vitest passed; `npm run lint` OK; `npm run build` OK.
+ - Residual (non-blocking): broaden RTL/MSW to more panels (lib `*.mjs` node:test migrate **CLOSED** 2026-09-02).
+- [x] E2E Playwright — **DONE** (2026-09-02)
+ - Local: 10 Playwright specs (`cd e2e && npm test`); macOS uses Chrome channel.
+ - CI: job `e2e-playwright` (Chromium on ubuntu-latest; builtin API + Vite `webServer`) landed SHA `7f01407`.
+ - GHA evidence: run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (head SHA `2f45e14`); job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499 — steps include green `Run Playwright E2E`.
+ - Residual breadth (multi-factor reverse E2E) tracked under , not .
+- [x] Backend property tests (Hypothesis) — **DONE** (2026-09-02, staged broaden)
+ - Beyond pricing Greeks: `backend/tests/test_m9_risk_properties.py` — VaR/ES ordering, MV aggregation, component-VaR Euler reconciliation under Hypothesis.
+ - Local: `pytest tests/test_m9_risk_properties.py` → **6 passed**.
+ - Residual (non-blocking): more methodologies / FULL_REVAL property space; keep Greeks suite as baseline.
+- [x] Golden quant tests — **DONE** (2026-09-02, expand)
+ - Expanded `backend/tests/test_quantlib_golden.py` (~49 cases): equity/FX options vs analytic BS/GK; CIP equity-future & FX-forward algebra (rel=1e-12); IR STIR algebra; continuous Actual365Fixed ZC bond golden (closes annual-compound day-count gap as documented); IRS payer/receiver + ATM residual; edge eval dates (weekend/leap/year-end); PricingEngine seam check.
+ - Tolerances/reference documented in module docstring (QuantLib AnalyticEuropeanEngine / FlatForward; algebraic CIP/STIR identities shared with Builtin).
+ - Local: `RISKFORGE_PRICING_ENGINE=quantlib pytest tests/test_quantlib_golden.py` → **49 passed**; full backend suite → **564 passed**.
+ - Residual (non-blocking): very short ``T ≲ 0.05`` option date-rounding bands remain in `test_quantlib_pricing.py`; IRS NPV not identical to Builtin annuity model.
+- [x] Stress invariants — **DONE** (2026-09-02, staged)
+ - Hypothesis: stress pnl == Σ by_position; empty scenario list → []; long-equity equity-shock monotonicity (same file as ).
+ - Complements prior zero-shock / empty-scenario attribution tests.
+ - Residual: threat-level / max_loss_pct boundary properties; multi-factor stress contribution invariants.
+- [x] CI GitHub Actions — workflow at `.github/workflows/ci.yml` (backend pytest Py3.12 + QuantLib-preferred / builtin fallback, frontend `npm test`/`npm run build`, optional native g++ smoke, **`postgres-smoke` service job** via `scripts/smoke_postgres.sh`). Runner validation deferred to .
+- [x] Static analysis (Ruff/mypy/ESLint) — **DONE** (staged gate, 2026-09-02)
+ - CI job `lint-static-analysis` runs `ruff check app tests`, `mypy app`, and `npm run lint` (`eslint src --max-warnings 0`).
+ - Config: `backend/pyproject.toml`, `backend/requirements-dev.txt`, `frontend/eslint.config.js`.
+ - **Honest staging (not full-strict):** Ruff selects E/F/I/B/UP/SIM/RUF with documented ignores (E501 line length, B008 FastAPI `Depends`, pyupgrade/SIM/RUF style debt, finance γ/Δ unicode). mypy runs with `disable_error_code` for known debt (`arg-type`, `assignment`, `var-annotated`, `no-redef`, `misc`) — still catches other errors; pay down by removing codes. ESLint: recommended + react/hooks; `prop-types` off (no TS yet).
+ - Trivial fixes: Ruff autofix (imports/unused), F821 lambda closure in `risk_run_worker.py`, Analytics `useEffect` deps for exhaustive-deps; kernel P&L tol imports moved to `app.compute.kernel` in tests.
+ - GHA evidence: push SHA `8d7a6f2`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 — includes green `lint-static-analysis`.
+ - Follow-up (non-blocking for ): enable ignored Ruff rules gradually; clear mypy `disable_error_code`; add Vitest/TS when advances.
+- [x] Containers — **DONE** (2026-09-02 Lead Architect disposition)
+ - **Acceptance (containers):** Compose ships `postgres` + `backend` + `worker` + `frontend` (`docker-compose.yml`); `backend` sets `RISKFORGE_EXTERNAL_WORKER=1`; `worker` runs `python -m app.worker` and claims via Postgres `FOR UPDATE SKIP LOCKED` ( / ADR 005). No VaR/pricing math changed.
+ - **Redis/RQ — DEFERRED (accepted residual, not claimed `[x]`):** Fair scheduling / ops queue is **out of scope**. Claim safety does **not** require Redis/RQ (Compose comment + `app/worker.py` + README). Do **not** add a fake Redis service or RQ worker that does not change product semantics.
+ - Follow-on (post-, optional ops): Redis/RQ or equivalent only if product needs cross-host fair scheduling beyond Postgres SKIP LOCKED — track outside Workstream 9.
 
-- [x] M9.9 Validate CI on GitHub-hosted runners (fix workflow green; document QuantLib install path) — **DONE** (2026-09-02)
-  - Local evidence (2026-09-02, DevOps): `docker compose up -d postgres` + `RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge ./scripts/smoke_postgres.sh` → **exit 0** (`postgres smoke OK`; Alembic head `002_risk_run_domain_fields`). Idempotent re-run OK. See `BUILD_NOTES.md`.
-  - CI hardening: smoke waits up to 60s for psycopg `SELECT 1`; job prints sqlalchemy/alembic/psycopg versions; QuantLib optional for `postgres-smoke` (full `requirements.txt` preferred; strip QuantLib on wheel failure). Main `backend` job still prefers QuantLib wheel on `ubuntu-latest`, falls back to builtin.
-  - GHA evidence: repo https://github.com/SergTogul/riskforge-mvp ; push SHA `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — `postgres-persistence-smoke` https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176 ; also `backend-pytest` + `frontend-test-build` green. QuantLib path: backend job prefers wheel on ubuntu-latest with builtin fallback (see workflow).
-  - Milestone 5 COMPLETE cleared on this evidence; M5.5 caching polish **DONE**.
-- [x] M9.10 E2E coverage for post-M2/M3/M4/M5 endpoints — **DONE** (2026-09-02 QA reverse-multi close)
-  - Done: ES contributions (`POST /risk/es`), change-attribution waterfall, VaR methodology compare, hedge-compare (`POST /risk/stress/compare`), overview collage → VaR & ES nav; risk-runs hash fix (`/#risk-runs`) after M8 sectioning
-  - Frontend UI: Stress-section **Multi-Factor Reverse Stress** → `POST /api/v1/risk/stress/reverse/multi` (helpers + Vitest/RTL/MSW)
-  - QA E2E close: `e2e/tests/reverse-stress.spec.ts` — navigate `#stress`, fill target/max-shock/weights + factor toggles, assert Status Converged/Not converged + factor table rows; client validation for fewer than two factors; **no invented PnL/shock numbers**
-  - Local evidence: `cd e2e && npm test` → **12 passed** (2026-09-02 QA); Chrome channel locally; CI stays Chromium via `CI=true` (`e2e/playwright.config.js`)
-  - CI close: push SHA `a61c29a` — run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 ; job `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 (also fixed Frontend `8409b7e` regression: single-factor heading strict-mode collision)
-  - Prior M9.2 gate: https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499)
-  - Prior note: Milestone 9 stayed PARTIAL until Lead Architect M9.8 disposition (below).
+- [x] Validate CI on GitHub-hosted runners (fix workflow green; document QuantLib install path) — **DONE** (2026-09-02)
+ - Local evidence (2026-09-02, DevOps): `docker compose up -d postgres` + `RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge ./scripts/smoke_postgres.sh` → **exit 0** (`postgres smoke OK`; Alembic head `002_risk_run_domain_fields`). Idempotent re-run OK. See `BUILD_NOTES.md`.
+ - CI hardening: smoke waits up to 60s for psycopg `SELECT 1`; job prints sqlalchemy/alembic/psycopg versions; QuantLib optional for `postgres-smoke` (full `requirements.txt` preferred; strip QuantLib on wheel failure). Main `backend` job still prefers QuantLib wheel on `ubuntu-latest`, falls back to builtin.
+ - GHA evidence: repo https://github.com/SergTogul/riskforge-mvp ; push SHA `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — `postgres-persistence-smoke` https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176 ; also `backend-pytest` + `frontend-test-build` green. QuantLib path: backend job prefers wheel on ubuntu-latest with builtin fallback (see workflow).
+ - Workstream 5 COMPLETE cleared on this evidence; caching polish **DONE**.
+- [x] E2E coverage for post- endpoints — **DONE** (2026-09-02 QA reverse-multi close)
+ - Done: ES contributions (`POST /risk/es`), change-attribution waterfall, VaR methodology compare, hedge-compare (`POST /risk/stress/compare`), overview collage → VaR & ES nav; risk-runs hash fix (`/#risk-runs`) after sectioning
+ - Frontend UI: Stress-section **Multi-Factor Reverse Stress** → `POST /api/v1/risk/stress/reverse/multi` (helpers + Vitest/RTL/MSW)
+ - QA E2E close: `e2e/tests/reverse-stress.spec.ts` — navigate `#stress`, fill target/max-shock/weights + factor toggles, assert Status Converged/Not converged + factor table rows; client validation for fewer than two factors; **no invented PnL/shock numbers**
+ - Local evidence: `cd e2e && npm test` → **12 passed** (2026-09-02 QA); Chrome channel locally; CI stays Chromium via `CI=true` (`e2e/playwright.config.js`)
+ - CI close: push SHA `a61c29a` — run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 ; job `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 (also fixed Frontend `8409b7e` regression: single-factor heading strict-mode collision)
+ - Prior gate: https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499)
+ - Prior note: Workstream 9 stayed PARTIAL until Lead Architect disposition (below).
 
-- [x] M9.11 CI failure triage (e2e-playwright reverse-stress heading collision) — **DONE** (2026-09-02 DevOps/QA)
-  - **Do not hide:** GHA run **failure** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700340552 (SHA `8409b7e`, “Add multi-factor reverse-stress UI”) — job **`e2e-playwright` failed**; siblings green (`backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`).
-  - Root cause: single-factor locator `.card` + heading `Reverse Stress` also matched **Multi-Factor Reverse Stress** card (`strict mode violation` → 2 elements).
-  - Fix (already on master via M9.10 close, hardened here): `exact: true` heading match + durable `data-testid="reverse-stress"` on single-factor card; multi keeps `data-testid="reverse-stress-multi"`.
-  - Older historical failure (M9.7 land): https://github.com/SergTogul/riskforge-mvp/actions/runs/33680821074 (`backend-pytest` + `lint-static-analysis`) — subsequently fixed; not reopened.
-  - Local evidence (this triage): backend `pytest -q` **571 passed** (QuantLib); frontend `npm test` **61+9 passed**; `ruff`/`mypy`/`eslint` OK; native kernel compile OK.
-  - HEAD at triage start: SHA `f74b528` — full CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33701266538 (all five jobs green). Hardening push SHA `16c91cc` — CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33703670779 (all five jobs green, including `e2e-playwright`).
+- [x] CI failure triage (e2e-playwright reverse-stress heading collision) — **DONE** (2026-09-02 DevOps/QA)
+ - **Do not hide:** GHA run **failure** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700340552 (SHA `8409b7e`, “Add multi-factor reverse-stress UI”) — job **`e2e-playwright` failed**; siblings green (`backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`).
+ - Root cause: single-factor locator `.card` + heading `Reverse Stress` also matched **Multi-Factor Reverse Stress** card (`strict mode violation` → 2 elements).
+ - Fix (already on master via close, hardened here): `exact: true` heading match + durable `data-testid="reverse-stress"` on single-factor card; multi keeps `data-testid="reverse-stress-multi"`.
+ - Older historical failure ( land): https://github.com/SergTogul/riskforge-mvp/actions/runs/33680821074 (`backend-pytest` + `lint-static-analysis`) — subsequently fixed; not reopened.
+ - Local evidence (this triage): backend `pytest -q` **571 passed** (QuantLib); frontend `npm test` **61+9 passed**; `ruff`/`mypy`/`eslint` OK; native kernel compile OK.
+ - HEAD at triage start: SHA `f74b528` — full CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33701266538 (all five jobs green). Hardening push SHA `16c91cc` — CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33703670779 (all five jobs green, including `e2e-playwright`).
 
-- [ ] M9.12 CI lint mypy regression (PortfolioService HistoricalRiskEngine narrowing) — **FIX PUSHED; GHA CONFIRM PENDING** (2026-09-02 DevOps/QA)
-  - **Local root cause (reproduced with CI commands):** `lint-static-analysis` / `mypy app` failed on `backend/app/services/portfolio_service.py` — ternary `isinstance(...)` did not narrow `risk: RiskEngine`, so `.seed` / `.observations` were attr-defined errors.
-  - **Fix:** SHA `11339c6` on `master` — statement-level `isinstance(risk, HistoricalRiskEngine)` before accessing attrs (PricingEngine seams untouched).
-  - **Local evidence before push:** backend `pytest -q` **619 passed** (QuantLib 1.43); `ruff`/`mypy` OK; frontend `npm test` **70 passed** + lint + build OK; native `risk_kernel_ok` + shared lib OK.
-  - **Push:** `git push` succeeded (`8d3d67a..11339c6`). Expected CI run URL: https://github.com/SergTogul/riskforge-mvp/actions (filter SHA `11339c6`).
-  - **Blocked:** `gh run list` / `gh run watch` return `Forbidden` — `gh auth status` reports *The token in keyring is invalid* (account still active). Git HTTPS push/fetch still works via credential helper. **Do not spam `gh auth login`.** Operator must repair keyring token once offline; then record green run URL here and check the box.
+- [x] CI lint mypy regression (PortfolioService HistoricalRiskEngine narrowing) — **DONE** (2026-09-03 Lead Architect: GHA confirmed green)
+ - **Local root cause (reproduced with CI commands):** `lint-static-analysis` / `mypy app` failed on `backend/app/services/portfolio_service.py` — ternary `isinstance(...)` did not narrow `risk: RiskEngine`, so `.seed` / `.observations` were attr-defined errors.
+ - **Fix:** SHA `11339c6` on `master` — statement-level `isinstance(risk, HistoricalRiskEngine)` before accessing attrs (PricingEngine seams untouched).
+ - **Local evidence before push:** backend `pytest -q` **619 passed** (QuantLib 1.43); `ruff`/`mypy` OK; frontend `npm test` **70 passed** + lint + build OK; native `risk_kernel_ok` + shared lib OK.
+ - **Push:** `git push` succeeded (`8d3d67a..11339c6`). Expected CI run URL: https://github.com/SergTogul/riskforge-mvp/actions (filter SHA `11339c6`).
+ - ~~**Blocked:** `gh run list` / `gh run watch` returned `Forbidden` from an invalid keyring token.~~ **CLEARED 2026-09-03** — `gh auth status` OK.
+ - **GHA evidence (2026-09-03):** the mypy fix `11339c6` is contained in current master `9818d58`; run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33712643872 — all five jobs green, including `lint-static-analysis` https://github.com/SergTogul/riskforge-mvp/actions/runs/33712643872/job/100515202600.
 
-### Progress update (2026-09-02, Lead Architect — M9.8 disposition + Milestone 9 COMPLETE)
+### Progress update (2026-09-02, Lead Architect — disposition + Workstream 9 COMPLETE)
 
 - Owner: Lead Architect / Orchestrator (DevOps charter consulted; no Redis/RQ implementation)
-- **Decision:** ROADMAP labeled Redis/RQ as **optional** for M9.8; M5.7 already closed multi-worker claim with Postgres `SKIP LOCKED`. Required M9.8 deliverable is the **Compose container stack**, which already exists and is documented. Redis/RQ is an **accepted deferred residual** (fair scheduling/ops) — **not** rubber-stamped done and **not** required for Milestone 9 COMPLETE.
-- **Did not** add Redis/RQ (would be empty ceremony without product semantics; must not regress M5.7 claim path or PricingEngine seams).
-- **M9.8 DONE** (containers). Redis/RQ remains deferred outside M9.
-- **Milestone 9 COMPLETE** — every required checklist item M9.1–M9.10 is honestly DONE.
-- Next highest-value residual outside M9: **M3.8** (started same session) / M6 SLA / M10.
+- **Decision:** ROADMAP labeled Redis/RQ as **optional** for ; already closed multi-worker claim with Postgres `SKIP LOCKED`. Required deliverable is the **Compose container stack**, which already exists and is documented. Redis/RQ is an **accepted deferred residual** (fair scheduling/ops) — **not** rubber-stamped done and **not** required for Workstream 9 COMPLETE.
+- **Did not** add Redis/RQ (would be empty ceremony without product semantics; must not regress claim path or PricingEngine seams).
+- ** DONE** (containers). Redis/RQ remains deferred outside .
+- **Workstream 9 COMPLETE** — every required checklist item is honestly DONE.
+- Next highest-value residual outside (started same session) / SLA / .
 
-### Progress update (2026-09-02, Lead Architect + Backend — M3.8 formal Scenario wire)
+### Progress update (2026-09-02, Lead Architect + Backend — formal Scenario wire)
 
 - Owner: Lead Architect / Orchestrator implementing Backend/API (+ Stress adapter reuse)
 - Landed formal HTTP wire without replacing legacy `StressScenario` endpoints (ADR 004).
 - Routes under dual-mount `/api/v1` (+ legacy): `GET /risk/stress/scenarios/formal`, `POST /risk/stress/formal/custom`, `POST /risk/stress/formal/evaluate/custom`.
 - PnL parity: formal wire → `scenario_to_stress` matches named-dict legacy custom stress (abs 1e-9).
-- PricingEngine seams / VaR math / M5.7 SKIP LOCKED untouched.
+- PricingEngine seams / VaR math / SKIP LOCKED untouched.
 - Residual: ScenarioBuilder UI and hedge-compare/what-if still use legacy shape.
 
-### Progress update (2026-09-02, QA — M9.10 E2E breadth)
+### Progress update (2026-09-02, QA — E2E breadth)
 
 - Owner: QA & Quant Validation (Lead Architect coordinated; no product/UI feature ownership)
-- Landed Playwright coverage for M8 panels that were ROADMAP-called-out gaps (ES, change-attribution, hedge-compare) plus VaR-compare and overview collage navigation
-- Fixed risk-runs E2E to target `#risk-runs` (panel left Overview under M8.1/M8.9)
-- Milestone 9 remains **PARTIAL** — M9.1/M9.3–M9.5 and reverse-multi E2E still open; M9.7 static analysis staged gate landed (see M9.7 notes)
+- Landed Playwright coverage for panels that were ROADMAP-called-out gaps (ES, change-attribution, hedge-compare) plus VaR-compare and overview collage navigation
+- Fixed risk-runs E2E to target `#risk-runs` (panel left Overview under )
+- Workstream 9 remains **PARTIAL** — and reverse-multi E2E still open; static analysis staged gate landed (see notes)
 
-### Progress update (2026-09-02, DevOps — M9.7 static analysis)
+### Progress update (2026-09-02, DevOps — static analysis)
 
 - Owner: DevOps / Platform
 - Landed CI `lint-static-analysis` (Ruff + mypy + ESLint) with staged configs; GHA green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 (SHA `8d7a6f2`)
 - Follow-up SHA `8d7a6f2`: restore Historical VaR kernel test imports after Ruff F401 cleanup; `FloatArray` PEP 695 alias + numpy in `requirements-dev.txt` so lint-job mypy matches CI
-- Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.1–M9.5, reverse-multi E2E still open; Playwright GHA job landed below — runner proof pending)
+- Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE (, reverse-multi E2E still open; Playwright GHA job landed below — runner proof pending)
 
 ### Progress update (2026-09-02, DevOps/QA — Playwright in GHA)
 
@@ -871,29 +875,29 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.
 - Restored `gh` auth (`repo` + `workflow` scopes) and verified latest master CI.
 - GHA run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (head SHA `2f45e14`, title: Document honest Playwright CI status pending runner proof.)
 - Job `e2e-playwright` **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499 (including step `Run Playwright E2E`). Sibling jobs also green: `backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`.
-- **M9.2 DONE** on this evidence. Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.1 Vitest/RTL, M9.3–M9.5 broaden, M9.8 Redis optional, M9.10 reverse-multi E2E still open). Do **not** start M9.1 in this task.
+- ** DONE** on this evidence. Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE ( Vitest/RTL, broaden, Redis optional, reverse-multi E2E still open). Do **not** start in this task.
 
-### Progress update (2026-09-02, QA — M9.1 Vitest/RTL/MSW)
+### Progress update (2026-09-02, QA — Vitest/RTL/MSW)
 
 - Owner: QA & Quant Validation (+ Frontend harness only)
 - Landed Vitest + RTL + MSW alongside existing node:test helpers (dual-run `npm test`).
 - Representative component coverage: MetricCard, AppNav, ScenarioBuilder (MSW fixtures for custom stress evaluate).
 - Local: `cd frontend && npm test` → 56 + 6 passed; lint + production build OK. CI `frontend-test-build` uses unchanged `npm test` entrypoint.
-- **M9.1 DONE** (staged). Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.3–M9.5 broaden, M9.8 Redis optional, M9.10 reverse-multi E2E / Frontend multi-factor reverse UI still open).
+- ** DONE** (staged). Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE ( broaden, Redis optional, reverse-multi E2E / Frontend multi-factor reverse UI still open).
 
-### Progress update (2026-09-02, QA — M9.3 Hypothesis + M9.5 stress invariants)
+### Progress update (2026-09-02, QA — Hypothesis + stress invariants)
 
 - Owner: QA & Quant Validation
 - Added `backend/tests/test_m9_risk_properties.py`: portfolio VaR/ES ordering, MV aggregation, component-VaR reconciliation; stress pnl sum / empty list / long-equity shock monotonicity (Hypothesis).
 - Local: `cd backend && pytest tests/test_m9_risk_properties.py tests/test_quant_properties.py tests/test_component_var.py` → **20 passed**.
-- **M9.3 + M9.5 DONE** (staged). Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.4 golden expand, M9.8 Redis optional, M9.10 reverse-multi UI/E2E still open).
+- ** + DONE** (staged). Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE ( golden expand, Redis optional, reverse-multi UI/E2E still open).
 
-### Progress update (2026-09-02, QA — M9.4 QuantLib golden expand)
+### Progress update (2026-09-02, QA — QuantLib golden expand)
 
 - Owner: QA & Quant Validation (PricingEngine seams preserved; no adapter code changes)
 - Expanded `test_quantlib_golden.py` with IRS/FX/futures/bond continuous DF goldens, edge evaluation dates, documented tolerances (analytic BS/GK, CIP/STIR algebra, Actual365Fixed continuous bond vs annual-compound gap).
 - Local: `RISKFORGE_PRICING_ENGINE=quantlib pytest tests/test_quantlib_golden.py` → **49 passed**; full `pytest` → **564 passed**, 1 warning.
-- **M9.4 DONE**. Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.8 Redis optional; M9.10 reverse-multi UI/E2E still open — Frontend multi-factor reverse panel required before QA E2E close).
+- ** DONE**. Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE ( Redis optional; reverse-multi UI/E2E still open — Frontend multi-factor reverse panel required before QA E2E close).
 
 ### Progress update (2026-09-02, Frontend — multi-factor reverse stress UI)
 
@@ -901,62 +905,62 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.
 - Landed Stress-section `ReverseStressMulti` wired to existing `POST /api/v1/risk/stress/reverse/multi` (`reverseStressMulti` client). Display-only: status, target/achieved, P&L, shock table, method/assumptions from API — no client search/optimization.
 - Helpers: `defaultReverseMultiForm`, `validateReverseMultiForm`, `reverseMultiRequestBody`, `formatFactorShock`, expanded `reverseStressMultiSummary`.
 - Tests: `risk.test.mjs` request/display helpers; Vitest/RTL/MSW `ReverseStressMulti.test.jsx`; structural Playwright `e2e/tests/reverse-stress.spec.ts` (labels/Converged status).
-- Milestone 9 remained **PARTIAL** after UI land (M9.8 Redis optional; M9.10 QA E2E close pending).
+- Workstream 9 remained **PARTIAL** after UI land ( Redis optional; QA E2E close pending).
 
-### Progress update (2026-09-02, QA — M9.10 reverse-multi E2E close)
+### Progress update (2026-09-02, QA — reverse-multi E2E close)
 
 - Owner: QA & Quant Validation
 - Closed reverse-multi live E2E gap: fill controls (target loss %, max shock %, weights, factor checkboxes), assert Status Converged/Not converged + shock table factor rows; validation path for fewer than two factors; fixed single-factor card selector (`exact: true`) after Multi-Factor heading collision.
 - Local: `cd e2e && npm test` → **12 passed** (no unexpected skips). Spec/selectors only — no UI product changes.
 - GHA: run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 (head `a61c29a`); `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 — also clears the `8409b7e` single-factor heading strict-mode failure.
-- **M9.10 DONE**. Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.8 Redis/RQ optional still open). Next: Lead Architect decide M9.8 deferral vs implement; then M3.8 / M6 SLA / M10.
+- ** DONE**. Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE ( Redis/RQ optional still open). Next: Lead Architect decide deferral vs implement; then SLA / .
 
 ---
 
-## Milestone 10 — Demo Data & Reproducibility
+## Workstream 10 — Demo Data & Reproducibility
 
-Status: **COMPLETE** (2026-09-02 — M10.1–M10.3 DONE)
+Status: **COMPLETE** (2026-09-02 — DONE)
 
 ### Tasks
 
-- [x] M10.1 Demo portfolios (Equity Vol / Rates Macro / Cross-Asset) — **DONE** (2026-09-02)
-  - In-code books: `equity-vol`, `rates-macro`, `global-macro` (Cross-Asset theme; default `SAMPLE_PORTFOLIO`)
-  - Catalog: `DEMO_PORTFOLIOS` + `GET /api/v1/portfolios` (+ `GET /portfolios/{id}`); SQLAlchemy seeds all three
-  - No live market vendor feeds; marks remain synthetic/embedded
-- [x] M10.2 Demo historical market dataset — **DONE** (2026-09-02)
-  - Packaged CSV `data/demo_historical_factors.csv` (750 obs; frozen replay of `SyntheticHistoricalDataset(seed=7)`)
-  - Loaders: `load_factor_observations_csv` / `load_demo_historical_dataset` / `create_historical_dataset`
-  - Env `RISKFORGE_HISTORICAL_DATASET=demo|synthetic|/path.csv`; API DI defaults to demo CSV
-  - Removed unused orphan `data/sample_portfolio.csv` (portfolios are in-code since M10.1)
-  - Docs: `data/README.md`; evidence `tests/test_demo_historical_dataset.py`
-- [x] M10.3 Deterministic demo scripts — **DONE** (2026-09-02)
-  - Module/CLI: `backend/app/demo/run_demo_risk.py` (+ `scripts/run_demo_risk.py` shim)
-  - Loads M10.1 portfolios + M10.2 demo factors; emits sorted-key VaR/stress JSON via `PortfolioService`
-  - Defaults: builtin pricing + Python scenario kernel; `--check` asserts byte-identical re-runs
-  - Frozen artifact: `data/demo_risk_artifact.json`; evidence `tests/test_demo_scripts.py`
+- [x] Demo portfolios (Equity Vol / Rates Macro / Cross-Asset) — **DONE** (2026-09-02)
+ - In-code books: `equity-vol`, `rates-macro`, `global-macro` (Cross-Asset theme; default `SAMPLE_PORTFOLIO`)
+ - Catalog: `DEMO_PORTFOLIOS` + `GET /api/v1/portfolios` (+ `GET /portfolios/{id}`); SQLAlchemy seeds all three
+ - No live market vendor feeds; marks remain synthetic/embedded
+- [x] Demo historical market dataset — **DONE** (2026-09-02)
+ - Packaged CSV `data/demo_historical_factors.csv` (750 obs; frozen replay of `SyntheticHistoricalDataset(seed=7)`)
+ - Loaders: `load_factor_observations_csv` / `load_demo_historical_dataset` / `create_historical_dataset`
+ - Env `RISKFORGE_HISTORICAL_DATASET=demo|synthetic|/path.csv`; API DI defaults to demo CSV
+ - Removed unused orphan `data/sample_portfolio.csv` (portfolios are in-code since )
+ - Docs: `data/README.md`; evidence `tests/test_demo_historical_dataset.py`
+- [x] Deterministic demo scripts — **DONE** (2026-09-02)
+ - Module/CLI: `backend/app/demo/run_demo_risk.py` (+ `scripts/run_demo_risk.py` shim)
+ - Loads portfolios + demo factors; emits sorted-key VaR/stress JSON via `PortfolioService`
+ - Defaults: builtin pricing + Python scenario kernel; `--check` asserts byte-identical re-runs
+ - Frozen artifact: `data/demo_risk_artifact.json`; evidence `tests/test_demo_scripts.py`
 
-### Progress update (2026-09-02, QA / Frontend — M9.1 lib Vitest migrate)
+### Progress update (2026-09-02, QA / Frontend — lib Vitest migrate)
 
 - Owner: QA & Quant Validation (+ Frontend harness)
 - Migrated leftover `src/lib/{risk,nav,heatmap}.test.mjs` (node:test) → Vitest `*.test.js`; removed vite exclude; `npm test` is Vitest-only.
-- Local: `cd frontend && npm test` → **70 passed**; lint + build OK. No client risk math; no M11/M12; backend untouched.
-- **M9.1 residual (lib migrate) CLOSED**. Remaining M9.1 residual: broaden RTL/MSW panels only. Milestone 9 stays **COMPLETE**.
+- Local: `cd frontend && npm test` → **70 passed**; lint + build OK. No client risk math; no ; backend untouched.
+- ** residual (lib migrate) CLOSED**. Remaining residual: broaden RTL/MSW panels only. Workstream 9 stays **COMPLETE**.
 
-### Progress update (2026-09-02, Lead Architect / Backend — M10.3)
+### Progress update (2026-09-02, Lead Architect / Backend — )
 
 - Owner: Backend/API (+ Lead Architect coordination); no Frontend / Market Data changes
 - Deterministic offline demo harness; no live vendors; PricingEngine seams untouched
-- **Milestone 10 COMPLETE** — M10.1–M10.3 all DONE per checklist above
-- Next residuals (ROADMAP): **M6 COMPLETE** (scenario-kernel SLA-K1/K2); M11/M12 **POSTPONED** — do not start; M3.9 methodology doc DONE
+- **Workstream 10 COMPLETE** — all DONE per checklist above
+- Next residuals (ROADMAP): ** COMPLETE** (scenario-kernel SLA-K1/K2); **POSTPONED** — do not start; methodology doc DONE
 
-### Progress update (2026-09-02, Market Data — M10.2)
+### Progress update (2026-09-02, Market Data — )
 
 - Owner: Market Data & Curves (+ Backend DI for `deps.py` / `PortfolioService` dataset sharing)
 - File-backed aggregate factor history for Historical VaR / scenario replay; no live vendors; PricingEngine untouched.
 - Demo CSV numerically identical to prior seed-7 / 750 synthetic default (API VaR continuity).
-- Milestone 10 remained **PARTIAL** until M10.3 (now closed same day).
+- Workstream 10 remained **PARTIAL** until (now closed same day).
 
-### Progress update (2026-09-02, Lead Architect / Market Data — M10.1)
+### Progress update (2026-09-02, Lead Architect / Market Data — )
 
 - Owner: Lead Architect (+ Market Data seams for snapshot-from-positions; no PricingEngine changes)
 - Landed three themed demo portfolios with composition invariants, list/get catalog API, persistence seed of all demos.
@@ -964,50 +968,63 @@ Status: **COMPLETE** (2026-09-02 — M10.1–M10.3 DONE)
 
 ---
 
-## Milestone 11 — AI Risk Assistant
+## Workstream 11 — AI Risk Assistant
 
 Status: **POSTPONED** (product decision 2026-09-02 — deferred; **do not start** until Lead/user explicitly unblocks). Not COMPLETE. Task list retained for when work resumes.
 
 ### Tasks
 
-- [ ] M11.1 Deterministic tool contracts — PARTIAL (keyword `RiskQueryEngine` + service methods)
-- [ ] M11.2 LLM orchestration — NOT STARTED
-- [ ] M11.3 Risk assistant evaluation suite — NOT STARTED
-- [ ] M11.4 Guardrails — NOT STARTED
+- [ ] Deterministic tool contracts — PARTIAL (keyword `RiskQueryEngine` + service methods)
+- [ ] LLM orchestration — NOT STARTED
+- [ ] Risk assistant evaluation suite — NOT STARTED
+- [ ] Guardrails — NOT STARTED
 
 ---
 
-## Milestone 12 — Documentation & Portfolio Presentation
+## Workstream 12 — Documentation & Portfolio Presentation
 
 Status: **POSTPONED** (product decision 2026-09-02 — deferred; **do not start** until Lead/user explicitly unblocks). Not COMPLETE. Task list retained for when work resumes.
 
-Note: M3.9 published `docs/methodology/multi_factor_reverse_stress.md` ahead of this milestone; M12.4 / M12.6 still own the broader recruiter methodology / limitations pack when unblocked.
+Note: published `docs/methodology/multi_factor_reverse_stress.md` ahead of this workstream; still own the broader recruiter methodology / limitations pack when unblocked.
 
 ### Tasks
 
-- [ ] M12.1 Recruiter/interviewer README — PARTIAL (current README is MVP-oriented)
-- [ ] M12.2 Architecture documentation — PARTIAL (agent docs; no system diagrams package)
-- [ ] M12.3 ADRs under `docs/adr/` — PARTIAL
-  - Landed (2026-09-02, evidence-backed only): `001`–`006` plus `007-quantlib-concurrency.md` (M6.6) and `008-api-v1-canonical-and-legacy-sunset.md` (M7.6)
-  - Not written yet (insufficient decided evidence / still open): e.g. RiskRun domain/API lifecycle (M5.2+), VaR methodology modes, caching — do not invent ADRs ahead of code
-  - Native kernel risk-path wiring (M6.3) documented via env flag + native/README; no separate ADR unless Lead requests
-- [ ] M12.4 Methodology documentation — NOT STARTED (partial input: M3.9 multi-factor reverse doc exists; VaR modes pack still open)
-  - Must include honest multi-factor reverse-stress assumptions (M3.9) and VaR methodology modes
-- [ ] M12.5 Performance report — PARTIAL (`BUILD_NOTES.md` caveated microbench)
-- [ ] M12.6 Known engine / pricing limitations catalog (recruiter-facing)
-  - Why: surface bump vs grid (M1.10), BlackConstantVol (M1.11), multi-factor reverse (M3.9) — prevent over-claiming completeness
+- [ ] Recruiter/interviewer README — PARTIAL (current README is MVP-oriented)
+- [ ] Architecture documentation — PARTIAL (agent docs; no system diagrams package)
+- [ ] ADRs under `docs/adr/` — PARTIAL
+ - Landed (2026-09-02, evidence-backed only): `001`–`006` plus `007-quantlib-concurrency.md` and `008-api-v1-canonical-and-legacy-sunset.md` - Not written yet (insufficient decided evidence / still open): e.g. RiskRun domain/API lifecycle (+), VaR methodology modes, caching — do not invent ADRs ahead of code
+ - Native kernel risk-path wiring documented via env flag + native/README; no separate ADR unless Lead requests
+- [ ] Methodology documentation — NOT STARTED (partial input: multi-factor reverse doc exists; VaR modes pack still open)
+ - Must include honest multi-factor reverse-stress assumptions and VaR methodology modes
+- [ ] Performance report — PARTIAL (`BUILD_NOTES.md` caveated microbench)
+- [ ] Known engine / pricing limitations catalog (recruiter-facing)
+ - Why: surface bump vs grid , BlackConstantVol , multi-factor reverse — prevent over-claiming completeness
 
 ---
 
-## Milestone 13 — Final Portfolio Demo
+## Workstream 13 — Final Portfolio Demo
 
-Status: NOT STARTED
+Status: **COMPLETE** (2026-09-03 — deterministic runbook, screenshots/ranges, and clean-checkout smoke)
 
 ### Tasks
 
-- [ ] M13.1 Seed data + deterministic setup for 3–5 minute demo flow
-- [ ] M13.2 Screenshots + demo instructions + expected output ranges
-- [ ] M13.3 Clean-checkout verification of demo path
+- [x] Seed data + deterministic setup for 3–5 minute demo flow — DONE (2026-09-03)
+ - Final-demo runbook: `docs/demo/final_demo.md`
+ - Reuses demo portfolios (`equity-vol`, `rates-macro`, `global-macro`), packaged historical CSV, and `run_demo_risk`; no live vendors and no invented risk numbers
+ - Demo risk values are read from generated/committed artifacts only (`data/demo_risk_artifact.json`)
+- [x] Screenshots + demo instructions + expected output ranges — DONE (2026-09-03)
+ - Screenshots: `docs/demo/riskforge_demo_01_overview.png`, `docs/demo/riskforge_demo_02_portfolio.png`, `docs/demo/riskforge_demo_03_var_es.png`, `docs/demo/riskforge_demo_04_stress.png`
+ - Expected ranges are derived from `data/demo_risk_artifact.json`, not invented in prose
+- [x] Clean-checkout verification of demo path — DONE (2026-09-03)
+ - CI-style local smoke: `PYTHONPATH=backend backend/.venv/bin/python scripts/check_final_demo.py`
+ - Verifies required demo files exist, runs deterministic double-build check, and asserts generated artifact byte-equals `data/demo_risk_artifact.json`
+ - Evidence: `backend/tests/test_final_demo_check.py` plus `scripts/check_final_demo.py`
+
+### Progress update (2026-09-03, Lead Architect / Frontend / DevOps / QA — close)
+
+- Owner: Lead Architect / Orchestrator coordinating Frontend, DevOps, and QA boundaries; no quant/pricing/risk formula changes
+- Added final-demo runbook, durable screenshots, artifact-derived expected output ranges, and clean-checkout smoke around existing deterministic data/scripts
+- **Workstream 13 COMPLETE** locally; CI still requires parent push and green run per repository workflow
 
 ---
 

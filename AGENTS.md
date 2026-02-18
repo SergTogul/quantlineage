@@ -69,13 +69,14 @@ Paths evolve; when in doubt, follow the charter and escalate boundary conflicts.
 3. Preserve interfaces unless the Lead Architect approves a breaking change.
 4. Every behavior change requires tests in the same change.
 5. Run the smallest relevant test suite during development and the full affected suite before handoff.
-6. Never declare work complete while tests are failing or skipped unexpectedly.
-7. Quant changes require numerical tolerances and an explanation of the reference or invariant used.
-8. UI code must not duplicate pricing/risk formulas.
-9. LLM/AI code must call deterministic APIs and must not invent or compute risk numbers.
-10. C++ optimizations must have a Python/reference implementation and benchmark evidence.
-11. Add an ADR for important architectural decisions.
-12. Keep commits/task batches narrow enough to review.
+6. The handoff condition is **all tests pass**: all applicable/affected suites required by the task must pass, with exact commands/results recorded and no unexplained failures or skips.
+7. The push condition is **CI is green**. Before the initial branch push, run all applicable local checks. The initial push may be needed to trigger CI; after CI starts, do not declare the push or handoff complete or continue integration until all required CI checks are green. If CI fails, fix the issue, rerun the applicable local checks, push the fix, and verify that required CI is green.
+8. Quant changes require numerical tolerances and an explanation of the reference or invariant used.
+9. UI code must not duplicate pricing/risk formulas.
+10. LLM/AI code must call deterministic APIs and must not invent or compute risk numbers.
+11. C++ optimizations must have a Python/reference implementation and benchmark evidence.
+12. Add an ADR for important architectural decisions.
+13. Keep commits/task batches narrow enough to review.
 
 ## Required completion report
 

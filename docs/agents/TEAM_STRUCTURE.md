@@ -5,7 +5,7 @@
 RiskForge benefits from specialist subagents because pricing, market data, portfolio risk, scenario analytics, native performance, API work, UI, AI orchestration, and numerical validation have different failure modes. The goal is not maximum agent count; it is clear ownership and controlled handoffs.
 
 ### 1. Lead Architect / Orchestrator
-Coordinates the team, decomposes milestones, protects module boundaries, approves interface changes, integrates cross-cutting work, and maintains ADRs.
+Coordinates the team, decomposes workstreams, protects module boundaries, approves interface changes, integrates cross-cutting work, and maintains ADRs.
 
 ### 2. Quant Pricing Engineer
 Owns instrument models, QuantLib adapters, pricing conventions, valuation, and instrument-level Greeks.
@@ -40,21 +40,21 @@ Owns environment reproducibility, Docker, CI, dependency/build checks, lint/type
 ## Dependency map
 
 ```text
-                         Lead Architect
-                              |
-          +-------------------+-------------------+
-          |                   |                   |
-      Market Data        Quant Pricing       Portfolio Risk
-          |                   |                   |
-          +---------+---------+---------+---------+
-                    |                   |
-              Stress/Scenario       Backend/API
-                    |                   |
-                    +---------+---------+
-                              |
-                         Frontend/Risk UX
-                              |
-                       AI Orchestration
+ Lead Architect
+ |
+ +-------------------+-------------------+
+ | | |
+ Market Data Quant Pricing Portfolio Risk
+ | | |
+ +---------+---------+---------+---------+
+ | |
+ Stress/Scenario Backend/API
+ | |
+ +---------+---------+
+ |
+ Frontend/Risk UX
+ |
+ AI Orchestration
 
 C++ Performance works underneath Risk/Scenario compute only.
 QA & Quant Validation reviews every quantitative boundary.

@@ -8,9 +8,10 @@ A task is not done because code was written. It is done when behavior, correctne
 - [ ] Tests added/updated for every behavior change.
 - [ ] Focused tests pass.
 - [ ] Affected integration tests pass.
-- [ ] No unexpected skips or warnings are ignored.
+- [ ] **All tests pass** before handoff: all applicable/affected test suites required by the task pass.
+- [ ] Exact test commands and results are recorded, with no unexplained failures or skips and no unexpected warnings ignored.
 - [ ] Documentation updated where behavior/architecture changed.
-- [ ] Handoff report contains exact commands/results.
+- [ ] **CI is green** before the push/handoff is declared complete or integration continues: all required CI checks pass.
 
 ## Quant/pricing/risk tasks
 - [ ] Units and sign conventions explicit.

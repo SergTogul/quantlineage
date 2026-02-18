@@ -1,21 +1,21 @@
-# Handoff — M9.4 QuantLib golden expand (QA)
+# Handoff — QuantLib golden expand (QA)
 
 ## Task
-M9.4 — Expand QuantLib golden coverage with documented tolerances/reference
+ — Expand QuantLib golden coverage with documented tolerances/reference
 
 ## Owner
 QA & Quant Validation Engineer
 
 ## Summary
-- Expanded `backend/tests/test_quantlib_golden.py` from a thin M1.8 slice to ~49 golden cases across equity/FX options, ZC bonds, IRS, equity futures, FX forwards, IR futures, edge evaluation dates, and PricingEngine seam checks.
+- Expanded `backend/tests/test_quantlib_golden.py` from a thin slice to ~49 golden cases across equity/FX options, ZC bonds, IRS, equity futures, FX forwards, IR futures, edge evaluation dates, and PricingEngine seam checks.
 - Bond day-count gap **documented and closed for validation**: tight continuous Actual365Fixed golden replaces reliance on annual-compound parity (wide band retained as documentation).
 - **No production/adapter code changes** — PricingEngine seams preserved.
-- **M9.4 DONE**. Milestone 9 remains **PARTIAL** (M9.8 Redis optional; M9.10 reverse-multi UI/E2E open). Do **not** mark Milestone 9 COMPLETE.
+- ** DONE**. Workstream 9 remains **PARTIAL** ( Redis optional; reverse-multi UI/E2E open). Do **not** mark Workstream 9 COMPLETE.
 
 ## Files changed
 - `backend/tests/test_quantlib_golden.py`
 - `ROADMAP.md`
-- `docs/agents/HANDOFF_M9_QA.md` (this file)
+- `docs/agents/HANDOFF_QA_ENGINEERING_QUALITY.md` (this file)
 
 ## Public/interface changes
 - None (tests + docs only)
@@ -52,14 +52,14 @@ cd backend && RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
 ## Results
 - Golden focused: 49 passed
 - Full backend QuantLib: 564 passed, 0 unexpected skips
-- Milestone 9: still PARTIAL
+- Workstream 9: still PARTIAL
 
 ## Known limitations / risks
 - Very short option tenors (`T ≲ 0.05`) and sub-day clamp policy remain in `test_quantlib_pricing.py` (wider bands) — not asserted at 2e-3 in golden file
 - IRS NPV not identical to Builtin annuity model (QL VanillaSwap schedule/day-count)
-- Caps/floors/swaptions still deferred product gap (not M9.4)
+- Caps/floors/swaptions still deferred product gap (not )
 
 ## Follow-up / next owner
-1. **Owner: Frontend — reverse-multi UI** — Stress section multi-factor reverse panel wired to `POST /risk/stress/reverse/multi`; then QA closes M9.10 residual E2E. **Blocking?: yes** for that E2E gap / honest M9 close path.
-2. **Owner: DevOps — M9.8** — Optional Redis/RQ worker path in compose (Postgres SKIP LOCKED path already exists). **Blocking?: no** (optional) — but ROADMAP should stay PARTIAL until M9.8 is DONE or explicitly deferred with Lead Architect note.
-3. Do **not** mark Milestone 9 COMPLETE until M9.8 honesty + reverse-multi E2E (or explicit deferral) are settled.
+1. **Owner: Frontend — reverse-multi UI** — Stress section multi-factor reverse panel wired to `POST /risk/stress/reverse/multi`; then QA closes residual E2E. **Blocking?: yes** for that E2E gap / honest close path.
+2. **Owner: DevOps — ** — Optional Redis/RQ worker path in compose (Postgres SKIP LOCKED path already exists). **Blocking?: no** (optional) — but ROADMAP should stay PARTIAL until is DONE or explicitly deferred with Lead Architect note.
+3. Do **not** mark Workstream 9 COMPLETE until honesty + reverse-multi E2E (or explicit deferral) are settled.

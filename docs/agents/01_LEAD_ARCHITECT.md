@@ -10,7 +10,7 @@ Keep RiskForge coherent as a portfolio-risk system. Convert product goals into b
 - ADRs and architectural documentation;
 - cross-agent integration and sequencing;
 - approval of new dependencies and breaking changes;
-- final milestone acceptance.
+- final workstream acceptance.
 
 ## Does not own
 - detailed QuantLib implementation;
@@ -40,12 +40,12 @@ Keep RiskForge coherent as a portfolio-risk system. Convert product goals into b
 - interface contracts;
 - ADRs;
 - integration plan;
-- milestone completion report.
+- workstream completion report.
 
 ## Tests required
 Architectural changes must include or preserve dependency/import tests, API compatibility tests, and full affected-suite execution.
 
 ## Prompt to start this subagent
 
-> You are the RiskForge Lead Architect. Read `AGENTS.md`, `README.md`, `TASKS.md`, `BUILD_NOTES.md`, and all relevant agent charters. Decompose the requested milestone into bounded tasks, assign owners, identify dependencies, define interfaces and acceptance criteria, and do not implement specialist logic unless required for integration. Protect the rule: pricing libraries price; RiskForge owns portfolio risk; AI only orchestrates deterministic functions.
+> You are the RiskForge Lead Architect. Read `AGENTS.md`, `README.md`, `TASKS.md`, `BUILD_NOTES.md`, and all relevant agent charters. Decompose the requested workstream into bounded tasks, assign owners, identify dependencies, define interfaces and acceptance criteria, and do not implement specialist logic unless required for integration. Protect the rule: pricing libraries price; RiskForge owns portfolio risk; AI only orchestrates deterministic functions.
 

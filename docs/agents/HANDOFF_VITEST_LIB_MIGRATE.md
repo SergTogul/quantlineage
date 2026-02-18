@@ -1,4 +1,4 @@
-# Agent Handoff: M9.1 residual — lib `*.mjs` → Vitest
+# Agent Handoff: residual — lib `*.mjs` → Vitest
 
 ## Task
 Migrate leftover frontend `src/lib/*.test.mjs` (node:test) onto Vitest without breaking `npm test` / CI.
@@ -7,7 +7,7 @@ Migrate leftover frontend `src/lib/*.test.mjs` (node:test) onto Vitest without b
 QA & Quant Validation (+ Frontend harness)
 
 ## Summary
-Converted `risk.test.mjs`, `nav.test.mjs`, and `heatmap.test.mjs` to Vitest suites (`*.test.js`) using `import { test } from 'vitest'` + existing `node:assert/strict` assertions. Dropped the vite exclude for lib tests. `npm test` is now a single Vitest run; `test:node` aliases to `vitest run src/lib` for script-name continuity. No client risk math; production helpers remain `.mjs` display/request-only. Backend / M1.12 bond pricing untouched.
+Converted `risk.test.mjs`, `nav.test.mjs`, and `heatmap.test.mjs` to Vitest suites (`*.test.js`) using `import { test } from 'vitest'` + existing `node:assert/strict` assertions. Dropped the vite exclude for lib tests. `npm test` is now a single Vitest run; `test:node` aliases to `vitest run src/lib` for script-name continuity. No client risk math; production helpers remain `.mjs` display/request-only. Backend / bond pricing untouched.
 
 ## Files changed
 - `frontend/src/lib/risk.test.js` (added; replaces `risk.test.mjs`)
@@ -18,9 +18,9 @@ Converted `risk.test.mjs`, `nav.test.mjs`, and `heatmap.test.mjs` to Vitest suit
 - `frontend/src/lib/heatmap.test.mjs` (deleted)
 - `frontend/vite.config.js` (remove lib `*.test.mjs` exclude)
 - `frontend/package.json` (`npm test` → `vitest run`; `test:node` → lib Vitest alias)
-- `ROADMAP.md` (M9.1 residual note + progress update)
+- `ROADMAP.md` ( residual note + progress update)
 - `docs/agents/HANDOFF_LEFTOVERS.md` (mark lib migrate closed)
-- `docs/agents/HANDOFF_M9_VITEST_LIB_MIGRATE.md` (this file)
+- `docs/agents/HANDOFF_VITEST_LIB_MIGRATE.md` (this file)
 
 ## Public/interface changes
 - None (test harness / scripts only). CI still invokes `npm test` in `frontend/`.
@@ -46,8 +46,8 @@ cd frontend && npm run build
 - Build: OK
 
 ## Known limitations / risks
-- M8 ROADMAP evidence lines may still cite `risk.test.mjs` path historically; suites now live at `*.test.js`.
-- Remaining M9.1 residual: broaden RTL/MSW to more panels (explicitly non-blocking).
+- ROADMAP evidence lines may still cite `risk.test.mjs` path historically; suites now live at `*.test.js`.
+- Remaining residual: broaden RTL/MSW to more panels (explicitly non-blocking).
 - Older CI docs mentioning dual-run node:test + Vitest are superseded by Vitest-only `npm test`.
 
 ## Follow-up / next owner

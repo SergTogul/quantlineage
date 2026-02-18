@@ -14,7 +14,7 @@ Evidence in repo:
 - `backend/app/pricing/quantlib.py` implements `QuantLibPricingEngine` (default production path).
 - `backend/app/pricing/builtin.py` implements `BuiltinPricingEngine` as a full-coverage reference / test fallback.
 - `backend/app/pricing/factory.py` selects the engine via `RISKFORGE_PRICING_ENGINE` (default `"quantlib"`; tests force `"builtin"` in `conftest.py`).
-- QuantLib coverage is partial: unsupported instruments fall back to Builtin inside the QuantLib adapter (documented in `ROADMAP.md` M1.2).
+- QuantLib coverage is partial: unsupported instruments fall back to Builtin inside the QuantLib adapter (documented in `ROADMAP.md` ).
 - Risk modules depend on `PricingEngine`, not QuantLib types (e.g. sensitivities docstring / imports).
 
 ## Decision
@@ -36,9 +36,9 @@ Evidence in repo:
 ## Consequences
 
 - Parallel agents must not bypass `PricingEngine` or move QuantLib imports into risk/UI/AI modules without Lead Architect approval.
-- Incomplete QuantLib instrument coverage (EquityFuture / FXForward / FXOption fallback; missing IR future / cap-floor / swaption) is tracked under M1.2, not as a change to this ADR.
+- Incomplete QuantLib instrument coverage (EquityFuture / FXForward / FXOption fallback; missing IR future / cap-floor / swaption) is tracked under , not as a change to this ADR.
 - Golden and property tests that compare Builtin vs QuantLib remain the validation strategy for adapter work.
 - Process-global QuantLib evaluation date / concurrency is recorded in
-  `docs/adr/007-quantlib-concurrency.md` (adapter `RLock`, prefer process
-  isolation for parallel QL reval, native kernels separate from QL globals).
-  This ADR only records the pricing-backend choice.
+ `docs/adr/007-quantlib-concurrency.md` (adapter `RLock`, prefer process
+ isolation for parallel QL reval, native kernels separate from QL globals).
+ This ADR only records the pricing-backend choice.

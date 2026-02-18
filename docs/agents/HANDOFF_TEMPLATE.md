@@ -35,6 +35,9 @@
 - QuantLib:
 - C++:
 - Build:
+- All tests pass (all applicable/affected suites required by the task): yes/no
+- Unexplained failures or skips: none/<explain>
+- CI is green (all required checks): yes/not started/<explain>
 
 ## Known limitations / risks
 - <limitation>

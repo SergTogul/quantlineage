@@ -1,4 +1,4 @@
-# Agent Handoff — M9.11 CI failure triage
+# Agent Handoff — CI failure triage
 
 ## Task
 Triage GitHub Actions failures on `origin/master`, document in ROADMAP, harden reverse-stress E2E locator, confirm green.
@@ -14,17 +14,17 @@ User reported failing pipelines. Audited recent GHA runs on `master`.
 | Run | SHA | Failed job(s) | Root cause |
 |-----|-----|---------------|------------|
 | [33700340552](https://github.com/SergTogul/riskforge-mvp/actions/runs/33700340552) | `8409b7e` | **e2e-playwright** | Heading locator `Reverse Stress` matched both single-factor and multi-factor cards (strict mode) |
-| [33680821074](https://github.com/SergTogul/riskforge-mvp/actions/runs/33680821074) | `68322c7` | backend-pytest + lint-static-analysis | Early M9.7 land (fixed in later commits) |
+| [33680821074](https://github.com/SergTogul/riskforge-mvp/actions/runs/33680821074) | `68322c7` | backend-pytest + lint-static-analysis | Early land (fixed in later commits) |
 
 **HEAD at triage:** `f74b528` — [33701266538](https://github.com/SergTogul/riskforge-mvp/actions/runs/33701266538) **success** — all jobs: `backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`, `e2e-playwright`.
 
-This change: ROADMAP **M9.11** (honest failure record), `data-testid="reverse-stress"` on single-factor card, E2E uses testid (durable vs heading substring).
+This change: ROADMAP (honest failure record), `data-testid="reverse-stress"` on single-factor card, E2E uses testid (durable vs heading substring).
 
 ## Files changed
-- `ROADMAP.md` — M9.11 + highest-risk gap note
+- `ROADMAP.md` — + highest-risk gap note
 - `frontend/src/components/ScenarioBuilder.jsx` — `data-testid="reverse-stress"`
 - `e2e/tests/reverse-stress.spec.ts` — locate via testid
-- `docs/agents/HANDOFF_M911_CI_TRIAGE.md` — this handoff
+- `docs/agents/HANDOFF_CI_TRIAGE.md` — this handoff
 
 ## Public/interface changes
 - None (UI testid only; no API / PricingEngine / risk math)
@@ -59,5 +59,5 @@ cd frontend && npm test && npm run lint
 
 ## Follow-up / next owner
 - Owner: Lead Architect
-- Requested action: Continue M10 / M3.9 / M6 SLA residuals; keep M9.11 as historical CI honesty (not a new open milestone)
+- Requested action: Continue SLA residuals; keep as historical CI honesty (not a new open workstream)
 - Blocking?: no (master CI green at triage; hardening is preventive)
