@@ -45,4 +45,4 @@ Evidence in repo:
 
 - New risk paths should shock via `bump` / `apply` / `shock_snapshot`, not in-place dict edits.
 - Deep freeze + copy-on-write is the contract; do not reintroduce mutable nested dict aliases on the snapshot.
-- Milestone 1 market-data + pricing-consumption acceptance is closed; remaining curve/vol work (bootstrap, SABR, caps/swaptions) is later-milestone enrichment, not a reopening of this ADR’s immutability decision.
+- Workstream 1 market-data + pricing-consumption acceptance is closed; remaining curve/vol work (bootstrap, SABR, caps/swaptions) is later-workstream enrichment, not a reopening of this ADR’s immutability decision.

@@ -1,11 +1,11 @@
-# M6 scenario-kernel benchmarks + formal product SLA
+# scenario-kernel benchmarks + formal product SLA
 
-**Owner:** C++ Performance Engineer (`docs/agents/06_CPP_PERFORMANCE_ENGINEER.md`).  
-**Milestone status:** M6 **COMPLETE** (2026-09-02) under the formal scenario-kernel
+**Owner:** C++ Performance Engineer (`docs/agents/06_CPP_PERFORMANCE_ENGINEER.md`).
+**Workstream status:COMPLETE** (2026-09-02) under the formal scenario-kernel
 SLA below — not under an HTTP end-to-end VaR latency claim.
 
-M6.3 wires this kernel into LINEAR/DELTA_GAMMA approximate P&L behind
-`RISKFORGE_SCENARIO_KERNEL`. M6.4 parallel results follow the serial baseline.
+ wires this kernel into LINEAR/DELTA_GAMMA approximate P&L behind
+`RISKFORGE_SCENARIO_KERNEL`. parallel results follow the serial baseline.
 
 Do **not** cite these numbers as multi-tenant capacity planning or HTTP risk-run
 guarantees. Absolute milliseconds move with CPU/thermal; the published SLA uses
@@ -13,7 +13,7 @@ guarantees. Absolute milliseconds move with CPU/thermal; the published SLA uses
 
 ---
 
-## Formal product SLA (M6 COMPLETE gate)
+## Formal product SLA ( COMPLETE gate)
 
 **Claim (Lead Architect + C++ Performance, 2026-09-02):** On the documented
 reference host class, the **native nested-loop scenario kernel** (same ctypes
@@ -39,7 +39,7 @@ backend/.venv/bin/python benchmarks/check_m6_sla.py
 | Serial JSON refresh | **133×** (42.3 ms vs 5643 ms) | — | above 50× |
 | Parallel compare refresh | **139×** (41.0 ms vs 5695 ms) | **1.83×** (22.4 ms) | above floors |
 | `check_m6_sla.py` verify runs | **106–145×** | **1.45–1.95×** | PASS (K2 floor 1.3×) |
-| Prior RESULTS.md M6.2 / M6.4 tables | 88–125× | ~2.0–2.1× | above floors |
+| Prior RESULTS.md tables | 88–125× | ~2.0–2.1× | above floors |
 
 ### Reference host class
 
@@ -57,14 +57,14 @@ backend/.venv/bin/python benchmarks/check_m6_sla.py
 - **Not** FULL_REVALUATION (never uses the kernel).
 - **Not** a CI hard gate on arbitrary runners (host class differs).
 - **Not** “1×N aggregated-Greek Historical VaR is 50× faster than NumPy.” Current
-  product path aggregates Greeks to **one** exposure before the kernel; ad-hoc
-  `1×750` / `1×10k` timings on this host show ctypes ≈ Python (FFI packing
-  dominates). Multi-exposure `E×S` is the measurable nested-loop claim for the
-  wired native ABI.
+ product path aggregates Greeks to **one** exposure before the kernel; ad-hoc
+ `1×750` / `1×10k` timings on this host show ctypes ≈ Python (FFI packing
+ dominates). Multi-exposure `E×S` is the measurable nested-loop claim for the
+ wired native ABI.
 
 ---
 
-## M6.2 — Baseline Python / NumPy / C++ single-thread comparison
+## — Baseline Python / NumPy / C++ single-thread comparison
 
 **Status:** captured microbenchmark snapshot (supports SLA-K1 evidence).
 
@@ -101,7 +101,7 @@ exposure vector once and applying each shock is algebraically identical to the
 nested loops:
 
 ```text
-Σ_e pnl(e, s)  ≡  pnl(Σ_e e, s)     (for this kernel)
+Σ_e pnl(e, s) ≡ pnl(Σ_e e, s) (for this kernel)
 ```
 
 The harness NumPy path uses that rewrite. Wall-time speedups for `numpy` are
@@ -128,7 +128,7 @@ Regenerate:
 
 ```bash
 OMP_NUM_THREADS=1 backend/.venv/bin/python benchmarks/run_scenario_bench.py \
-  --workload 1k_x_1k --workload 10k_x_1k --iters 1 --json
+ --workload 1k_x_1k --workload 10k_x_1k --iters 1 --json
 ```
 
 ---
@@ -162,37 +162,37 @@ Wall times are for the timed region only (warmup excluded). Throughput
 ### Readout (single-thread, this host only)
 
 - Nested-loop C++ via ctypes is ~**100–125×** the pure-Python reference at these
-  sizes, including marshalling.
+ sizes, including marshalling.
 - In-process `cpp_header` is slightly faster than ctypes at 10k×1k (~**173×**)
-  and avoids interpreter RSS; small sizes are noisy (FFI vs cache effects).
+ and avoids interpreter RSS; small sizes are noisy (FFI vs cache effects).
 - NumPy’s headline speedups are dominated by the **algebraic rewrite**, not by
-  beating an `O(E×S)` C++ loop — treat as methodology signal for optional
-  aggregate-then-scale paths, not as “NumPy beats C++” marketing.
+ beating an `O(E×S)` C++ loop — treat as methodology signal for optional
+ aggregate-then-scale paths, not as “NumPy beats C++” marketing.
 
 ---
 
 ## Environment caveats
 
 - Results vary with CPU generation, thermal throttling, power mode, compiler
-  (`-O3`), Python build, NumPy BLAS, and OS scheduler.
+ (`-O3`), Python build, NumPy BLAS, and OS scheduler.
 - Single-process microbench: no concurrent tenants, no QuantLib pricing, no
-  DB/API, no risk-run worker.
+ DB/API, no risk-run worker.
 - Peak RSS mixes interpreter + buffers + library mappings; macOS `ru_maxrss`
-  is normalized to KiB by the harness.
+ is normalized to KiB by the harness.
 - `cpp_ctypes` includes Python→C packing; `cpp_header` does not.
-- M6.3 wires LINEAR/DELTA_GAMMA approximate P&L optionally via native kernel;
-  FULL_REVALUATION never uses it. Formal product claim is the **SLA-K1/K2**
-  section above only (parity gate: `tests/test_historical_scenario_kernel.py`).
+- wires LINEAR/DELTA_GAMMA approximate P&L optionally via native kernel;
+ FULL_REVALUATION never uses it. Formal product claim is the **SLA-K1/K2**
+ section above only (parity gate: `tests/test_historical_scenario_kernel.py`).
 
 ---
 
-## M6.4 — Parallel C++ (`std::thread` / `std::jthread` shock partitions)
+## — Parallel C++ (`std::thread` / `std::jthread` shock partitions)
 
-**Status:** captured microbenchmark snapshot (supports SLA-K2 evidence).  
+**Status:** captured microbenchmark snapshot (supports SLA-K2 evidence).
 **Strategy (one only):** standard-library thread pool over contiguous shock
 ranges. Prefer `std::jthread` when `__cpp_lib_jthread` is defined; otherwise
 `std::thread` + join-on-scope-exit. **Not OpenMP** (Apple Clang often lacks
-bundled `libomp`; mixing runtimes is forbidden).  
+bundled `libomp`; mixing runtimes is forbidden).
 **Env:** `RISKFORGE_KERNEL_THREADS` / harness `--threads N --parallel-compare`.
 
 ### Why this strategy
@@ -220,7 +220,7 @@ Regenerate:
 
 ```bash
 backend/.venv/bin/python benchmarks/run_scenario_bench.py \
-  --workload 1k_x_1k --workload 10k_x_1k --threads 4 --parallel-compare --iters 1
+ --workload 1k_x_1k --workload 10k_x_1k --threads 4 --parallel-compare --iters 1
 ```
 
 ### Results table (iters=1, threads=4 vs serial)
@@ -254,21 +254,21 @@ backend/.venv/bin/python benchmarks/run_scenario_bench.py \
 ### Readout (this host only)
 
 - With 4 workers on a 4C/8T laptop, nested-loop C++ sees ~**2.0–2.2×** wall
-  speedup for in-process `cpp_header` and ~**2.1–2.8×** for ctypes (FFI packing
-  still present; parallel helps the native loop portion).
+ speedup for in-process `cpp_header` and ~**2.1–2.8×** for ctypes (FFI packing
+ still present; parallel helps the native loop portion).
 - Perfect linear scaling is not expected (memory bandwidth, HT, thermal).
 - Small workloads (`smoke` 64×64) may show little/no gain — thread spawn cost.
 - Checksums match serial at the harness guard (`1e-6` rel) and unit tests at
-  `1e-12`.
+ `1e-12`.
 
 ### Environment caveats (parallel)
 
 - Do **not** set `OMP_NUM_THREADS` expecting kernel OpenMP — there is none.
 - Hyperthreading / power limits / antivirus can flatten speedups.
 - HTTP / 1×N Historical VaR wall time is **not** claimed from this table;
-  SLA-K2 is the parallel ctypes floor only.
+ SLA-K2 is the parallel ctypes floor only.
 - macOS Apple Clang 14 used `std::thread` fallback (`RISKFORGE_HAS_JTHREAD=0`);
-  Linux libstdc++ typically uses `std::jthread` — same partition math either way.
+ Linux libstdc++ typically uses `std::jthread` — same partition math either way.
 
 ---
 

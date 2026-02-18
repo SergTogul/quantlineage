@@ -1,7 +1,5 @@
-# Multi-factor reverse stress — methodology & limitations (M3.9)
-
-**Status:** Published for users and interviewers. Implements ROADMAP M3.9.  
-**Code:** `backend/app/risk/reverse_stress_multi.py` (`MultiFactorReverseStressEngine`)  
+# Multi-factor reverse stress — methodology & limitations **Status:** Published for users and interviewers. Implements ROADMAP .
+**Code:** `backend/app/risk/reverse_stress_multi.py` (`MultiFactorReverseStressEngine`)
 **API:** `POST /risk/stress/reverse/multi` (and `/api/v1/...`)
 
 This document states what the solver **does** and what it **is not**. Do not describe the result as a certified global optimum or a complete risk optimizer.
@@ -20,7 +18,7 @@ Target comparison uses the public `target_loss_pct` against this `loss_pct`.
 
 ## Adverse orthant (fixed directions)
 
-Same convention as single-factor reverse stress (M3.5):
+Same convention as single-factor reverse stress :
 
 | Family | Adverse direction | Wire units |
 |--------|-------------------|------------|
@@ -61,6 +59,4 @@ Assumptions echoed on every result payload (`assumptions: string[]`) match the `
 
 ## Related
 
-- Single-factor reverse: `backend/app/risk/reverse_stress.py` (M3.5)
-- Formal scenario shocks: `backend/app/risk/scenario_model.py` (M3.1)
-- ROADMAP residual pairing: full methodology pack / limitations catalog tracked under postponed Milestone 12 (M12.4 / M12.6); this file closes **M3.9** specifically
+- Single-factor reverse: `backend/app/risk/reverse_stress.py` - Formal scenario shocks: `backend/app/risk/scenario_model.py` - ROADMAP residual pairing: full methodology pack / limitations catalog tracked under postponed Workstream 12 ; this file closes specifically

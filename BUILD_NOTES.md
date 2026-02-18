@@ -7,32 +7,32 @@ Final verification in the execution sandbox:
 - Python compileall: passed.
 - Native C++20 kernel: compiled and executed successfully with `g++`.
 - C++ benchmark workload: 50,000 exposures x 1,000 scenarios executed in 44 ms in this sandbox run (environment-specific, not a production benchmark claim).
-- Repo-root harness (M6.1/M6.2/M6.4): `benchmarks/run_scenario_bench.py` — see `benchmarks/README.md` and `benchmarks/RESULTS.md` (M6.4 parallel `std::thread` shock partitions; ~2× vs serial at 10k×1k / 4 threads on the capture host — not a production SLA).
+- Repo-root harness : `benchmarks/run_scenario_bench.py` — see `benchmarks/README.md` and `benchmarks/RESULTS.md` ( parallel `std::thread` shock partitions; ~2× vs serial at 10k×1k / 4 threads on the capture host — not a production SLA).
 - FastAPI live smoke: `/health`, `/portfolio`, `/risk/var`, `/risk/stress/evaluate` passed.
 - Service was stopped after smoke testing; port 8000 is not left listening.
 - `npm run build`: blocked because Vite is not installed locally and external npm registry access is unavailable in this sandbox. `npm test` succeeds because the unit suite uses Node's built-in test runner.
 
-## M9.7 Static analysis CI (2026-09-02, DevOps)
+## Static analysis CI (2026-09-02, DevOps)
 
 - Backend: `pip install -r requirements-dev.txt` then `ruff check app tests` and `mypy app` (config in `backend/pyproject.toml`).
 - Frontend: `npm run lint` (`eslint.config.js`; `--max-warnings 0`).
 - CI: `.github/workflows/ci.yml` job `lint-static-analysis`.
-- Staged: not full-strict — see ROADMAP M9.7 for ignored Ruff rules and mypy `disable_error_code` debt list.
+- Staged: not full-strict — see ROADMAP for ignored Ruff rules and mypy `disable_error_code` debt list.
 - Follow-up `8d7a6f2`: lint CI installs numpy (mypy `numpy.typing`); Historical VaR kernel tests keep absolute `TOL` / `assert_allclose` imports.
 
-## M9.1 Frontend Vitest / RTL / MSW (2026-09-02, QA)
+## Frontend Vitest / RTL / MSW (2026-09-02, QA)
 
 - Dual-run: `cd frontend && npm test` → `test:node` (lib helpers) + `test:vitest` (components).
 - Harness: `vite.config.js` `test` block; `src/test/setup.js` (jest-dom + MSW lifecycle); `src/test/mswServer.js` (fixed API fixtures).
 - Watch: `npm run test:watch`. Lib `*.test.mjs` remain on node:test until migrated.
 
-## M9.2 / M9.10 Playwright E2E CI (2026-09-02, DevOps/QA)
+## Playwright E2E CI (2026-09-02, DevOps/QA)
 
 - Local: `cd e2e && npm install && npm run install:browsers && npm test` (Chrome channel; `backend/.venv`).
 - CI: `.github/workflows/ci.yml` job `e2e-playwright` — backend pip (QuantLib optional), frontend + e2e `npm ci`, `npm run install:browsers:ci`, `CI=true npm test`.
 - Config: when `CI` is set, use Playwright Chromium + `python -m uvicorn` if `.venv` is absent.
 
-## M9.9 / M5.1 Postgres CI smoke (2026-09-02, DevOps)
+## Postgres CI smoke (2026-09-02, DevOps)
 
 ### Local Compose (green)
 
@@ -49,7 +49,7 @@ Result: **exit 0**. Alembic applied `001_initial_persistence` → `002_risk_run_
 
 - `.github/workflows/ci.yml` job `postgres-smoke` uses `postgres:16-alpine` service + same URL/script.
 - This checkout had **no `git remote`**, no GitHub Actions history, and **`gh` was not installed** — cannot record a runner URL/conclusion.
-- M9.9 remains open until a push produces a green Actions run and the URL is recorded in `ROADMAP.md`.
+- remains open until a push produces a green Actions run and the URL is recorded in `ROADMAP.md`.
 
 ### QuantLib install path (CI)
 
