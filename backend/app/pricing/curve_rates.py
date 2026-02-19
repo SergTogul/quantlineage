@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from app.domain.models import MarketSnapshot
-from app.market.curves import TENOR_YEARS, CurveNode, CurveType, YieldCurve
+from app.market.curves import CurveNode, CurveType, YieldCurve, tenor_to_years
 
 
 def curve_from_payload(name: str, payload: Mapping) -> YieldCurve | None:
@@ -27,8 +27,9 @@ def curve_from_payload(name: str, payload: Mapping) -> YieldCurve | None:
     curve_type: CurveType = "projection" if raw_type == "projection" else "discount"
     nodes: list[CurveNode] = []
     for tenor, rate in zeros.items():
-        years = TENOR_YEARS.get(str(tenor))
-        if years is None:
+        try:
+            years = tenor_to_years(str(tenor))
+        except ValueError:
             continue
         nodes.append(CurveNode(tenor=str(tenor), years=years, zero_rate=float(rate)))
     if not nodes:

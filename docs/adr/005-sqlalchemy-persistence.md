@@ -1,6 +1,6 @@
 # ADR 005: SQLAlchemy / Alembic persistence (no QuantLib runtime objects)
 
-- Status: Accepted ( schema + repos; FastAPI DI **DONE**; stress HTTP ← scenario_definitions DI **DONE**; Compose worker + Postgres `SKIP LOCKED` claim **DONE**; Postgres CI smoke authored)
+- Status: Accepted (schema + repos; FastAPI DI **DONE**; stress HTTP ← scenario_definitions DI **DONE**; Compose worker + Postgres `SKIP LOCKED` claim **DONE**; Postgres CI smoke green; Redis/RQ deferred)
 - Date: 2026-09-02
 - Owners: Backend/API Engineer; DevOps/Platform Engineer
 
@@ -39,6 +39,7 @@ QuantLib at runtime; those handles are not serializable and must not be stored.
 | ORM inside ``app/risk/`` | Couples risk agents to DB churn; charter prefers persistence boundary. |
 | Persist QuantLib handles | Not portable across process restart; violates pricing-adapter rule. |
 | Require Postgres for every unit test | Slower / flakier; SQLite covers schema + repo contracts; dedicated CI job covers psycopg. |
+| Redis/RQ for MVP risk runs | Deferred: Postgres `FOR UPDATE SKIP LOCKED` already provides multi-worker claim safety. Redis/RQ should only be introduced with real product/ops semantics such as priority, tenancy, retries, or queue observability. |
 
 ## Consequences
 
@@ -72,4 +73,5 @@ QuantLib at runtime; those handles are not serializable and must not be stored.
 - Apply Alembic before first use: ``alembic upgrade head`` (or
  ``docker compose run --rm backend alembic upgrade head``).
 - Local / CI Postgres smoke: ``./scripts/smoke_postgres.sh`` (requires
- ``RISKFORGE_DATABASE_URL``). Runner validation remains .
+ ``RISKFORGE_DATABASE_URL``). GitHub-hosted runner evidence is recorded in
+ ``ROADMAP.md``.

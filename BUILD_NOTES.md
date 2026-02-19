@@ -12,6 +12,19 @@ Final verification in the execution sandbox:
 - Service was stopped after smoke testing; port 8000 is not left listening.
 - `npm run build`: blocked because Vite is not installed locally and external npm registry access is unavailable in this sandbox. `npm test` succeeds because the unit suite uses Node's built-in test runner.
 
+## Documentation package (Workstream 12)
+
+Recruiter/interviewer-facing documentation now lives in:
+
+- `README.md` for the project entry point, demo path, architecture summary, and limitations.
+- `docs/architecture.md` for system boundaries, dependency direction, and ownership.
+- `docs/adr/README.md` for the ADR index/status.
+- `docs/methodology/README.md` for VaR/ES, stress, reverse stress, pricing scope, and AI guardrails.
+- `docs/performance.md` for the scoped scenario-kernel performance claim and non-claims.
+- `docs/known_limitations.md` for the limitations catalog.
+
+This is a documentation-only package. It does not change risk, pricing, API, frontend, persistence, or native-kernel behavior.
+
 ## Static analysis CI (2026-09-02, DevOps)
 
 - Backend: `pip install -r requirements-dev.txt` then `ruff check app tests` and `mypy app` (config in `backend/pyproject.toml`).
@@ -45,13 +58,28 @@ export RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost
 
 Result: **exit 0**. Alembic applied `001_initial_persistence` → `002_risk_run_domain_fields`; seed wiring asserted portfolio + snapshot + scenarios + limits. Idempotent second run also exit 0. Script path works from repo root and from `backend/` (as GHA `working-directory: backend` does).
 
-### GitHub-hosted runners (blocked — not green-proved)
+### GitHub-hosted runners (green)
 
-- `.github/workflows/ci.yml` job `postgres-smoke` uses `postgres:16-alpine` service + same URL/script.
-- This checkout had **no `git remote`**, no GitHub Actions history, and **`gh` was not installed** — cannot record a runner URL/conclusion.
-- remains open until a push produces a green Actions run and the URL is recorded in `ROADMAP.md`.
+- `.github/workflows/ci.yml` job `postgres-persistence-smoke` uses a `postgres:16-alpine` service + the same URL/script.
+- Green runner evidence is recorded in `ROADMAP.md`: https://github.com/SergTogul/riskforge-mvp/actions/runs/33712643872.
+- The Postgres smoke remains the CI proof for the durable persistence path; unit tests use SQLite or in-memory repos for speed.
+
+## Risk-run queue / worker residual (2026-09-03)
+
+- RiskForge does **not** ship Redis/RQ in the MVP. The accepted queue mechanism is `risk_runs` rows in Postgres, claimed by `python -m app.worker` via `SELECT ... FOR UPDATE SKIP LOCKED` and transitioned `QUEUED -> RUNNING`.
+- Redis/RQ was evaluated as optional ops/fair-scheduling infrastructure, not as a claim-safety requirement. Adding it without priority, tenancy, retries, or observability semantics would be empty ceremony.
+- Compose still ships one worker for the demo. Additional Postgres-backed worker replicas are safe from double-claim; SQLite remains a single-writer/unit-test fallback without `SKIP LOCKED`.
+- API submit semantics remain stable: `POST /risk/runs` returns a queued acceptance snapshot, while `GET /risk/runs/{id}` reports current status/results.
 
 ### QuantLib install path (CI)
 
 - Main `backend` job: `pip install -r requirements.txt` (includes QuantLib); on failure, strip QuantLib line and continue with builtin (`RISKFORGE_PRICING_ENGINE` detected via import).
 - `postgres-smoke` does not require QuantLib; same install fallback so persistence proof is independent of the QL wheel.
+
+## Performance reporting
+
+The current performance report is intentionally scoped:
+
+- Formal claim: native C++20 `ctypes` scenario-kernel relative SLA on workload `10k_x_1k`, documented in `docs/performance.md` and `benchmarks/RESULTS.md`.
+- Verification command: `backend/.venv/bin/python benchmarks/check_m6_sla.py`.
+- Non-claims: HTTP endpoint latency, queued risk-run latency, FULL_REVALUATION acceleration, QuantLib pricing speedup, and multi-tenant capacity planning.

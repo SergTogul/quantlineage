@@ -4,8 +4,10 @@ import pytest
 
 ql = pytest.importorskip("QuantLib")
 
+import app.pricing.quantlib as quantlib_mod
 from app.domain.models import (
     BondPosition,
+    CapFloorPosition,
     EquityFuturePosition,
     EquityPosition,
     EuropeanOptionPosition,
@@ -15,6 +17,13 @@ from app.domain.models import (
     MarketSnapshot,
     StressScenario,
     SwapPosition,
+    SwaptionPosition,
+)
+from app.market.vol_surfaces import (
+    VolSurface,
+    attach_vol_surface,
+    build_equity_vol_surface,
+    build_fx_vol_surface,
 )
 from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.quantlib import QuantLibPricingEngine
@@ -169,6 +178,161 @@ def test_fx_option_sub_day_maturity_uses_one_day_exercise(engine, monkeypatch):
     assert abs(ql_v.market_value - builtin_v.market_value) > abs(builtin_v.market_value)
 
 
+def _skewed_equity_surface(name: str = "ABC", atm: float = 0.20, skew: float = 0.50) -> VolSurface:
+    return build_equity_vol_surface(name, atm).skew_shock(skew)
+
+
+def _forbid_point_vol_lookup(monkeypatch) -> None:
+    def boom(*args, **kwargs):
+        raise AssertionError("QuantLib surface path must not precompute a point sigma")
+
+    monkeypatch.setattr(quantlib_mod, "option_vol_from_snapshot", boom, raising=False)
+
+
+def _forbid_black_constant_vol(monkeypatch) -> None:
+    def boom(*args, **kwargs):
+        raise AssertionError("attached vol grids must use a QuantLib surface, not BlackConstantVol")
+
+    monkeypatch.setattr(quantlib_mod.ql, "BlackConstantVol", boom)
+
+
+def test_quantlib_equity_option_uses_surface_term_structure_not_point_sigma(engine, monkeypatch):
+    opt = EuropeanOptionPosition(
+        type="european_option",
+        id="eq-surface",
+        symbol="ABC",
+        quantity=10,
+        spot=100.0,
+        strike=110.0,
+        maturity_years=1.0,
+        volatility=0.20,
+        risk_free_rate=0.03,
+        option_type="call",
+    )
+    scalar = MarketSnapshot(
+        equity_spots={"ABC": 100.0},
+        equity_vols={"ABC": 0.20},
+        rates={"USD": 0.03},
+    )
+    # ATM remains 20%, while moneyness 1.1 is 25%; the QL adapter must consume
+    # the full grid directly rather than asking RiskForge for one interpolated vol.
+    with_surface = attach_vol_surface(scalar, _skewed_equity_surface("ABC", 0.20, 0.50))
+    scalar_pv = BuiltinPricingEngine().value(opt, scalar).market_value
+
+    _forbid_point_vol_lookup(monkeypatch)
+    _forbid_black_constant_vol(monkeypatch)
+
+    ql_surface_pv = engine.value(opt, with_surface).market_value
+    assert ql_surface_pv > scalar_pv
+
+
+def test_quantlib_fx_option_uses_surface_term_structure_not_black_constant_vol(engine, monkeypatch):
+    opt = FXOptionPosition(
+        type="fx_option",
+        id="fx-surface",
+        pair="EURUSD",
+        notional_base=500_000,
+        spot=1.10,
+        strike=1.21,
+        maturity_years=1.0,
+        volatility=0.10,
+        domestic_rate=0.04,
+        foreign_rate=0.03,
+        option_type="call",
+    )
+    scalar = MarketSnapshot(
+        fx_spots={"EURUSD": 1.10},
+        fx_vols={"EURUSD": 0.10},
+        rates={"USD": 0.04, "EUR": 0.03},
+    )
+    with_surface = attach_vol_surface(scalar, build_fx_vol_surface("EURUSD", 0.10).skew_shock(0.50))
+    scalar_pv = BuiltinPricingEngine().value(opt, scalar).market_value
+
+    _forbid_point_vol_lookup(monkeypatch)
+    _forbid_black_constant_vol(monkeypatch)
+
+    ql_surface_pv = engine.value(opt, with_surface).market_value
+    assert ql_surface_pv > scalar_pv
+
+
+def test_quantlib_flat_surfaces_preserve_scalar_option_compatibility(engine):
+    eq_opt = EuropeanOptionPosition(
+        type="european_option",
+        id="eq-flat",
+        symbol="ABC",
+        quantity=10,
+        spot=100.0,
+        strike=100.0,
+        maturity_years=1.0,
+        volatility=0.20,
+        risk_free_rate=0.03,
+        option_type="call",
+    )
+    fx_opt = FXOptionPosition(
+        type="fx_option",
+        id="fx-flat",
+        pair="EURUSD",
+        notional_base=500_000,
+        spot=1.10,
+        strike=1.10,
+        maturity_years=1.0,
+        volatility=0.10,
+        domestic_rate=0.04,
+        foreign_rate=0.03,
+        option_type="call",
+    )
+    scalar = MarketSnapshot(
+        equity_spots={"ABC": 100.0},
+        equity_vols={"ABC": 0.20},
+        fx_spots={"EURUSD": 1.10},
+        fx_vols={"EURUSD": 0.10},
+        rates={"USD": 0.04, "EUR": 0.03},
+    )
+    with_surfaces = attach_vol_surface(
+        attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20)),
+        build_fx_vol_surface("EURUSD", 0.10),
+    )
+
+    assert engine.value(eq_opt, with_surfaces).market_value == pytest.approx(
+        engine.value(eq_opt, scalar).market_value,
+        rel=1e-12,
+        abs=1e-9,
+    )
+    assert engine.value(fx_opt, with_surfaces).market_value == pytest.approx(
+        engine.value(fx_opt, scalar).market_value,
+        rel=1e-12,
+        abs=1e-9,
+    )
+
+
+def test_quantlib_surface_term_tilt_changes_longer_expiry_more(engine):
+    scalar = MarketSnapshot(
+        equity_spots={"ABC": 100.0},
+        equity_vols={"ABC": 0.20},
+        rates={"USD": 0.03},
+    )
+    flat = attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20))
+    term_tilted = attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20).term_structure_shock(0.03))
+    short = EuropeanOptionPosition(
+        type="european_option",
+        id="short-term",
+        symbol="ABC",
+        quantity=1,
+        spot=100.0,
+        strike=100.0,
+        maturity_years=0.25,
+        volatility=0.20,
+        risk_free_rate=0.03,
+        option_type="call",
+    )
+    long = short.model_copy(update={"id": "long-term", "maturity_years": 2.0})
+
+    short_bump = engine.value(short, term_tilted).market_value - engine.value(short, flat).market_value
+    long_bump = engine.value(long, term_tilted).market_value - engine.value(long, flat).market_value
+    assert short_bump > 0.0
+    assert long_bump > short_bump
+
+
 def test_extended_instruments_respect_market_snapshot(engine, monkeypatch):
     future = EquityFuturePosition(
         type="equity_future", id="fut", symbol="SPY", quantity=2, spot=500.0,
@@ -224,3 +388,48 @@ def test_ir_future_matches_builtin_without_fallback(engine, monkeypatch):
     # Long future: higher forward → lower MV
     higher = engine.value(p, MarketSnapshot(rates={"USD": 0.045}))
     assert higher.market_value < ql_v.market_value
+
+
+def test_cap_floor_matches_builtin_without_fallback(engine, monkeypatch):
+    p = CapFloorPosition(
+        type="cap_floor",
+        id="usd-cap",
+        currency="USD",
+        notional=1_000_000.0,
+        strike=0.04,
+        maturity_years=2.0,
+        volatility=0.20,
+        option_type="cap",
+        forward_rate=0.04,
+        discount_rate=0.035,
+        payment_frequency_per_year=2,
+    )
+    builtin_v = BuiltinPricingEngine().value(p)
+    _forbid_builtin_fallback(monkeypatch)
+    ql_v = engine.value(p)
+    assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=1e-12, abs=1e-8)
+    assert ql_v.vega == pytest.approx(builtin_v.vega, rel=1e-12, abs=1e-8)
+    assert ql_v.dv01 == pytest.approx(builtin_v.dv01, rel=1e-12, abs=1e-8)
+
+
+def test_swaption_matches_builtin_without_fallback(engine, monkeypatch):
+    p = SwaptionPosition(
+        type="swaption",
+        id="usd-payer-swaption",
+        currency="USD",
+        notional=1_000_000.0,
+        strike=0.04,
+        option_maturity_years=1.0,
+        swap_tenor_years=5.0,
+        volatility=0.20,
+        option_type="payer",
+        forward_swap_rate=0.04,
+        discount_rate=0.035,
+        payment_frequency_per_year=2,
+    )
+    builtin_v = BuiltinPricingEngine().value(p)
+    _forbid_builtin_fallback(monkeypatch)
+    ql_v = engine.value(p)
+    assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=1e-12, abs=1e-8)
+    assert ql_v.vega == pytest.approx(builtin_v.vega, rel=1e-12, abs=1e-8)
+    assert ql_v.dv01 == pytest.approx(builtin_v.dv01, rel=1e-12, abs=1e-8)

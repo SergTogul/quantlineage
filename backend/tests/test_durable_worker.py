@@ -96,6 +96,22 @@ def test_submit_execute_false_stays_queued_until_poll(tiny_portfolio, tmp_path):
         assert stored.status == RiskRunStatus.COMPLETED
 
 
+def test_submit_execute_true_returns_stable_queued_acceptance_snapshot(tiny_portfolio):
+    """POST /risk/runs semantics: acceptance is stable even if execution starts fast."""
+    repo = InMemoryRiskRunRepository()
+    svc = PortfolioService(create_pricing_engine(), HistoricalRiskEngine())
+    worker = RiskRunWorker(svc, repo=repo, max_workers=1)
+
+    accepted = worker.submit(portfolio=tiny_portfolio, run_type="summary", execute=True)
+
+    assert accepted.status == RiskRunStatus.QUEUED
+    assert accepted.results == []
+    done = _wait_worker(worker, accepted.id)
+    worker.shutdown(wait=True)
+    assert done.status == RiskRunStatus.COMPLETED, done.error_message
+    assert done.results[0].result_type == "summary"
+
+
 def test_external_worker_env_defers_execution(monkeypatch, tiny_portfolio, tmp_path):
     monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
     url = f"sqlite:///{tmp_path / 'm57_ext.db'}"
@@ -109,6 +125,27 @@ def test_external_worker_env_defers_execution(monkeypatch, tiny_portfolio, tmp_p
     done = _wait_worker(worker, view.id)
     worker.shutdown(wait=True)
     assert done.status == RiskRunStatus.COMPLETED
+
+
+def test_poll_once_respects_batch_limit_and_leaves_excess_queued(tiny_portfolio):
+    """Postgres/RQ-equivalent queue contract: FIFO claims are bounded by poll batch."""
+    repo = InMemoryRiskRunRepository()
+    svc = PortfolioService(create_pricing_engine(), HistoricalRiskEngine())
+    worker = RiskRunWorker(svc, repo=repo, max_workers=1)
+    accepted = [
+        worker.submit(
+            portfolio=tiny_portfolio.model_copy(update={"id": f"batch-book-{idx}"}),
+            run_type="summary",
+            execute=False,
+        )
+        for idx in range(3)
+    ]
+
+    assert worker.poll_once(limit=2) == 2
+
+    queued = repo.list_by_status(RiskRunStatus.QUEUED, limit=10)
+    worker.shutdown(wait=True)
+    assert [run.id for run in queued] == [accepted[2].id]
 
 
 def test_claim_queued_memory_exclusive_fifo():

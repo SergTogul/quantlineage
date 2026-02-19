@@ -6,9 +6,7 @@ Rebuilds RiskForge ``VolSurface`` from the snapshot payload grid
 
 from __future__ import annotations
 
-from typing import Mapping
-
-from app.market.vol_surfaces import VolSurface
+from app.market.vol_surfaces import vol_surface_from_dict
 
 
 def option_vol_from_snapshot(
@@ -25,17 +23,4 @@ def option_vol_from_snapshot(
     raw = surfaces.get(name)
     if raw is None or spot <= 0:
         return fallback
-    return _surface_from_payload(raw, default_name=name).vol(maturity_years, strike / spot)
-
-
-def _surface_from_payload(payload: Mapping, *, default_name: str) -> VolSurface:
-    raw_grid = payload.get("grid") or {}
-    grid: dict[tuple[str, float], float] = {}
-    for key, vol in raw_grid.items():
-        expiry_s, m_s = str(key).split("|", 1)
-        grid[(expiry_s, float(m_s))] = float(vol)
-    return VolSurface.from_grid(
-        str(payload.get("name") or default_name),
-        payload["asset_class"],
-        grid,
-    )
+    return vol_surface_from_dict(raw, default_name=name).vol(maturity_years, strike / spot)

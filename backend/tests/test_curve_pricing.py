@@ -21,7 +21,11 @@ from app.domain.models import (
     MarketSnapshot,
     SwapPosition,
 )
-from app.market.curves import attach_standard_usd_curves
+from app.market.curves import (
+    CurveBootstrapInstrument,
+    attach_bootstrapped_curve,
+    attach_standard_usd_curves,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import RateZero
 
@@ -117,6 +121,45 @@ def test_ir_future_uses_projection_curve_tenor():
     up_10 = builtin.value(pos, market.bump(RateZero("USD", "10Y"), 0.0025)).market_value
     # Maturity at 1Y node: 10Y pillar does not change z(1).
     assert up_10 == pytest.approx(base, rel=1e-12)
+
+
+def test_bootstrapped_curve_feeds_builtin_bond_and_swap_pricing():
+    market = attach_bootstrapped_curve(
+        MarketSnapshot(id="boot", rates={"USD": 0.01}),
+        currency="USD",
+        curve_type="discount",
+        name="USD_BOOT",
+        instruments=[
+            CurveBootstrapInstrument(kind="deposit", tenor="6M", rate=0.04),
+            CurveBootstrapInstrument(kind="zero", tenor="1Y", rate=0.041),
+            CurveBootstrapInstrument(kind="zero", tenor="2Y", rate=0.042),
+            CurveBootstrapInstrument(kind="zero", tenor="5Y", rate=0.045),
+        ],
+    )
+
+    bond = BondPosition(
+        type="bond",
+        id="b2",
+        issuer="UST",
+        face_value=1_000_000.0,
+        quantity=1.0,
+        maturity_years=2.0,
+        yield_rate=0.01,
+        duration=1.9,
+    )
+    swap = SwapPosition(
+        type="swap",
+        id="s5_boot",
+        notional=5_000_000.0,
+        maturity_years=5.0,
+        fixed_rate=0.04,
+        market_swap_rate=0.01,
+        pay_fixed=True,
+        duration=4.3,
+    )
+
+    assert builtin.value(bond, market).market_value == pytest.approx(1_000_000.0 * math.exp(-0.042 * 2.0))
+    assert builtin.value(swap, market).market_value == pytest.approx((0.045 - 0.04) * 5_000_000.0 * 4.3)
 
 
 @pytest.fixture

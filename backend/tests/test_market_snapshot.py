@@ -7,7 +7,11 @@ import pytest
 from app.domain.models import MarketSnapshot, StressScenario
 from app.market.curves import attach_standard_usd_curves
 from app.market.snapshot import shock_snapshot
-from app.market.vol_surfaces import attach_vol_surface, build_equity_vol_surface
+from app.market.vol_surfaces import (
+    attach_vol_surface,
+    build_equity_vol_surface,
+    build_fx_vol_surface,
+)
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero
 
 
@@ -85,6 +89,71 @@ def test_bump_vol_is_relative():
     assert eq.equity_vols["SPY"] == pytest.approx(0.25)
     fx = base.bump(FXVol(pair="EURUSD"), 0.10)
     assert fx.fx_vols["EURUSD"] == pytest.approx(0.11)
+
+
+def test_bump_vol_rewrites_attached_surface_grids_and_keeps_copies_frozen():
+    base = attach_vol_surface(
+        attach_vol_surface(
+            MarketSnapshot(equity_vols={"SPY": 0.20}, fx_vols={"EURUSD": 0.10}, rates={"USD": 0.04}),
+            build_equity_vol_surface("SPY", 0.20),
+        ),
+        build_fx_vol_surface("EURUSD", 0.10),
+    )
+
+    bumped = base.bump(EquityVol(underlying="SPY"), 0.25).bump(FXVol(pair="EURUSD"), 0.10)
+
+    assert bumped.equity_vols["SPY"] == pytest.approx(0.25)
+    assert bumped.vol_surfaces["SPY"]["atm_vol"] == pytest.approx(0.25)
+    assert bumped.vol_surfaces["SPY"]["grid"]["1Y|1"] == pytest.approx(0.25)
+    assert bumped.vol_surfaces["SPY"]["grid"]["2Y|1.2"] == pytest.approx(0.25)
+    assert base.vol_surfaces["SPY"]["grid"]["1Y|1"] == pytest.approx(0.20)
+
+    assert bumped.fx_vols["EURUSD"] == pytest.approx(0.11)
+    assert bumped.vol_surfaces["EURUSD"]["atm_vol"] == pytest.approx(0.11)
+    assert bumped.vol_surfaces["EURUSD"]["grid"]["1Y|1"] == pytest.approx(0.11)
+    assert bumped.vol_surfaces["EURUSD"]["grid"]["2Y|0.8"] == pytest.approx(0.11)
+    assert base.vol_surfaces["EURUSD"]["grid"]["1Y|1"] == pytest.approx(0.10)
+
+    with pytest.raises(TypeError):
+        bumped.vol_surfaces["SPY"]["grid"]["1Y|1"] = 0.99  # type: ignore[index]
+
+
+def test_apply_vol_shock_updates_attached_surface_grids():
+    base = attach_vol_surface(
+        MarketSnapshot(equity_vols={"SPY": 0.20}, rates={"USD": 0.04}),
+        build_equity_vol_surface("SPY", 0.20),
+    )
+
+    out = base.apply([(EquityVol(underlying="SPY"), 0.50)])
+
+    assert out.equity_vols["SPY"] == pytest.approx(0.30)
+    assert out.vol_surfaces["SPY"]["atm_vol"] == pytest.approx(0.30)
+    assert out.vol_surfaces["SPY"]["grid"]["1M|0.8"] == pytest.approx(0.30)
+    assert out.vol_surfaces["SPY"]["grid"]["2Y|1.2"] == pytest.approx(0.30)
+
+
+def test_surface_vol_bucket_skew_and_term_shocks_use_surface_model():
+    base = attach_vol_surface(
+        MarketSnapshot(equity_vols={"SPY": 0.20}, rates={"USD": 0.04}),
+        build_equity_vol_surface("SPY", 0.20),
+    )
+
+    bucket = base.bump(EquityVol(underlying="SPY", expiry="1Y"), 0.25)
+    assert bucket.vol_surfaces["SPY"]["grid"]["1Y|1"] == pytest.approx(0.25)
+    assert bucket.vol_surfaces["SPY"]["grid"]["3M|1"] == pytest.approx(0.20)
+    assert bucket.equity_vols["SPY"] == pytest.approx(0.25)
+
+    skew = base.bump(EquityVol(underlying="SPY", moneyness="SKEW"), 0.10)
+    assert skew.vol_surfaces["SPY"]["grid"]["1Y|0.8"] == pytest.approx(0.18)
+    assert skew.vol_surfaces["SPY"]["grid"]["1Y|1"] == pytest.approx(0.20)
+    assert skew.vol_surfaces["SPY"]["grid"]["1Y|1.2"] == pytest.approx(0.22)
+    assert skew.equity_vols["SPY"] == pytest.approx(0.20)
+
+    term = base.bump(EquityVol(underlying="SPY", expiry="TERM"), 0.02)
+    assert term.vol_surfaces["SPY"]["grid"]["3M|1"] == pytest.approx(0.20 + 0.02 * 0.25)
+    assert term.vol_surfaces["SPY"]["grid"]["1Y|1"] == pytest.approx(0.22)
+    assert term.vol_surfaces["SPY"]["grid"]["2Y|1"] == pytest.approx(0.24)
+    assert term.equity_vols["SPY"] == pytest.approx(0.22)
 
 
 def test_apply_multiple_shocks():

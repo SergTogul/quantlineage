@@ -5,6 +5,7 @@ from statistics import NormalDist
 
 from app.domain.models import (
     BondPosition,
+    CapFloorPosition,
     EquityFuturePosition,
     EquityPosition,
     EuropeanOptionPosition,
@@ -14,6 +15,7 @@ from app.domain.models import (
     MarketSnapshot,
     Position,
     SwapPosition,
+    SwaptionPosition,
     Valuation,
 )
 from app.interfaces.pricing import PricingEngine
@@ -70,6 +72,10 @@ class BuiltinPricingEngine(PricingEngine):
             return self._fx_option(position, market)
         if isinstance(position, InterestRateFuturePosition):
             return self._ir_future(position, market)
+        if isinstance(position, CapFloorPosition):
+            return self._cap_floor(position, market)
+        if isinstance(position, SwaptionPosition):
+            return self._swaption(position, market)
         raise TypeError(f"Unsupported position: {type(position)!r}")
 
     def _bond(self, p: BondPosition, market: MarketSnapshot | None) -> Valuation:
@@ -161,3 +167,116 @@ class BuiltinPricingEngine(PricingEngine):
         )
         mv = p.quantity * p.pv01 * (p.quoted_rate - fwd) * 10000.0
         return Valuation(position_id=p.id, market_value=mv, dv01=-p.quantity * p.pv01)
+
+    def _cap_floor_components(
+        self,
+        p: CapFloorPosition,
+        market: MarketSnapshot | None,
+        *,
+        rate_shift: float = 0.0,
+        vol_shift: float = 0.0,
+    ) -> tuple[float, float]:
+        periods = max(1, round(p.maturity_years * p.payment_frequency_per_year))
+        accrual = p.maturity_years / periods
+        sigma = max(1e-8, p.volatility + vol_shift)
+        unit_pv = 0.0
+        unit_vega = 0.0
+
+        for i in range(1, periods + 1):
+            payment_time = i * accrual
+            # Spot-start approximation: first reset/exercise is clamped to one
+            # calendar day, matching the adapter's existing short-option policy.
+            option_expiry = max(1.0 / 365.0, payment_time - accrual)
+            forward = continuous_zero(
+                market,
+                p.currency,
+                option_expiry,
+                fallback=p.forward_rate,
+                prefer_projection=True,
+            ) + rate_shift
+            discount_rate = continuous_zero(
+                market,
+                p.currency,
+                payment_time,
+                fallback=p.discount_rate,
+            ) + rate_shift
+            if forward <= 0.0:
+                raise ValueError("Black cap/floor pricing requires a positive forward rate")
+            df = math.exp(-discount_rate * payment_time)
+            sqrt_t = math.sqrt(option_expiry)
+            d1 = (math.log(forward / p.strike) + 0.5 * sigma * sigma * option_expiry) / (
+                sigma * sqrt_t
+            )
+            d2 = d1 - sigma * sqrt_t
+            if p.option_type == "cap":
+                optionlet = forward * _cdf(d1) - p.strike * _cdf(d2)
+            else:
+                optionlet = p.strike * _cdf(-d2) - forward * _cdf(-d1)
+            unit_pv += df * accrual * optionlet
+            unit_vega += df * accrual * forward * _pdf(d1) * sqrt_t
+
+        scale = p.quantity * p.notional
+        return scale * unit_pv, scale * unit_vega * 0.01
+
+    def _cap_floor(self, p: CapFloorPosition, market: MarketSnapshot | None) -> Valuation:
+        pv, vega = self._cap_floor_components(p, market)
+        bumped, _ = self._cap_floor_components(p, market, rate_shift=0.0001)
+        return Valuation(position_id=p.id, market_value=pv, vega=vega, dv01=bumped - pv)
+
+    def _swaption_components(
+        self,
+        p: SwaptionPosition,
+        market: MarketSnapshot | None,
+        *,
+        rate_shift: float = 0.0,
+        vol_shift: float = 0.0,
+    ) -> tuple[float, float]:
+        periods = max(1, round(p.swap_tenor_years * p.payment_frequency_per_year))
+        accrual = p.swap_tenor_years / periods
+        sigma = max(1e-8, p.volatility + vol_shift)
+        forward = (
+            continuous_zero(
+                market,
+                p.currency,
+                p.option_maturity_years,
+                fallback=p.forward_swap_rate,
+                prefer_projection=True,
+            )
+            + rate_shift
+        )
+        discount_rate = (
+            continuous_zero(
+                market,
+                p.currency,
+                p.option_maturity_years + p.swap_tenor_years,
+                fallback=p.discount_rate,
+            )
+            + rate_shift
+        )
+        if forward <= 0.0:
+            raise ValueError("Black swaption pricing requires a positive forward swap rate")
+
+        annuity = sum(
+            accrual * math.exp(-discount_rate * (p.option_maturity_years + i * accrual))
+            for i in range(1, periods + 1)
+        )
+        expiry = p.option_maturity_years
+        sqrt_t = math.sqrt(expiry)
+        d1 = (math.log(forward / p.strike) + 0.5 * sigma * sigma * expiry) / (
+            sigma * sqrt_t
+        )
+        d2 = d1 - sigma * sqrt_t
+        if p.option_type == "payer":
+            unit = forward * _cdf(d1) - p.strike * _cdf(d2)
+        else:
+            unit = p.strike * _cdf(-d2) - forward * _cdf(-d1)
+
+        scale = p.quantity * p.notional
+        pv = scale * annuity * unit
+        vega = scale * annuity * forward * _pdf(d1) * sqrt_t * 0.01
+        return pv, vega
+
+    def _swaption(self, p: SwaptionPosition, market: MarketSnapshot | None) -> Valuation:
+        pv, vega = self._swaption_components(p, market)
+        bumped, _ = self._swaption_components(p, market, rate_shift=0.0001)
+        return Valuation(position_id=p.id, market_value=pv, vega=vega, dv01=bumped - pv)

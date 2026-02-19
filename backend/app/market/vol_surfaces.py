@@ -8,6 +8,7 @@ Conventions
 -----------
 - Vols: absolute decimals (0.20 = 20%).
 - Parallel / expiry-bucket shocks: absolute vol shifts (0.01 = +1 vol point).
+- Snapshot typed vol bumps: relative vol-level changes (0.25 = +25%).
 - Skew shock: ``Δσ = amount * (moneyness - 1.0)`` (ATM unchanged).
 - Term-structure shock: ``Δσ = amount * expiry_years``.
 - Floor: vols clamped to ``MIN_VOL`` after shocks.
@@ -142,10 +143,19 @@ class VolSurface:
     def parallel_shift(self, dvol: float) -> VolSurface:
         return self._map_vols(lambda p: p.vol + dvol)
 
+    def relative_shift(self, amount: float) -> VolSurface:
+        """Scale every node by ``1 + amount`` for typed MarketSnapshot vol bumps."""
+        return self._map_vols(lambda p: p.vol * (1.0 + amount))
+
     def expiry_bucket_shift(self, expiry: str, dvol: float) -> VolSurface:
         if expiry not in EXPIRY_YEARS:
             raise KeyError(f"unknown expiry label: {expiry}")
         return self._map_vols(lambda p: p.vol + dvol if p.expiry == expiry else p.vol)
+
+    def expiry_bucket_relative_shift(self, expiry: str, amount: float) -> VolSurface:
+        if expiry not in EXPIRY_YEARS:
+            raise KeyError(f"unknown expiry label: {expiry}")
+        return self._map_vols(lambda p: p.vol * (1.0 + amount) if p.expiry == expiry else p.vol)
 
     def skew_shock(self, amount: float) -> VolSurface:
         """Tilt smile: ``Δσ = amount * (moneyness - 1)``."""
@@ -196,6 +206,20 @@ def build_equity_vol_surface(underlying: str, vol: float) -> VolSurface:
 def build_fx_vol_surface(pair: str, vol: float) -> VolSurface:
     """FX implied-vol surface (flat scaffolding)."""
     return VolSurface.from_grid(pair, "fx", flat_vol_grid(vol))
+
+
+def vol_surface_from_dict(payload: Mapping, *, default_name: str) -> VolSurface:
+    """Rebuild a RiskForge surface from a snapshot ``vol_surfaces`` payload."""
+    raw_grid = payload.get("grid") or {}
+    grid: dict[GridKey, float] = {}
+    for key, vol in raw_grid.items():
+        expiry_s, m_s = str(key).split("|", 1)
+        grid[(expiry_s, float(m_s))] = float(vol)
+    return VolSurface.from_grid(
+        str(payload.get("name") or default_name),
+        payload["asset_class"],
+        grid,
+    )
 
 
 # Public aliases for callers / type hints (same concrete type).
@@ -252,5 +276,6 @@ __all__ = [
     "flat_vol_grid",
     "build_equity_vol_surface",
     "build_fx_vol_surface",
+    "vol_surface_from_dict",
     "attach_vol_surface",
 ]
