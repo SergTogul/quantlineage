@@ -4,7 +4,7 @@ Conventions
 -----------
 - Surface lookup: bilinear vol at (maturity_years, strike/spot).
 - Absent surface → scalar equity_vols / fx_vols (or trade mark).
-- Note: snapshot.bump(EquityVol|FXVol) does not rewrite attached surface grids;
+- ``MarketSnapshot.bump`` / ``apply`` rewrite attached grids for typed vol shocks;
   pricing always reads the grid payload when attached.
 """
 
@@ -21,6 +21,7 @@ from app.market.vol_surfaces import (
 )
 from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.surface_vol import option_vol_from_snapshot
+from app.risk.factor_types import EquityVol, FXVol
 
 try:
     from app.pricing.quantlib import QuantLibPricingEngine
@@ -98,6 +99,56 @@ def test_builtin_flat_surface_matches_scalar_atm():
     flat = attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20))
     engine = BuiltinPricingEngine()
     assert engine.value(opt, flat).market_value == pytest.approx(engine.value(opt, scalar).market_value)
+
+
+def test_builtin_flat_surfaces_match_scalar_after_typed_vol_apply():
+    eq_opt = EuropeanOptionPosition(
+        type="european_option",
+        id="eqo",
+        symbol="ABC",
+        quantity=1,
+        spot=100.0,
+        strike=100.0,
+        maturity_years=1.0,
+        volatility=0.20,
+        risk_free_rate=0.03,
+        option_type="call",
+    )
+    fx_opt = FXOptionPosition(
+        type="fx_option",
+        id="fxo",
+        pair="EURUSD",
+        notional_base=1_000_000,
+        spot=1.10,
+        strike=1.10,
+        maturity_years=1.0,
+        volatility=0.10,
+        domestic_rate=0.04,
+        foreign_rate=0.03,
+        option_type="call",
+    )
+    scalar = MarketSnapshot(
+        equity_spots={"ABC": 100.0},
+        equity_vols={"ABC": 0.20},
+        fx_spots={"EURUSD": 1.10},
+        fx_vols={"EURUSD": 0.10},
+        rates={"USD": 0.04, "EUR": 0.03},
+    )
+    with_surfaces = attach_vol_surface(
+        attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20)),
+        build_fx_vol_surface("EURUSD", 0.10),
+    )
+
+    bumped_scalar = scalar.apply([(EquityVol("ABC"), 0.25), (FXVol("EURUSD"), 0.25)])
+    bumped_surfaces = with_surfaces.apply([(EquityVol("ABC"), 0.25), (FXVol("EURUSD"), 0.25)])
+
+    engine = BuiltinPricingEngine()
+    assert engine.value(eq_opt, bumped_surfaces).market_value == pytest.approx(
+        engine.value(eq_opt, bumped_scalar).market_value
+    )
+    assert engine.value(fx_opt, bumped_surfaces).market_value == pytest.approx(
+        engine.value(fx_opt, bumped_scalar).market_value
+    )
 
 
 def test_builtin_fx_option_pv_differs_on_skewed_surface():

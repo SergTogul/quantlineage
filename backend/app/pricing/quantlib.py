@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import math
 from contextlib import contextmanager
 from datetime import date, timedelta
 from threading import RLock
 
 from app.domain.models import (
     BondPosition,
+    CapFloorPosition,
     EquityFuturePosition,
     EquityPosition,
     EuropeanOptionPosition,
@@ -16,11 +18,12 @@ from app.domain.models import (
     Position,
     StressScenario,
     SwapPosition,
+    SwaptionPosition,
     Valuation,
 )
 from app.interfaces.pricing import PricingEngine
+from app.market.vol_surfaces import vol_surface_from_dict
 from app.pricing.curve_rates import continuous_zero, has_curve_or_key_rates, select_yield_curve
-from app.pricing.surface_vol import option_vol_from_snapshot
 
 try:
     import QuantLib as ql
@@ -92,14 +95,7 @@ class QuantLibPricingEngine(PricingEngine):
                 fallback = market.equity_vols.get(position.symbol, position.volatility)
                 updates = {
                     "spot": spot,
-                    "volatility": option_vol_from_snapshot(
-                        market,
-                        name=position.symbol,
-                        maturity_years=position.maturity_years,
-                        strike=position.strike,
-                        spot=spot,
-                        fallback=fallback,
-                    ),
+                    "volatility": fallback,
                     "risk_free_rate": market.rates.get("USD", position.risk_free_rate),
                 }
             elif isinstance(position, BondPosition):
@@ -124,6 +120,38 @@ class QuantLibPricingEngine(PricingEngine):
                     fallback=position.forward_rate,
                     prefer_projection=True,
                 )
+            elif isinstance(position, CapFloorPosition):
+                updates = {
+                    "forward_rate": continuous_zero(
+                        market,
+                        position.currency,
+                        position.maturity_years,
+                        fallback=position.forward_rate,
+                        prefer_projection=True,
+                    ),
+                    "discount_rate": continuous_zero(
+                        market,
+                        position.currency,
+                        position.maturity_years,
+                        fallback=position.discount_rate,
+                    ),
+                }
+            elif isinstance(position, SwaptionPosition):
+                updates = {
+                    "forward_swap_rate": continuous_zero(
+                        market,
+                        position.currency,
+                        position.option_maturity_years,
+                        fallback=position.forward_swap_rate,
+                        prefer_projection=True,
+                    ),
+                    "discount_rate": continuous_zero(
+                        market,
+                        position.currency,
+                        position.option_maturity_years + position.swap_tenor_years,
+                        fallback=position.discount_rate,
+                    ),
+                }
             elif isinstance(position, FXForwardPosition):
                 updates = {
                     "spot": market.fx_spots.get(position.pair, position.spot),
@@ -135,14 +163,7 @@ class QuantLibPricingEngine(PricingEngine):
                 fallback = market.fx_vols.get(position.pair, position.volatility)
                 updates = {
                     "spot": spot,
-                    "volatility": option_vol_from_snapshot(
-                        market,
-                        name=position.pair,
-                        maturity_years=position.maturity_years,
-                        strike=position.strike,
-                        spot=spot,
-                        fallback=fallback,
-                    ),
+                    "volatility": fallback,
                     "domestic_rate": market.rates.get(position.pair[-3:], position.domestic_rate),
                     "foreign_rate": market.rates.get(position.pair[:3], position.foreign_rate),
                 }
@@ -158,17 +179,21 @@ class QuantLibPricingEngine(PricingEngine):
             if isinstance(position, EquityFuturePosition):
                 return self._equity_future(position)
             if isinstance(position, EuropeanOptionPosition):
-                return self._option(position)
+                return self._option(position, market)
             if isinstance(position, BondPosition):
                 return self._bond(position, market)
             if isinstance(position, SwapPosition):
                 return self._swap(position, market)
             if isinstance(position, InterestRateFuturePosition):
                 return self._ir_future(position)
+            if isinstance(position, CapFloorPosition):
+                return self._cap_floor(position, market)
+            if isinstance(position, SwaptionPosition):
+                return self._swaption(position, market)
             if isinstance(position, FXForwardPosition):
                 return self._fx_forward(position)
             if isinstance(position, FXOptionPosition):
-                return self._fx_option(position)
+                return self._fx_option(position, market)
         # Instruments not yet covered by native QuantLib adapter use the reference pricer.
         from app.pricing.builtin import BuiltinPricingEngine
         return BuiltinPricingEngine().value(position, market)
@@ -210,17 +235,60 @@ class QuantLibPricingEngine(PricingEngine):
         curve.enableExtrapolation()
         return ql.YieldTermStructureHandle(curve)
 
-    def _option(self, p: EuropeanOptionPosition) -> Valuation:
-        spot = ql.QuoteHandle(ql.SimpleQuote(p.spot))
-        risk_free = self._flat_curve(p.risk_free_rate)
-        dividend = self._flat_curve(p.dividend_yield)
-        vol = ql.BlackVolTermStructureHandle(
+    def _black_vol_handle(
+        self,
+        market: MarketSnapshot | None,
+        *,
+        name: str,
+        asset_class: str,
+        spot: float,
+        flat_vol: float,
+    ):
+        """Build a QL vol term structure from an attached grid, else flat scalar vol."""
+        raw = (market.vol_surfaces.get(name) if market is not None else None) or None
+        if raw is not None and spot > 0.0 and str(raw.get("asset_class", "")).lower() == asset_class:
+            surface = vol_surface_from_dict(raw, default_name=name)
+            return self._black_surface_handle(surface, spot)
+        return ql.BlackVolTermStructureHandle(
             ql.BlackConstantVol(
                 self._ql_date(self.evaluation_date),
                 ql.NullCalendar(),
-                p.volatility,
+                flat_vol,
                 ql.Actual365Fixed(),
             )
+        )
+
+    def _black_surface_handle(self, surface, spot: float):
+        expiries = sorted({p.expiry_years for p in surface.points})
+        moneynesses = sorted({p.moneyness for p in surface.points})
+        dates = [self._maturity_date(t) for t in expiries]
+        strikes = [spot * m for m in moneynesses]
+        vols = ql.Matrix(len(strikes), len(dates))
+        for row, strike in enumerate(strikes):
+            moneyness = strike / spot
+            for col, expiry in enumerate(expiries):
+                vols[row][col] = surface.vol(expiry, moneyness)
+        ql_surface = ql.BlackVarianceSurface(
+            self._ql_date(self.evaluation_date),
+            ql.NullCalendar(),
+            dates,
+            strikes,
+            vols,
+            ql.Actual365Fixed(),
+        )
+        ql_surface.enableExtrapolation()
+        return ql.BlackVolTermStructureHandle(ql_surface)
+
+    def _option(self, p: EuropeanOptionPosition, market: MarketSnapshot | None = None) -> Valuation:
+        spot = ql.QuoteHandle(ql.SimpleQuote(p.spot))
+        risk_free = self._flat_curve(p.risk_free_rate)
+        dividend = self._flat_curve(p.dividend_yield)
+        vol = self._black_vol_handle(
+            market,
+            name=p.symbol,
+            asset_class="equity",
+            spot=p.spot,
+            flat_vol=p.volatility,
         )
         process = ql.BlackScholesMertonProcess(spot, dividend, risk_free, vol)
         payoff = ql.PlainVanillaPayoff(
@@ -359,19 +427,18 @@ class QuantLibPricingEngine(PricingEngine):
             fx_delta=p.notional_base * p.spot,
         )
 
-    def _fx_option(self, p: FXOptionPosition) -> Valuation:
+    def _fx_option(self, p: FXOptionPosition, market: MarketSnapshot | None = None) -> Valuation:
         # Garman–Kohlhagen ≡ Black–Scholes–Merton with foreign rate as dividend yield.
         # Exercise date from _maturity_date (T < ~1/365 clamps to 1 calendar day).
         spot = ql.QuoteHandle(ql.SimpleQuote(p.spot))
         domestic = self._flat_curve(p.domestic_rate)
         foreign = self._flat_curve(p.foreign_rate)
-        vol = ql.BlackVolTermStructureHandle(
-            ql.BlackConstantVol(
-                self._ql_date(self.evaluation_date),
-                ql.NullCalendar(),
-                p.volatility,
-                ql.Actual365Fixed(),
-            )
+        vol = self._black_vol_handle(
+            market,
+            name=p.pair,
+            asset_class="fx",
+            spot=p.spot,
+            flat_vol=p.volatility,
         )
         process = ql.BlackScholesMertonProcess(spot, foreign, domestic, vol)
         payoff = ql.PlainVanillaPayoff(
@@ -404,6 +471,122 @@ class QuantLibPricingEngine(PricingEngine):
         # so evaluation-date locking stays consistent with other instruments.
         mv = p.quantity * p.pv01 * (p.quoted_rate - p.forward_rate) * 10000.0
         return Valuation(position_id=p.id, market_value=mv, dv01=-p.quantity * p.pv01)
+
+    def _cap_floor_components(
+        self,
+        p: CapFloorPosition,
+        market: MarketSnapshot | None,
+        *,
+        rate_shift: float = 0.0,
+        vol_shift: float = 0.0,
+    ) -> tuple[float, float]:
+        periods = max(1, round(p.maturity_years * p.payment_frequency_per_year))
+        accrual = p.maturity_years / periods
+        sigma = max(1e-8, p.volatility + vol_shift)
+        option_type = ql.Option.Call if p.option_type == "cap" else ql.Option.Put
+        unit_pv = 0.0
+        unit_vega = 0.0
+
+        for i in range(1, periods + 1):
+            payment_time = i * accrual
+            option_expiry = max(1.0 / 365.0, payment_time - accrual)
+            forward = continuous_zero(
+                market,
+                p.currency,
+                option_expiry,
+                fallback=p.forward_rate,
+                prefer_projection=True,
+            ) + rate_shift
+            discount_rate = continuous_zero(
+                market,
+                p.currency,
+                payment_time,
+                fallback=p.discount_rate,
+            ) + rate_shift
+            if forward <= 0.0:
+                raise ValueError("Black cap/floor pricing requires a positive forward rate")
+            df = math.exp(-discount_rate * payment_time)
+            stddev = sigma * math.sqrt(option_expiry)
+            discount = df * accrual
+            unit_pv += ql.blackFormula(option_type, p.strike, forward, stddev, discount)
+            d1 = (math.log(forward / p.strike) + 0.5 * sigma * sigma * option_expiry) / stddev
+            unit_vega += (
+                df
+                * accrual
+                * forward
+                * math.exp(-0.5 * d1 * d1)
+                / math.sqrt(2.0 * math.pi)
+                * math.sqrt(option_expiry)
+            )
+
+        scale = p.quantity * p.notional
+        return scale * unit_pv, scale * unit_vega * 0.01
+
+    def _cap_floor(self, p: CapFloorPosition, market: MarketSnapshot | None) -> Valuation:
+        # Native QuantLib Black formula per optionlet; no QuantLib objects leave this adapter.
+        pv, vega = self._cap_floor_components(p, market)
+        bumped, _ = self._cap_floor_components(p, market, rate_shift=0.0001)
+        return Valuation(position_id=p.id, market_value=pv, vega=vega, dv01=bumped - pv)
+
+    def _swaption_components(
+        self,
+        p: SwaptionPosition,
+        market: MarketSnapshot | None,
+        *,
+        rate_shift: float = 0.0,
+        vol_shift: float = 0.0,
+    ) -> tuple[float, float]:
+        periods = max(1, round(p.swap_tenor_years * p.payment_frequency_per_year))
+        accrual = p.swap_tenor_years / periods
+        sigma = max(1e-8, p.volatility + vol_shift)
+        forward = (
+            continuous_zero(
+                market,
+                p.currency,
+                p.option_maturity_years,
+                fallback=p.forward_swap_rate,
+                prefer_projection=True,
+            )
+            + rate_shift
+        )
+        discount_rate = (
+            continuous_zero(
+                market,
+                p.currency,
+                p.option_maturity_years + p.swap_tenor_years,
+                fallback=p.discount_rate,
+            )
+            + rate_shift
+        )
+        if forward <= 0.0:
+            raise ValueError("Black swaption pricing requires a positive forward swap rate")
+
+        annuity = sum(
+            accrual * math.exp(-discount_rate * (p.option_maturity_years + i * accrual))
+            for i in range(1, periods + 1)
+        )
+        expiry = p.option_maturity_years
+        stddev = sigma * math.sqrt(expiry)
+        option_type = ql.Option.Call if p.option_type == "payer" else ql.Option.Put
+        scale = p.quantity * p.notional
+        pv = scale * ql.blackFormula(option_type, p.strike, forward, stddev, annuity)
+        d1 = (math.log(forward / p.strike) + 0.5 * sigma * sigma * expiry) / stddev
+        vega = (
+            scale
+            * annuity
+            * forward
+            * math.exp(-0.5 * d1 * d1)
+            / math.sqrt(2.0 * math.pi)
+            * math.sqrt(expiry)
+            * 0.01
+        )
+        return pv, vega
+
+    def _swaption(self, p: SwaptionPosition, market: MarketSnapshot | None) -> Valuation:
+        # Native QuantLib Black formula on a deterministic flat par-swap annuity.
+        pv, vega = self._swaption_components(p, market)
+        bumped, _ = self._swaption_components(p, market, rate_shift=0.0001)
+        return Valuation(position_id=p.id, market_value=pv, vega=vega, dv01=bumped - pv)
 
     def shocked_value(self, position: Position, scenario: StressScenario, market: MarketSnapshot | None = None) -> float:
         return super().shocked_value(position, scenario, market)

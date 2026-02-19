@@ -249,7 +249,7 @@ class RiskRunWorker:
         should_execute = (not external_worker_enabled()) if execute is None else bool(execute)
         if should_execute:
             self._schedule(rid)
-        return self._to_view(run)
+        return RiskRunView.from_risk_run(run)
 
     def get(self, run_id: str) -> RiskRunView:
         run = self._with_service(lambda svc: svc.get(run_id))

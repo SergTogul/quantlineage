@@ -13,6 +13,6 @@ test.describe('Risk Query', () => {
 
     const answer = card.locator('.query-answer')
     await expect(answer).toBeVisible()
-    await expect(answer).toContainText(/Worst scenario/i)
+    await expect(answer).toContainText(/Worst stress scenario/i)
   })
 })

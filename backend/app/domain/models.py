@@ -17,6 +17,10 @@ from pydantic import (
 
 # RateZero tenors that parallel-shift scalar ``rates[ccy]`` (and all pillars).
 _RATE_PARALLEL_TENORS = frozenset({"ALL", "PARALLEL"})
+_VOL_GENERIC_EXPIRIES = frozenset({"GENERIC", "ALL", "PARALLEL"})
+_VOL_ATM_BUCKETS = frozenset({"ATM", "GENERIC", "ALL", "PARALLEL"})
+_VOL_SKEW_BUCKETS = frozenset({"SKEW", "SMILE_SKEW"})
+_VOL_TERM_BUCKETS = frozenset({"TERM", "TERM_STRUCTURE"})
 
 
 def _deep_freeze(value: Any) -> Any:
@@ -56,6 +60,31 @@ def _bump_curve_zeros(payload: Mapping, amount: float, tenor: str | None) -> dic
         zeros[tenor] = float(zeros[tenor]) + amount
     out["zeros"] = zeros
     return out
+
+
+def _vol_surface_matches_asset_class(payload: Mapping, asset_class: str) -> bool:
+    return str(payload.get("asset_class", "")).lower() == asset_class
+
+
+def _bump_vol_surface_payload(payload: Mapping, factor, amount: float) -> dict:
+    """Copy and shock one vol surface payload using RiskForge surface semantics."""
+    from app.market.vol_surfaces import EXPIRY_YEARS, vol_surface_from_dict
+
+    surface = vol_surface_from_dict(payload, default_name=getattr(factor, "underlying", getattr(factor, "pair", "")))
+    expiry = str(getattr(factor, "expiry", "GENERIC")).upper()
+    moneyness = str(getattr(factor, "moneyness", "ATM")).upper()
+
+    if moneyness in _VOL_SKEW_BUCKETS:
+        return surface.skew_shock(amount).to_dict()
+    if expiry in _VOL_TERM_BUCKETS:
+        return surface.term_structure_shock(amount).to_dict()
+    if expiry in EXPIRY_YEARS and moneyness in _VOL_ATM_BUCKETS:
+        return surface.expiry_bucket_relative_shift(expiry, amount).to_dict()
+    if expiry in _VOL_GENERIC_EXPIRIES and moneyness in _VOL_ATM_BUCKETS:
+        return surface.relative_shift(amount).to_dict()
+    # Preserve pre-surface behavior for future dimensions such as delta buckets:
+    # older typed vol bumps ignored expiry/moneyness and applied a scalar move.
+    return surface.relative_shift(amount).to_dict()
 
 
 class AssetClass(str, Enum):
@@ -170,11 +199,7 @@ class FXOptionPosition(PositionHierarchyMixin):
 
 
 class InterestRateFuturePosition(PositionHierarchyMixin):
-    """Exchange-traded short-rate future (simplified STIR-style mark).
-
-    Cap/floor and swaption domain types are deferred until curve/vol surfaces
-    exist (Quant Pricing charter: after Market Data M1.4/M1.5).
-    """
+    """Exchange-traded short-rate future (simplified STIR-style mark)."""
 
     type: Literal["ir_future"]
     id: str
@@ -188,6 +213,59 @@ class InterestRateFuturePosition(PositionHierarchyMixin):
     book: str = "Rates Derivatives"
 
 
+class CapFloorPosition(PositionHierarchyMixin):
+    """Vanilla interest-rate cap/floor as a flat-forward Black-76 optionlet strip.
+
+    Conventions are intentionally explicit for the M1.9 slice:
+    rates/strike/volatility are decimals, notional is currency notional,
+    ``option_type='cap'`` is a long cap and ``'floor'`` is a long floor, and
+    equal accrual periods are generated from ``maturity_years`` and
+    ``payment_frequency_per_year``. The lognormal Black model requires positive
+    strike and forward rates; richer IR-vol cube/exercise schedules are deferred.
+    """
+
+    type: Literal["cap_floor"]
+    id: str
+    currency: str = "USD"
+    notional: float = Field(gt=0)
+    quantity: float = 1.0
+    strike: float = Field(gt=0)
+    maturity_years: float = Field(gt=0)
+    volatility: float = Field(gt=0)
+    option_type: Literal["cap", "floor"]
+    forward_rate: float = Field(gt=0)
+    discount_rate: float = 0.04
+    payment_frequency_per_year: int = Field(default=2, ge=1, le=12)
+    book: str = "Rates Derivatives"
+
+
+class SwaptionPosition(PositionHierarchyMixin):
+    """Vanilla European swaption on a flat-rate par swap representation.
+
+    Conventions are intentionally narrow for the M1.9 slice: rates, strike,
+    and volatility are decimals; ``option_type='payer'`` is a call on the
+    forward swap rate and ``'receiver'`` is a put; the underlying swap annuity
+    is generated from equal fixed-leg periods over ``swap_tenor_years`` after
+    ``option_maturity_years``. Explicit date schedules and IR vol cubes are
+    deferred.
+    """
+
+    type: Literal["swaption"]
+    id: str
+    currency: str = "USD"
+    notional: float = Field(gt=0)
+    quantity: float = 1.0
+    strike: float = Field(gt=0)
+    option_maturity_years: float = Field(gt=0)
+    swap_tenor_years: float = Field(gt=0)
+    volatility: float = Field(gt=0)
+    option_type: Literal["payer", "receiver"]
+    forward_swap_rate: float = Field(gt=0)
+    discount_rate: float = 0.04
+    payment_frequency_per_year: int = Field(default=2, ge=1, le=12)
+    book: str = "Rates Derivatives"
+
+
 Position = Annotated[
     Union[
         EquityPosition,
@@ -198,6 +276,8 @@ Position = Annotated[
         FXForwardPosition,
         FXOptionPosition,
         InterestRateFuturePosition,
+        CapFloorPosition,
+        SwaptionPosition,
     ],
     Field(discriminator="type"),
 ]
@@ -411,12 +491,36 @@ class MarketSnapshot(BaseModel):
             if factor.underlying not in vols:
                 raise KeyError(f"equity vol not in snapshot: {factor.underlying}")
             vols[factor.underlying] = max(1e-6, vols[factor.underlying] * (1.0 + amount))
+            surfaces = {name: _deep_unfreeze(payload) for name, payload in self.vol_surfaces.items()}
+            payload = surfaces.get(factor.underlying)
+            if payload is not None and _vol_surface_matches_asset_class(payload, "equity"):
+                surfaces[factor.underlying] = _bump_vol_surface_payload(payload, factor, amount)
+                vols[factor.underlying] = float(surfaces[factor.underlying]["atm_vol"])
+                return self.model_copy(
+                    update={
+                        "id": f"{self.id}:bump:{factor.key}",
+                        "equity_vols": vols,
+                        "vol_surfaces": surfaces,
+                    }
+                )
             return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "equity_vols": vols})
         if isinstance(factor, FXVol):
             vols = dict(self.fx_vols)
             if factor.pair not in vols:
                 raise KeyError(f"fx vol not in snapshot: {factor.pair}")
             vols[factor.pair] = max(1e-6, vols[factor.pair] * (1.0 + amount))
+            surfaces = {name: _deep_unfreeze(payload) for name, payload in self.vol_surfaces.items()}
+            payload = surfaces.get(factor.pair)
+            if payload is not None and _vol_surface_matches_asset_class(payload, "fx"):
+                surfaces[factor.pair] = _bump_vol_surface_payload(payload, factor, amount)
+                vols[factor.pair] = float(surfaces[factor.pair]["atm_vol"])
+                return self.model_copy(
+                    update={
+                        "id": f"{self.id}:bump:{factor.key}",
+                        "fx_vols": vols,
+                        "vol_surfaces": surfaces,
+                    }
+                )
             return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "fx_vols": vols})
         if isinstance(factor, RateZero):
             return self._bump_rate_zero(factor, amount)
@@ -1056,6 +1160,8 @@ class RiskQueryResponse(BaseModel):
     intent: str
     answer: str
     data: dict
+    tool_name: str | None = None
+    requires_clarification: bool = False
 
 
 class WhatIfChange(BaseModel):
