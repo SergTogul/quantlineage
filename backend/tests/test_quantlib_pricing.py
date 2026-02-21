@@ -1,8 +1,9 @@
 from datetime import date
 
 import pytest
+from tests.quantlib_gate import import_quantlib
 
-ql = pytest.importorskip("QuantLib")
+ql = import_quantlib()
 
 import app.pricing.quantlib as quantlib_mod
 from app.domain.models import (
