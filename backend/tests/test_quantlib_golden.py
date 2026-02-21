@@ -1,7 +1,7 @@
 """Golden / reference QuantLib comparisons (M1.8 baseline + M9.4 expand).
 
-Uses ``pytest.importorskip`` so environments without QuantLib still run the
-Builtin property suite.
+Uses ``tests.quantlib_gate.import_quantlib`` so environments without QuantLib
+still skip these goldens, unless ``RISKFORGE_REQUIRE_QUANTLIB=1`` (R0.1.6).
 
 Numerical conventions (documented for M9.4)
 -------------------------------------------
@@ -44,8 +44,9 @@ from datetime import date, timedelta
 from statistics import NormalDist
 
 import pytest
+from tests.quantlib_gate import import_quantlib
 
-ql = pytest.importorskip("QuantLib")
+ql = import_quantlib()
 
 from app.domain.models import (
     BondPosition,
