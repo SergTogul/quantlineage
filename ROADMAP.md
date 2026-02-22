@@ -1,11 +1,16 @@
 # RiskForge Development Roadmap
 
-Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout (still referenced by agent docs); do not recreate Workstream 0 work there—use this file going forward.
+Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout (still referenced by agent docs); do not recreate it—use this file going forward and consult `reviews/FINDINGS.md` for the independent review findings.
+
+## Current gate
+
+Milestone R0 — Core Remediation & Trustworthiness is **IN PROGRESS** on branch `r0-core-remediation`. Net-new feature development is paused until R0 completes; `reviews/FINDINGS.md` and `reviews/REMEDIATION_MILESTONE.md` are the authoritative remediation backlog.
 
 ## Progress
 
 | Workstream | Status |
 |-----------|--------|
+| Milestone R0 — Core Remediation & Trustworthiness | **IN PROGRESS** (2026-09-03) — Phase B; RF-003 CLOSED; remaining P0s open |
 | Workstream 0 — Prototype Foundation | COMPLETE |
 | Workstream 1 — Quant Foundation | **COMPLETE** (2026-09-02) |
 | Workstream 2 — VaR, ES & Portfolio Risk | **COMPLETE** (2026-09-02) |
@@ -20,6 +25,8 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Workstream 11 — AI Risk Assistant | **COMPLETE** (2026-09-03 — deterministic tools plus provider-agnostic model/tool loop) |
 | Workstream 12 — Documentation & Portfolio Presentation | **COMPLETE** (2026-09-03 — recruiter docs, architecture, methodology, performance, and limitations package) |
 | Workstream 13 — Final Portfolio Demo | **COMPLETE** (2026-09-03 — ) |
+
+Workstreams 0–13 record historical MVP delivery completions; independent review opened Milestone R0 for residual remediation.
 
 ### Baseline verification (2026-09-02, local macOS — Lead Architect acceptance)
 
