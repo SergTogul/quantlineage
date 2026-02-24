@@ -6,6 +6,8 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - No live market-data vendor integration is implemented.
 - Demo historical factors are a packaged synthetic replay (`data/demo_historical_factors.csv`), not observed licensed market data.
+- Packaged demo history broadcasts four macro series (equity, volatility, rates, and FX) across matching exposures; it is not per-name or per-tenor factor history or a full multi-asset historical model (RF-005).
+- Position objects still carry live marks such as spot, volatility, yield, and swap rate. `PositionMarketDataProvider` can resolve shared keys by last writer, so `MarketSnapshot` is the intended market authority while R0.2 remains in progress.
 - Market snapshots are immutable and deterministic, but production entitlement, quality checks, market close processes, and vendor symbology are out of scope.
 
 ## Curves
@@ -32,6 +34,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - `LINEAR` and `DELTA_GAMMA` are approximation modes; they do not capture all higher-order or model-specific repricing behavior.
 - `FULL_REVALUATION` depends on available pricing-adapter coverage and market snapshot fidelity.
+- Exact VaR/ES goldens cover reviewed deterministic cases in `backend/tests/test_var_es_golden.py`; they do not make the approximate `LINEAR` and `DELTA_GAMMA` methodologies exact.
 - Component VaR is a covariance/Euler allocation to parametric VaR, not an additive allocation of historical quantile VaR.
 - Demo VaR/ES values use packaged deterministic inputs and should not be marketed as live production analytics.
 
@@ -46,7 +49,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - The accepted performance claim is limited to the native scenario-kernel SLA in [`performance.md`](performance.md) and [`benchmarks/RESULTS.md`](../benchmarks/RESULTS.md).
 - No HTTP risk-run latency, multi-tenant capacity, or FULL_REVALUATION performance SLA is claimed.
-- QuantLib concurrency is protected by an adapter lock inside a process; parallel full revaluation should use process isolation, not unsafe shared `ql.Settings` mutation.
+- The QuantLib adapter lock is per pricing-engine instance, while `Settings.evaluationDate` is process-global; overlapping engine sessions can contaminate evaluation dates. R0.3 owns process-level serialization, and parallel full revaluation should prefer process isolation.
 
 ## Persistence And Workers
 
@@ -59,6 +62,10 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 - `/api/v1` is canonical.
 - Legacy unversioned routes remain dual-mounted with deprecation headers until the published sunset gate.
 - OpenAPI examples are illustrative payloads, not guaranteed live values.
+
+## Local Demo Security
+
+- The Compose local/demo profile can publish the unauthenticated API and Postgres ports. It is not internet-ready and must not be treated as a production security or IAM deployment (RF-014).
 
 ## Frontend
 

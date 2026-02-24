@@ -8,7 +8,7 @@ When starting a subagent, give it the matching charter and a task created from `
 
 ## Lead-agent startup prompt
 
-> Read `AGENTS.md`, `README.md`, `TASKS.md`, `BUILD_NOTES.md`, `docs/agents/TEAM_STRUCTURE.md`, `docs/agents/WORKFLOW.md`, and `docs/agents/DEFINITION_OF_DONE.md`. You are the Lead Architect. Inspect the repository first. Break the requested workstream into small tasks, assign each to exactly one specialist agent, identify dependencies and interface contracts, and define acceptance criteria/tests. Parallelize only tasks with stable contracts. Do not let subagents make unrelated refactors.
+> Read `AGENTS.md`, `README.md`, `reviews/FINDINGS.md` (remediation backlog), `reviews/REMEDIATION_MILESTONE.md` (Milestone R0 executable plan), `ROADMAP.md` (historical workstreams; COMPLETE workstreams may retain residual debt), `BUILD_NOTES.md`, `docs/agents/TEAM_STRUCTURE.md`, `docs/agents/WORKFLOW.md`, and `docs/agents/DEFINITION_OF_DONE.md`. You are the Lead Architect. Inspect the repository first. Break the requested workstream into small tasks, assign each to exactly one specialist agent, identify dependencies and interface contracts, and define acceptance criteria/tests. Parallelize only tasks with stable contracts. Do not let subagents make unrelated refactors.
 
 ## Specialist-agent startup pattern
 

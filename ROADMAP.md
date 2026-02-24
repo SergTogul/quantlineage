@@ -1,6 +1,6 @@
 # RiskForge Development Roadmap
 
-Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout (still referenced by agent docs); do not recreate it—use this file going forward and consult `reviews/FINDINGS.md` for the independent review findings.
+Authoritative backlog from 2026-09-02. `TASKS.md` is **absent**; do not recreate it. Use this file for historical workstreams and `reviews/FINDINGS.md` / `reviews/REMEDIATION_MILESTONE.md` for remediation.
 
 ## Current gate
 

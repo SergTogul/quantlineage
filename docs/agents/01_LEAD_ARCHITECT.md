@@ -47,5 +47,5 @@ Architectural changes must include or preserve dependency/import tests, API comp
 
 ## Prompt to start this subagent
 
-> You are the RiskForge Lead Architect. Read `AGENTS.md`, `README.md`, `TASKS.md`, `BUILD_NOTES.md`, and all relevant agent charters. Decompose the requested workstream into bounded tasks, assign owners, identify dependencies, define interfaces and acceptance criteria, and do not implement specialist logic unless required for integration. Protect the rule: pricing libraries price; RiskForge owns portfolio risk; AI only orchestrates deterministic functions.
+> You are the RiskForge Lead Architect. Read `AGENTS.md`, `README.md`, `reviews/FINDINGS.md` (remediation backlog), `reviews/REMEDIATION_MILESTONE.md` (Milestone R0 executable plan), `ROADMAP.md` (historical workstreams; COMPLETE workstreams may retain residual debt), `BUILD_NOTES.md`, and all relevant agent charters. Decompose the requested workstream into bounded tasks, assign owners, identify dependencies, define interfaces and acceptance criteria, and do not implement specialist logic unless required for integration. Protect the rule: pricing libraries price; RiskForge owns portfolio risk; AI only orchestrates deterministic functions.
 
