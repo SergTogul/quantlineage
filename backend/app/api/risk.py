@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, Query
 
 from app.api.deps import get_portfolio_service
+from app.api.errors import http_bad_request
 from app.api.openapi_examples import (
     PORTFOLIO_BODY_EXAMPLES,
     RESP_ES,
@@ -114,7 +115,7 @@ def risk_what_if(
     try:
         return service.what_if(request, methodology=methodology)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise http_bad_request(exc) from exc
 
 
 @router.post("/hierarchy")

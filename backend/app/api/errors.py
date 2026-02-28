@@ -120,6 +120,29 @@ def body_internal_error() -> ErrorBody:
     )
 
 
+# Stable client-facing copy. Never interpolate ``str(exc)`` into these.
+PUBLIC_BAD_REQUEST_MESSAGE = "Invalid request"
+PUBLIC_RISK_RUN_FAILURE_MESSAGE = "Risk run failed"
+
+
+def http_bad_request(
+    exc: BaseException,
+    *,
+    message: str = PUBLIC_BAD_REQUEST_MESSAGE,
+    details: dict[str, Any] | list[Any] | None = None,
+) -> HTTPException:
+    """400 with a stable envelope; log ``exc`` server-side and never return ``str(exc)``."""
+    logger.exception("Client-facing request error: %s", exc)
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=error_payload(
+            code=code_for_status(status.HTTP_400_BAD_REQUEST),
+            message=message,
+            details=details,
+        ),
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach centralized handlers so every mount shares the error shape."""
 

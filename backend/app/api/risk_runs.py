@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from app.api.deps import get_risk_run_worker
+from app.api.errors import http_bad_request
 from app.api.openapi_examples import (
     RESP_RISK_RUN_CREATE,
     RESP_RISK_RUN_GET,
@@ -52,7 +53,7 @@ def create_risk_run(
             market_snapshot_id=body.market_snapshot_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise http_bad_request(exc) from exc
 
 
 @router.get(

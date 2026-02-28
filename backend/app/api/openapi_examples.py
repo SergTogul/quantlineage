@@ -127,7 +127,7 @@ EXAMPLE_VALIDATION_ERROR: dict[str, Any] = {
 
 EXAMPLE_BAD_REQUEST: dict[str, Any] = {
     "code": "bad_request",
-    "message": "unknown position_id for remove: missing-id",
+    "message": "Invalid request",
     # OpenAPI generators omit JSON nulls; use empty object so ``details`` stays visible.
     "details": {},
 }
