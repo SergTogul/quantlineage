@@ -136,7 +136,11 @@ def test_unsupported_run_type_400(client, tiny_portfolio):
         },
     )
     assert resp.status_code == 400
-    assert "unsupported run_type" in resp.json()["message"]
+    err = resp.json()
+    assert err["code"] == "bad_request"
+    assert err["message"] == "Invalid request"
+    assert "unsupported run_type" not in err["message"]
+    assert "not-a-real-type" not in resp.text
 
 
 def test_validation_rejects_empty_run_type(client, tiny_portfolio):
@@ -169,7 +173,8 @@ def test_worker_fails_run_on_execution_error(tiny_portfolio):
     worker.shutdown(wait=True)
     assert last is not None
     assert last.status == RiskRunStatus.FAILED
-    assert "boom" in (last.error_message or "")
+    assert last.error_message == "Risk run failed"
+    assert "boom" not in (last.error_message or "")
 
 
 def test_execute_run_type_dispatch(tiny_portfolio):
