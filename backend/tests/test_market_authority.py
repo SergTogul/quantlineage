@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 
 from app.domain.models import (
+    EquityFuturePosition,
     EquityPosition,
+    EuropeanOptionPosition,
     MarketSnapshot,
     Portfolio,
     VaRMethodology,
@@ -17,6 +19,7 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
+from tests.quantlib_gate import import_quantlib
 
 
 def _equity_book() -> tuple[Portfolio, EquityPosition]:
@@ -201,3 +204,140 @@ def test_portfolio_service_passes_resolved_snapshot_to_contributors_and_compare(
     assert provider.calls == 2
     assert pricing.markets
     assert all(market is snapshot for market in pricing.markets)
+
+
+def _future_book() -> tuple[Portfolio, EquityFuturePosition]:
+    position = EquityFuturePosition(
+        type="equity_future",
+        id="fut",
+        symbol="AUTH",
+        quantity=10.0,
+        spot=999.0,
+        multiplier=50.0,
+        maturity_years=0.25,
+        risk_free_rate=0.04,
+        dividend_yield=0.0,
+    )
+    return Portfolio(id="authority", name="authority", positions=[position]), position
+
+
+def _option_book() -> tuple[Portfolio, EuropeanOptionPosition]:
+    position = EuropeanOptionPosition(
+        type="european_option",
+        id="opt",
+        symbol="AUTH",
+        quantity=10.0,
+        spot=999.0,
+        strike=100.0,
+        maturity_years=1.0,
+        volatility=0.20,
+        risk_free_rate=0.03,
+        option_type="call",
+    )
+    return Portfolio(id="authority", name="authority", positions=[position]), position
+
+
+@pytest.mark.parametrize(
+    "book_factory",
+    [_future_book, _option_book],
+    ids=["future", "option"],
+)
+@pytest.mark.parametrize(
+    "market",
+    [
+        MarketSnapshot(id="empty"),
+        MarketSnapshot(id="spy-only", equity_spots={"SPY": 565.0}),
+    ],
+    ids=["empty", "spy-only"],
+)
+def test_missing_equity_family_spot_raises_when_market_is_supplied(
+    book_factory, market: MarketSnapshot
+) -> None:
+    _, position = book_factory()
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        BuiltinPricingEngine().value(position, market)
+    assert raised.value.factor_key == f"equity_spots[{position.symbol}]"
+
+
+@pytest.mark.parametrize(
+    "book_factory",
+    [_future_book, _option_book],
+    ids=["future", "option"],
+)
+@pytest.mark.parametrize(
+    "market",
+    [
+        MarketSnapshot(id="empty"),
+        MarketSnapshot(id="spy-only", equity_spots={"SPY": 565.0}),
+    ],
+    ids=["empty", "spy-only"],
+)
+def test_quantlib_missing_equity_family_spot_raises_when_market_is_supplied(
+    book_factory, market: MarketSnapshot
+) -> None:
+    import_quantlib()
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    _, position = book_factory()
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        QuantLibPricingEngine().value(position, market)
+    assert raised.value.factor_key == f"equity_spots[{position.symbol}]"
+
+
+def test_supplied_snapshot_beats_trade_local_equity_future_spot() -> None:
+    _, position = _future_book()
+    original = position.model_dump(mode="json")
+    market = MarketSnapshot(id="authoritative", equity_spots={"AUTH": 101.0})
+
+    valuation = BuiltinPricingEngine().value(position, market)
+    local = BuiltinPricingEngine().value(position)
+
+    assert valuation.market_value != local.market_value
+    assert valuation.market_value != position.quantity * position.multiplier * position.spot
+    assert position.model_dump(mode="json") == original
+
+
+def test_supplied_snapshot_beats_trade_local_equity_option_spot() -> None:
+    _, position = _option_book()
+    original = position.model_dump(mode="json")
+    market = MarketSnapshot(id="authoritative", equity_spots={"AUTH": 101.0})
+
+    valuation = BuiltinPricingEngine().value(position, market)
+    local = BuiltinPricingEngine().value(position)
+
+    assert valuation.market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+def test_quantlib_supplied_snapshot_beats_trade_local_equity_future_spot() -> None:
+    import_quantlib()
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    _, position = _future_book()
+    original = position.model_dump(mode="json")
+    market = MarketSnapshot(id="authoritative", equity_spots={"AUTH": 101.0})
+    engine = QuantLibPricingEngine()
+
+    valuation = engine.value(position, market)
+    local = engine.value(position)
+
+    assert valuation.market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+def test_quantlib_supplied_snapshot_beats_trade_local_equity_option_spot() -> None:
+    import_quantlib()
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    _, position = _option_book()
+    original = position.model_dump(mode="json")
+    market = MarketSnapshot(id="authoritative", equity_spots={"AUTH": 101.0})
+    engine = QuantLibPricingEngine()
+
+    valuation = engine.value(position, market)
+    local = engine.value(position)
+
+    assert valuation.market_value != local.market_value
+    assert position.model_dump(mode="json") == original

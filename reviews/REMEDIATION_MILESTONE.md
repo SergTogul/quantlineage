@@ -227,8 +227,9 @@ Related findings:
 
 | Slice | Status | Evidence |
 |---|---|---|
-| R0.2-A explicit snapshot path and validated demo bridge | COMPLETE | Independent re-review **APPROVE** (`reviews/r0.2-a-rereview.md`). Conflict adapter; production VaR/ES/historical pass an explicit snapshot; equity cash missing spots raise; demo matcher is exact id+position-set; `PortfolioService` summary/VaR/ES/contributors/compare share one resolved snapshot. |
-| Remaining family terms and non-equity fallbacks | OPEN | Brief §2 sequence. Deferred Minors: QuantLib missing-spot test parametrization; golden snapshot-routing extensions; engine `market=None` inference. |
+| R0.2-A explicit snapshot path and validated demo bridge | COMPLETE | Independent re-review **APPROVE** (`reviews/r0.2-a-rereview.md`). |
+| R0.2 equity future/option spots | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-equity-spots-independent-review.md`). Missing `equity_spots[symbol]` raises for cash, futures, and European options when market is supplied. |
+| Remaining family vols/rates/dividends, terms, non-equity fallbacks | OPEN | Next: option vol / future rates+dividends. Deferred: golden snapshot-routing; engine `market=None` inference. |
 
 RF-001 remains **OPEN** until remaining families cannot silently fall back to trade-local marks and production methods no longer infer markets.
 

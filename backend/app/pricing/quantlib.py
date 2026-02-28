@@ -39,6 +39,13 @@ class QuantLibUnavailableError(RuntimeError):
     pass
 
 
+def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
+    try:
+        return market.equity_spots[symbol]
+    except KeyError:
+        raise MissingMarketDataError(f"equity_spots[{symbol}]") from None
+
+
 class QuantLibPricingEngine(PricingEngine):
     """QuantLib-backed valuation adapter.
 
@@ -85,22 +92,16 @@ class QuantLibPricingEngine(PricingEngine):
             # Convert immutable market snapshot values into the trade-local marks QuantLib consumes.
             updates = {}
             if isinstance(position, EquityPosition):
-                try:
-                    updates["price"] = market.equity_spots[position.symbol]
-                except KeyError:
-                    raise MissingMarketDataError(
-                        f"equity_spots[{position.symbol}]"
-                    ) from None
+                updates["price"] = _required_equity_spot(market, position.symbol)
             elif isinstance(position, EquityFuturePosition):
                 updates = {
-                    "spot": market.equity_spots.get(position.symbol, position.spot),
+                    "spot": _required_equity_spot(market, position.symbol),
                     "risk_free_rate": market.rates.get("USD", position.risk_free_rate),
                 }
             elif isinstance(position, EuropeanOptionPosition):
-                spot = market.equity_spots.get(position.symbol, position.spot)
                 fallback = market.equity_vols.get(position.symbol, position.volatility)
                 updates = {
-                    "spot": spot,
+                    "spot": _required_equity_spot(market, position.symbol),
                     "volatility": fallback,
                     "risk_free_rate": market.rates.get("USD", position.risk_free_rate),
                 }
