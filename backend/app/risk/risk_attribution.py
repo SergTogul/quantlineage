@@ -42,8 +42,9 @@ from app.domain.models import (
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.snapshot import PositionMarketDataProvider
+from app.market.snapshot import MarketDataProvider
 from app.risk.historical import HistoricalRiskEngine
+from app.sample import DemoPortfolioMarketDataProvider
 
 # Market field groups applied sequentially after the position bridge.
 _MARKET_STEPS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -75,10 +76,10 @@ class RiskChangeAttributionEngine:
     def __init__(
         self,
         risk_engine: HistoricalRiskEngine | None = None,
-        market_data: PositionMarketDataProvider | None = None,
+        market_data: MarketDataProvider | None = None,
     ):
         self.risk_engine = risk_engine or HistoricalRiskEngine()
-        self.market_data = market_data or PositionMarketDataProvider()
+        self.market_data = market_data or DemoPortfolioMarketDataProvider()
 
     def _var(
         self,

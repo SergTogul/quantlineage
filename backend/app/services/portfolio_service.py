@@ -29,7 +29,6 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
-from app.market.snapshot import PositionMarketDataProvider
 from app.risk.attribution import AttributionEngine
 from app.risk.es import ESContributionAnalytics
 from app.risk.factors import RiskFactorEngine
@@ -48,6 +47,7 @@ from app.risk.stress import (
     StressEngine,
 )
 from app.risk.var import VaRAnalytics
+from app.sample import DemoPortfolioMarketDataProvider, demo_aggregate_market_snapshot
 
 
 def position_label(position: Position) -> str:
@@ -80,7 +80,7 @@ class PortfolioService:
     def __init__(self, pricing: PricingEngine, risk: RiskEngine):
         self.pricing = pricing
         self.risk = risk
-        self.market_data = PositionMarketDataProvider()
+        self.market_data = DemoPortfolioMarketDataProvider()
         self.stress_engine = StressEngine()
         self.reverse_stress_engine = ReverseStressEngine()
         self.multi_reverse_stress_engine = MultiFactorReverseStressEngine()
@@ -128,8 +128,14 @@ class PortfolioService:
         portfolio: Portfolio,
         methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
     ) -> RiskSummary:
+        market = self.market_snapshot(portfolio)
         if isinstance(self.risk, HistoricalRiskEngine):
-            r = self.risk.calculate(portfolio, self.pricing, methodology=methodology)
+            r = self.risk.calculate(
+                portfolio,
+                self.pricing,
+                methodology=methodology,
+                market=market,
+            )
         else:
             r = self.risk.calculate(portfolio, self.pricing)
             r = {**r, "methodology": methodology.value}
@@ -178,7 +184,13 @@ class PortfolioService:
         portfolio: Portfolio,
         methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
     ):
-        return self.var_engine.report(portfolio, self.pricing, methodology=methodology)
+        market = self.market_snapshot(portfolio)
+        return self.var_engine.report(
+            portfolio,
+            self.pricing,
+            methodology=methodology,
+            market=market,
+        )
 
     def es_contributions(
         self,
@@ -196,8 +208,13 @@ class PortfolioService:
             )
         else:
             engine = self.es_engine
+        market = self.market_snapshot(portfolio)
         return engine.report(
-            portfolio, self.pricing, confidence=confidence, methodology=methodology
+            portfolio,
+            self.pricing,
+            confidence=confidence,
+            methodology=methodology,
+            market=market,
         )
 
     def compare_var_methodologies(
@@ -222,6 +239,7 @@ class PortfolioService:
             self.pricing,
             risk_engine=engine,
             methodologies=methodologies,
+            market=self.market_snapshot(portfolio),
         )
 
     def what_if(
@@ -253,7 +271,7 @@ class PortfolioService:
         return self.risk_change_engine.explain(request, self.pricing)
     def demo_attribution(self, portfolio):
         from app.domain.models import AttributionRequest
-        current=self.market_data.snapshot(portfolio)
+        current=demo_aggregate_market_snapshot(portfolio)
         previous=current.model_copy(update={
             "id":"illustrative_previous",
             "as_of":"illustrative_previous",
@@ -275,7 +293,11 @@ class PortfolioService:
 
     def contributors(self, portfolio: Portfolio) -> list[Contributor]:
         """Rank positions by parametric component VaR with distinct trade labels."""
-        report = self.var_engine.report(portfolio, self.pricing)
+        report = self.var_engine.report(
+            portfolio,
+            self.pricing,
+            market=self.market_snapshot(portfolio),
+        )
         labels = {p.id: position_label(p) for p in portfolio.positions}
         return [
             Contributor(
@@ -288,13 +310,23 @@ class PortfolioService:
         ]
 
     def limits(self, portfolio: Portfolio):
-        risk = self.risk.calculate(portfolio, self.pricing)
+        market = self.market_snapshot(portfolio)
+        if isinstance(self.risk, HistoricalRiskEngine):
+            risk = self.risk.calculate(portfolio, self.pricing, market=market)
+        else:
+            risk = self.risk.calculate(portfolio, self.pricing)
         stress = self.stress_engine.run(portfolio, self.pricing, DEFAULT_SCENARIOS)
         enriched = {
             **risk,
             "stress_loss": max(0.0, max((-float(s.pnl) for s in stress), default=0.0)),
         }
-        return self.limit_engine.evaluate(portfolio, self.pricing, enriched, DEFAULT_LIMITS)
+        return self.limit_engine.evaluate(
+            portfolio,
+            self.pricing,
+            enriched,
+            DEFAULT_LIMITS,
+            market=market,
+        )
 
     def limit_drilldown(
         self,

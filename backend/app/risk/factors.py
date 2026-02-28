@@ -10,12 +10,13 @@ from app.domain.models import (
     FXForwardPosition,
     FXOptionPosition,
     InterestRateFuturePosition,
+    MarketSnapshot,
     Portfolio,
     RiskFactorExposure,
     SwapPosition,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.snapshot import MarketDataProvider, PositionMarketDataProvider
+from app.market.snapshot import MarketDataProvider
 from app.risk.factor_types import (
     EquitySpot,
     EquityVol,
@@ -25,17 +26,21 @@ from app.risk.factor_types import (
     RiskFactor,
     factor_sort_key,
 )
+from app.sample import DemoPortfolioMarketDataProvider
 
 
 class RiskFactorEngine:
     def __init__(self, market_data: MarketDataProvider | None = None):
-        self.market_data = market_data or PositionMarketDataProvider()
+        self.market_data = market_data or DemoPortfolioMarketDataProvider()
 
     def calculate_typed(
-        self, portfolio: Portfolio, pricing: PricingEngine
+        self,
+        portfolio: Portfolio,
+        pricing: PricingEngine,
+        market: MarketSnapshot | None = None,
     ) -> list[tuple[RiskFactor, float]]:
         """Aggregate exposures keyed by typed :class:`RiskFactor` instances."""
-        market = self.market_data.snapshot(portfolio)
+        market = market or self.market_data.snapshot(portfolio)
         agg: dict[RiskFactor, float] = defaultdict(float)
         for p in portfolio.positions:
             v = pricing.value(p, market)
@@ -52,7 +57,12 @@ class RiskFactorEngine:
                     agg[FXVol(pair=p.pair)] += v.vega
         return sorted(agg.items(), key=lambda item: factor_sort_key(item[0]))
 
-    def calculate(self, portfolio: Portfolio, pricing: PricingEngine) -> list[RiskFactorExposure]:
+    def calculate(
+        self,
+        portfolio: Portfolio,
+        pricing: PricingEngine,
+        market: MarketSnapshot | None = None,
+    ) -> list[RiskFactorExposure]:
         """API-facing exposures; ``factor`` remains a stable string key."""
         return [
             RiskFactorExposure(
@@ -61,5 +71,5 @@ class RiskFactorEngine:
                 bucket=factor.bucket,
                 exposure=exposure,
             )
-            for factor, exposure in self.calculate_typed(portfolio, pricing)
+            for factor, exposure in self.calculate_typed(portfolio, pricing, market)
         ]

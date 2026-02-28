@@ -2,21 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from app.domain.models import (
-    BondPosition,
-    CapFloorPosition,
-    EquityFuturePosition,
-    EquityPosition,
-    EuropeanOptionPosition,
-    FXForwardPosition,
-    FXOptionPosition,
-    InterestRateFuturePosition,
-    MarketSnapshot,
-    Portfolio,
-    StressScenario,
-    SwapPosition,
-    SwaptionPosition,
-)
+from app.domain.models import MarketSnapshot, Portfolio, StressScenario
+from app.market.demo_snapshot import DemoSampleMarksSnapshotAdapter
 
 
 class MarketDataProvider(ABC):
@@ -26,38 +13,15 @@ class MarketDataProvider(ABC):
 
 
 class PositionMarketDataProvider(MarketDataProvider):
-    """Builds an immutable snapshot from trade marks. Replaceable by live/DB market data."""
+    """Deprecated compatibility name for validated demo sample-mark adaptation.
+
+    Compatibility choice for R0.2-A: the default wrapper raises on competing
+    marks. Demo portfolios use ``sample.demo_market_snapshot`` explicitly; no
+    legacy last-writer-wins mode remains on the production-facing API.
+    """
+
     def snapshot(self, portfolio: Portfolio) -> MarketSnapshot:
-        eq, vols, fx, fxv, rates, projection_rates = {}, {}, {}, {}, {"USD": 0.04}, {}
-        for p in portfolio.positions:
-            if isinstance(p, EquityPosition): eq[p.symbol] = p.price
-            elif isinstance(p, (EuropeanOptionPosition, EquityFuturePosition)):
-                eq[p.symbol] = p.spot
-                if isinstance(p, EuropeanOptionPosition): vols[p.symbol] = p.volatility
-                rates["USD"] = p.risk_free_rate
-            elif isinstance(p, BondPosition): rates[p.currency] = p.yield_rate
-            elif isinstance(p, SwapPosition): rates[p.currency] = p.market_swap_rate
-            elif isinstance(p, InterestRateFuturePosition): rates[p.currency] = p.forward_rate
-            elif isinstance(p, CapFloorPosition):
-                rates[p.currency] = p.discount_rate
-                projection_rates[p.currency] = p.forward_rate
-            elif isinstance(p, SwaptionPosition):
-                rates[p.currency] = p.discount_rate
-                projection_rates[p.currency] = p.forward_swap_rate
-            elif isinstance(p, (FXForwardPosition, FXOptionPosition)):
-                fx[p.pair] = p.spot
-                if isinstance(p, FXOptionPosition): fxv[p.pair] = p.volatility
-                rates[p.pair[-3:]] = p.domestic_rate
-                rates[p.pair[:3]] = p.foreign_rate
-        return MarketSnapshot(
-            id="position_marks",
-            equity_spots=eq,
-            equity_vols=vols,
-            fx_spots=fx,
-            fx_vols=fxv,
-            rates=rates,
-            projection_rates=projection_rates,
-        )
+        return DemoSampleMarksSnapshotAdapter().snapshot(portfolio)
 
 
 def shock_snapshot(base: MarketSnapshot, scenario: StressScenario) -> MarketSnapshot:

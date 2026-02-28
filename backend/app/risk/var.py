@@ -14,11 +14,11 @@ from app.domain.models import (
     VaRReport,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.snapshot import PositionMarketDataProvider
 from app.risk.historical import approximate_pnl_series
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.marginal_var import parametric_component_var, parametric_marginal_var
 from app.risk.scenarios import historical_shocked_snapshots
+from app.sample import demo_market_snapshot
 
 
 class VaRAnalytics:
@@ -34,7 +34,6 @@ class VaRAnalytics:
             seed=seed, observations=observations
         )
         self.methodology = methodology
-        self._market_data = PositionMarketDataProvider()
 
     def _factor_history(self):
         obs = self.dataset.factor_observations()
@@ -45,16 +44,14 @@ class VaRAnalytics:
         portfolio: Portfolio,
         pricing: PricingEngine,
         methodology: VaRMethodology,
-        market: MarketSnapshot | None,
+        market: MarketSnapshot,
     ) -> dict[str, np.ndarray]:
         if methodology is VaRMethodology.FULL_REVALUATION:
-            assert market is not None
             return self._full_reval_position_pnls(portfolio, pricing, market)
         er, vp, rb, fx = self._factor_history()
         out: dict[str, np.ndarray] = {}
         for p in portfolio.positions:
-            # Legacy Greek path: position-embedded marks (no shared snapshot).
-            v = pricing.value(p)
+            v = pricing.value(p, market)
             out[p.id] = approximate_pnl_series(
                 delta=v.delta,
                 gamma=v.gamma,
@@ -92,11 +89,7 @@ class VaRAnalytics:
         market: MarketSnapshot | None = None,
     ) -> VaRReport:
         meth = methodology if methodology is not None else self.methodology
-        base_market = (
-            market
-            if market is not None
-            else (self._market_data.snapshot(portfolio) if meth is VaRMethodology.FULL_REVALUATION else None)
-        )
+        base_market = market if market is not None else demo_market_snapshot(portfolio)
         pos = self._position_pnls(portfolio, pricing, meth, base_market)
         n = next(iter(pos.values())).shape[0] if pos else self.dataset.factor_observations().n_observations
         total = sum(pos.values(), start=np.zeros(n))

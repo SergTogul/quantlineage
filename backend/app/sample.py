@@ -1,7 +1,8 @@
-"""In-code demo portfolios for local demos and persistence seeding (M10.1).
+"""In-code demo portfolios and their explicit market snapshots.
 
-No live market-data vendor feeds. Marks are synthetic and embedded on positions;
-``PositionMarketDataProvider`` derives ``MarketSnapshot`` marks at runtime.
+No live market-data vendor feeds. Legacy positions retain synthetic sample marks,
+but production demo risk uses deliberate snapshots rather than merging those
+marks with last-writer-wins semantics.
 
 Themes (ROADMAP M10.1):
 - Equity Vol — cash equity + options + index future (vol / skew book)
@@ -18,7 +19,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.domain.models import Portfolio
+from app.domain.models import MarketSnapshot, Portfolio
+from app.market.vol_surfaces import VolSurface
 
 DemoTheme = Literal["equity_vol", "rates_macro", "cross_asset"]
 
@@ -324,6 +326,130 @@ DEMO_PORTFOLIOS: tuple[Portfolio, ...] = (
 )
 
 DEMO_PORTFOLIOS_BY_ID: dict[str, Portfolio] = {p.id: p for p in DEMO_PORTFOLIOS}
+
+
+def _spy_demo_surface() -> dict:
+    """SPY smile/term grid preserving the two equity-vol demo option marks."""
+    return VolSurface.from_grid(
+        "SPY",
+        "equity",
+        {
+            ("3M", 0.9): 0.18,
+            ("3M", 1.0): 0.18,
+            ("3M", 1.1): 0.18,
+            ("6M", 0.9): 0.22,
+            ("6M", 1.0): 0.22,
+            ("6M", 1.1): 0.22,
+        },
+    ).to_dict()
+
+
+_DEMO_MARKETS: dict[str, MarketSnapshot] = {
+    "equity-vol": MarketSnapshot(
+        id="demo:equity-vol",
+        equity_spots={"NVDA": 118.50, "SPY": 565.00},
+        equity_vols={"NVDA": 0.46, "SPY": 0.22},
+        rates={"USD": 0.04},
+        dividend_yields={"NVDA": 0.0, "SPY": 0.0},
+        vol_surfaces={"SPY": _spy_demo_surface()},
+    ),
+    "rates-macro": MarketSnapshot(
+        id="demo:rates-macro",
+        rates={"USD": 0.04},
+        key_rates={
+            "USD": {
+                "0.25Y": 0.0425,
+                "1.9Y": 0.043 * ((694.0 / 365.0) / 1.9),
+                "2Y": 0.043,
+                "5Y": 0.041,
+                "9.5Y": 0.041 * ((3468.0 / 365.0) / 9.5),
+                "10Y": 0.0415,
+            }
+        },
+        projection_rates={"USD": 0.0425},
+    ),
+    "global-macro": MarketSnapshot(
+        id="demo:global-macro",
+        equity_spots={"NVDA": 118.50, "SPY": 565.00},
+        equity_vols={"NVDA": 0.46, "SPY": 0.22},
+        fx_spots={"EURUSD": 1.10},
+        fx_vols={"EURUSD": 0.12},
+        rates={"USD": 0.04, "EUR": 0.03},
+        key_rates={
+            "USD": {
+                "5Y": 0.041,
+                "9.5Y": 0.041 * ((3468.0 / 365.0) / 9.5),
+            }
+        },
+        dividend_yields={"NVDA": 0.0, "SPY": 0.0},
+    ),
+}
+
+_DEMO_AGGREGATE_MARKETS: dict[str, MarketSnapshot] = {
+    "equity-vol": MarketSnapshot(
+        id="demo-aggregate:equity-vol",
+        equity_spots={"NVDA": 118.50, "SPY": 565.00},
+        equity_vols={"NVDA": 0.46, "SPY": 0.18},
+        rates={"USD": 0.04},
+    ),
+    "rates-macro": MarketSnapshot(
+        id="demo-aggregate:rates-macro",
+        rates={"USD": 0.0425},
+    ),
+    "global-macro": MarketSnapshot(
+        id="demo-aggregate:global-macro",
+        equity_spots={"NVDA": 118.50, "SPY": 565.00},
+        equity_vols={"NVDA": 0.46, "SPY": 0.22},
+        fx_spots={"EURUSD": 1.10},
+        fx_vols={"EURUSD": 0.12},
+        rates={"USD": 0.04, "EUR": 0.03},
+    ),
+}
+
+
+def _matching_demo_id(portfolio: Portfolio) -> str | None:
+    """Bind a canned snapshot only for exact demo identity (id and position ids)."""
+    demo = DEMO_PORTFOLIOS_BY_ID.get(portfolio.id)
+    if demo is None:
+        return None
+    position_ids = {position.id for position in portfolio.positions}
+    demo_ids = {position.id for position in demo.positions}
+    if position_ids == demo_ids:
+        return portfolio.id
+    return None
+
+
+def demo_market_snapshot(portfolio: Portfolio) -> MarketSnapshot:
+    """Resolve an explicit demo snapshot, otherwise validate legacy sample marks."""
+    demo_id = _matching_demo_id(portfolio)
+    if demo_id is not None:
+        return _DEMO_MARKETS[demo_id]
+
+    from app.market.demo_snapshot import DemoSampleMarksSnapshotAdapter
+
+    return DemoSampleMarksSnapshotAdapter().snapshot(portfolio)
+
+
+def demo_aggregate_market_snapshot(portfolio: Portfolio) -> MarketSnapshot:
+    """Explicit compatibility snapshot for pre-R0.2 demo stress/attribution goldens."""
+    demo_id = _matching_demo_id(portfolio)
+    if demo_id is not None:
+        return _DEMO_AGGREGATE_MARKETS[demo_id]
+    return demo_market_snapshot(portfolio)
+
+
+class DemoPortfolioMarketDataProvider:
+    """Application-boundary resolver for explicit demos and validated ad-hoc books."""
+
+    def snapshot(self, portfolio: Portfolio) -> MarketSnapshot:
+        return demo_market_snapshot(portfolio)
+
+
+class DemoAggregateMarketDataProvider:
+    """Resolve deliberate aggregate snapshots for unchanged demo risk goldens."""
+
+    def snapshot(self, portfolio: Portfolio) -> MarketSnapshot:
+        return demo_aggregate_market_snapshot(portfolio)
 
 
 def get_demo_portfolio(portfolio_id: str) -> Portfolio | None:

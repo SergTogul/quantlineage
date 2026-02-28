@@ -35,7 +35,7 @@ from typing import Iterable, Literal, Mapping, Sequence
 
 from app.domain.models import MarketSnapshot, Portfolio, Position
 from app.interfaces.pricing import PricingEngine
-from app.market.snapshot import MarketDataProvider, PositionMarketDataProvider
+from app.market.snapshot import MarketDataProvider
 from app.risk.factor_types import (
     EquitySpot,
     EquityVol,
@@ -46,6 +46,7 @@ from app.risk.factor_types import (
     factor_sort_key,
 )
 from app.risk.factors import RiskFactorEngine
+from app.sample import DemoPortfolioMarketDataProvider
 
 MeasureName = Literal[
     "delta",
@@ -127,7 +128,7 @@ class SensitivityEngine:
     ):
         if spot_bump <= 0 or vol_bump <= 0 or rate_bump_bps <= 0:
             raise ValueError("bump sizes must be positive")
-        self.market_data = market_data or PositionMarketDataProvider()
+        self.market_data = market_data or DemoPortfolioMarketDataProvider()
         self.spot_bump = spot_bump
         self.vol_bump = vol_bump
         self.rate_bump_bps = rate_bump_bps
@@ -227,7 +228,12 @@ class SensitivityEngine:
         requested = tuple(measures) if measures is not None else DEFAULT_MEASURES
         self._validate_measures(requested)
         market = market or self.market_data.snapshot(portfolio)
-        factors = [f for f, _ in self._factors.calculate_typed(portfolio, pricing)]
+        factors = [
+            f
+            for f, _ in self._factors.calculate_typed(
+                portfolio, pricing, market
+            )
+        ]
         return self._compute(portfolio, pricing, market, factors, requested, scope="portfolio")
 
     def calculate_position(
@@ -242,7 +248,12 @@ class SensitivityEngine:
         requested = tuple(measures) if measures is not None else DEFAULT_MEASURES
         self._validate_measures(requested)
         market = market or self.market_data.snapshot(portfolio)
-        factors = [f for f, _ in self._factors.calculate_typed(portfolio, pricing)]
+        factors = [
+            f
+            for f, _ in self._factors.calculate_typed(
+                portfolio, pricing, market
+            )
+        ]
         return self._compute(portfolio, pricing, market, factors, requested, scope="position")
 
     def _validate_measures(self, measures: Iterable[str]) -> None:

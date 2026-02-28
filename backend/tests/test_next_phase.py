@@ -4,10 +4,10 @@ from fastapi.testclient import TestClient
 
 from app.domain.models import AttributionRequest, StressScenario
 from app.main import app
-from app.market.snapshot import PositionMarketDataProvider, shock_snapshot
+from app.market.snapshot import shock_snapshot
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
 
 svc=PortfolioService(BuiltinPricingEngine(),HistoricalRiskEngine())
@@ -15,7 +15,7 @@ client=TestClient(app)
 
 
 def test_market_snapshot_and_instrument_specific_shock():
-    market=PositionMarketDataProvider().snapshot(SAMPLE_PORTFOLIO)
+    market=demo_market_snapshot(SAMPLE_PORTFOLIO)
     assert market.equity_spots["NVDA"] == 118.5
     assert market.fx_spots["EURUSD"] == 1.10
     shocked=shock_snapshot(market,StressScenario(name="NVDA only",equity_shocks={"NVDA":-0.2}))
