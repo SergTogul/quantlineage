@@ -28,6 +28,13 @@ def _cdf(x: float) -> float: return _N.cdf(x)
 def _pdf(x: float) -> float: return math.exp(-0.5*x*x)/math.sqrt(2*math.pi)
 
 
+def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
+    try:
+        return market.equity_spots[symbol]
+    except KeyError:
+        raise MissingMarketDataError(f"equity_spots[{symbol}]") from None
+
+
 def _act365_fixed_years(maturity_years: float) -> float:
     """Actual/365 Fixed year fraction matching QuantLib ZeroCouponBond.
 
@@ -48,18 +55,18 @@ class BuiltinPricingEngine(PricingEngine):
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
         if isinstance(position, EquityPosition):
-            if market is None:
-                spot = position.price
-            else:
-                try:
-                    spot = market.equity_spots[position.symbol]
-                except KeyError:
-                    raise MissingMarketDataError(
-                        f"equity_spots[{position.symbol}]"
-                    ) from None
+            spot = (
+                position.price
+                if market is None
+                else _required_equity_spot(market, position.symbol)
+            )
             return Valuation(position_id=position.id, market_value=position.quantity*spot, delta=position.quantity*spot)
         if isinstance(position, EquityFuturePosition):
-            s = market.equity_spots.get(position.symbol, position.spot) if market else position.spot
+            s = (
+                position.spot
+                if market is None
+                else _required_equity_spot(market, position.symbol)
+            )
             r = market.rates.get("USD", position.risk_free_rate) if market else position.risk_free_rate
             f = s * math.exp((r-position.dividend_yield)*position.maturity_years)
             mv = position.quantity*position.multiplier*f
@@ -116,7 +123,7 @@ class BuiltinPricingEngine(PricingEngine):
         return Valuation(position_id=p.id, market_value=pv, dv01=sign * annuity * 0.0001)
 
     def _equity_option(self, p: EuropeanOptionPosition, market: MarketSnapshot | None) -> Valuation:
-        s = market.equity_spots.get(p.symbol,p.spot) if market else p.spot
+        s = p.spot if market is None else _required_equity_spot(market, p.symbol)
         fallback = market.equity_vols.get(p.symbol, p.volatility) if market else p.volatility
         sigma = (
             option_vol_from_snapshot(
