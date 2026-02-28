@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from enum import Enum
@@ -7,13 +9,16 @@ from types import MappingProxyType
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     computed_field,
     field_serializer,
     model_validator,
 )
+from pydantic_core import PydanticCustomError
 
 # RateZero tenors that parallel-shift scalar ``rates[ccy]`` (and all pillars).
 _RATE_PARALLEL_TENORS = frozenset({"ALL", "PARALLEL"})
@@ -21,6 +26,99 @@ _VOL_GENERIC_EXPIRIES = frozenset({"GENERIC", "ALL", "PARALLEL"})
 _VOL_ATM_BUCKETS = frozenset({"ATM", "GENERIC", "ALL", "PARALLEL"})
 _VOL_SKEW_BUCKETS = frozenset({"SKEW", "SMILE_SKEW"})
 _VOL_TERM_BUCKETS = frozenset({"TERM", "TERM_STRUCTURE"})
+_FX_PAIR_RE = re.compile(r"^[A-Z]{6}$")
+_NON_FINITE_LABELS = frozenset({"NaN", "Infinity", "-Infinity"})
+
+
+def _non_finite_label(value: float) -> str:
+    if math.isnan(value):
+        return "NaN"
+    return "Infinity" if value > 0 else "-Infinity"
+
+
+def _coerce_non_finite_to_label(value: Any) -> Any:
+    """Swap NaN/Inf for a JSON-safe label before the float parser runs.
+
+    FastAPI's 422 handler serializes ``exc.errors()`` (including ``input``)
+    via Starlette ``JSONResponse`` (``allow_nan=False``). Keeping the original
+    float in the error payload would turn a validation failure into HTTP 500.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return _non_finite_label(value)
+    return value
+
+
+def _finite_number_error() -> None:
+    # PydanticCustomError keeps 422 ``exc.errors()`` JSON-serializable
+    # (``raise ValueError`` puts a ValueError object in ``ctx``).
+    raise PydanticCustomError("finite_number", "must be a finite number")
+
+
+def _reject_non_finite_label(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            parsed = float(value)
+        except ValueError:
+            return value
+        if not math.isfinite(parsed):
+            _finite_number_error()
+    return value
+
+
+def _require_finite(value: float) -> float:
+    """Reject NaN / ±Infinity after Pydantic coerces the field to float."""
+    if not math.isfinite(value):
+        _finite_number_error()
+    return value
+
+
+def _require_fx_pair(value: str) -> str:
+    """Accept a 6-letter ISO pair (EURUSD); reject empty or punctuation shapes."""
+    pair = value.strip().upper()
+    if _FX_PAIR_RE.fullmatch(pair) is None:
+        raise PydanticCustomError(
+            "fx_pair",
+            "must be a 6-letter ISO FX pair (e.g. EURUSD)",
+        )
+    return pair
+
+
+def _replace_nested_non_finite(value: Any) -> Any:
+    """Copy a tree, replacing non-finite floats with JSON-safe labels."""
+    if isinstance(value, Mapping):
+        return {k: _replace_nested_non_finite(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_replace_nested_non_finite(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_replace_nested_non_finite(v) for v in value)
+    if isinstance(value, float) and not math.isfinite(value):
+        return _non_finite_label(value)
+    return value
+
+
+def _assert_nested_floats_finite(value: Any) -> None:
+    """Walk mappings/sequences and reject non-finite floats (curves / surfaces)."""
+    if isinstance(value, Mapping):
+        for item in value.values():
+            _assert_nested_floats_finite(item)
+        return
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            _assert_nested_floats_finite(item)
+        return
+    if isinstance(value, str) and value in _NON_FINITE_LABELS:
+        _finite_number_error()
+    if isinstance(value, float) and not math.isfinite(value):
+        _finite_number_error()
+
+
+FiniteFloat = Annotated[
+    float,
+    BeforeValidator(_coerce_non_finite_to_label),
+    BeforeValidator(_reject_non_finite_label),
+    AfterValidator(_require_finite),
+]
+FxPair = Annotated[str, AfterValidator(_require_fx_pair)]
 
 
 def _deep_freeze(value: Any) -> Any:
@@ -93,7 +191,23 @@ class AssetClass(str, Enum):
     FX = "fx"
 
 
-class PositionHierarchyMixin(BaseModel):
+class FiniteInputMixin(BaseModel):
+    """Rewrite NaN/±Inf to JSON-safe labels before field validation.
+
+    Pydantic records the *field* input in ``ValidationError.errors()``. FastAPI
+    then serializes that list as the 422 body. Replacing non-finite floats here
+    keeps those details JSON-compliant without changing ``errors.py``.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _label_non_finite_inputs(cls, data: Any) -> Any:
+        if isinstance(data, Mapping):
+            return _replace_nested_non_finite(data)
+        return data
+
+
+class PositionHierarchyMixin(FiniteInputMixin):
     """Optional desk/strategy placement on a trade.
 
     ``None`` inherits :attr:`Portfolio.desk` / :attr:`Portfolio.strategy`
@@ -108,8 +222,8 @@ class EquityPosition(PositionHierarchyMixin):
     type: Literal["equity"]
     id: str
     symbol: str
-    quantity: float
-    price: float
+    quantity: FiniteFloat
+    price: FiniteFloat
     sector: str = "Other"
     book: str = "Equity"
 
@@ -118,12 +232,12 @@ class EquityFuturePosition(PositionHierarchyMixin):
     type: Literal["equity_future"]
     id: str
     symbol: str
-    quantity: float
-    spot: float
-    multiplier: float = 50.0
-    maturity_years: float = Field(default=0.25, gt=0)
-    risk_free_rate: float = 0.04
-    dividend_yield: float = 0.0
+    quantity: FiniteFloat
+    spot: FiniteFloat
+    multiplier: FiniteFloat = 50.0
+    maturity_years: FiniteFloat = Field(default=0.25, gt=0)
+    risk_free_rate: FiniteFloat = 0.04
+    dividend_yield: FiniteFloat = 0.0
     sector: str = "Index"
     book: str = "Equity Derivatives"
 
@@ -132,13 +246,13 @@ class EuropeanOptionPosition(PositionHierarchyMixin):
     type: Literal["european_option"]
     id: str
     symbol: str
-    quantity: float
-    spot: float
-    strike: float
-    maturity_years: float = Field(gt=0)
-    volatility: float = Field(gt=0)
-    risk_free_rate: float = 0.04
-    dividend_yield: float = 0.0
+    quantity: FiniteFloat
+    spot: FiniteFloat
+    strike: FiniteFloat
+    maturity_years: FiniteFloat = Field(gt=0)
+    volatility: FiniteFloat = Field(gt=0)
+    risk_free_rate: FiniteFloat = 0.04
+    dividend_yield: FiniteFloat = 0.0
     option_type: Literal["call", "put"]
     sector: str = "Other"
     book: str = "Equity Derivatives"
@@ -148,11 +262,11 @@ class BondPosition(PositionHierarchyMixin):
     type: Literal["bond"]
     id: str
     issuer: str
-    face_value: float = Field(gt=0)
-    quantity: float = 1.0
-    maturity_years: float = Field(gt=0)
-    yield_rate: float
-    duration: float = Field(gt=0)
+    face_value: FiniteFloat = Field(gt=0)
+    quantity: FiniteFloat = 1.0
+    maturity_years: FiniteFloat = Field(gt=0)
+    yield_rate: FiniteFloat
+    duration: FiniteFloat = Field(gt=0)
     currency: str = "USD"
     book: str = "Rates"
 
@@ -161,39 +275,39 @@ class SwapPosition(PositionHierarchyMixin):
     type: Literal["swap"]
     id: str
     currency: str = "USD"
-    notional: float = Field(gt=0)
-    maturity_years: float = Field(gt=0)
-    fixed_rate: float
-    market_swap_rate: float
+    notional: FiniteFloat = Field(gt=0)
+    maturity_years: FiniteFloat = Field(gt=0)
+    fixed_rate: FiniteFloat
+    market_swap_rate: FiniteFloat
     pay_fixed: bool = True
-    duration: float = Field(gt=0)
+    duration: FiniteFloat = Field(gt=0)
     book: str = "Rates Derivatives"
 
 
 class FXForwardPosition(PositionHierarchyMixin):
     type: Literal["fx_forward"]
     id: str
-    pair: str
-    notional_base: float
-    spot: float = Field(gt=0)
-    strike: float = Field(gt=0)
-    maturity_years: float = Field(gt=0)
-    domestic_rate: float = 0.04
-    foreign_rate: float = 0.03
+    pair: FxPair
+    notional_base: FiniteFloat
+    spot: FiniteFloat = Field(gt=0)
+    strike: FiniteFloat = Field(gt=0)
+    maturity_years: FiniteFloat = Field(gt=0)
+    domestic_rate: FiniteFloat = 0.04
+    foreign_rate: FiniteFloat = 0.03
     book: str = "FX"
 
 
 class FXOptionPosition(PositionHierarchyMixin):
     type: Literal["fx_option"]
     id: str
-    pair: str
-    notional_base: float
-    spot: float = Field(gt=0)
-    strike: float = Field(gt=0)
-    maturity_years: float = Field(gt=0)
-    volatility: float = Field(gt=0)
-    domestic_rate: float = 0.04
-    foreign_rate: float = 0.03
+    pair: FxPair
+    notional_base: FiniteFloat
+    spot: FiniteFloat = Field(gt=0)
+    strike: FiniteFloat = Field(gt=0)
+    maturity_years: FiniteFloat = Field(gt=0)
+    volatility: FiniteFloat = Field(gt=0)
+    domestic_rate: FiniteFloat = 0.04
+    foreign_rate: FiniteFloat = 0.03
     option_type: Literal["call", "put"]
     book: str = "FX Derivatives"
 
@@ -204,12 +318,12 @@ class InterestRateFuturePosition(PositionHierarchyMixin):
     type: Literal["ir_future"]
     id: str
     currency: str = "USD"
-    quantity: float
+    quantity: FiniteFloat
     # Dollar value of a 1bp move per contract (e.g. 25 for classic Eurodollar).
-    pv01: float = Field(default=25.0, gt=0)
-    quoted_rate: float
-    forward_rate: float
-    maturity_years: float = Field(gt=0)
+    pv01: FiniteFloat = Field(default=25.0, gt=0)
+    quoted_rate: FiniteFloat
+    forward_rate: FiniteFloat
+    maturity_years: FiniteFloat = Field(gt=0)
     book: str = "Rates Derivatives"
 
 
@@ -227,14 +341,14 @@ class CapFloorPosition(PositionHierarchyMixin):
     type: Literal["cap_floor"]
     id: str
     currency: str = "USD"
-    notional: float = Field(gt=0)
-    quantity: float = 1.0
-    strike: float = Field(gt=0)
-    maturity_years: float = Field(gt=0)
-    volatility: float = Field(gt=0)
+    notional: FiniteFloat = Field(gt=0)
+    quantity: FiniteFloat = 1.0
+    strike: FiniteFloat = Field(gt=0)
+    maturity_years: FiniteFloat = Field(gt=0)
+    volatility: FiniteFloat = Field(gt=0)
     option_type: Literal["cap", "floor"]
-    forward_rate: float = Field(gt=0)
-    discount_rate: float = 0.04
+    forward_rate: FiniteFloat = Field(gt=0)
+    discount_rate: FiniteFloat = 0.04
     payment_frequency_per_year: int = Field(default=2, ge=1, le=12)
     book: str = "Rates Derivatives"
 
@@ -253,15 +367,15 @@ class SwaptionPosition(PositionHierarchyMixin):
     type: Literal["swaption"]
     id: str
     currency: str = "USD"
-    notional: float = Field(gt=0)
-    quantity: float = 1.0
-    strike: float = Field(gt=0)
-    option_maturity_years: float = Field(gt=0)
-    swap_tenor_years: float = Field(gt=0)
-    volatility: float = Field(gt=0)
+    notional: FiniteFloat = Field(gt=0)
+    quantity: FiniteFloat = 1.0
+    strike: FiniteFloat = Field(gt=0)
+    option_maturity_years: FiniteFloat = Field(gt=0)
+    swap_tenor_years: FiniteFloat = Field(gt=0)
+    volatility: FiniteFloat = Field(gt=0)
     option_type: Literal["payer", "receiver"]
-    forward_swap_rate: float = Field(gt=0)
-    discount_rate: float = 0.04
+    forward_swap_rate: FiniteFloat = Field(gt=0)
+    discount_rate: FiniteFloat = 0.04
     payment_frequency_per_year: int = Field(default=2, ge=1, le=12)
     book: str = "Rates Derivatives"
 
@@ -283,7 +397,7 @@ Position = Annotated[
 ]
 
 
-class Portfolio(BaseModel):
+class Portfolio(FiniteInputMixin):
     id: str
     name: str
     positions: list[Position]
@@ -299,7 +413,7 @@ class Portfolio(BaseModel):
         return self
 
 
-class MarketSnapshot(BaseModel):
+class MarketSnapshot(FiniteInputMixin):
     """Immutable market marks consumed by pricing and risk.
 
     Flat dict fields remain the storage/API shape for compatibility. Typed
@@ -323,15 +437,15 @@ class MarketSnapshot(BaseModel):
 
     id: str = "current"
     as_of: str = "current"
-    equity_spots: dict[str, float] = Field(default_factory=dict)
-    equity_vols: dict[str, float] = Field(default_factory=dict)
-    fx_spots: dict[str, float] = Field(default_factory=dict)
-    fx_vols: dict[str, float] = Field(default_factory=dict)
-    rates: dict[str, float] = Field(default_factory=lambda: {"USD": 0.04})
-    key_rates: dict[str, dict[str, float]] = Field(default_factory=dict)
-    dividend_yields: dict[str, float] = Field(default_factory=dict)
-    projection_rates: dict[str, float] = Field(default_factory=dict)
-    rate_spreads: dict[str, float] = Field(default_factory=dict)
+    equity_spots: dict[str, FiniteFloat] = Field(default_factory=dict)
+    equity_vols: dict[str, FiniteFloat] = Field(default_factory=dict)
+    fx_spots: dict[str, FiniteFloat] = Field(default_factory=dict)
+    fx_vols: dict[str, FiniteFloat] = Field(default_factory=dict)
+    rates: dict[str, FiniteFloat] = Field(default_factory=lambda: {"USD": 0.04})
+    key_rates: dict[str, dict[str, FiniteFloat]] = Field(default_factory=dict)
+    dividend_yields: dict[str, FiniteFloat] = Field(default_factory=dict)
+    projection_rates: dict[str, FiniteFloat] = Field(default_factory=dict)
+    rate_spreads: dict[str, FiniteFloat] = Field(default_factory=dict)
     # Named curve payloads: {name: {currency, curve_type, name, zeros}}
     curves: dict[str, dict] = Field(default_factory=dict)
     # Named vol surface payloads: {name: {asset_class, atm_vol, grid, ...}}
@@ -358,6 +472,8 @@ class MarketSnapshot(BaseModel):
 
     @model_validator(mode="after")
     def _freeze_nested_maps(self):
+        for name in self._NESTED_MAP_FIELDS:
+            _assert_nested_floats_finite(getattr(self, name))
         self._apply_nested_freeze()
         return self
 
@@ -688,21 +804,21 @@ class ScenarioKind(str, Enum):
     REVERSE = "reverse"
 
 
-class StressScenario(BaseModel):
+class StressScenario(FiniteInputMixin):
     id: str | None = None
     name: str
     description: str = ""
     kind: ScenarioKind = ScenarioKind.FACTOR
     horizon: str = "instant"
-    equity_shock: float = 0.0
-    vol_shock: float = 0.0
-    rates_shift_bps: float = 0.0
-    fx_shock: float = 0.0
-    equity_shocks: dict[str, float] = {}
-    vol_shocks: dict[str, float] = {}
-    rate_shocks_bps: dict[str, float] = {}
-    fx_shocks: dict[str, float] = {}
-    max_loss_pct: float | None = Field(default=None, gt=0)
+    equity_shock: FiniteFloat = 0.0
+    vol_shock: FiniteFloat = 0.0
+    rates_shift_bps: FiniteFloat = 0.0
+    fx_shock: FiniteFloat = 0.0
+    equity_shocks: dict[str, FiniteFloat] = {}
+    vol_shocks: dict[str, FiniteFloat] = {}
+    rate_shocks_bps: dict[str, FiniteFloat] = {}
+    fx_shocks: dict[str, FiniteFloat] = {}
+    max_loss_pct: FiniteFloat | None = Field(default=None, gt=0)
 
 
 class StressResult(BaseModel):
@@ -778,16 +894,16 @@ class ScenarioEvaluationReport(BaseModel):
     evaluations: list[StressEvaluation]
 
 
-class CustomStressRequest(BaseModel):
+class CustomStressRequest(FiniteInputMixin):
     portfolio: Portfolio
     scenarios: list[StressScenario]
 
 
-class ReverseStressRequest(BaseModel):
+class ReverseStressRequest(FiniteInputMixin):
     portfolio: Portfolio
-    target_loss_pct: float = Field(gt=0)
+    target_loss_pct: FiniteFloat = Field(gt=0)
     factor: Literal["equity", "rates", "vol", "fx"] = "equity"
-    max_shock: float = Field(default=0.80, gt=0)
+    max_shock: FiniteFloat = Field(default=0.80, gt=0)
 
 
 class ReverseStressConvergence(BaseModel):
@@ -824,15 +940,15 @@ class ReverseStressResult(BaseModel):
     convergence: ReverseStressConvergence | None = None
 
 
-class MultiFactorReverseStressRequest(BaseModel):
+class MultiFactorReverseStressRequest(FiniteInputMixin):
     """Constrained multi-factor reverse stress (M3.6)."""
 
     portfolio: Portfolio
-    target_loss_pct: float = Field(gt=0)
+    target_loss_pct: FiniteFloat = Field(gt=0)
     factors: list[Literal["equity", "rates", "vol", "fx"]] | None = None
-    weights: dict[str, float] | None = None
-    max_shocks: dict[str, float] | None = None
-    max_shock: float = Field(default=0.80, gt=0)
+    weights: dict[str, FiniteFloat] | None = None
+    max_shocks: dict[str, FiniteFloat] | None = None
+    max_shock: FiniteFloat = Field(default=0.80, gt=0)
 
 
 class FactorShockSolution(BaseModel):
@@ -861,7 +977,7 @@ class MultiFactorReverseStressResult(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
 
 
-class ScenarioComparisonRequest(BaseModel):
+class ScenarioComparisonRequest(FiniteInputMixin):
     portfolio: Portfolio
     hedged_portfolio: Portfolio
     scenarios: list[StressScenario]
@@ -905,7 +1021,7 @@ LimitStatus = Literal["OK", "WARNING", "BREACH"]
 LimitScope = Literal["firm", "portfolio", "desk", "strategy", "book", "trade"]
 
 
-class RiskLimit(BaseModel):
+class RiskLimit(FiniteInputMixin):
     """Configurable risk limit with optional warning band.
 
     ``warning_threshold_pct`` is utilization (%) at/above which status becomes
@@ -915,8 +1031,8 @@ class RiskLimit(BaseModel):
     """
 
     metric: LimitMetric
-    limit: float
-    warning_threshold_pct: float = 80.0
+    limit: FiniteFloat
+    warning_threshold_pct: FiniteFloat = 80.0
     scope: LimitScope | None = None
     label: str | None = None
 
@@ -1032,7 +1148,7 @@ class HierarchyRef(BaseModel):
     trade_id: str | None = None
 
 
-class LimitDrilldownRequest(BaseModel):
+class LimitDrilldownRequest(FiniteInputMixin):
     """Drill into limit utilization at a hierarchy node (M4.6).
 
     When ``metric`` is set, that metric is returned even if not breached
@@ -1114,13 +1230,13 @@ class AttributionReport(BaseModel):
     items: list[AttributionItem]
 
 
-class AttributionRequest(BaseModel):
+class AttributionRequest(FiniteInputMixin):
     previous_portfolio: Portfolio
     current_portfolio: Portfolio
     previous_market: MarketSnapshot | None = None
     current_market: MarketSnapshot | None = None
     # Day fraction for theta (maturity aging). 0 → no theta. Additive; optional for API compat.
-    dt_years: float = 0.0
+    dt_years: FiniteFloat = 0.0
 
 
 class RiskChangeItem(BaseModel):
@@ -1142,7 +1258,7 @@ class RiskChangeAttributionReport(BaseModel):
     items: list[RiskChangeItem]
 
 
-class RiskChangeAttributionRequest(BaseModel):
+class RiskChangeAttributionRequest(FiniteInputMixin):
     previous_portfolio: Portfolio
     current_portfolio: Portfolio
     previous_market: MarketSnapshot | None = None
@@ -1151,7 +1267,7 @@ class RiskChangeAttributionRequest(BaseModel):
     methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
 
 
-class RiskQueryRequest(BaseModel):
+class RiskQueryRequest(FiniteInputMixin):
     portfolio: Portfolio
     question: str
 
@@ -1164,7 +1280,7 @@ class RiskQueryResponse(BaseModel):
     requires_clarification: bool = False
 
 
-class WhatIfChange(BaseModel):
+class WhatIfChange(FiniteInputMixin):
     """One hypothetical trade mutation for incremental VaR / what-if (M2.8/M2.9).
 
     - ``add``: requires ``position`` with a new unique id
@@ -1177,7 +1293,7 @@ class WhatIfChange(BaseModel):
     position: Position | None = None
 
 
-class WhatIfRequest(BaseModel):
+class WhatIfRequest(FiniteInputMixin):
     """What-if request: evaluate changes without mutating persisted portfolio state."""
 
     portfolio: Portfolio
@@ -1354,7 +1470,7 @@ class RiskRun(BaseModel):
         return self
 
 
-class RiskRunCreateRequest(BaseModel):
+class RiskRunCreateRequest(FiniteInputMixin):
     """POST /risk/runs body (M5.4). Mounted under ``/risk`` until M7.2 ``/api/v1``."""
 
     model_config = ConfigDict(
