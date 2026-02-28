@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.domain.models import MarketSnapshot, Portfolio, RiskLimit, StressScenario
-from app.market.snapshot import PositionMarketDataProvider
 
 # Import models so metadata is populated before create_all.
 from app.persistence import models as _models  # noqa: F401
@@ -39,7 +38,7 @@ from app.persistence.sqlalchemy_repos import (
 )
 from app.risk.limits import DEFAULT_LIMITS
 from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
-from app.sample import DEMO_PORTFOLIOS, SAMPLE_PORTFOLIO
+from app.sample import DEMO_PORTFOLIOS, SAMPLE_PORTFOLIO, demo_market_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +47,8 @@ DEFAULT_MARKET_SNAPSHOT_ID = "position_marks"
 
 
 def default_sample_market_snapshot() -> MarketSnapshot:
-    """Immutable marks snapshot derived from ``SAMPLE_PORTFOLIO`` (Cross-Asset)."""
-    snap = PositionMarketDataProvider().snapshot(SAMPLE_PORTFOLIO)
+    """Explicit immutable snapshot for ``SAMPLE_PORTFOLIO`` (Cross-Asset)."""
+    snap = demo_market_snapshot(SAMPLE_PORTFOLIO)
     return snap.model_copy(update={"id": DEFAULT_MARKET_SNAPSHOT_ID})
 
 

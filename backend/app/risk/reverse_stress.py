@@ -24,10 +24,10 @@ from app.domain.models import (
     ReverseStressResult,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.snapshot import PositionMarketDataProvider
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
 from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory
+from app.sample import DemoAggregateMarketDataProvider
 
 FactorFamily = Literal["equity", "rates", "vol", "fx"]
 
@@ -148,7 +148,7 @@ class ReverseStressEngine:
     """Finds the smallest one-factor shock that reaches a requested loss % of |NAV|."""
 
     def __init__(self) -> None:
-        self.market_data = PositionMarketDataProvider()
+        self.market_data = DemoAggregateMarketDataProvider()
 
     def solve(
         self,

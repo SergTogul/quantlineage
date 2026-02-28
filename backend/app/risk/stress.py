@@ -29,7 +29,6 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
-from app.market.snapshot import PositionMarketDataProvider
 from app.risk.crisis_library import CRISIS_STRESS_SCENARIOS
 from app.risk.factors import RiskFactorEngine
 from app.risk.historical import HistoricalRiskEngine
@@ -37,6 +36,7 @@ from app.risk.reverse_stress import ReverseStressEngine
 from app.risk.reverse_stress_multi import MultiFactorReverseStressEngine
 from app.risk.scenario_attribution import ScenarioAttributionEngine, ScenarioLike
 from app.risk.scenario_engine import ScenarioEngine, apply_scenario
+from app.sample import DemoAggregateMarketDataProvider
 
 __all__ = [
     "DEFAULT_SCENARIOS",
@@ -134,7 +134,7 @@ def _threat_level(loss_pct_nav: float) -> str:
 
 class StressEngine:
     def __init__(self):
-        self.market_data = PositionMarketDataProvider()
+        self.market_data = DemoAggregateMarketDataProvider()
         self.attribution = ScenarioAttributionEngine()
 
     def run(self, portfolio: Portfolio, pricing_engine: PricingEngine, scenarios: list[StressScenario]) -> list[StressResult]:

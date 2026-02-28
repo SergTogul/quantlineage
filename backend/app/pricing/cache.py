@@ -1,8 +1,8 @@
 """Valuation cache wrapping any ``PricingEngine`` without leaking QuantLib.
 
 Cache keys bind:
-- trade (full position payload),
-- market snapshot content hash (or a sentinel when ``market is None``),
+- contractual trade economics (equity-family projection; legacy payload elsewhere),
+- required market snapshot content hash,
 - pricing configuration (engine identity + evaluation date + extras).
 
 A market bump produces a new ``content_hash`` and therefore a miss — no separate
@@ -20,10 +20,15 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from app.domain.models import MarketSnapshot, Position, Valuation
+from app.domain.models import (
+    EquityFuturePosition,
+    EquityPosition,
+    EuropeanOptionPosition,
+    MarketSnapshot,
+    Position,
+    Valuation,
+)
 from app.interfaces.pricing import PricingEngine
-
-_NONE_MARKET = "market:none"
 
 
 def _stable_json_hash(payload: Any) -> str:
@@ -76,14 +81,35 @@ class PricingConfiguration:
 
 
 def trade_cache_key(position: Position) -> str:
-    """Hash of the full trade payload (identity + economics)."""
-    return _stable_json_hash(position.model_dump(mode="json"))
+    """Versioned economics hash; equity-family observable marks are excluded."""
+    payload = position.model_dump(mode="json")
+    if isinstance(position, EquityPosition):
+        observable_fields = {"price"}
+        schema = "equity_terms_v1"
+    elif isinstance(position, EquityFuturePosition):
+        observable_fields = {"spot", "risk_free_rate", "dividend_yield"}
+        schema = "equity_future_terms_v1"
+    elif isinstance(position, EuropeanOptionPosition):
+        observable_fields = {
+            "spot",
+            "volatility",
+            "risk_free_rate",
+            "dividend_yield",
+        }
+        schema = "equity_option_terms_v1"
+    else:
+        observable_fields = set()
+        schema = "legacy_position_v1"
+    economics = {
+        key: value for key, value in payload.items() if key not in observable_fields
+    }
+    return _stable_json_hash({"schema": schema, "economics": economics})
 
 
 def market_cache_key(market: MarketSnapshot | None) -> str:
     """Snapshot content hash, independent of ``id`` / ``as_of`` labels."""
     if market is None:
-        return _NONE_MARKET
+        raise ValueError("production cache keys require an explicit MarketSnapshot")
     return f"market:{market.content_hash()}"
 
 
@@ -92,7 +118,7 @@ def valuation_cache_key(
     market: MarketSnapshot | None,
     config: PricingConfiguration,
 ) -> str:
-    return f"v1|{trade_cache_key(position)}|{market_cache_key(market)}|{config.fingerprint()}"
+    return f"v2|{trade_cache_key(position)}|{market_cache_key(market)}|{config.fingerprint()}"
 
 
 @dataclass
@@ -150,6 +176,8 @@ class CachedPricingEngine(PricingEngine):
             self._cache.clear()
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
+        if market is None:
+            raise ValueError("CachedPricingEngine requires an explicit MarketSnapshot")
         key = valuation_cache_key(position, market, self._config)
         with self._lock:
             cached = self._cache.get(key)

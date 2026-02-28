@@ -255,9 +255,9 @@ def test_full_revaluation_path_unaffected_by_native_flag(tmp_path, monkeypatch):
     assert out["methodology"] == "FULL_REVALUATION"
     assert out["var_95"] >= 0.0
     # Smoke: full_revaluation helper still documents/runs independently of kernel.
-    from app.market.snapshot import PositionMarketDataProvider
+    from app.sample import demo_market_snapshot
 
-    base = PositionMarketDataProvider().snapshot(SAMPLE_PORTFOLIO)
+    base = demo_market_snapshot(SAMPLE_PORTFOLIO)
     pnl = full_revaluation_pnl_series(SAMPLE_PORTFOLIO, pricing, base, dataset)
     assert pnl.shape == (dataset.factor_observations().n_observations,)
 

@@ -24,7 +24,6 @@ from app.domain.models import (
     StressScenario,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.snapshot import PositionMarketDataProvider
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
 from app.risk.scenario_model import (
     FactorShock,
@@ -32,6 +31,7 @@ from app.risk.scenario_model import (
     scenario_from_stress,
     scenario_to_stress,
 )
+from app.sample import DemoAggregateMarketDataProvider
 
 ScenarioLike = Union[Scenario, StressScenario]
 
@@ -169,7 +169,7 @@ class ScenarioAttributionEngine:
     """Decompose stress scenario P&L by hierarchy and risk factor (M3.4)."""
 
     def __init__(self) -> None:
-        self.market_data = PositionMarketDataProvider()
+        self.market_data = DemoAggregateMarketDataProvider()
 
     def decompose(
         self,

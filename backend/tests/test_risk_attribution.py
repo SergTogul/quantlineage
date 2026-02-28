@@ -8,11 +8,14 @@ from app.domain.models import (
     RiskChangeAttributionRequest,
     VaRMethodology,
 )
-from app.market.snapshot import PositionMarketDataProvider
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.risk_attribution import RiskChangeAttributionEngine
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import (
+    SAMPLE_PORTFOLIO,
+    DemoPortfolioMarketDataProvider,
+    demo_market_snapshot,
+)
 from app.services.portfolio_service import PortfolioService
 
 # Reconciliation: sum(drivers) == total_change (correlation absorbs remainder).
@@ -23,14 +26,14 @@ _REL_TOL = 1e-8
 def _engine(seed: int = 1, observations: int = 80) -> RiskChangeAttributionEngine:
     return RiskChangeAttributionEngine(
         risk_engine=HistoricalRiskEngine(seed=seed, observations=observations),
-        market_data=PositionMarketDataProvider(),
+        market_data=DemoPortfolioMarketDataProvider(),
     )
 
 
 def test_identical_state_zero_change():
     """Invariant: identical portfolio + market → zero Δ risk and ~zero drivers."""
     pricing = BuiltinPricingEngine()
-    market = PositionMarketDataProvider().snapshot(SAMPLE_PORTFOLIO)
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
     report = _engine().explain(
         RiskChangeAttributionRequest(
             previous_portfolio=SAMPLE_PORTFOLIO,
@@ -50,8 +53,7 @@ def test_identical_state_zero_change():
 
 def test_drivers_reconcile_to_total_change():
     pricing = BuiltinPricingEngine()
-    md = PositionMarketDataProvider()
-    previous = md.snapshot(SAMPLE_PORTFOLIO)
+    previous = demo_market_snapshot(SAMPLE_PORTFOLIO)
     current = previous.model_copy(
         update={
             "id": "shocked",
@@ -85,8 +87,7 @@ def test_drivers_reconcile_to_total_change():
 
 def test_new_and_closed_trades_attributed():
     pricing = BuiltinPricingEngine()
-    md = PositionMarketDataProvider()
-    market = md.snapshot(SAMPLE_PORTFOLIO)
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
     closed_id = SAMPLE_PORTFOLIO.positions[0].id
     remaining = [p for p in SAMPLE_PORTFOLIO.positions if p.id != closed_id]
@@ -107,7 +108,12 @@ def test_new_and_closed_trades_attributed():
         strategy=SAMPLE_PORTFOLIO.strategy,
     )
     # Markets for both books (union of symbols).
-    market_curr = md.snapshot(current)
+    market_curr = market.model_copy(
+        update={
+            "id": "current-with-aapl",
+            "equity_spots": {**dict(market.equity_spots), "AAPL": new_pos.price},
+        }
+    )
     # Align shared marks so only positions drive the change.
     shared = market.model_copy(
         update={
@@ -144,7 +150,7 @@ def test_new_and_closed_trades_attributed():
 
 def test_position_resize_attributed():
     pricing = BuiltinPricingEngine()
-    market = PositionMarketDataProvider().snapshot(SAMPLE_PORTFOLIO)
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
     current_positions = []
     for p in SAMPLE_PORTFOLIO.positions:
         if p.id == "eq-spy":
@@ -169,8 +175,7 @@ def test_position_resize_attributed():
 
 def test_service_risk_change_attribution():
     svc = PortfolioService(BuiltinPricingEngine(), HistoricalRiskEngine(seed=2, observations=60))
-    md = PositionMarketDataProvider()
-    market = md.snapshot(SAMPLE_PORTFOLIO)
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
     report = svc.risk_change_attribution(
         RiskChangeAttributionRequest(
             previous_portfolio=SAMPLE_PORTFOLIO,

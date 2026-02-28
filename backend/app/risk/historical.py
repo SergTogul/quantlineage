@@ -11,9 +11,9 @@ from app.compute.kernel import (
 from app.domain.models import MarketSnapshot, Portfolio, Valuation, VaRMethodology
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
-from app.market.snapshot import PositionMarketDataProvider
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.scenarios import historical_shocked_snapshots
+from app.sample import demo_market_snapshot
 
 
 def _aggregate_greeks(vals: list[Valuation]) -> tuple[float, float, float, float, float, float]:
@@ -195,7 +195,6 @@ class HistoricalRiskEngine(RiskEngine):
         self.methodology = methodology
         self.scenario_kernel = scenario_kernel
         self.scenario_backend = scenario_backend
-        self._market_data = PositionMarketDataProvider()
 
     def calculate(
         self,
@@ -205,13 +204,13 @@ class HistoricalRiskEngine(RiskEngine):
         market: MarketSnapshot | None = None,
     ) -> dict:
         meth = methodology if methodology is not None else self.methodology
-        # When ``market`` is provided, Greeks/MV reflect that snapshot (risk-change
-        # attribution). When None, position-embedded marks preserve legacy behavior.
-        vals = pricing_engine.value_portfolio(portfolio, market)
+        # Resolve once: approximate and full-revaluation methodologies must derive
+        # every PV/Greek from one authoritative snapshot.
+        base_market = market if market is not None else demo_market_snapshot(portfolio)
+        vals = pricing_engine.value_portfolio(portfolio, base_market)
         mv, delta, gamma, vega, dv01, fx_delta = _aggregate_greeks(vals)
 
         if meth is VaRMethodology.FULL_REVALUATION:
-            base_market = market if market is not None else self._market_data.snapshot(portfolio)
             pnl = full_revaluation_pnl_series(portfolio, pricing_engine, base_market, self.dataset)
         else:
             obs = self.dataset.factor_observations()

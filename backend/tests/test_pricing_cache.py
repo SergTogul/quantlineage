@@ -11,7 +11,7 @@ from datetime import date
 import pytest
 
 from app.domain.models import EquityPosition, MarketSnapshot, Valuation
-from app.interfaces.pricing import PricingEngine
+from app.interfaces.pricing import LegacyDemoPricingAdapter, PricingEngine
 from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.cache import (
     CachedPricingEngine,
@@ -50,8 +50,19 @@ def test_trade_and_market_keys_stable():
     assert market_cache_key(m) == market_cache_key(
         MarketSnapshot(id="other", as_of="later", equity_spots={"SPY": 100.0}, rates={"USD": 0.04})
     )
-    assert market_cache_key(None) == market_cache_key(None)
-    assert market_cache_key(m) != market_cache_key(None)
+    with pytest.raises(ValueError, match="explicit MarketSnapshot"):
+        market_cache_key(None)
+
+
+def test_equity_trade_key_excludes_legacy_spot_but_keeps_economics():
+    position = _equity()
+
+    assert trade_cache_key(position) == trade_cache_key(
+        position.model_copy(update={"price": 125.0})
+    )
+    assert trade_cache_key(position) != trade_cache_key(
+        position.model_copy(update={"quantity": 20.0})
+    )
 
 
 def test_cache_hit_skips_inner_engine():
@@ -146,23 +157,34 @@ def test_returned_valuation_is_copy():
     assert v2.market_value == pytest.approx(1000.0)
 
 
-def test_none_market_cached_separately_from_snapshot():
+def test_cache_requires_market_and_named_legacy_adapter_normalizes_one():
     inner = CountingPricingEngine()
     cached = CachedPricingEngine(inner)
     pos = _equity()
 
-    cached.value(pos, None)
-    cached.value(pos, _market())
-    cached.value(pos, None)
+    with pytest.raises(ValueError, match="explicit MarketSnapshot"):
+        cached.value(pos, None)
 
-    assert inner.calls == 2
+    legacy = LegacyDemoPricingAdapter(cached)
+    legacy.value(pos)
+    cached.value(
+        pos,
+        MarketSnapshot(id="explicit", equity_spots={"SPY": 100.0}, rates={}),
+    )
+
+    assert inner.calls == 1
     assert cached.stats.hits == 1
 
 
 def test_lru_eviction():
     inner = CountingPricingEngine()
     cached = CachedPricingEngine(inner, maxsize=2)
-    market = _market()
+    market = MarketSnapshot(
+        id="m1",
+        as_of="t0",
+        equity_spots={"SPY": 100.0, "QQQ": 100.0, "IWM": 100.0},
+        rates={"USD": 0.04},
+    )
     p1 = _equity()
     p2 = p1.model_copy(update={"id": "eq2", "symbol": "QQQ"})
     p3 = p1.model_copy(update={"id": "eq3", "symbol": "IWM"})

@@ -22,6 +22,7 @@ from app.domain.models import (
     Valuation,
 )
 from app.interfaces.pricing import PricingEngine
+from app.market.demo_snapshot import MissingMarketDataError
 from app.market.vol_surfaces import vol_surface_from_dict
 from app.pricing.curve_rates import continuous_zero, has_curve_or_key_rates, select_yield_curve
 
@@ -84,7 +85,12 @@ class QuantLibPricingEngine(PricingEngine):
             # Convert immutable market snapshot values into the trade-local marks QuantLib consumes.
             updates = {}
             if isinstance(position, EquityPosition):
-                updates["price"] = market.equity_spots.get(position.symbol, position.price)
+                try:
+                    updates["price"] = market.equity_spots[position.symbol]
+                except KeyError:
+                    raise MissingMarketDataError(
+                        f"equity_spots[{position.symbol}]"
+                    ) from None
             elif isinstance(position, EquityFuturePosition):
                 updates = {
                     "spot": market.equity_spots.get(position.symbol, position.spot),

@@ -223,6 +223,15 @@ Related findings:
 - RF-011
 - RF-012
 
+## R0.2 slice status (Phase B)
+
+| Slice | Status | Evidence |
+|---|---|---|
+| R0.2-A explicit snapshot path and validated demo bridge | COMPLETE | Independent re-review **APPROVE** (`reviews/r0.2-a-rereview.md`). Conflict adapter; production VaR/ES/historical pass an explicit snapshot; equity cash missing spots raise; demo matcher is exact id+position-set; `PortfolioService` summary/VaR/ES/contributors/compare share one resolved snapshot. |
+| Remaining family terms and non-equity fallbacks | OPEN | Brief §2 sequence. Deferred Minors: QuantLib missing-spot test parametrization; golden snapshot-routing extensions; engine `market=None` inference. |
+
+RF-001 remains **OPEN** until remaining families cannot silently fall back to trade-local marks and production methods no longer infer markets.
+
 ## R0.2.1 Introduce contractual trade/instrument terms
 
 Production trade models should contain contractual economics such as:
