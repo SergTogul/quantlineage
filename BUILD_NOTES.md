@@ -51,6 +51,7 @@ This is a documentation-only package. It does not change risk, pricing, API, fro
 
 ```bash
 docker compose up -d postgres
+# Default Compose publishes bind to loopback only (127.0.0.1).
 export RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
 # PATH must include backend/.venv (alembic, sqlalchemy, psycopg[binary])
 ./scripts/smoke_postgres.sh
@@ -75,6 +76,10 @@ Result: **exit 0**. Alembic applied `001_initial_persistence` → `002_risk_run_
 
 - Main `backend` job: `pip install -r requirements.txt` (includes QuantLib); on failure, strip QuantLib line and continue with builtin (`RISKFORGE_PRICING_ENGINE` detected via import).
 - `postgres-smoke` does not require QuantLib; same install fallback so persistence proof is independent of the QL wheel.
+
+## Local Compose resource expectations (R0.11.6)
+
+Default `docker compose up` (Postgres 16 + API + one risk-run worker + nginx frontend) is a laptop demo, not a capacity SLA. Budget about **2 CPU cores and 2–3 GiB RAM** for idle/light dashboard traffic with the packaged books. FULL_REVALUATION, large `observations` counts, or enabling the native scenario kernel can use more CPU on the API/worker; Postgres stays small for the seeded demo schema. Images drop to a non-root `USER` where practical (backend `riskforge`, frontend `nginx`); Compose still publishes only on loopback (R0.11.1).
 
 ## Performance reporting
 
