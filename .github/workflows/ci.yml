@@ -1,7 +1,8 @@
 # RiskForge CI — honest gates matching README / BUILD_NOTES commands.
 #
-# Jobs: backend-pytest, backend-quantlib-hard-gate (R0.1.6), postgres-smoke,
-# frontend-test-build, lint (M9.7), e2e-playwright (M9.2 / M9.10 CI gate).
+# Jobs: backend-pytest, backend-quantlib-hard-gate (R0.1.6), PR-FAST (R0.12.1),
+# postgres-smoke, frontend-test-build, lint (M9.7), e2e-playwright (M9.2 / M9.10).
+# R0.12.1: a green "PR-FAST" means deterministic goldens + frontend unit/lint ran (not PR-FULL).
 name: CI
 
 on:
@@ -117,6 +118,70 @@ jobs:
             tests/test_approx_pnl_units_golden.py \
             tests/test_full_reval_golden.py \
             tests/test_quantlib_gate.py
+
+  # R0.12.1 / RF-016: deterministic goldens + high-value properties + frontend
+  # unit/lint. Builtin pricing is OK. This job is not PR-FULL (QuantLib, native,
+  # Playwright, and Postgres remain other jobs; do not treat a green PR-FAST as
+  # those having run).
+  pr-fast:
+    name: PR-FAST
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          # Builtin engine is sufficient for PR-FAST goldens/properties.
+          if pip install -r requirements.txt; then
+            echo "Installed backend/requirements.txt (including QuantLib if resolvable)."
+          else
+            echo "::warning::Full requirements install failed; retrying without QuantLib"
+            grep -Eiv '^[[:space:]]*QuantLib' requirements.txt > /tmp/requirements-no-ql.txt
+            pip install -r /tmp/requirements-no-ql.txt
+          fi
+
+      - name: Deterministic goldens and properties (builtin)
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          RISKFORGE_PRICING_ENGINE: builtin
+        run: |
+          pytest -q \
+            tests/test_var_es_golden.py \
+            tests/test_approx_pnl_units_golden.py \
+            tests/test_full_reval_golden.py \
+            tests/test_pricing.py \
+            tests/test_quant_properties.py \
+            tests/test_m9_risk_properties.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend unit tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Frontend lint
+        working-directory: frontend
+        run: npm run lint
 
   # M5.1 / M5.6 / M9.9: prove psycopg path beyond SQLite unit tests.
   postgres-smoke:
