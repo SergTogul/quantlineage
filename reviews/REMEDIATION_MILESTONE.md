@@ -228,8 +228,10 @@ Related findings:
 | Slice | Status | Evidence |
 |---|---|---|
 | R0.2-A explicit snapshot path and validated demo bridge | COMPLETE | Independent re-review **APPROVE** (`reviews/r0.2-a-rereview.md`). |
-| R0.2 equity future/option spots | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-equity-spots-independent-review.md`). Missing `equity_spots[symbol]` raises for cash, futures, and European options when market is supplied. |
-| Remaining family vols/rates/dividends, terms, non-equity fallbacks | OPEN | Next: option vol / future rates+dividends. Deferred: golden snapshot-routing; engine `market=None` inference. |
+| R0.2 equity future/option spots | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-equity-spots-independent-review.md`). |
+| R0.2 equity option vol | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-equity-vol-independent-review.md`). |
+| R0.2 what-if snapshot threading | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-what-if-snapshot-independent-review.md`). |
+| Remaining family rates/dividends, terms, non-equity fallbacks | OPEN | Next: future/option rates and dividend yields. Deferred: golden snapshot-routing; engine `market=None` inference. |
 
 RF-001 remains **OPEN** until remaining families cannot silently fall back to trade-local marks and production methods no longer infer markets.
 

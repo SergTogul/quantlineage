@@ -14,6 +14,7 @@ from __future__ import annotations
 from app.domain.models import (
     FactorExposureChange,
     HedgeComparisonReport,
+    MarketSnapshot,
     Portfolio,
     PositionStressContribution,
     RiskFactorExposure,
@@ -137,8 +138,14 @@ class StressEngine:
         self.market_data = DemoAggregateMarketDataProvider()
         self.attribution = ScenarioAttributionEngine()
 
-    def run(self, portfolio: Portfolio, pricing_engine: PricingEngine, scenarios: list[StressScenario]) -> list[StressResult]:
-        market = self.market_data.snapshot(portfolio)
+    def run(
+        self,
+        portfolio: Portfolio,
+        pricing_engine: PricingEngine,
+        scenarios: list[StressScenario],
+        market: MarketSnapshot | None = None,
+    ) -> list[StressResult]:
+        market = market if market is not None else self.market_data.snapshot(portfolio)
         base = {p.id: pricing_engine.value(p, market).market_value for p in portfolio.positions}
         output = []
         for scenario in scenarios:
