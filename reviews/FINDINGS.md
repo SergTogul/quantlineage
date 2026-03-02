@@ -810,7 +810,7 @@ A dashboard load does not execute redundant full valuations of the same book and
 Priority: **P1**  
 Risk types: TEST_GAP, CI, OPERABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.1.6 QuantLib hard-gate job added; remaining tiers are R0.12)
+Status: **IN PROGRESS** (R0.1.6 QuantLib hard-gate; R0.12.1 PR-FAST APPROVE; remaining PR-FULL/nightly/ABI)
 
 Source findings:
 
