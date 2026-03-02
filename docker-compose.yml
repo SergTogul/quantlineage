@@ -5,7 +5,8 @@ services:
       POSTGRES_USER: riskforge
       POSTGRES_PASSWORD: riskforge
       POSTGRES_DB: riskforge
-    ports: ["5432:5432"]
+    # Local demo: bind to loopback so a laptop on a shared network does not expose Postgres.
+    ports: ["127.0.0.1:5432:5432"]
     volumes:
       - riskforge_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -23,7 +24,8 @@ services:
       RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@postgres:5432/riskforge
       # Defer execution to the ``worker`` service (shared Postgres QUEUED rows).
       RISKFORGE_EXTERNAL_WORKER: "1"
-    ports: ["8000:8000"]
+    # Local demo: bind to loopback (unauthenticated API; not internet-ready).
+    ports: ["127.0.0.1:8000:8000"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,7 +46,8 @@ services:
 
   frontend:
     build: ./frontend
-    ports: ["5173:80"]
+    # Local demo: bind to loopback (static frontend; not internet-ready).
+    ports: ["127.0.0.1:5173:80"]
     depends_on: [backend]
 
 volumes:

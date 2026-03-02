@@ -146,6 +146,7 @@ Inside Compose, services use host `postgres` instead of `localhost` via `RISKFOR
 
 ```bash
 # Start Postgres
+# Default Compose publishes bind to loopback only (127.0.0.1).
 docker compose up -d postgres
 
 # Apply migrations (required before API/worker against Postgres)
