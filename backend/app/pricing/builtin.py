@@ -21,7 +21,7 @@ from app.domain.models import (
 from app.interfaces.pricing import PricingEngine
 from app.market.demo_snapshot import MissingMarketDataError
 from app.pricing.curve_rates import continuous_zero, discount_factor
-from app.pricing.surface_vol import option_vol_from_snapshot
+from app.pricing.surface_vol import option_vol_from_snapshot, required_equity_option_vol
 
 _N = NormalDist()
 def _cdf(x: float) -> float: return _N.cdf(x)
@@ -124,18 +124,16 @@ class BuiltinPricingEngine(PricingEngine):
 
     def _equity_option(self, p: EuropeanOptionPosition, market: MarketSnapshot | None) -> Valuation:
         s = p.spot if market is None else _required_equity_spot(market, p.symbol)
-        fallback = market.equity_vols.get(p.symbol, p.volatility) if market else p.volatility
         sigma = (
-            option_vol_from_snapshot(
+            p.volatility
+            if market is None
+            else required_equity_option_vol(
                 market,
                 name=p.symbol,
                 maturity_years=p.maturity_years,
                 strike=p.strike,
                 spot=s,
-                fallback=fallback,
             )
-            if market
-            else fallback
         )
         r = market.rates.get("USD",p.risk_free_rate) if market else p.risk_free_rate
         k,t,q = p.strike,p.maturity_years,p.dividend_yield

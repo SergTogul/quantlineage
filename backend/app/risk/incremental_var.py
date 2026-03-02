@@ -33,6 +33,7 @@ from typing import Any, Mapping, Sequence
 
 from app.domain.models import (
     FactorExposureChange,
+    MarketSnapshot,
     Portfolio,
     Position,
     RiskFactorExposure,
@@ -128,9 +129,12 @@ def _calculate(
     pricing: PricingEngine,
     risk_engine: RiskEngine,
     methodology: VaRMethodology,
+    market: MarketSnapshot | None = None,
 ) -> RiskSummary:
     if isinstance(risk_engine, HistoricalRiskEngine):
-        raw = risk_engine.calculate(portfolio, pricing, methodology=methodology)
+        raw = risk_engine.calculate(
+            portfolio, pricing, methodology=methodology, market=market
+        )
     else:
         raw = risk_engine.calculate(portfolio, pricing)
         raw = {**raw, "methodology": methodology.value}
@@ -158,15 +162,17 @@ def incremental_var(
     changes: Sequence[WhatIfChange | Mapping[str, Any]],
     risk_engine: RiskEngine | None = None,
     methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
+    market: MarketSnapshot | None = None,
 ) -> WhatIfReport:
     """Compute before/after risk and incremental VaR for hypothetical changes.
 
     Does not compute factor/stress diffs (those are filled by ``what_if_analysis``).
+    After-book risk uses the same ``market`` as the before book when supplied.
     """
     engine = risk_engine or HistoricalRiskEngine()
     after_portfolio = apply_what_if_changes(portfolio, changes)
-    before = _calculate(portfolio, pricing, engine, methodology)
-    after = _calculate(after_portfolio, pricing, engine, methodology)
+    before = _calculate(portfolio, pricing, engine, methodology, market)
+    after = _calculate(after_portfolio, pricing, engine, methodology, market)
     return WhatIfReport(
         portfolio_id=portfolio.id,
         methodology=methodology,
@@ -249,21 +255,26 @@ def what_if_analysis(
     factor_engine: RiskFactorEngine | None = None,
     stress_engine: StressEngine | None = None,
     scenarios: list[StressScenario] | None = None,
+    market: MarketSnapshot | None = None,
 ) -> WhatIfReport:
-    """Full what-if: incremental VaR plus factor exposure and stress P&L diffs."""
+    """Full what-if: incremental VaR plus factor exposure and stress P&L diffs.
+
+    ``market`` is the single base snapshot for before and after books. Mutated
+    add/remove books must not re-infer marks from the changed position set.
+    """
     engine = risk_engine or HistoricalRiskEngine()
     factors = factor_engine or RiskFactorEngine()
     stress = stress_engine or StressEngine()
     scen = scenarios if scenarios is not None else DEFAULT_SCENARIOS
 
     after_portfolio = apply_what_if_changes(portfolio, changes)
-    before = _calculate(portfolio, pricing, engine, methodology)
-    after = _calculate(after_portfolio, pricing, engine, methodology)
+    before = _calculate(portfolio, pricing, engine, methodology, market)
+    after = _calculate(after_portfolio, pricing, engine, methodology, market)
 
-    before_fx = factors.calculate(portfolio, pricing)
-    after_fx = factors.calculate(after_portfolio, pricing)
-    before_stress = stress.run(portfolio, pricing, scen)
-    after_stress = stress.run(after_portfolio, pricing, scen)
+    before_fx = factors.calculate(portfolio, pricing, market)
+    after_fx = factors.calculate(after_portfolio, pricing, market)
+    before_stress = stress.run(portfolio, pricing, scen, market=market)
+    after_stress = stress.run(after_portfolio, pricing, scen, market=market)
 
     return WhatIfReport(
         portfolio_id=portfolio.id,

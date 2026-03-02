@@ -252,6 +252,7 @@ class PortfolioService:
         from app.risk.incremental_var import what_if_analysis
 
         meth = methodology if methodology is not None else request.methodology
+        market = self.market_snapshot(request.portfolio)
         return what_if_analysis(
             request.portfolio,
             self.pricing,
@@ -261,6 +262,7 @@ class PortfolioService:
             factor_engine=self.factor_engine,
             stress_engine=self.stress_engine,
             scenarios=request.scenarios,
+            market=market,
         )
 
     def hierarchy(self, portfolio): return self.hierarchy_engine.build(portfolio,self.pricing)
