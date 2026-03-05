@@ -72,6 +72,7 @@ def _option_market() -> MarketSnapshot:
         equity_spots={"SPY": 100.0},
         equity_vols={"SPY": 0.25},
         rates={"USD": 0.04},
+        dividend_yields={"SPY": 0.0},
     )
 
 

@@ -138,6 +138,7 @@ def test_option_spot_move_has_delta_and_gamma():
         equity_spots={"XYZ": 100.0},
         equity_vols={"XYZ": 0.20},
         rates={"USD": 0.03},
+        dividend_yields={"XYZ": 0.0},
     )
     curr = prev.model_copy(
         update={"id": "t1", "equity_spots": {"XYZ": 105.0}},
@@ -185,6 +186,7 @@ def test_vol_move_explained_by_vega():
         equity_spots={"XYZ": 100.0},
         equity_vols={"XYZ": 0.20},
         rates={"USD": 0.03},
+        dividend_yields={"XYZ": 0.0},
     )
     curr = prev.model_copy(
         update={"id": "t1", "equity_vols": {"XYZ": 0.22}},
@@ -310,6 +312,7 @@ def test_theta_from_dt_years():
         equity_spots={"XYZ": 100.0},
         equity_vols={"XYZ": 0.20},
         rates={"USD": 0.03},
+        dividend_yields={"XYZ": 0.0},
     )
     curr = prev.model_copy(update={"id": "t1", "as_of": "2026-01-02"})
     book = Portfolio(
