@@ -35,6 +35,25 @@ def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
         raise MissingMarketDataError(f"equity_spots[{symbol}]") from None
 
 
+def _equity_settlement_currency(position) -> str:
+    currency = getattr(position, "currency", None)
+    return str(currency) if currency else "USD"
+
+
+def _required_settlement_rate(market: MarketSnapshot, currency: str) -> float:
+    try:
+        return market.rates[currency]
+    except KeyError:
+        raise MissingMarketDataError(f"rates[{currency}]") from None
+
+
+def _required_dividend_yield(market: MarketSnapshot, symbol: str) -> float:
+    try:
+        return market.dividend_yields[symbol]
+    except KeyError:
+        raise MissingMarketDataError(f"dividend_yields[{symbol}]") from None
+
+
 def _act365_fixed_years(maturity_years: float) -> float:
     """Actual/365 Fixed year fraction matching QuantLib ZeroCouponBond.
 
@@ -67,8 +86,14 @@ class BuiltinPricingEngine(PricingEngine):
                 if market is None
                 else _required_equity_spot(market, position.symbol)
             )
-            r = market.rates.get("USD", position.risk_free_rate) if market else position.risk_free_rate
-            f = s * math.exp((r-position.dividend_yield)*position.maturity_years)
+            if market is None:
+                r = position.risk_free_rate
+                q = position.dividend_yield
+            else:
+                currency = _equity_settlement_currency(position)
+                r = _required_settlement_rate(market, currency)
+                q = _required_dividend_yield(market, position.symbol)
+            f = s * math.exp((r-q)*position.maturity_years)
             mv = position.quantity*position.multiplier*f
             return Valuation(position_id=position.id, market_value=mv, delta=mv, dv01=mv*position.maturity_years*0.0001)
         if isinstance(position, EuropeanOptionPosition):
@@ -135,8 +160,14 @@ class BuiltinPricingEngine(PricingEngine):
                 spot=s,
             )
         )
-        r = market.rates.get("USD",p.risk_free_rate) if market else p.risk_free_rate
-        k,t,q = p.strike,p.maturity_years,p.dividend_yield
+        if market is None:
+            r = p.risk_free_rate
+            q = p.dividend_yield
+        else:
+            currency = _equity_settlement_currency(p)
+            r = _required_settlement_rate(market, currency)
+            q = _required_dividend_yield(market, p.symbol)
+        k,t = p.strike,p.maturity_years
         sqrt_t=math.sqrt(t); d1=(math.log(s/k)+(r-q+0.5*sigma*sigma)*t)/(sigma*sqrt_t); d2=d1-sigma*sqrt_t
         dr,dq=math.exp(-r*t),math.exp(-q*t)
         if p.option_type=="call": price=s*dq*_cdf(d1)-k*dr*_cdf(d2); delta=dq*_cdf(d1)

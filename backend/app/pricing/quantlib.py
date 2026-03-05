@@ -47,6 +47,25 @@ def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
         raise MissingMarketDataError(f"equity_spots[{symbol}]") from None
 
 
+def _equity_settlement_currency(position) -> str:
+    currency = getattr(position, "currency", None)
+    return str(currency) if currency else "USD"
+
+
+def _required_settlement_rate(market: MarketSnapshot, currency: str) -> float:
+    try:
+        return market.rates[currency]
+    except KeyError:
+        raise MissingMarketDataError(f"rates[{currency}]") from None
+
+
+def _required_dividend_yield(market: MarketSnapshot, symbol: str) -> float:
+    try:
+        return market.dividend_yields[symbol]
+    except KeyError:
+        raise MissingMarketDataError(f"dividend_yields[{symbol}]") from None
+
+
 class QuantLibPricingEngine(PricingEngine):
     """QuantLib-backed valuation adapter.
 
@@ -95,11 +114,14 @@ class QuantLibPricingEngine(PricingEngine):
             if isinstance(position, EquityPosition):
                 updates["price"] = _required_equity_spot(market, position.symbol)
             elif isinstance(position, EquityFuturePosition):
+                currency = _equity_settlement_currency(position)
                 updates = {
                     "spot": _required_equity_spot(market, position.symbol),
-                    "risk_free_rate": market.rates.get("USD", position.risk_free_rate),
+                    "risk_free_rate": _required_settlement_rate(market, currency),
+                    "dividend_yield": _required_dividend_yield(market, position.symbol),
                 }
             elif isinstance(position, EuropeanOptionPosition):
+                currency = _equity_settlement_currency(position)
                 spot = _required_equity_spot(market, position.symbol)
                 updates = {
                     "spot": spot,
@@ -110,7 +132,8 @@ class QuantLibPricingEngine(PricingEngine):
                         strike=position.strike,
                         spot=spot,
                     ),
-                    "risk_free_rate": market.rates.get("USD", position.risk_free_rate),
+                    "risk_free_rate": _required_settlement_rate(market, currency),
+                    "dividend_yield": _required_dividend_yield(market, position.symbol),
                 }
             elif isinstance(position, BondPosition):
                 updates["yield_rate"] = continuous_zero(

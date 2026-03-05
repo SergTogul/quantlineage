@@ -64,6 +64,7 @@ def test_builtin_equity_option_pv_differs_on_skewed_surface():
         equity_spots={"ABC": 100.0},
         equity_vols={"ABC": 0.20},
         rates={"USD": 0.03},
+        dividend_yields={"ABC": 0.0},
     )
     skewed = _skewed_equity_surface("ABC", atm=0.20, skew=0.50)
     # ATM stays 0.20; moneyness 1.1 → 0.20 + 0.50*0.1 = 0.25
@@ -95,6 +96,7 @@ def test_builtin_flat_surface_matches_scalar_atm():
         equity_spots={"ABC": 100.0},
         equity_vols={"ABC": 0.20},
         rates={"USD": 0.03},
+        dividend_yields={"ABC": 0.0},
     )
     flat = attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20))
     engine = BuiltinPricingEngine()
@@ -133,6 +135,7 @@ def test_builtin_flat_surfaces_match_scalar_after_typed_vol_apply():
         fx_spots={"EURUSD": 1.10},
         fx_vols={"EURUSD": 0.10},
         rates={"USD": 0.04, "EUR": 0.03},
+        dividend_yields={"ABC": 0.0},
     )
     with_surfaces = attach_vol_surface(
         attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20)),
@@ -197,6 +200,7 @@ def test_quantlib_equity_option_pv_differs_on_skewed_surface():
         equity_spots={"ABC": 100.0},
         equity_vols={"ABC": 0.20},
         rates={"USD": 0.03},
+        dividend_yields={"ABC": 0.0},
     )
     with_surface = attach_vol_surface(scalar, _skewed_equity_surface("ABC", 0.20, 0.50))
     pv_scalar = _ql_engine.value(opt, scalar).market_value

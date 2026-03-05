@@ -321,7 +321,11 @@ def test_quantlib_missing_equity_family_spot_raises_when_market_is_supplied(
 def test_supplied_snapshot_beats_trade_local_equity_future_spot() -> None:
     _, position = _future_book()
     original = position.model_dump(mode="json")
-    market = MarketSnapshot(id="authoritative", equity_spots={"AUTH": 101.0})
+    market = MarketSnapshot(
+        id="authoritative",
+        equity_spots={"AUTH": 101.0},
+        dividend_yields={"AUTH": position.dividend_yield},
+    )
 
     valuation = BuiltinPricingEngine().value(position, market)
     local = BuiltinPricingEngine().value(position)
@@ -338,6 +342,7 @@ def test_supplied_snapshot_beats_trade_local_equity_option_spot() -> None:
         id="authoritative",
         equity_spots={"AUTH": 101.0},
         equity_vols={"AUTH": position.volatility},
+        dividend_yields={"AUTH": position.dividend_yield},
     )
 
     valuation = BuiltinPricingEngine().value(position, market)
@@ -353,7 +358,11 @@ def test_quantlib_supplied_snapshot_beats_trade_local_equity_future_spot() -> No
 
     _, position = _future_book()
     original = position.model_dump(mode="json")
-    market = MarketSnapshot(id="authoritative", equity_spots={"AUTH": 101.0})
+    market = MarketSnapshot(
+        id="authoritative",
+        equity_spots={"AUTH": 101.0},
+        dividend_yields={"AUTH": position.dividend_yield},
+    )
     engine = QuantLibPricingEngine()
 
     valuation = engine.value(position, market)
@@ -373,6 +382,7 @@ def test_quantlib_supplied_snapshot_beats_trade_local_equity_option_spot() -> No
         id="authoritative",
         equity_spots={"AUTH": 101.0},
         equity_vols={"AUTH": position.volatility},
+        dividend_yields={"AUTH": position.dividend_yield},
     )
     engine = QuantLibPricingEngine()
 
@@ -437,6 +447,7 @@ def test_supplied_snapshot_equity_vols_price_without_mutating_trade() -> None:
         id="authoritative-vol",
         equity_spots={"AUTH": 101.0},
         equity_vols={"AUTH": 0.40},
+        dividend_yields={"AUTH": position.dividend_yield},
     )
 
     valuation = BuiltinPricingEngine().value(position, market)
@@ -456,6 +467,7 @@ def test_quantlib_supplied_snapshot_equity_vols_price_without_mutating_trade() -
         id="authoritative-vol",
         equity_spots={"AUTH": 101.0},
         equity_vols={"AUTH": 0.40},
+        dividend_yields={"AUTH": position.dividend_yield},
     )
     engine = QuantLibPricingEngine()
 
@@ -487,10 +499,259 @@ def test_option_surface_quote_satisfies_vol_without_equity_vols() -> None:
         id="surface-only",
         equity_spots={"AUTH": 101.0},
         vol_surfaces={"AUTH": surface.to_dict()},
+        dividend_yields={"AUTH": position.dividend_yield},
     )
 
     valuation = BuiltinPricingEngine().value(position, market)
     local = BuiltinPricingEngine().value(position)
 
     assert valuation.market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+def _option_vol_extra() -> dict:
+    return {"equity_vols": {"AUTH": 0.20}}
+
+
+@pytest.mark.parametrize(
+    "book_factory, extra",
+    [(_future_book, {}), (_option_book, _option_vol_extra())],
+    ids=["future", "option"],
+)
+@pytest.mark.parametrize(
+    "rates",
+    [{}, {"EUR": 0.03}],
+    ids=["empty-rates", "eur-only"],
+)
+def test_missing_equity_family_rate_raises_when_market_is_supplied(
+    book_factory, extra, rates: dict[str, float]
+) -> None:
+    _, position = book_factory()
+    market = MarketSnapshot(
+        id="no-usd-rate",
+        equity_spots={"AUTH": 101.0},
+        rates=rates,
+        dividend_yields={"AUTH": 0.0},
+        **extra,
+    )
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        BuiltinPricingEngine().value(position, market)
+    assert raised.value.factor_key == "rates[USD]"
+
+
+@pytest.mark.parametrize(
+    "book_factory, extra",
+    [(_future_book, {}), (_option_book, _option_vol_extra())],
+    ids=["future", "option"],
+)
+@pytest.mark.parametrize(
+    "rates",
+    [{}, {"EUR": 0.03}],
+    ids=["empty-rates", "eur-only"],
+)
+def test_quantlib_missing_equity_family_rate_raises_when_market_is_supplied(
+    book_factory, extra, rates: dict[str, float]
+) -> None:
+    import_quantlib()
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    _, position = book_factory()
+    market = MarketSnapshot(
+        id="no-usd-rate",
+        equity_spots={"AUTH": 101.0},
+        rates=rates,
+        dividend_yields={"AUTH": 0.0},
+        **extra,
+    )
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        QuantLibPricingEngine().value(position, market)
+    assert raised.value.factor_key == "rates[USD]"
+
+
+@pytest.mark.parametrize(
+    "book_factory, extra",
+    [(_future_book, {}), (_option_book, _option_vol_extra())],
+    ids=["future", "option"],
+)
+@pytest.mark.parametrize(
+    "dividend_yields",
+    [{}, {"SPY": 0.01}],
+    ids=["empty-divs", "spy-div"],
+)
+def test_missing_equity_family_dividend_yield_raises_when_market_is_supplied(
+    book_factory, extra, dividend_yields: dict[str, float]
+) -> None:
+    _, position = book_factory()
+    market = MarketSnapshot(
+        id="no-symbol-div",
+        equity_spots={"AUTH": 101.0},
+        rates={"USD": 0.04},
+        dividend_yields=dividend_yields,
+        **extra,
+    )
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        BuiltinPricingEngine().value(position, market)
+    assert raised.value.factor_key == f"dividend_yields[{position.symbol}]"
+
+
+@pytest.mark.parametrize(
+    "book_factory, extra",
+    [(_future_book, {}), (_option_book, _option_vol_extra())],
+    ids=["future", "option"],
+)
+@pytest.mark.parametrize(
+    "dividend_yields",
+    [{}, {"SPY": 0.01}],
+    ids=["empty-divs", "spy-div"],
+)
+def test_quantlib_missing_equity_family_dividend_yield_raises_when_market_is_supplied(
+    book_factory, extra, dividend_yields: dict[str, float]
+) -> None:
+    import_quantlib()
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    _, position = book_factory()
+    market = MarketSnapshot(
+        id="no-symbol-div",
+        equity_spots={"AUTH": 101.0},
+        rates={"USD": 0.04},
+        dividend_yields=dividend_yields,
+        **extra,
+    )
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        QuantLibPricingEngine().value(position, market)
+    assert raised.value.factor_key == f"dividend_yields[{position.symbol}]"
+
+
+def test_supplied_snapshot_beats_trade_local_equity_future_rate_and_div() -> None:
+    _, position = _future_book()
+    original = position.model_dump(mode="json")
+    pricing = BuiltinPricingEngine()
+    local = pricing.value(position)
+
+    rate_market = MarketSnapshot(
+        id="auth-rate",
+        equity_spots={"AUTH": position.spot},
+        rates={"USD": 0.08},
+        dividend_yields={"AUTH": position.dividend_yield},
+    )
+    div_market = MarketSnapshot(
+        id="auth-div",
+        equity_spots={"AUTH": position.spot},
+        rates={"USD": position.risk_free_rate},
+        dividend_yields={"AUTH": 0.05},
+    )
+
+    assert pricing.value(position, rate_market).market_value != local.market_value
+    assert pricing.value(position, div_market).market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+def test_supplied_snapshot_beats_trade_local_equity_option_rate_and_div() -> None:
+    _, position = _option_book()
+    original = position.model_dump(mode="json")
+    pricing = BuiltinPricingEngine()
+    local = pricing.value(position)
+
+    rate_market = MarketSnapshot(
+        id="auth-rate",
+        equity_spots={"AUTH": position.spot},
+        equity_vols={"AUTH": position.volatility},
+        rates={"USD": 0.08},
+        dividend_yields={"AUTH": position.dividend_yield},
+    )
+    div_market = MarketSnapshot(
+        id="auth-div",
+        equity_spots={"AUTH": position.spot},
+        equity_vols={"AUTH": position.volatility},
+        rates={"USD": position.risk_free_rate},
+        dividend_yields={"AUTH": 0.05},
+    )
+
+    assert pricing.value(position, rate_market).market_value != local.market_value
+    assert pricing.value(position, div_market).market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+def test_quantlib_supplied_snapshot_beats_trade_local_equity_future_rate_and_div() -> None:
+    import_quantlib()
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    _, position = _future_book()
+    original = position.model_dump(mode="json")
+    engine = QuantLibPricingEngine()
+    local = engine.value(position)
+
+    rate_market = MarketSnapshot(
+        id="auth-rate",
+        equity_spots={"AUTH": position.spot},
+        rates={"USD": 0.08},
+        dividend_yields={"AUTH": position.dividend_yield},
+    )
+    div_market = MarketSnapshot(
+        id="auth-div",
+        equity_spots={"AUTH": position.spot},
+        rates={"USD": position.risk_free_rate},
+        dividend_yields={"AUTH": 0.05},
+    )
+
+    assert engine.value(position, rate_market).market_value != local.market_value
+    assert engine.value(position, div_market).market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+def test_quantlib_supplied_snapshot_beats_trade_local_equity_option_rate_and_div() -> None:
+    import_quantlib()
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    _, position = _option_book()
+    original = position.model_dump(mode="json")
+    engine = QuantLibPricingEngine()
+    local = engine.value(position)
+
+    rate_market = MarketSnapshot(
+        id="auth-rate",
+        equity_spots={"AUTH": position.spot},
+        equity_vols={"AUTH": position.volatility},
+        rates={"USD": 0.08},
+        dividend_yields={"AUTH": position.dividend_yield},
+    )
+    div_market = MarketSnapshot(
+        id="auth-div",
+        equity_spots={"AUTH": position.spot},
+        equity_vols={"AUTH": position.volatility},
+        rates={"USD": position.risk_free_rate},
+        dividend_yields={"AUTH": 0.05},
+    )
+
+    assert engine.value(position, rate_market).market_value != local.market_value
+    assert engine.value(position, div_market).market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+@pytest.mark.parametrize(
+    "book_factory",
+    [_future_book, _option_book],
+    ids=["future", "option"],
+)
+def test_equity_family_uses_trade_local_rate_and_div_when_market_is_none(
+    book_factory,
+) -> None:
+    _, position = book_factory()
+    original = position.model_dump(mode="json")
+
+    valuation = BuiltinPricingEngine().value(position)
+    richer_rate = BuiltinPricingEngine().value(
+        position.model_copy(update={"risk_free_rate": 0.08})
+    )
+    richer_div = BuiltinPricingEngine().value(
+        position.model_copy(update={"dividend_yield": 0.05})
+    )
+
+    assert richer_rate.market_value != valuation.market_value
+    assert richer_div.market_value != valuation.market_value
     assert position.model_dump(mode="json") == original

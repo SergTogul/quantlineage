@@ -214,6 +214,7 @@ def test_quantlib_equity_option_uses_surface_term_structure_not_point_sigma(engi
         equity_spots={"ABC": 100.0},
         equity_vols={"ABC": 0.20},
         rates={"USD": 0.03},
+        dividend_yields={"ABC": 0.0},
     )
     # ATM remains 20%, while moneyness 1.1 is 25%; the QL adapter must consume
     # the full grid directly rather than asking RiskForge for one interpolated vol.
@@ -288,6 +289,7 @@ def test_quantlib_flat_surfaces_preserve_scalar_option_compatibility(engine):
         fx_spots={"EURUSD": 1.10},
         fx_vols={"EURUSD": 0.10},
         rates={"USD": 0.04, "EUR": 0.03},
+        dividend_yields={"ABC": 0.0},
     )
     with_surfaces = attach_vol_surface(
         attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20)),
@@ -311,6 +313,7 @@ def test_quantlib_surface_term_tilt_changes_longer_expiry_more(engine):
         equity_spots={"ABC": 100.0},
         equity_vols={"ABC": 0.20},
         rates={"USD": 0.03},
+        dividend_yields={"ABC": 0.0},
     )
     flat = attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20))
     term_tilted = attach_vol_surface(scalar, build_equity_vol_surface("ABC", 0.20).term_structure_shock(0.03))
@@ -353,6 +356,7 @@ def test_extended_instruments_respect_market_snapshot(engine, monkeypatch):
         fx_spots={"EURUSD": 1.20},
         fx_vols={"EURUSD": 0.18},
         rates={"USD": 0.05, "EUR": 0.02},
+        dividend_yields={"SPY": 0.0},
     )
     expected = {
         p.id: BuiltinPricingEngine().value(p, market)
