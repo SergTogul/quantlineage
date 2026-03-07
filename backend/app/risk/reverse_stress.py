@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import Literal
 
 from app.domain.models import (
+    MarketSnapshot,
     Portfolio,
     ReverseStressConvergence,
     ReverseStressResult,
@@ -160,6 +161,7 @@ class ReverseStressEngine:
         *,
         max_iterations: int = DEFAULT_MAX_ITERATIONS,
         loss_tolerance: float = DEFAULT_LOSS_TOLERANCE,
+        market: MarketSnapshot | None = None,
     ) -> ReverseStressResult:
         if target_loss_pct <= 0:
             raise ValueError("target_loss_pct must be > 0")
@@ -169,7 +171,7 @@ class ReverseStressEngine:
             raise ValueError(f"unsupported reverse-stress factor: {factor!r}")
         family: FactorFamily = factor  # type: ignore[assignment]
 
-        base_market = self.market_data.snapshot(portfolio)
+        base_market = market if market is not None else self.market_data.snapshot(portfolio)
         base_mv = _portfolio_mv(pricing_engine, portfolio, base_market)
         denom = abs(base_mv) or 1.0
         target_loss = float(target_loss_pct) * denom

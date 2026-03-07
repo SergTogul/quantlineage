@@ -29,6 +29,7 @@ from app.domain.models import (
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.risk.hierarchy import _ref_path, portfolio_at
+from app.risk.historical import HistoricalRiskEngine
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.var import VaRAnalytics
 
@@ -44,11 +45,12 @@ _ES_METRICS = frozenset({"expected_shortfall_99"})
 def _stress_loss_amounts(
     portfolio: Portfolio,
     pricing: PricingEngine,
+    market: MarketSnapshot | None = None,
 ) -> dict[str, float]:
     """Position losses on the worst default stress scenario (loss = max(0, -pnl))."""
     from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 
-    results = StressEngine().run(portfolio, pricing, DEFAULT_SCENARIOS)
+    results = StressEngine().run(portfolio, pricing, DEFAULT_SCENARIOS, market=market)
     if not results:
         return {p.id: 0.0 for p in portfolio.positions}
     worst = max(results, key=lambda r: max(0.0, -float(r.pnl)))
@@ -177,7 +179,7 @@ def contributors_for_metric(
 
     if metric in _VAR_METRICS or metric in _ES_METRICS:
         engine = var_engine or VaRAnalytics()
-        report = engine.report(portfolio, pricing)
+        report = engine.report(portfolio, pricing, market=market)
         amounts: dict[str, float] = {}
         for c in report.contributions:
             if metric in _ES_METRICS:
@@ -187,7 +189,9 @@ def contributors_for_metric(
         return _rank_amounts(amounts, labels, top_n)
 
     if metric == "stress_loss":
-        return _rank_amounts(_stress_loss_amounts(portfolio, pricing), labels, top_n)
+        return _rank_amounts(
+            _stress_loss_amounts(portfolio, pricing, market=market), labels, top_n
+        )
 
     # Unknown metrics: no position decomposition here.
     return []
@@ -242,12 +246,17 @@ class LimitDrilldownEngine:
         top_n: int = 5,
         breaches_only: bool = True,
         label_fn: LabelFn | None = None,
+        market: MarketSnapshot | None = None,
     ) -> LimitDrilldownReport:
         ref = hierarchy or _default_ref(portfolio)
         node_path = _ref_path(portfolio, ref)
         level = _level_scope(ref.level)
         sub = portfolio_at(portfolio, ref)
-        risk = self.risk.calculate(sub, pricing)
+        # Always the root book's snapshot — never demo_market_snapshot(sub).
+        if isinstance(self.risk, HistoricalRiskEngine):
+            risk = self.risk.calculate(sub, pricing, market=market)
+        else:
+            risk = self.risk.calculate(sub, pricing)
         limit_defs = list(limits) if limits is not None else list(DEFAULT_LIMITS)
         if metric is not None:
             limit_defs = [lim for lim in limit_defs if lim.metric == metric]
@@ -258,7 +267,9 @@ class LimitDrilldownEngine:
                     f"metric {metric!r} not present in supplied/default limits"
                 )
 
-        results = self.limit_engine.evaluate(sub, pricing, risk, limit_defs)
+        results = self.limit_engine.evaluate(
+            sub, pricing, risk, limit_defs, market=market
+        )
         items: list[LimitBreachDrilldown] = []
         for result in results:
             if breaches_only and not result.breached:
@@ -270,6 +281,7 @@ class LimitDrilldownEngine:
                 top_n=top_n,
                 label_fn=label_fn,
                 var_engine=self.var_engine,
+                market=market,
             )
             items.append(
                 enrich_limit_result(
