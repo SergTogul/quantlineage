@@ -131,12 +131,15 @@ def _stress_loss_abs(
     portfolio: Portfolio,
     pricing_engine: PricingEngine,
     risk: dict[str, float],
+    market: MarketSnapshot | None = None,
 ) -> float:
     if "stress_loss" in risk:
         return abs(float(risk["stress_loss"]))
     from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 
-    results = StressEngine().run(portfolio, pricing_engine, DEFAULT_SCENARIOS)
+    results = StressEngine().run(
+        portfolio, pricing_engine, DEFAULT_SCENARIOS, market=market
+    )
     if not results:
         return 0.0
     # Loss = -pnl for adverse scenarios; take the worst loss (>= 0).
@@ -186,7 +189,9 @@ class LimitEngine:
                 portfolio, pricing_engine, risk, market
             )
         if "stress_loss" in want:
-            out["stress_loss"] = _stress_loss_abs(portfolio, pricing_engine, risk)
+            out["stress_loss"] = _stress_loss_abs(
+                portfolio, pricing_engine, risk, market
+            )
         return out
 
     def evaluate(

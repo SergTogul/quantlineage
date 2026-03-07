@@ -183,8 +183,9 @@ class StressEngine:
         portfolio: Portfolio,
         pricing_engine: PricingEngine,
         scenarios: list[StressScenario],
+        market: MarketSnapshot | None = None,
     ) -> ScenarioEvaluationReport:
-        market = self.market_data.snapshot(portfolio)
+        market = market if market is not None else self.market_data.snapshot(portfolio)
         base_by_position = {p.id: pricing_engine.value(p, market).market_value for p in portfolio.positions}
         base_mv = sum(base_by_position.values())
         nav_denominator = abs(base_mv) or 1.0
@@ -289,9 +290,12 @@ def _risk_summary(
     pricing_engine: PricingEngine,
     risk_engine: RiskEngine,
     methodology: VaRMethodology,
+    market: MarketSnapshot | None = None,
 ) -> RiskSummary:
     if isinstance(risk_engine, HistoricalRiskEngine):
-        raw = risk_engine.calculate(portfolio, pricing_engine, methodology=methodology)
+        raw = risk_engine.calculate(
+            portfolio, pricing_engine, methodology=methodology, market=market
+        )
     else:
         raw = risk_engine.calculate(portfolio, pricing_engine)
         raw = {**raw, "methodology": methodology.value}
@@ -318,9 +322,14 @@ class ScenarioComparisonEngine:
         scenarios: list[StressScenario],
         *,
         methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
+        market: MarketSnapshot | None = None,
     ) -> HedgeComparisonReport:
-        base_stress = self.engine.run(base_portfolio, pricing_engine, scenarios)
-        hedged_stress = self.engine.run(hedged_portfolio, pricing_engine, scenarios)
+        base_stress = self.engine.run(
+            base_portfolio, pricing_engine, scenarios, market=market
+        )
+        hedged_stress = self.engine.run(
+            hedged_portfolio, pricing_engine, scenarios, market=market
+        )
         scenario_rows: list[ScenarioComparison] = []
         for x, y in zip(base_stress, hedged_stress):
             base_loss = max(0.0, -x.pnl)
@@ -337,10 +346,18 @@ class ScenarioComparisonEngine:
                 )
             )
 
-        base_risk = _risk_summary(base_portfolio, pricing_engine, self.risk_engine, methodology)
-        hedged_risk = _risk_summary(hedged_portfolio, pricing_engine, self.risk_engine, methodology)
-        base_fx = self.factor_engine.calculate(base_portfolio, pricing_engine)
-        hedged_fx = self.factor_engine.calculate(hedged_portfolio, pricing_engine)
+        base_risk = _risk_summary(
+            base_portfolio, pricing_engine, self.risk_engine, methodology, market=market
+        )
+        hedged_risk = _risk_summary(
+            hedged_portfolio, pricing_engine, self.risk_engine, methodology, market=market
+        )
+        base_fx = self.factor_engine.calculate(
+            base_portfolio, pricing_engine, market=market
+        )
+        hedged_fx = self.factor_engine.calculate(
+            hedged_portfolio, pricing_engine, market=market
+        )
 
         return HedgeComparisonReport(
             hedge_cost=hedged_risk.market_value - base_risk.market_value,
