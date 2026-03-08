@@ -19,6 +19,15 @@ Backend selection (M6.3):
 
 Tolerances (M6.5): ``KERNEL_ABI_*`` for direct ABI compares; ``KERNEL_PNL_*`` for
 NumPy risk-path vs kernel (also re-exported from ``app.risk.historical``).
+
+C ABI (R0.12.5)
+- ``riskforge_kernel_abi_version()`` must equal ``KERNEL_ABI_VERSION`` (1).
+- ``riskforge_portfolio_scenarios`` returns ``KERNEL_OK`` / ``KERNEL_ERR_*``.
+- Lengths: ``n_exposure_doubles == n_exposures * 5``,
+  ``n_shock_doubles == n_shocks * 4``, ``n_out == n_shocks``.
+- Null/empty: count 0 may pass NULL; count > 0 and NULL is ``KERNEL_ERR_NULL``.
+  Empty book (0 exposures, N shocks) writes 0.0 per shock. Mismatch fails
+  closed (error, no buffer walk).
 """
 
 from __future__ import annotations
@@ -46,6 +55,21 @@ KERNEL_ABI_REL_TOL = 1e-12
 # gating in Python; see also re-exports in ``app.risk.historical``.
 KERNEL_PNL_ABS_TOL = 1e-9
 KERNEL_PNL_REL_TOL = 1e-12
+
+# R0.12.5 C ABI contract (must match native/include/risk_kernel_capi.h).
+KERNEL_ABI_VERSION = 1
+KERNEL_EXPOSURE_STRIDE = 5
+KERNEL_SHOCK_STRIDE = 4
+KERNEL_OK = 0
+KERNEL_ERR_ABI = 1
+KERNEL_ERR_NULL = 2
+KERNEL_ERR_LENGTH = 3
+
+_KERNEL_ERR_NAMES = {
+    KERNEL_ERR_ABI: "ABI mismatch",
+    KERNEL_ERR_NULL: "null pointer",
+    KERNEL_ERR_LENGTH: "length mismatch",
+}
 
 
 @dataclass(frozen=True)
@@ -88,31 +112,76 @@ class PythonScenarioKernel(ScenarioKernel):
         ]
 
 
+class NativeKernelError(Exception):
+    """Native C ABI rejected the call (version, null pointer, or length)."""
+
+    def __init__(self, code: int, message: str):
+        self.code = code
+        super().__init__(message)
+
+
 class NativeScenarioKernel(ScenarioKernel):
     """Dependency-free ctypes adapter for the optional C++20 scenario kernel."""
 
     def __init__(self, library_path: str | Path):
         self.library_path = Path(library_path)
         self.lib = ctypes.CDLL(str(self.library_path))
+        if not hasattr(self.lib, "riskforge_kernel_abi_version"):
+            raise NativeKernelError(
+                KERNEL_ERR_ABI,
+                "native library missing riskforge_kernel_abi_version",
+            )
+        ver_fn = self.lib.riskforge_kernel_abi_version
+        ver_fn.argtypes = []
+        ver_fn.restype = ctypes.c_int
+        self.abi_version = int(ver_fn())
+        if self.abi_version != KERNEL_ABI_VERSION:
+            raise NativeKernelError(
+                KERNEL_ERR_ABI,
+                f"native ABI {self.abi_version} != Python KERNEL_ABI_VERSION {KERNEL_ABI_VERSION}",
+            )
         self.fn = self.lib.riskforge_portfolio_scenarios
         self.fn.argtypes = [
+            ctypes.c_int,
             ctypes.POINTER(ctypes.c_double),
+            ctypes.c_size_t,
             ctypes.c_size_t,
             ctypes.POINTER(ctypes.c_double),
             ctypes.c_size_t,
+            ctypes.c_size_t,
             ctypes.POINTER(ctypes.c_double),
+            ctypes.c_size_t,
         ]
-        self.fn.restype = None
+        self.fn.restype = ctypes.c_int
 
     def pnl(self, exposures, shocks):
+        n_e = len(exposures)
+        n_s = len(shocks)
         eflat = [x for e in exposures for x in (e.delta, e.gamma, e.vega, e.dv01, e.fx_delta)]
         sflat = [
             x for s in shocks for x in (s.equity_return, s.vol_points, s.rates_bps, s.fx_return)
         ]
-        E = (ctypes.c_double * len(eflat))(*eflat)
-        S = (ctypes.c_double * len(sflat))(*sflat)
-        O = (ctypes.c_double * len(shocks))()
-        self.fn(E, len(exposures), S, len(shocks), O)
+        n_ed = len(eflat)
+        n_sd = len(sflat)
+        if n_ed != n_e * KERNEL_EXPOSURE_STRIDE or n_sd != n_s * KERNEL_SHOCK_STRIDE:
+            raise NativeKernelError(KERNEL_ERR_LENGTH, "packed buffer length does not match strides")
+        E = (ctypes.c_double * n_ed)(*eflat)
+        S = (ctypes.c_double * n_sd)(*sflat)
+        O = (ctypes.c_double * n_s)()
+        rc = self.fn(
+            KERNEL_ABI_VERSION,
+            E if n_e else None,
+            n_e,
+            n_ed,
+            S if n_s else None,
+            n_s,
+            n_sd,
+            O if n_s else None,
+            n_s,
+        )
+        if rc != KERNEL_OK:
+            name = _KERNEL_ERR_NAMES.get(rc, "unknown")
+            raise NativeKernelError(rc, f"riskforge_portfolio_scenarios failed: {name} ({rc})")
         return list(O)
 
 
