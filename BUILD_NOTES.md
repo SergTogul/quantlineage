@@ -77,6 +77,25 @@ Result: **exit 0**. Alembic applied `001_initial_persistence` → `002_risk_run_
 - Main `backend` job: `pip install -r requirements.txt` (includes QuantLib); on failure, strip QuantLib line and continue with builtin (`RISKFORGE_PRICING_ENGINE` detected via import).
 - `postgres-smoke` does not require QuantLib; same install fallback so persistence proof is independent of the QL wheel.
 
+## Nightly / labeled runner (R0.12.4)
+
+Heavier checks live in `.github/workflows/nightly.yml` (`schedule` daily 06:00 UTC + `workflow_dispatch`). They are **not** on `pull_request` and must **not** be added to PR-FULL `needs:`.
+
+What actually runs (not echo-only):
+
+- Native benchmark binary: compile `backend/native/src/benchmark.cpp` and run `10k × 1k` (`--threads 4 --json`) asserting `impl` / `checksum` identity (not SLA-K1/K2; `check_m6_sla.py` is not run on `ubuntu-latest`), then `benchmarks/run_scenario_bench.py --workload 1k_x_1k`.
+- Postgres two-worker claim: GHA `postgres:16-alpine` service + `scripts/smoke_postgres.sh` + `RISKFORGE_NIGHTLY=1 pytest tests/test_postgres_two_worker.py`.
+- Larger FULL_REVALUATION sample: `RISKFORGE_NIGHTLY=1 pytest tests/test_nightly_full_reval_sample.py` (120 observations).
+
+Local Docker/Postgres is **optional** for laptop pytest. `tests/test_postgres_two_worker.py` skips when `CI` and `RISKFORGE_NIGHTLY` are unset and `RISKFORGE_DATABASE_URL` is missing or unreachable. When `RISKFORGE_NIGHTLY` is set, a missing or unreachable DSN **fails**. When `CI` is set and a postgresql DSN is offered, an unreachable DSN **fails** (no skip-green). `CI` plus an unset DSN still skips so PR `backend-pytest` is not broken. That skip does **not** apply to PR `postgres-persistence-smoke`, which is unchanged. To run the two-worker test locally:
+
+```bash
+docker compose up -d postgres
+export RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+./scripts/smoke_postgres.sh
+cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_postgres_two_worker.py
+```
+
 ## Local Compose resource expectations (R0.11.6)
 
 Default `docker compose up` (Postgres 16 + API + one risk-run worker + nginx frontend) is a laptop demo, not a capacity SLA. Budget about **2 CPU cores and 2–3 GiB RAM** for idle/light dashboard traffic with the packaged books. FULL_REVALUATION, large `observations` counts, or enabling the native scenario kernel can use more CPU on the API/worker; Postgres stays small for the seeded demo schema. Images drop to a non-root `USER` where practical (backend `riskforge`, frontend `nginx`); Compose still publishes only on loopback (R0.11.1).

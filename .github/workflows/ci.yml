@@ -5,6 +5,8 @@
 # e2e-playwright (M9.2 / M9.10).
 # R0.12.1: a green "PR-FAST" means deterministic goldens + frontend unit/lint ran (not PR-FULL).
 # R0.12.2: a green "PR-FULL" means the production-relevant jobs below all succeeded.
+# R0.12.4 nightly heavier checks live in .github/workflows/nightly.yml
+# (schedule + workflow_dispatch only). Do not add those jobs to PR-FULL needs.
 name: CI
 
 on:
