@@ -810,7 +810,7 @@ A dashboard load does not execute redundant full valuations of the same book and
 Priority: **P1**  
 Risk types: TEST_GAP, CI, OPERABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.1.6 QuantLib hard-gate; R0.12.1 PR-FAST APPROVE; R0.12.2 PR-FULL aggregator APPROVE; R0.12.3 critical E2E journey green; remaining nightly/ABI)
+Status: **IN PROGRESS** (R0.1.6 QuantLib hard-gate; R0.12.1 PR-FAST APPROVE; R0.12.2 PR-FULL aggregator APPROVE; R0.12.3 critical E2E journey APPROVE; R0.12.5 native ABI fail-closed APPROVE; remaining nightly)
 
 Source findings:
 
@@ -858,7 +858,8 @@ A broken QuantLib installation cannot produce a green "full" CI run.
 
 Priority: **P2**  
 Risk types: PERFORMANCE, MAINTAINABILITY, NATIVE_SAFETY  
-Confidence: HIGH
+Confidence: HIGH  
+Status: **IN PROGRESS** (R0.12.5 ABI version/length/null fail-closed APPROVE. Remaining: contiguous NumPy path, per-call thread setup; do not expand native VaR/QuantLib.)
 
 Source findings:
 

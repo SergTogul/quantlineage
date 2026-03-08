@@ -11,6 +11,39 @@ g++ -std=c++20 -O3 -shared -fPIC -pthread -I include \
 
 `app.compute.kernel.NativeScenarioKernel` loads it with Python `ctypes`; no pybind11 dependency is required.
 
+## C ABI (R0.12.5)
+
+Header: `include/risk_kernel_capi.h`. Python constants live in `app.compute.kernel`
+(`KERNEL_ABI_VERSION`, `KERNEL_OK`, `KERNEL_ERR_*`).
+
+| Symbol | Role |
+|---|---|
+| `RISKFORGE_KERNEL_ABI` / `riskforge_kernel_abi_version()` | Version **1**. Python refuses to load a mismatch. |
+| `riskforge_portfolio_scenarios` | Returns `int` (`OK=0`, `ERR_ABI=1`, `ERR_NULL=2`, `ERR_LENGTH=3`). |
+| Exposure stride | 5 doubles (`delta, gamma, vega, dv01, fx_delta`) |
+| Shock stride | 4 doubles (`equity, vol_points, rates_bps, fx`) |
+
+Length contract (mismatch → `ERR_LENGTH`, **no writes / no overrun**):
+
+- `n_exposure_doubles == n_exposures * 5`
+- `n_shock_doubles == n_shocks * 4`
+- `n_out == n_shocks`
+
+Null / empty policy:
+
+- Count `== 0`: pointer may be `NULL`; it is not dereferenced.
+- `n_shocks == 0`: success, no writes (`out` may be `NULL`).
+- `n_exposures == 0` and `n_shocks > 0`: write `0.0` per shock (empty book).
+- Count `> 0` and pointer is `NULL`: `ERR_NULL` (out buffer unchanged).
+
+P&L math, thread pool, and (absent) SIMD are unchanged. `kernel_test` must compile
+`src/risk_kernel_capi.cpp` with the same flags as the baseline:
+
+```bash
+g++ -std=c++20 -O2 -pthread -I include \
+  tests/kernel_test.cpp src/risk_kernel_capi.cpp -o /tmp/kernel_test
+```
+
 ## Parallel strategy — one approach only
 
 **Choice: C++20 standard-library thread pool over contiguous shock partitions.**
