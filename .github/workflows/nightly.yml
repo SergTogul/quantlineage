@@ -1,0 +1,178 @@
+# R0.12.4 / RF-016 — Nightly / labeled-runner heavier checks.
+#
+# Triggers: daily schedule + workflow_dispatch (Actions → Nightly → Run workflow).
+# workflow_dispatch is the labeled-runner equivalent. This file is intentionally
+# not on pull_request so it cannot become a required PR check.
+#
+# Do not add these jobs to PR-FULL needs: in .github/workflows/ci.yml.
+# Do not weaken PR-FAST, QuantLib hard-gate, or postgres-persistence-smoke.
+#
+# Local laptop: Docker/Postgres is optional. tests/test_postgres_two_worker.py
+# skips when CI and RISKFORGE_NIGHTLY are unset and the DSN is missing or
+# unreachable. The GHA job below sets RISKFORGE_NIGHTLY=1 so a missing or
+# unreachable DSN fails (no skip-green).
+#
+# Native job is compile + 10k×1k checksum/impl identity. Do not run
+# benchmarks/check_m6_sla.py on ubuntu-latest (host-specific SLA-K1/K2 floors
+# flake). Labeled-runner SLA remains an RF-016 leftover.
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  native-benchmark:
+    name: nightly-native-benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile in-tree native benchmark binary
+        run: |
+          test -f backend/native/src/benchmark.cpp
+          g++ -std=c++20 -O3 -pthread -I backend/native/include \
+            backend/native/src/benchmark.cpp -o /tmp/scenario_bench
+          test -x /tmp/scenario_bench
+
+      - name: Run native benchmark (10k exposures × 1k shocks)
+        run: |
+          /tmp/scenario_bench --exposures 10000 --shocks 1000 --threads 4 --json \
+            | tee /tmp/scenario_bench.json
+          python3 -c "
+          import json
+          row = json.loads(open('/tmp/scenario_bench.json', encoding='utf-8').read())
+          assert row.get('impl') == 'cpp_header', row
+          assert int(row['n_exposures']) == 10000, row
+          assert int(row['n_shocks']) == 1000, row
+          assert float(row['checksum']) == -9900, row
+          print('native benchmark 10k x 1k checksum/impl identity ok')
+          "
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies (QuantLib optional)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          if pip install -r requirements.txt; then
+            echo "Installed backend/requirements.txt"
+          else
+            echo "::warning::Full requirements install failed; retrying without QuantLib"
+            grep -Eiv '^[[:space:]]*QuantLib' requirements.txt > /tmp/requirements-no-ql.txt
+            pip install -r /tmp/requirements-no-ql.txt
+          fi
+
+      - name: Scenario-application harness (1k × 1k)
+        env:
+          PYTHONPATH: backend
+        run: |
+          python benchmarks/run_scenario_bench.py \
+            --workload 1k_x_1k --iters 1 --threads 4 --parallel-compare --json \
+            | tee /tmp/scenario_harness.json
+          python3 -c "
+          import json
+          payload = json.loads(open('/tmp/scenario_harness.json', encoding='utf-8').read())
+          impls = {r['impl'] for r in payload.get('results', [])}
+          assert 'cpp_header' in impls, impls
+          assert 'python' in impls, impls
+          print('scenario-application benchmark completed', sorted(impls))
+          "
+
+  postgres-two-worker:
+    name: nightly-postgres-two-worker
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: riskforge
+          POSTGRES_PASSWORD: riskforge
+          POSTGRES_DB: riskforge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U riskforge -d riskforge"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies (no QuantLib required)
+        run: |
+          python -m pip install --upgrade pip
+          if ! pip install -r requirements.txt; then
+            echo "::warning::Full requirements install failed; retrying without QuantLib"
+            grep -Eiv '^[[:space:]]*QuantLib' requirements.txt > /tmp/requirements-no-ql.txt
+            pip install -r /tmp/requirements-no-ql.txt
+          fi
+          python -c "import sqlalchemy, alembic, psycopg; print('sqlalchemy', sqlalchemy.__version__)"
+
+      - name: Alembic + seed (same script as PR postgres-smoke)
+        env:
+          PYTHONPATH: .
+          RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+        run: |
+          chmod +x ../scripts/smoke_postgres.sh
+          ../scripts/smoke_postgres.sh
+
+      - name: Postgres two-worker claim
+        env:
+          PYTHONPATH: .
+          RISKFORGE_NIGHTLY: "1"
+          RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+        run: pytest -q --tb=short tests/test_postgres_two_worker.py
+
+  full-reval-sample:
+    name: nightly-full-reval-sample
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies (builtin is enough)
+        run: |
+          python -m pip install --upgrade pip
+          if pip install -r requirements.txt; then
+            echo "Installed backend/requirements.txt"
+          else
+            echo "::warning::Full requirements install failed; retrying without QuantLib"
+            grep -Eiv '^[[:space:]]*QuantLib' requirements.txt > /tmp/requirements-no-ql.txt
+            pip install -r /tmp/requirements-no-ql.txt
+          fi
+
+      - name: Larger FULL_REVALUATION sample
+        env:
+          PYTHONPATH: .
+          RISKFORGE_PRICING_ENGINE: builtin
+          RISKFORGE_NIGHTLY: "1"
+        run: pytest -q --tb=short tests/test_nightly_full_reval_sample.py
