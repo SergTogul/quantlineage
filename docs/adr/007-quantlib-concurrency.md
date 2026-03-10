@@ -28,11 +28,14 @@ Evidence already in code:
 
 ## Decision
 
-1. **Serialize QuantLib use inside one process via `RLock`.**
- `QuantLibPricingEngine` owns an instance `RLock` and wraps every valuation
- path that touches QuantLib settings (and related construction) in `_session`.
- Callers (risk engines, services, workers) must not manipulate
- `ql.Settings` themselves.
+1. **Serialize QuantLib use inside one process via `_QL_PROCESS_LOCK`.**
+ `QuantLibPricingEngine` binds every instance to the module-level
+ `_QL_PROCESS_LOCK` and wraps every valuation path that touches QuantLib
+ settings (and related construction) in `_session`. Valuation cache keys
+ include parseable snapshot as-of so ISO evaluation dates cannot share a
+ cached PV. Callers (risk engines, services, workers) must not manipulate
+ `ql.Settings` themselves. Parallel full revaluation remains
+ process-partitioned (R0.3.5).
 
 2. **Prefer process isolation for parallel QuantLib revaluation.**
  For high-throughput FULL_REVALUATION / multi-run pricing, scale with

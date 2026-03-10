@@ -47,11 +47,56 @@ def test_trade_and_market_keys_stable():
     p = _equity()
     m = _market()
     assert trade_cache_key(p) == trade_cache_key(p.model_copy())
-    assert market_cache_key(m) == market_cache_key(
-        MarketSnapshot(id="other", as_of="later", equity_spots={"SPY": 100.0}, rates={"USD": 0.04})
+    # Labels stay equivalent; id is excluded. Parseable ISO as_of is not a label.
+    labeled_other_id = MarketSnapshot(
+        id="other", as_of="later", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}
     )
+    labeled_current = MarketSnapshot(
+        id="third", as_of="current", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}
+    )
+    iso_2018 = MarketSnapshot(
+        id="iso-a", as_of="2018-01-01", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}
+    )
+    iso_2018_other_id = MarketSnapshot(
+        id="iso-b", as_of="2018-01-01", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}
+    )
+    iso_2024 = MarketSnapshot(
+        id="iso-c", as_of="2024-06-14", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}
+    )
+    assert market_cache_key(m) == market_cache_key(labeled_other_id)
+    assert market_cache_key(m) == market_cache_key(labeled_current)
+    assert market_cache_key(iso_2018) == market_cache_key(iso_2018_other_id)
+    assert market_cache_key(iso_2018) != market_cache_key(iso_2024)
+    assert market_cache_key(iso_2018) != market_cache_key(m)
+    date_2018 = MarketSnapshot.model_construct(
+        id="iso-date",
+        as_of=date(2018, 1, 1),
+        equity_spots={"SPY": 100.0},
+        rates={"USD": 0.04},
+    )
+    assert market_cache_key(date_2018) == market_cache_key(iso_2018)
     with pytest.raises(ValueError, match="explicit MarketSnapshot"):
         market_cache_key(None)
+
+
+def test_cache_miss_on_parseable_as_of_change():
+    """ISO as_of is load-bearing for valuation identity even when marks match."""
+    inner = CountingPricingEngine()
+    cached = CachedPricingEngine(inner)
+    pos = _equity()
+    m2018 = MarketSnapshot(
+        id="a", as_of="2018-01-01", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}
+    )
+    m2024 = MarketSnapshot(
+        id="b", as_of="2024-06-14", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}
+    )
+
+    cached.value(pos, m2018)
+    cached.value(pos, m2024)
+
+    assert inner.calls == 2
+    assert cached.stats.misses == 2
+    assert cached.stats.hits == 0
 
 
 def test_equity_trade_key_excludes_legacy_spot_but_keeps_economics():

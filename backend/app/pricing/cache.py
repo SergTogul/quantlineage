@@ -3,6 +3,7 @@
 Cache keys bind:
 - contractual trade economics (equity-family projection; legacy payload elsewhere),
 - required market snapshot content hash,
+- parseable snapshot ``as_of`` (ISO ``YYYY-MM-DD`` or ``date``; labels omitted),
 - pricing configuration (engine identity + evaluation date + extras).
 
 A market bump produces a new ``content_hash`` and therefore a miss — no separate
@@ -106,11 +107,34 @@ def trade_cache_key(position: Position) -> str:
     return _stable_json_hash({"schema": schema, "economics": economics})
 
 
+def _parseable_as_of(as_of: object) -> date | None:
+    """Return a calendar date from snapshot ``as_of``, or None for labels.
+
+    Matches the QuantLib adapter contract: ISO ``YYYY-MM-DD`` and ``date``
+    objects are load-bearing; labels such as ``current`` / ``t0`` / ``later``
+    fall back to engine ``evaluation_date`` (already in ``PricingConfiguration``).
+    """
+    if isinstance(as_of, date):
+        return as_of
+    if not isinstance(as_of, str):
+        return None
+    text = as_of.strip()
+    if not text or text.lower() == "current":
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
+
+
 def market_cache_key(market: MarketSnapshot | None) -> str:
-    """Snapshot content hash, independent of ``id`` / ``as_of`` labels."""
+    """Snapshot content hash plus parseable ``as_of``; ``id`` and labels omitted."""
     if market is None:
         raise ValueError("production cache keys require an explicit MarketSnapshot")
-    return f"market:{market.content_hash()}"
+    parsed = _parseable_as_of(market.as_of)
+    if parsed is None:
+        return f"market:{market.content_hash()}"
+    return f"market:{market.content_hash()}|as_of:{parsed.isoformat()}"
 
 
 def valuation_cache_key(

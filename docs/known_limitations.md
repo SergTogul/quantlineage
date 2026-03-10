@@ -49,7 +49,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - The accepted performance claim is limited to the native scenario-kernel SLA in [`performance.md`](performance.md) and [`benchmarks/RESULTS.md`](../benchmarks/RESULTS.md).
 - No HTTP risk-run latency, multi-tenant capacity, or FULL_REVALUATION performance SLA is claimed.
-- The QuantLib adapter lock is per pricing-engine instance, while `Settings.evaluationDate` is process-global; overlapping engine sessions can contaminate evaluation dates. R0.3 owns process-level serialization, and parallel full revaluation should prefer process isolation.
+- In-process QuantLib is serialized by `_QL_PROCESS_LOCK`; valuation cache keys include parseable snapshot as-of (ISO `YYYY-MM-DD` or `date`; labels such as `current` / `t0` stay equivalent and use the engine evaluation date). Parallel full revaluation remains process-partitioned (R0.3.5).
 
 ## Persistence And Workers
 
