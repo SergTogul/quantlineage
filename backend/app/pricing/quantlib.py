@@ -25,7 +25,7 @@ from app.interfaces.pricing import PricingEngine
 from app.market.demo_snapshot import MissingMarketDataError
 from app.market.vol_surfaces import vol_surface_from_dict
 from app.pricing.curve_rates import continuous_zero, has_curve_or_key_rates, select_yield_curve
-from app.pricing.surface_vol import required_equity_option_vol
+from app.pricing.surface_vol import required_equity_option_vol, required_fx_option_vol
 
 try:
     import QuantLib as ql
@@ -85,6 +85,13 @@ def _required_dividend_yield(market: MarketSnapshot, symbol: str) -> float:
         return market.dividend_yields[symbol]
     except KeyError:
         raise MissingMarketDataError(f"dividend_yields[{symbol}]") from None
+
+
+def _required_fx_spot(market: MarketSnapshot, pair: str) -> float:
+    try:
+        return market.fx_spots[pair]
+    except KeyError:
+        raise MissingMarketDataError(f"fx_spots[{pair}]") from None
 
 
 class QuantLibPricingEngine(PricingEngine):
@@ -236,18 +243,23 @@ class QuantLibPricingEngine(PricingEngine):
                 }
             elif isinstance(position, FXForwardPosition):
                 updates = {
-                    "spot": market.fx_spots.get(position.pair, position.spot),
-                    "domestic_rate": market.rates.get(position.pair[-3:], position.domestic_rate),
-                    "foreign_rate": market.rates.get(position.pair[:3], position.foreign_rate),
+                    "spot": _required_fx_spot(market, position.pair),
+                    "domestic_rate": _required_settlement_rate(market, position.pair[-3:]),
+                    "foreign_rate": _required_settlement_rate(market, position.pair[:3]),
                 }
             elif isinstance(position, FXOptionPosition):
-                spot = market.fx_spots.get(position.pair, position.spot)
-                fallback = market.fx_vols.get(position.pair, position.volatility)
+                spot = _required_fx_spot(market, position.pair)
                 updates = {
                     "spot": spot,
-                    "volatility": fallback,
-                    "domestic_rate": market.rates.get(position.pair[-3:], position.domestic_rate),
-                    "foreign_rate": market.rates.get(position.pair[:3], position.foreign_rate),
+                    "volatility": required_fx_option_vol(
+                        market,
+                        name=position.pair,
+                        maturity_years=position.maturity_years,
+                        strike=position.strike,
+                        spot=spot,
+                    ),
+                    "domestic_rate": _required_settlement_rate(market, position.pair[-3:]),
+                    "foreign_rate": _required_settlement_rate(market, position.pair[:3]),
                 }
             if updates:
                 position = position.model_copy(update=updates)
