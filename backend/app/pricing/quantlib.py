@@ -35,9 +35,30 @@ except ImportError as exc:  # pragma: no cover - exercised only when dependency 
 else:
     _IMPORT_ERROR = None
 
+# Process-owned QuantLib session. Settings.evaluationDate and IndexManager
+# histories are process-global; this lock is the only serialization boundary.
+# Engine instances bind it — they must not allocate a private RLock.
+_QL_PROCESS_LOCK = RLock()
+_QL_SESSION_DEPTH = 0
+
 
 class QuantLibUnavailableError(RuntimeError):
     pass
+
+
+def _parse_snapshot_as_of(as_of: object) -> date | None:
+    """Return a calendar date from snapshot ``as_of``, or None for labels."""
+    if isinstance(as_of, date):
+        return as_of
+    if not isinstance(as_of, str):
+        return None
+    text = as_of.strip()
+    if not text or text.lower() == "current":
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
 
 
 def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
@@ -69,11 +90,18 @@ def _required_dividend_yield(market: MarketSnapshot, symbol: str) -> float:
 class QuantLibPricingEngine(PricingEngine):
     """QuantLib-backed valuation adapter.
 
-    QuantLib's evaluation date is process-global.  The adapter owns that state and
-    serializes pricing calls so callers never need to know about QuantLib globals.
-    For high-throughput production use, run multiple worker processes or replace
-    this adapter with a native C++ pricing service.
+    QuantLib Settings and IndexManager state are process-global.  All access is
+    serialized by the module-level ``_QL_PROCESS_LOCK`` (shared by every engine
+    instance).  Parseable ``MarketSnapshot.as_of`` drives the evaluation date
+    for a valuation; otherwise the engine's ``evaluation_date`` is used.
+    IndexManager histories are cleared on the outermost session exit so one
+    valuation cannot leave fixings for the next.
+
+    In-process callers are serialized.  Parallel full revaluation should use
+    separate processes (R0.3.5), not additional in-process QuantLib engines.
     """
+
+    _process_lock = _QL_PROCESS_LOCK
 
     def __init__(self, evaluation_date: date | None = None):
         if ql is None:
@@ -82,17 +110,30 @@ class QuantLibPricingEngine(PricingEngine):
                 "`pip install QuantLib`."
             ) from _IMPORT_ERROR
         self.evaluation_date = evaluation_date or date.today()
-        self._lock = RLock()
+        # Bind the process lock; do not allocate a per-instance RLock.
+        self._lock = _QL_PROCESS_LOCK
 
     @contextmanager
-    def _session(self):
+    def _session(self, evaluation_date: date | None = None):
+        global _QL_SESSION_DEPTH
+        eval_date = evaluation_date or self.evaluation_date
         with self._lock:
-            previous = ql.Settings.instance().evaluationDate
-            ql.Settings.instance().evaluationDate = self._ql_date(self.evaluation_date)
+            previous_settings = ql.Settings.instance().evaluationDate
+            previous_engine_date = self.evaluation_date
+            outermost = _QL_SESSION_DEPTH == 0
+            if outermost:
+                ql.IndexManager.instance().clearHistories()
+            _QL_SESSION_DEPTH += 1
+            self.evaluation_date = eval_date
+            ql.Settings.instance().evaluationDate = self._ql_date(eval_date)
             try:
                 yield
             finally:
-                ql.Settings.instance().evaluationDate = previous
+                _QL_SESSION_DEPTH -= 1
+                self.evaluation_date = previous_engine_date
+                ql.Settings.instance().evaluationDate = previous_settings
+                if _QL_SESSION_DEPTH == 0:
+                    ql.IndexManager.instance().clearHistories()
 
     @staticmethod
     def _ql_date(value: date):
@@ -108,7 +149,11 @@ class QuantLibPricingEngine(PricingEngine):
         return self._ql_date(self.evaluation_date + timedelta(days=days))
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
+        session_date = self.evaluation_date
         if market is not None:
+            parsed_as_of = _parse_snapshot_as_of(market.as_of)
+            if parsed_as_of is not None:
+                session_date = parsed_as_of
             # Convert immutable market snapshot values into the trade-local marks QuantLib consumes.
             updates = {}
             if isinstance(position, EquityPosition):
@@ -206,7 +251,7 @@ class QuantLibPricingEngine(PricingEngine):
                 }
             if updates:
                 position = position.model_copy(update=updates)
-        with self._session():
+        with self._session(evaluation_date=session_date):
             if isinstance(position, EquityPosition):
                 return Valuation(
                     position_id=position.id,
