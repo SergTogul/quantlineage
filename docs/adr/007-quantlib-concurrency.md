@@ -34,8 +34,9 @@ Evidence already in code:
  settings (and related construction) in `_session`. Valuation cache keys
  include parseable snapshot as-of so ISO evaluation dates cannot share a
  cached PV. Callers (risk engines, services, workers) must not manipulate
- `ql.Settings` themselves. Parallel full revaluation remains
- process-partitioned (R0.3.5).
+ `ql.Settings` themselves. Parallel full revaluation is process-partitioned
+ (R0.3.5): Compose ``worker`` / ``python -m app.worker``, not an in-process
+ QuantLib thread pool.
 
 2. **Prefer process isolation for parallel QuantLib revaluation.**
  For high-throughput FULL_REVALUATION / multi-run pricing, scale with
@@ -57,6 +58,32 @@ Evidence already in code:
  Do not add OpenMP (or a second pool) to the scenario kernel, and do not
  “speed up” QuantLib by spawning threads that each mutate process-global
  evaluation date without going through the adapter lock.
+
+## R0.3.5 process-partition design (bounded)
+
+R0.3.5 pins the concurrency architecture. It does **not** introduce a
+scenario-block `ProcessPoolExecutor` or a job platform (that remains R0.6.5
+after profiling).
+
+| Path | What happens | Parallelism |
+|---|---|---|
+| In-process QuantLib (`QuantLibPricingEngine._session`) | `_QL_PROCESS_LOCK` serializes `Settings` / `IndexManager` | None (correct serial bottleneck) |
+| In-process `RiskRunWorker` `ThreadPoolExecutor` | Schedules risk-run **jobs** only; pricing still takes the process lock | Job overlap, not QL overlap |
+| Compose `backend` + `RISKFORGE_EXTERNAL_WORKER=1` | HTTP enqueues `QUEUED` rows; does not execute full reval in the API process | API process stays off the QL work |
+| Compose `worker` / `python -m app.worker` | Separate OS process claims and executes runs | One QuantLib address space per worker |
+| Extra worker replicas | `FOR UPDATE SKIP LOCKED` claim | Process-level scale-out |
+| Native scenario kernel | Δ-Γ buffers only; no QuantLib types or settings | Shock-index threads inside the `.so` |
+
+Forbidden:
+
+- `ThreadPoolExecutor` (or any in-process pool) that mutates `ql.Settings` or
+  prices QuantLib without `_QL_PROCESS_LOCK` / `_session`.
+- Moving QuantLib into `backend/native/`.
+- Changing numerical methodology to “get parallelism.”
+
+`full_revaluation_pnl_series` stays a sequential `PricingEngine` loop inside
+one process. Parallel full revaluation, when needed, is another worker
+process — not more threads in that loop.
 
 ## Alternatives considered
 
@@ -84,6 +111,8 @@ Evidence already in code:
 
 - `docs/adr/001-quantlib-for-pricing.md`
 - `backend/app/pricing/quantlib.py` (`RLock`, `_session`)
-- `backend/app/services/risk_run_worker.py` (thread pool + external process worker)
+- `backend/app/services/risk_run_worker.py` (job thread pool + external process worker)
+- `backend/app/worker.py` (Compose worker process entrypoint)
+- `backend/tests/test_quantlib_process_parallelism.py` (R0.3.5 pins)
 - `backend/native/README.md` (kernel parallelism; FULL_REVAL out of scope)
 - ROADMAP

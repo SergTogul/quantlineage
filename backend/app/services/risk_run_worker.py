@@ -1,13 +1,21 @@
-"""In-process / out-of-process risk-run execution (M5.4 / M5.7).
+"""In-process / out-of-process risk-run execution (M5.4 / M5.7 / R0.3.5).
 
-Uses a small ``ThreadPoolExecutor`` — not a distributed queue. Lifecycle
-transitions go through ``RiskRunService``; persistence is either the default
-in-memory repo or a SQLAlchemy session factory when provided.
+Uses a small ``ThreadPoolExecutor`` to **schedule risk-run jobs**, not to
+parallelize QuantLib. That pool is not a distributed queue and must not call
+``ql.Settings`` (or otherwise price QuantLib) except through
+``PricingEngine.value`` → ``_session`` → ``_QL_PROCESS_LOCK``.
 
 When ``RISKFORGE_EXTERNAL_WORKER=1``, ``submit`` only enqueues QUEUED rows;
 ``poll_once`` (Compose ``worker`` / ``python -m app.worker``) drains them from
 shared Postgres via ``claim_queued`` (Postgres: ``FOR UPDATE SKIP LOCKED``).
+The Compose worker is a **separate OS process** with its own QuantLib globals.
+Additional worker replicas are the supported parallel full-revaluation scale-out.
+This module does not start a ``ProcessPoolExecutor`` or a job platform
+(R0.6.5 may add a scenario-block process pool after profiling).
 Redis/RQ is not required for safe multi-worker claim.
+
+Lifecycle transitions go through ``RiskRunService``; persistence is either the
+default in-memory repo or a SQLAlchemy session factory when provided.
 """
 
 from __future__ import annotations
