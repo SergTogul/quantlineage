@@ -174,7 +174,7 @@ None. This is the primary architecture dependency for several other fixes.
 Priority: **P0**  
 Risk types: CORRECTNESS, CONCURRENCY, ARCHITECTURE  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.3.2–R0.3.4 process-owned session, fixing isolation, and backdated as-of; remaining R0.3.1 typed `as_of` and R0.3.5 process-level parallelism)
+Status: **IN PROGRESS** (R0.3.2–R0.3.4 process-owned session; R0.3.5 Compose worker process partition APPROVE. Remaining: typed `as_of` (R0.3.1).)
 
 Source findings:
 
@@ -216,13 +216,13 @@ The performance review described QuantLib as protected by an `RLock`; the archit
 - Repeated valuation leaves no fixing contamination.
 - Parallel full-revaluation design uses processes or another demonstrated-safe ownership model.
 
-Evidence so far (R0.3.2–R0.3.4; not CLOSED):
+Evidence so far (R0.3.2–R0.3.5; not CLOSED):
 
 - Module-level `_QL_PROCESS_LOCK` is shared by every `QuantLibPricingEngine` instance (`backend/app/pricing/quantlib.py`).
 - `tests/test_quantlib_process_state.py` requires overlapping sessions to serialize; restoring per-instance locks fails Acc 5.
 - Parseable snapshot `as_of` (ISO `YYYY-MM-DD`) drives `Settings.evaluationDate`; labels such as `current` / `t0` keep the engine date.
 - Outermost session clears `IndexManager` histories so swap fixings do not leak.
-- Remaining: typed `MarketSnapshot.as_of: date` (R0.3.1) and process-partitioned full revaluation (R0.3.5).
+- Remaining: typed `MarketSnapshot.as_of: date` (R0.3.1). Process partition is the Compose `worker` OS process; in-process QuantLib stays serialized. Detector tests are not a closed contract against a later QL thread pool.
 
 ---
 

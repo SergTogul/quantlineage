@@ -347,6 +347,8 @@ Document and implement:
 
 Two concurrent/request-equivalent valuation contexts cannot contaminate one another.
 
+R0.3.5 status: COMPLETE (independent review APPROVE, `reviews/r0.3.5-independent-review.md`). Parallel full reval is the Compose `worker` process. Remaining R0.3 work is typed `as_of` (R0.3.1).
+
 ---
 
 # R0.4 — Converge Market and Scenario Contracts

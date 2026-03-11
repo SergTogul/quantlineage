@@ -59,7 +59,9 @@ def external_worker_enabled() -> bool:
 
     Compose sets ``RISKFORGE_EXTERNAL_WORKER=1`` on ``backend`` so the
     ``worker`` service (``python -m app.worker``) drains the shared Postgres
-    queue. Unset → in-process ThreadPoolExecutor (default for unit tests).
+    queue in a **separate OS process** (R0.3.5 QuantLib process partition).
+    Unset → in-process ThreadPoolExecutor job scheduler (default for unit
+    tests); QuantLib still takes ``_QL_PROCESS_LOCK``.
     """
     return _env_flag("RISKFORGE_EXTERNAL_WORKER")
 
