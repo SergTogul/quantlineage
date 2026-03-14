@@ -13,7 +13,13 @@ from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.scenarios import historical_shocked_snapshots
-from app.sample import demo_market_snapshot
+
+
+def require_explicit_market(market: MarketSnapshot | None) -> MarketSnapshot:
+    """Fail closed: production VaR / ES / full-reval must receive a snapshot."""
+    if market is None:
+        raise ValueError("production risk calculation requires an explicit MarketSnapshot")
+    return market
 
 
 def _aggregate_greeks(vals: list[Valuation]) -> tuple[float, float, float, float, float, float]:
@@ -204,9 +210,9 @@ class HistoricalRiskEngine(RiskEngine):
         market: MarketSnapshot | None = None,
     ) -> dict:
         meth = methodology if methodology is not None else self.methodology
-        # Resolve once: approximate and full-revaluation methodologies must derive
-        # every PV/Greek from one authoritative snapshot.
-        base_market = market if market is not None else demo_market_snapshot(portfolio)
+        # Production path: caller must supply the snapshot. Demo inference is
+        # reserved for named demo helpers / tests, not this engine.
+        base_market = require_explicit_market(market)
         vals = pricing_engine.value_portfolio(portfolio, base_market)
         mv, delta, gamma, vega, dv01, fx_delta = _aggregate_greeks(vals)
 

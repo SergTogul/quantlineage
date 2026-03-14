@@ -30,7 +30,9 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.marginal_var import finite_difference_marginal_var, parametric_marginal_vars
 from app.risk.var import VaRAnalytics
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 
 def _mixed_series(n: int = 100) -> FactorObservationSeries:
@@ -73,8 +75,13 @@ def _book() -> Portfolio:
 
 def test_marginal_var_equals_component_at_unit_weights_delta_gamma():
     pricing = BuiltinPricingEngine()
+    book = _book()
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(
-        _book(), pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA
+        book,
+        pricing,
+        confidence=0.99,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=demo_market_snapshot(book),
     )
     assert all(hasattr(c, "marginal_var") for c in report.contributions)
     for c in report.contributions:
@@ -88,6 +95,7 @@ def test_marginal_var_equals_component_under_full_revaluation():
         pricing,
         confidence=0.95,
         methodology=VaRMethodology.FULL_REVALUATION,
+        market=SAMPLE_MARKET,
     )
     pvar = next(m.var for m in report.methods if m.method == "parametric")
     assert pvar > 0
@@ -117,7 +125,11 @@ def test_zero_risk_portfolio_has_zero_marginal_var():
         rate_moves_bps=z.copy(),
         fx_returns=z.copy(),
     )
+    book = _book()
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(series)).report(
-        _book(), BuiltinPricingEngine(), methodology=VaRMethodology.DELTA_GAMMA
+        book,
+        BuiltinPricingEngine(),
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=demo_market_snapshot(book),
     )
     assert all(c.marginal_var == 0.0 for c in report.contributions)

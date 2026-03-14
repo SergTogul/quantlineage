@@ -14,11 +14,10 @@ from app.domain.models import (
     VaRReport,
 )
 from app.interfaces.pricing import PricingEngine
-from app.risk.historical import approximate_pnl_series
+from app.risk.historical import approximate_pnl_series, require_explicit_market
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.marginal_var import parametric_component_var, parametric_marginal_var
 from app.risk.scenarios import historical_shocked_snapshots
-from app.sample import demo_market_snapshot
 
 
 class VaRAnalytics:
@@ -89,7 +88,7 @@ class VaRAnalytics:
         market: MarketSnapshot | None = None,
     ) -> VaRReport:
         meth = methodology if methodology is not None else self.methodology
-        base_market = market if market is not None else demo_market_snapshot(portfolio)
+        base_market = require_explicit_market(market)
         pos = self._position_pnls(portfolio, pricing, meth, base_market)
         n = next(iter(pos.values())).shape[0] if pos else self.dataset.factor_observations().n_observations
         total = sum(pos.values(), start=np.zeros(n))

@@ -38,6 +38,7 @@ from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.stress import StressEngine
 from app.risk.var import VaRAnalytics
+from app.sample import demo_market_snapshot
 
 pricing = BuiltinPricingEngine()
 stress = StressEngine()
@@ -87,7 +88,10 @@ def _parametric_var(report) -> float:
 def test_var_es_ordering_nonnegative(n, data, seed):
     """M9.3: ES99 ≥ VaR99 ≥ VaR95 ≥ 0 for random long-equity books."""
     book = _equity_book(n, data)
-    r = HistoricalRiskEngine(seed=seed, observations=60).calculate(book, pricing)
+    market = demo_market_snapshot(book)
+    r = HistoricalRiskEngine(seed=seed, observations=60).calculate(
+        book, pricing, market=market
+    )
     assert r["var_95"] >= 0.0
     assert r["var_99"] >= r["var_95"]
     assert r["expected_shortfall_99"] >= r["var_99"]
@@ -98,8 +102,11 @@ def test_var_es_ordering_nonnegative(n, data, seed):
 def test_risk_market_value_equals_sum_of_position_mvs(n, data):
     """M9.3: HistoricalRiskEngine market_value == Σ position valuations."""
     book = _equity_book(n, data)
-    r = HistoricalRiskEngine(seed=3, observations=40).calculate(book, pricing)
-    expected = sum(v.market_value for v in pricing.value_portfolio(book))
+    market = demo_market_snapshot(book)
+    r = HistoricalRiskEngine(seed=3, observations=40).calculate(
+        book, pricing, market=market
+    )
+    expected = sum(v.market_value for v in pricing.value_portfolio(book, market))
     assert r["market_value"] == pytest.approx(expected, abs=1e-9)
 
 
@@ -135,7 +142,11 @@ def test_component_var_reconciles_random_equity_option_book(qty_eq, price, qty_o
         ],
     )
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(
-        book, pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA
+        book,
+        pricing,
+        confidence=0.99,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=demo_market_snapshot(book),
     )
     pvar = _parametric_var(report)
     total = sum(c.component_var for c in report.contributions)

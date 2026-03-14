@@ -234,7 +234,8 @@ Related findings:
 | R0.2 equity future/option rates and dividend yields | COMPLETE | Independent re-review **APPROVE** (`reviews/r0.2-equity-rates-divs-rereview.md`). |
 | R0.2 dashboard/compare/reverse/drilldown root snapshot | COMPLETE | Independent re-review **APPROVE** (`reviews/r0.2-demo-dashboard-snapshot-rereview.md`). |
 | R0.2 FX forward/option spots, vol, domestic/foreign rates | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-fx-independent-review.md`). |
-| Remaining bond/swap/IR fallbacks, terms split, omitted `market=` | OPEN | Next: bond/swap/IR fail-closed. Deferred: golden snapshot-routing. |
+| R0.2 VaR/ES/full-reval require explicit market | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-omit-market-independent-review.md`). |
+| Remaining bond/swap/IR fallbacks, terms split, hierarchy/stress omitted `market=` | OPEN | Bond/swap/IR in flight. Deferred: golden snapshot-routing. |
 
 RF-001 remains **OPEN** until remaining families cannot silently fall back to trade-local marks and production methods no longer infer markets.
 

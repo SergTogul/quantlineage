@@ -2,20 +2,24 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.limits import DEFAULT_LIMITS
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 from app.services.portfolio_service import PortfolioService
 
 
 def test_risk_is_deterministic():
     pricing = BuiltinPricingEngine()
     engine = HistoricalRiskEngine(seed=1)
-    a = engine.calculate(SAMPLE_PORTFOLIO, pricing)
-    b = engine.calculate(SAMPLE_PORTFOLIO, pricing)
+    a = engine.calculate(SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET)
+    b = engine.calculate(SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET)
     assert a == b
 
 
 def test_var_ordering_and_es():
-    r = HistoricalRiskEngine().calculate(SAMPLE_PORTFOLIO, BuiltinPricingEngine())
+    r = HistoricalRiskEngine().calculate(
+        SAMPLE_PORTFOLIO, BuiltinPricingEngine(), market=SAMPLE_MARKET
+    )
     assert r["var_99"] >= r["var_95"] >= 0
     assert r["expected_shortfall_99"] >= r["var_99"]
 

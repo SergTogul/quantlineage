@@ -20,7 +20,9 @@ from app.risk.historical_data import (
     SyntheticHistoricalDataset,
 )
 from app.risk.var import VaRAnalytics
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 
 def test_factor_observation_series_rejects_mismatched_lengths():
@@ -73,17 +75,19 @@ def test_array_dataset_feeds_historical_engine():
     )
     engine = HistoricalRiskEngine(dataset=ArrayHistoricalDataset(series))
     pricing = BuiltinPricingEngine()
-    r = engine.calculate(SAMPLE_PORTFOLIO, pricing)
+    r = engine.calculate(SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET)
     assert r["var_99"] >= r["var_95"] >= 0.0
     assert r["expected_shortfall_99"] >= r["var_99"]
 
 
 def test_historical_engine_default_matches_seeded_synthetic():
     pricing = BuiltinPricingEngine()
-    via_seed = HistoricalRiskEngine(seed=1).calculate(SAMPLE_PORTFOLIO, pricing)
+    via_seed = HistoricalRiskEngine(seed=1).calculate(
+        SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET
+    )
     via_dataset = HistoricalRiskEngine(
         dataset=SyntheticHistoricalDataset(seed=1, observations=750)
-    ).calculate(SAMPLE_PORTFOLIO, pricing)
+    ).calculate(SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET)
     assert via_seed == via_dataset
 
 
@@ -96,7 +100,7 @@ def test_var_analytics_uses_dataset_without_key_rates():
         fx_returns=np.zeros(40),
     )
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(series)).report(
-        SAMPLE_PORTFOLIO, BuiltinPricingEngine(), confidence=0.95
+        SAMPLE_PORTFOLIO, BuiltinPricingEngine(), confidence=0.95, market=SAMPLE_MARKET
     )
     assert {m.method for m in report.methods} == {"historical", "parametric"}
     hist = next(m for m in report.methods if m.method == "historical")

@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from app.domain.models import EquityPosition, Portfolio, VaRMethodology
+from app.domain.models import EquityPosition, MarketSnapshot, Portfolio, VaRMethodology
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
@@ -36,6 +36,7 @@ UNIT_BOOK = Portfolio(
         )
     ],
 )
+UNIT_MARKET = MarketSnapshot(id="unit", equity_spots={"UNIT": 1.0})
 
 
 def dataset_from_pnl(pnl: np.ndarray) -> ArrayHistoricalDataset:
@@ -56,7 +57,7 @@ def historical_result(pnl: np.ndarray) -> dict:
     return HistoricalRiskEngine(
         dataset=dataset_from_pnl(pnl),
         methodology=VaRMethodology.LINEAR,
-    ).calculate(UNIT_BOOK, PRICING)
+    ).calculate(UNIT_BOOK, PRICING, market=UNIT_MARKET)
 
 
 def historical_method(pnl: np.ndarray, confidence: float):
@@ -68,6 +69,7 @@ def historical_method(pnl: np.ndarray, confidence: float):
         PRICING,
         confidence=confidence,
         methodology=VaRMethodology.LINEAR,
+        market=UNIT_MARKET,
     )
     return next(method for method in report.methods if method.method == "historical")
 

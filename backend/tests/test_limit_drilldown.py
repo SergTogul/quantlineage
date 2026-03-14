@@ -34,7 +34,9 @@ from app.risk.historical import HistoricalRiskEngine
 from app.risk.limit_drilldown import LimitDrilldownEngine, contributors_for_metric
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.sensitivities import SensitivityEngine
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 from app.services.portfolio_service import PortfolioService, position_label
 
 
@@ -73,7 +75,9 @@ def _tiny_breach_portfolio() -> Portfolio:
 
 def test_enrich_matches_limit_result_fields():
     pricing = BuiltinPricingEngine()
-    risk = HistoricalRiskEngine(seed=1, observations=40).calculate(SAMPLE_PORTFOLIO, pricing)
+    risk = HistoricalRiskEngine(seed=1, observations=40).calculate(
+        SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET
+    )
     results = LimitEngine().evaluate(SAMPLE_PORTFOLIO, pricing, risk, DEFAULT_LIMITS)
     engine = LimitDrilldownEngine(HistoricalRiskEngine(seed=1, observations=40))
     report = engine.report(
@@ -82,6 +86,7 @@ def test_enrich_matches_limit_result_fields():
         breaches_only=False,
         top_n=3,
         label_fn=position_label,
+        market=SAMPLE_MARKET,
     )
     by_metric = {item.metric: item for item in report.items}
     for lim in results:
@@ -149,6 +154,7 @@ def test_var_contributors_sum_to_100_when_untruncated():
         "var_99",
         top_n=len(SAMPLE_PORTFOLIO.positions),
         label_fn=position_label,
+        market=SAMPLE_MARKET,
     )
     assert len(contribs) == len(SAMPLE_PORTFOLIO.positions)
     assert math.isclose(sum(c.contribution_pct for c in contribs), 100.0, abs_tol=1e-9)

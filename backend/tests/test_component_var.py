@@ -29,7 +29,9 @@ from app.domain.models import (
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.var import VaRAnalytics
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 
 def _mixed_series(n: int = 100) -> FactorObservationSeries:
@@ -136,7 +138,11 @@ def test_component_var_reconciles_sample_portfolio_both_methodologies():
     dataset = ArrayHistoricalDataset(_mixed_series(120))
     for meth in (VaRMethodology.DELTA_GAMMA, VaRMethodology.FULL_REVALUATION):
         report = VaRAnalytics(dataset=dataset).report(
-            SAMPLE_PORTFOLIO, pricing, confidence=0.99, methodology=meth
+            SAMPLE_PORTFOLIO,
+            pricing,
+            confidence=0.99,
+            methodology=meth,
+            market=SAMPLE_MARKET,
         )
         pvar = _parametric_var(report)
         assert len(report.contributions) == len(SAMPLE_PORTFOLIO.positions)
@@ -164,7 +170,10 @@ def test_single_position_component_equals_portfolio_parametric_var():
         ],
     )
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(
-        book, pricing, methodology=VaRMethodology.DELTA_GAMMA
+        book,
+        pricing,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=demo_market_snapshot(book),
     )
     pvar = _parametric_var(report)
     assert len(report.contributions) == 1

@@ -18,7 +18,9 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.var import VaRAnalytics
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 from app.services.portfolio_service import PortfolioService
 
 
@@ -99,9 +101,11 @@ def test_var_methodology_enum_values():
 
 def test_default_methodology_is_delta_gamma():
     engine = HistoricalRiskEngine(seed=1, observations=50)
-    r = engine.calculate(SAMPLE_PORTFOLIO, BuiltinPricingEngine())
+    r = engine.calculate(SAMPLE_PORTFOLIO, BuiltinPricingEngine(), market=SAMPLE_MARKET)
     assert r["methodology"] == "DELTA_GAMMA"
-    report = VaRAnalytics(seed=1, observations=50).report(SAMPLE_PORTFOLIO, BuiltinPricingEngine())
+    report = VaRAnalytics(seed=1, observations=50).report(
+        SAMPLE_PORTFOLIO, BuiltinPricingEngine(), market=SAMPLE_MARKET
+    )
     assert report.methodology == VaRMethodology.DELTA_GAMMA
 
 
@@ -185,7 +189,9 @@ def test_service_and_api_default_methodology():
 def test_delta_gamma_default_matches_legacy_seeded_numbers():
     """Regression: default path remains the pre-M2.3 Δ-Γ approximation."""
     pricing = BuiltinPricingEngine()
-    r = HistoricalRiskEngine(seed=1, observations=750).calculate(SAMPLE_PORTFOLIO, pricing)
+    r = HistoricalRiskEngine(seed=1, observations=750).calculate(
+        SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET
+    )
     # Same seed/obs as historical continuity tests; methodology tag is additive.
     assert r["methodology"] == "DELTA_GAMMA"
     assert r["var_99"] >= r["var_95"] >= 0.0
