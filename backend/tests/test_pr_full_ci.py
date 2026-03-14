@@ -44,7 +44,7 @@ def _needs_ids(block: str) -> set[str]:
             for part in inline.group(1).split(",")
             if part.strip()
         }
-    listed = re.search(r"(?ms)^    needs:\n((?:      - .+\n?)+)", block)
+    listed = re.search(r"(?m)^    needs:\n((?:      - \S+\n)+)", block)
     if listed:
         return set(re.findall(r"^      - (\S+)", listed.group(1), re.M))
     raise AssertionError("PR-FULL job must declare needs:")
@@ -63,6 +63,9 @@ def test_pr_full_needs_production_relevant_jobs():
     needed = _needs_ids(block)
     missing = [job_id for job_id in REQUIRED_NEEDS if job_id not in needed]
     assert not missing, f"PR-FULL needs: must include {missing}; found {sorted(needed)}"
+    extra = needed - set(REQUIRED_NEEDS)
+    assert not extra, f"PR-FULL needs: must stay the six PR jobs; extra {sorted(extra)}"
+    assert "quantlib-e2e" not in needed
 
 
 def test_quantlib_hard_gate_still_requires_quantlib():

@@ -86,6 +86,7 @@ What actually runs (not echo-only):
 - Native benchmark binary: compile `backend/native/src/benchmark.cpp` and run `10k × 1k` (`--threads 4 --json`) asserting `impl` / `checksum` identity (not SLA-K1/K2; `check_m6_sla.py` is not run on `ubuntu-latest`), then `benchmarks/run_scenario_bench.py --workload 1k_x_1k`.
 - Postgres two-worker claim: GHA `postgres:16-alpine` service + `scripts/smoke_postgres.sh` + `RISKFORGE_NIGHTLY=1 pytest tests/test_postgres_two_worker.py`.
 - Larger FULL_REVALUATION sample: `RISKFORGE_NIGHTLY=1 pytest tests/test_nightly_full_reval_sample.py` (120 observations).
+- QuantLib critical E2E (`quantlib-e2e`): mandatory `pip install -r requirements.txt` (no no-ql fallback) + `import QuantLib`, then Playwright `tests/r0-critical-journey.spec.ts` with `RISKFORGE_PRICING_ENGINE=quantlib` and `RISKFORGE_REQUIRE_QUANTLIB=1`. Missing QuantLib **fails** when `RISKFORGE_NIGHTLY=1` (no skip-green). PR `e2e-playwright` stays builtin.
 
 Local Docker/Postgres is **optional** for laptop pytest. `tests/test_postgres_two_worker.py` skips when `CI` and `RISKFORGE_NIGHTLY` are unset and `RISKFORGE_DATABASE_URL` is missing or unreachable. When `RISKFORGE_NIGHTLY` is set, a missing or unreachable DSN **fails**. When `CI` is set and a postgresql DSN is offered, an unreachable DSN **fails** (no skip-green). `CI` plus an unset DSN still skips so PR `backend-pytest` is not broken. That skip does **not** apply to PR `postgres-persistence-smoke`, which is unchanged. To run the two-worker test locally:
 
@@ -99,6 +100,25 @@ cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_p
 ## Local Compose resource expectations (R0.11.6)
 
 Default `docker compose up` (Postgres 16 + API + one risk-run worker + nginx frontend) is a laptop demo, not a capacity SLA. Budget about **2 CPU cores and 2–3 GiB RAM** for idle/light dashboard traffic with the packaged books. FULL_REVALUATION, large `observations` counts, or enabling the native scenario kernel can use more CPU on the API/worker; Postgres stays small for the seeded demo schema. Images drop to a non-root `USER` where practical (backend `riskforge`, frontend `nginx`); Compose still publishes only on loopback (R0.11.1).
+
+## Local vs shared vs not production-like (R0.11.5)
+
+Three deployment profiles, not a production IAM story:
+
+| Profile | How it is selected | Auth |
+|---|---|---|
+| **Local demo** | Default. Compose publishes `127.0.0.1` only. `RISKFORGE_BIND` unset or in `{127.0.0.1, localhost, ::1}`. `RISKFORGE_SHARED_DEPLOYMENT` unset. | None. Laptop `uvicorn` / default Compose stay unauthenticated. |
+| **Shared / non-loopback** | Set `RISKFORGE_SHARED_DEPLOYMENT=1`, or set `RISKFORGE_BIND` to a non-loopback address (e.g. `0.0.0.0`). | Fail closed: process refuses to boot without `RISKFORGE_API_TOKEN`. `/api` and dual-mount routes require `Authorization: Bearer <token>` (401 otherwise). `/health`, `/docs`, `/redoc`, `/openapi.json` stay open. |
+| **Not production-like** | Anything beyond the shared-token gate. | Not provided. No OIDC/SSO, no object ACLs, no in-app TLS, no secret manager, no tenant isolation. Demo DB password and unpublished-Postgres leftovers remain. Do not treat this repo as internet-ready. |
+
+In-container `uvicorn --host 0.0.0.0` (backend Dockerfile) is not a host publish. Default Compose still binds host ports to loopback and does **not** set the shared flag. Operators who publish the API beyond loopback must set `RISKFORGE_SHARED_DEPLOYMENT=1` (or `RISKFORGE_BIND=0.0.0.0`) **and** `RISKFORGE_API_TOKEN`.
+
+```bash
+# Shared profile example (still not production-like):
+export RISKFORGE_SHARED_DEPLOYMENT=1
+export RISKFORGE_API_TOKEN='replace-me'
+# curl -H "Authorization: Bearer $RISKFORGE_API_TOKEN" http://127.0.0.1:8000/api/v1/portfolio
+```
 
 ## Performance reporting
 
