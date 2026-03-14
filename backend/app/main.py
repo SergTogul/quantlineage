@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.attribution import router as attribution_router
+from app.api.auth import SharedTokenMiddleware, require_shared_auth_configured
 from app.api.deps import portfolio_service
 from app.api.errors import register_exception_handlers
 from app.api.health import router as health_router
@@ -49,7 +50,11 @@ async def lifespan(app: FastAPI):
     When ``RISKFORGE_DATABASE_URL`` is set, seeds portfolio + market snapshot +
     scenario / limit definitions and exposes SQLAlchemy via session factory.
     When unset, in-memory repos (pre-seeded) live on ``app.state`` for Depends.
+
+    Shared / non-loopback profiles fail closed here unless ``RISKFORGE_API_TOKEN``
+    is set (R0.11.5). Local loopback / default Compose stays unauthenticated.
     """
+    require_shared_auth_configured()
     wiring = build_persistence_wiring()
     app.state.persistence_enabled = wiring.enabled
     app.state.session_factory = wiring.session_factory
@@ -86,8 +91,9 @@ app.add_middleware(
 # M7.6: Deprecation/Sunset/Link on legacy dual-mount only (canonical = /api/v1).
 app.add_middleware(LegacyDeprecationMiddleware)
 # Byte cap must sit outside BaseHTTPMiddleware and FastAPI body parsing.
-# Last add_middleware is outermost: sees the raw ASGI receive stream first.
 app.add_middleware(WorkloadBodyLimitMiddleware)
+# Last add_middleware is outermost: token gate rejects unauthenticated /api first.
+app.add_middleware(SharedTokenMiddleware)
 
 # M7.5: one error envelope for legacy and /api/v1 mounts.
 register_exception_handlers(app)
