@@ -7,6 +7,7 @@
 # R0.12.2: a green "PR-FULL" means the production-relevant jobs below all succeeded.
 # R0.12.4 nightly heavier checks live in .github/workflows/nightly.yml
 # (schedule + workflow_dispatch only). Do not add those jobs to PR-FULL needs.
+# QuantLib E2E (quantlib-e2e) is nightly-only; PR e2e stays builtin.
 name: CI
 
 on:

@@ -56,7 +56,8 @@ module.exports = defineConfig({
       env: {
         ...process.env,
         PYTHONPATH: backend,
-        RISKFORGE_PRICING_ENGINE: 'builtin',
+        // PR e2e stays builtin. Nightly QuantLib E2E sets RISKFORGE_PRICING_ENGINE=quantlib.
+        RISKFORGE_PRICING_ENGINE: process.env.RISKFORGE_PRICING_ENGINE || 'builtin',
       },
     },
     {
