@@ -19,13 +19,16 @@ import numpy as np
 from app.domain.models import (
     EquityPosition,
     EuropeanOptionPosition,
+    MarketSnapshot,
     Portfolio,
     VaRMethodology,
 )
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.es import ESContributionAnalytics
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 
 def _mixed_series(n: int = 80) -> FactorObservationSeries:
@@ -95,7 +98,11 @@ def test_position_es_contributions_reconcile_delta_gamma():
     pricing = BuiltinPricingEngine()
     dataset = ArrayHistoricalDataset(_mixed_series())
     report = ESContributionAnalytics(dataset=dataset).report(
-        SAMPLE_PORTFOLIO, pricing, confidence=0.95, methodology=VaRMethodology.DELTA_GAMMA
+        SAMPLE_PORTFOLIO,
+        pricing,
+        confidence=0.95,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=SAMPLE_MARKET,
     )
     assert report.methodology == VaRMethodology.DELTA_GAMMA
     assert report.portfolio_es >= report.portfolio_var >= 0.0
@@ -109,7 +116,11 @@ def test_book_desk_strategy_es_contributions_reconcile():
     dataset = ArrayHistoricalDataset(_mixed_series())
     book = _two_book_portfolio()
     report = ESContributionAnalytics(dataset=dataset).report(
-        book, pricing, confidence=0.9, methodology=VaRMethodology.DELTA_GAMMA
+        book,
+        pricing,
+        confidence=0.9,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=demo_market_snapshot(book),
     )
     books = {c.key for c in report.by_book}
     assert books == {"Equity Cash", "Equity Derivatives"}
@@ -132,7 +143,11 @@ def test_risk_factor_es_contributions_reconcile_delta_gamma():
     pricing = BuiltinPricingEngine()
     dataset = ArrayHistoricalDataset(_mixed_series())
     report = ESContributionAnalytics(dataset=dataset).report(
-        SAMPLE_PORTFOLIO, pricing, confidence=0.95, methodology=VaRMethodology.DELTA_GAMMA
+        SAMPLE_PORTFOLIO,
+        pricing,
+        confidence=0.95,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=SAMPLE_MARKET,
     )
     keys = {c.key for c in report.by_risk_factor}
     assert {"equity", "vol", "rate", "fx"} <= keys
@@ -148,6 +163,7 @@ def test_full_revaluation_position_and_factor_es_reconcile():
         pricing,
         confidence=0.9,
         methodology=VaRMethodology.FULL_REVALUATION,
+        market=SAMPLE_MARKET,
     )
     assert report.methodology == VaRMethodology.FULL_REVALUATION
     assert report.portfolio_es >= report.portfolio_var >= 0.0
@@ -162,7 +178,11 @@ def test_zero_positions_yield_zero_es_contributions():
     pricing = BuiltinPricingEngine()
     empty = Portfolio(id="empty", name="Empty", positions=[])
     report = ESContributionAnalytics(dataset=ArrayHistoricalDataset(_mixed_series(20))).report(
-        empty, pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA
+        empty,
+        pricing,
+        confidence=0.99,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=MarketSnapshot(id="empty"),
     )
     assert report.portfolio_es == 0.0
     assert report.by_position == []
@@ -181,7 +201,11 @@ def test_tail_empty_when_flat_pnl_uses_var_as_es():
     )
     pricing = BuiltinPricingEngine()
     report = ESContributionAnalytics(dataset=ArrayHistoricalDataset(series)).report(
-        SAMPLE_PORTFOLIO, pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA
+        SAMPLE_PORTFOLIO,
+        pricing,
+        confidence=0.99,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=SAMPLE_MARKET,
     )
     assert report.portfolio_var == 0.0
     assert report.portfolio_es == 0.0
@@ -194,7 +218,11 @@ def test_var_report_includes_position_es_contributions():
     from app.risk.var import VaRAnalytics
 
     report = VaRAnalytics(dataset=dataset).report(
-        SAMPLE_PORTFOLIO, pricing, confidence=0.95, methodology=VaRMethodology.DELTA_GAMMA
+        SAMPLE_PORTFOLIO,
+        pricing,
+        confidence=0.95,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=SAMPLE_MARKET,
     )
     hist = next(m for m in report.methods if m.method == "historical")
     es_sum = sum(c.component_es or 0.0 for c in report.contributions)

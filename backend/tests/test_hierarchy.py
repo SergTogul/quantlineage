@@ -31,7 +31,7 @@ from app.risk.hierarchy import (
 )
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.limits import DEFAULT_LIMITS
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
 
 _ADDITIVE = ("market_value", "delta", "gamma", "vega", "dv01", "fx_delta")
@@ -271,7 +271,7 @@ def test_es_contributions_split_by_position_desk_strategy():
     pricing = BuiltinPricingEngine()
     pf = _multi_desk_portfolio()
     report = ESContributionAnalytics(seed=1, observations=60).report(
-        pf, pricing, confidence=0.9
+        pf, pricing, confidence=0.9, market=demo_market_snapshot(pf)
     )
     desks = {c.key for c in report.by_desk}
     strategies = {c.key for c in report.by_strategy}
@@ -292,11 +292,12 @@ def test_risk_at_matches_subset_var():
         portfolio_id="multi-desk",
         desk="Rates Desk",
     )
-    node = engine.risk_at(pf, pricing, ref)
+    market = demo_market_snapshot(pf)
+    node = engine.risk_at(pf, pricing, ref, market=market)
     assert node.level == "desk"
     assert node.name == "Rates Desk"
     subset = portfolio_at(pf, ref)
-    expected = risk.calculate(subset, pricing)
+    expected = risk.calculate(subset, pricing, market=market)
     assert math.isclose(node.market_value, expected["market_value"], abs_tol=1e-9)
     assert math.isclose(node.var_99, expected["var_99"], abs_tol=1e-9)
     assert math.isclose(node.expected_shortfall_99, expected["expected_shortfall_99"], abs_tol=1e-9)
@@ -309,7 +310,8 @@ def test_greeks_var_es_stress_limits_on_nodes():
     risk = HistoricalRiskEngine(seed=1, observations=40)
     engine = HierarchyEngine(risk)
     pf = _multi_desk_portfolio()
-    root = engine.build(pf, pricing)
+    market = demo_market_snapshot(pf)
+    root = engine.build(pf, pricing, market=market)
 
     _assert_additive_reconciles(root)
 
@@ -325,7 +327,7 @@ def test_greeks_var_es_stress_limits_on_nodes():
         desk="Equity Desk",
     )
     desk_node = next(d for d in root.children[0].children if d.name == "Equity Desk")
-    expected = risk.calculate(portfolio_at(pf, desk_ref), pricing)
+    expected = risk.calculate(portfolio_at(pf, desk_ref), pricing, market=market)
     assert math.isclose(desk_node.var_95, expected["var_95"], abs_tol=1e-9)
     assert math.isclose(desk_node.var_99, expected["var_99"], abs_tol=1e-9)
     assert math.isclose(desk_node.expected_shortfall_99, expected["expected_shortfall_99"], abs_tol=1e-9)

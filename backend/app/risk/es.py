@@ -25,6 +25,7 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
+from app.risk.historical import require_explicit_market
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.scenarios import (
     AggregateFactorChange,
@@ -34,7 +35,6 @@ from app.risk.scenarios import (
     market_scenario_from_change,
 )
 from app.risk.var import VaRAnalytics
-from app.sample import demo_market_snapshot
 
 # Aggregate risk-factor families used for ES factor attribution.
 _FACTOR_KEYS = ("equity", "vol", "rate", "fx")
@@ -186,6 +186,7 @@ class ESContributionAnalytics:
         market: MarketSnapshot | None = None,
     ) -> ESContributionReport:
         meth = methodology if methodology is not None else self.methodology
+        base_market = require_explicit_market(market)
         if not portfolio.positions:
             return ESContributionReport(
                 portfolio_id=portfolio.id,
@@ -200,7 +201,6 @@ class ESContributionAnalytics:
                 by_risk_factor=[],
             )
 
-        base_market = market if market is not None else demo_market_snapshot(portfolio)
         pos_pnl = self._var._position_pnls(portfolio, pricing, meth, base_market)
         n = next(iter(pos_pnl.values())).shape[0]
         total_pnl = sum(pos_pnl.values(), start=np.zeros(n))
@@ -224,7 +224,6 @@ class ESContributionAnalytics:
         by_desk = _contributions_from_pnl_map(dict(desk_pnl), mask, portfolio_es)
 
         if meth is VaRMethodology.FULL_REVALUATION:
-            assert base_market is not None
             factor_pnl = _aggregate_factor_pnl_full_reval(
                 portfolio, pricing, base_market, self.dataset, total_pnl
             )

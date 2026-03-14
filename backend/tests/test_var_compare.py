@@ -6,12 +6,14 @@ import math
 
 from fastapi.testclient import TestClient
 
-from app.domain.models import EquityPosition, Portfolio, VaRMethodology
+from app.domain.models import EquityPosition, MarketSnapshot, Portfolio, VaRMethodology
 from app.main import app
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.var_compare import DEFAULT_COMPARE_METHODOLOGIES, compare_methodologies
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 from app.services.portfolio_service import PortfolioService
 
 # Small path length keeps FULL_REVALUATION tests fast while preserving quantile shape.
@@ -25,7 +27,9 @@ def _engine() -> HistoricalRiskEngine:
 
 
 def test_compare_returns_all_three_methodologies():
-    report = compare_methodologies(SAMPLE_PORTFOLIO, BuiltinPricingEngine(), risk_engine=_engine())
+    report = compare_methodologies(
+        SAMPLE_PORTFOLIO, BuiltinPricingEngine(), risk_engine=_engine(), market=SAMPLE_MARKET
+    )
     assert report.portfolio_id == SAMPLE_PORTFOLIO.id
     assert report.observations == _OBS
     assert [r.methodology for r in report.results] == list(DEFAULT_COMPARE_METHODOLOGIES)
@@ -34,9 +38,13 @@ def test_compare_returns_all_three_methodologies():
 def test_compare_metrics_match_direct_engine_calculate():
     pricing = BuiltinPricingEngine()
     engine = _engine()
-    report = compare_methodologies(SAMPLE_PORTFOLIO, pricing, risk_engine=engine)
+    report = compare_methodologies(
+        SAMPLE_PORTFOLIO, pricing, risk_engine=engine, market=SAMPLE_MARKET
+    )
     for row in report.results:
-        direct = engine.calculate(SAMPLE_PORTFOLIO, pricing, methodology=row.methodology)
+        direct = engine.calculate(
+            SAMPLE_PORTFOLIO, pricing, methodology=row.methodology, market=SAMPLE_MARKET
+        )
         assert math.isclose(row.var_95, direct["var_95"], rel_tol=0.0, abs_tol=_TOL)
         assert math.isclose(row.var_99, direct["var_99"], rel_tol=0.0, abs_tol=_TOL)
         assert math.isclose(
@@ -49,7 +57,9 @@ def test_compare_metrics_match_direct_engine_calculate():
 
 
 def test_compare_var_es_ordering_per_methodology():
-    report = compare_methodologies(SAMPLE_PORTFOLIO, BuiltinPricingEngine(), risk_engine=_engine())
+    report = compare_methodologies(
+        SAMPLE_PORTFOLIO, BuiltinPricingEngine(), risk_engine=_engine(), market=SAMPLE_MARKET
+    )
     for row in report.results:
         assert row.var_99 >= row.var_95 >= 0.0
         assert row.expected_shortfall_99 >= row.var_99
@@ -57,7 +67,12 @@ def test_compare_var_es_ordering_per_methodology():
 
 def test_compare_zero_positions_zero_risk():
     empty = Portfolio(id="empty", name="Empty", base_currency="USD", positions=[])
-    report = compare_methodologies(empty, BuiltinPricingEngine(), risk_engine=_engine())
+    report = compare_methodologies(
+        empty,
+        BuiltinPricingEngine(),
+        risk_engine=_engine(),
+        market=MarketSnapshot(id="empty"),
+    )
     for row in report.results:
         assert row.var_95 == 0.0
         assert row.var_99 == 0.0
@@ -76,13 +91,17 @@ def test_linear_equals_delta_gamma_when_gamma_zero():
     )
     pricing = BuiltinPricingEngine()
     engine = _engine()
-    greeks = engine.calculate(equity_only, pricing, methodology=VaRMethodology.LINEAR)
+    market = demo_market_snapshot(equity_only)
+    greeks = engine.calculate(
+        equity_only, pricing, methodology=VaRMethodology.LINEAR, market=market
+    )
     assert abs(greeks["gamma"]) < 1e-12
     report = compare_methodologies(
         equity_only,
         pricing,
         risk_engine=engine,
         methodologies=(VaRMethodology.LINEAR, VaRMethodology.DELTA_GAMMA),
+        market=market,
     )
     linear, dg = report.results
     assert math.isclose(linear.var_95, dg.var_95, rel_tol=0.0, abs_tol=_TOL)

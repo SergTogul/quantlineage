@@ -136,7 +136,13 @@ def test_removing_all_risk_positions_reduces_var():
 def test_empty_changes_zero_incremental():
     pricing = BuiltinPricingEngine()
     engine = _engine()
-    result = incremental_var(SAMPLE_PORTFOLIO, pricing, changes=[], risk_engine=engine)
+    result = incremental_var(
+        SAMPLE_PORTFOLIO,
+        pricing,
+        changes=[],
+        risk_engine=engine,
+        market=demo_market_snapshot(SAMPLE_PORTFOLIO),
+    )
     assert result.incremental.var_99 == 0.0
     assert result.incremental.var_95 == 0.0
     assert result.incremental.expected_shortfall_99 == 0.0
@@ -148,15 +154,15 @@ def test_zero_portfolio_add_trade_incremental_equals_standalone_var():
     trade = _new_equity()
     pricing = BuiltinPricingEngine()
     engine = _engine()
+    after = Portfolio(id="t", name="t", positions=[trade])
+    market = demo_market_snapshot(after)
     result = incremental_var(
         empty,
         pricing,
         changes=[{"operation": "add", "position": trade}],
         risk_engine=engine,
+        market=market,
     )
-    standalone = engine.calculate(
-        Portfolio(id="t", name="t", positions=[trade]),
-        pricing,
-    )
+    standalone = engine.calculate(after, pricing, market=market)
     assert result.before.var_99 == 0.0
     assert math.isclose(result.incremental.var_99, standalone["var_99"], abs_tol=_TOL)
