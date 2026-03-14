@@ -49,7 +49,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - The accepted performance claim is limited to the native scenario-kernel SLA in [`performance.md`](performance.md) and [`benchmarks/RESULTS.md`](../benchmarks/RESULTS.md).
 - No HTTP risk-run latency, multi-tenant capacity, or FULL_REVALUATION performance SLA is claimed.
-- In-process QuantLib is serialized by `_QL_PROCESS_LOCK`; valuation cache keys include parseable snapshot as-of (ISO `YYYY-MM-DD` or `date`; labels such as `current` / `t0` stay equivalent and use the engine evaluation date). Parallel full revaluation remains process-partitioned (R0.3.5).
+- In-process QuantLib is serialized by `_QL_PROCESS_LOCK`; valuation cache keys include parseable snapshot as-of (ISO `YYYY-MM-DD` or `date`; labels such as `current` / `t0` stay equivalent and use the engine evaluation date). Parallel full revaluation is process-partitioned (R0.3.5): Compose `worker` (`python -m app.worker`) is a separate OS process from the API; native kernels stay QuantLib-free; there is no in-process QuantLib thread pool and no `ProcessPoolExecutor` job platform.
 
 ## Persistence And Workers
 
@@ -66,6 +66,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 ## Local Demo Security
 
 - Default Compose binds published Postgres (`5432`), API (`8000`), and frontend (`5173`) ports to loopback (`127.0.0.1`). The local/demo profile is still unauthenticated and is not internet-ready; it must not be treated as a production security or IAM deployment (RF-014).
+- A shared / non-loopback profile (`RISKFORGE_SHARED_DEPLOYMENT=1` or non-loopback `RISKFORGE_BIND`) fails closed without `RISKFORGE_API_TOKEN` and requires Bearer auth on API routes. That single shared-token gate is not OIDC, object authorization, TLS, or production IAM. See `BUILD_NOTES.md` (R0.11.5).
 
 ## Frontend
 

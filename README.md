@@ -147,6 +147,8 @@ Inside Compose, services use host `postgres` instead of `localhost` via `RISKFOR
 ```bash
 # Start Postgres
 # Default Compose publishes bind to loopback only (127.0.0.1).
+# Local demo stays unauthenticated. Shared/non-loopback requires
+# RISKFORGE_SHARED_DEPLOYMENT=1 (or non-loopback RISKFORGE_BIND) and RISKFORGE_API_TOKEN.
 docker compose up -d postgres
 
 # Apply migrations (required before API/worker against Postgres)
