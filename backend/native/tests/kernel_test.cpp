@@ -22,8 +22,8 @@ int main() {
   std::vector<Exposure> exposures = {
       e, { -300, 80, 10, 5, -200 }, { 50, -10, 2, 1, 25 }, e};
   std::vector<Shock> shocks;
-  shocks.reserve(128);
-  for (int k = 0; k < 128; ++k) {
+  shocks.reserve(2048);
+  for (int k = 0; k < 2048; ++k) {
     const double t = static_cast<double>(k);
     shocks.push_back(Shock{-0.01 + 0.0001 * t, 2.0 - 0.01 * t, 5.0 + 0.1 * t,
                            -0.002 + 0.00005 * t});
@@ -160,6 +160,31 @@ int main() {
                                      1);
   assert(rc == RISKFORGE_KERNEL_OK);
   assert(abi_out == 0.0);
+
+  // R0.17: tiny E×S stays serial (no per-call thread spawn) even if workers > 1.
+  assert(KERNEL_PARALLEL_MIN_WORK == 4096);
+  assert(kernel_work_is_tiny(1, 8));
+  assert(kernel_work_is_tiny(4, 256));
+  assert(kernel_work_is_tiny(0, 10000));
+  assert(!kernel_work_is_tiny(4, 2048));
+  assert(kernel_use_serial(4, 2048, 1));
+  assert(!kernel_use_serial(4, 2048, 4));
+
+  std::vector<double> tiny_e = {1000.0, 200.0, 30.0, -10.0, 500.0};
+  std::vector<double> tiny_s = {-0.1, 5.0, 20.0, -0.02, 0.03, -2.0, -10.0, 0.01};
+  std::vector<double> tiny_out(2, 99.0);
+  kernel_last_used_workers_flag() = true;
+  portfolio_scenarios_flat_into(tiny_e.data(), 1, tiny_s.data(), 2, tiny_out.data(), 8);
+  assert(!kernel_last_used_workers_flag());
+
+  std::vector<double> large_out(shocks.size(), 0.0);
+  kernel_last_used_workers_flag() = false;
+  portfolio_scenarios_flat_into(eflat.data(), exposures.size(), sflat.data(), shocks.size(),
+                                large_out.data(), 4);
+  assert(kernel_last_used_workers_flag());
+  for (std::size_t j = 0; j < serial.size(); ++j) {
+    assert(std::abs(large_out[j] - serial[j]) < 1e-12);
+  }
 
   std::cout << "risk_kernel_ok\n";
 }

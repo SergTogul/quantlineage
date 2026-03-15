@@ -28,6 +28,13 @@ C ABI (R0.12.5)
 - Null/empty: count 0 may pass NULL; count > 0 and NULL is ``KERNEL_ERR_NULL``.
   Empty book (0 exposures, N shocks) writes 0.0 per shock. Mismatch fails
   closed (error, no buffer walk).
+
+R0.17 buffer / threads
+- ``NativeScenarioKernel.pnl_from_arrays`` passes C-contiguous float64 buffers
+  straight to the C ABI (no pack copy). Non-contiguous / non-float64 arrays
+  are made contiguous float64 first.
+- C++ stays serial when ``n_exposures * n_shocks < KERNEL_PARALLEL_MIN_WORK``
+  (4096) so tiny workloads do not spawn threads per call.
 """
 
 from __future__ import annotations
@@ -38,6 +45,9 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+
+import numpy as np
+from numpy.typing import NDArray
 
 SCENARIO_KERNEL_ENV = "RISKFORGE_SCENARIO_KERNEL"
 SCENARIO_KERNEL_LIB_ENV = "RISKFORGE_SCENARIO_KERNEL_LIB"
@@ -64,6 +74,11 @@ KERNEL_OK = 0
 KERNEL_ERR_ABI = 1
 KERNEL_ERR_NULL = 2
 KERNEL_ERR_LENGTH = 3
+
+# R0.17: must match native/include/risk_kernel.hpp KERNEL_PARALLEL_MIN_WORK.
+# Work items are n_exposures * n_shocks; below this the C++ kernel stays serial
+# even when RISKFORGE_KERNEL_THREADS > 1 (avoids per-call thread spawn).
+KERNEL_PARALLEL_MIN_WORK = 4096
 
 _KERNEL_ERR_NAMES = {
     KERNEL_ERR_ABI: "ABI mismatch",
@@ -120,8 +135,44 @@ class NativeKernelError(Exception):
         super().__init__(message)
 
 
+def _native_f64_c_buffer(arr: object, stride: int, *, name: str) -> tuple[np.ndarray, int, int]:
+    """Return ``(c_contiguous float64 view, n_rows, n_doubles)``.
+
+    A C-contiguous ``float64`` array is returned as-is (no copy). Other layouts
+    or dtypes go through ``np.ascontiguousarray``. Shape must be ``(n, stride)``
+    or packed ``(n * stride,)``.
+    """
+    a = np.asarray(arr)
+    if a.ndim == 2:
+        if a.shape[1] != stride:
+            raise NativeKernelError(
+                KERNEL_ERR_LENGTH,
+                f"{name} second dimension must be {stride}, got {a.shape[1]}",
+            )
+        n_rows = int(a.shape[0])
+    elif a.ndim == 1:
+        if a.size % stride != 0:
+            raise NativeKernelError(
+                KERNEL_ERR_LENGTH,
+                f"{name} length {a.size} is not a multiple of stride {stride}",
+            )
+        n_rows = int(a.size // stride)
+    else:
+        raise NativeKernelError(KERNEL_ERR_LENGTH, f"{name} must be 1-D or 2-D, got ndim={a.ndim}")
+    n_doubles = n_rows * stride
+    if a.dtype == np.float64 and a.flags.c_contiguous:
+        return a, n_rows, n_doubles
+    return np.ascontiguousarray(a, dtype=np.float64), n_rows, n_doubles
+
+
+def _c_double_ptr(arr: np.ndarray):
+    if arr.size == 0:
+        return None
+    return arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+
+
 class NativeScenarioKernel(ScenarioKernel):
-    """Dependency-free ctypes adapter for the optional C++20 scenario kernel."""
+    """ctypes adapter for the optional C++20 scenario kernel."""
 
     def __init__(self, library_path: str | Path):
         self.library_path = Path(library_path)
@@ -154,6 +205,32 @@ class NativeScenarioKernel(ScenarioKernel):
         ]
         self.fn.restype = ctypes.c_int
 
+    def _invoke(
+        self,
+        exposures,
+        n_exposures: int,
+        n_exposure_doubles: int,
+        shocks,
+        n_shocks: int,
+        n_shock_doubles: int,
+        out,
+        n_out: int,
+    ) -> None:
+        rc = self.fn(
+            KERNEL_ABI_VERSION,
+            exposures,
+            n_exposures,
+            n_exposure_doubles,
+            shocks,
+            n_shocks,
+            n_shock_doubles,
+            out,
+            n_out,
+        )
+        if rc != KERNEL_OK:
+            name = _KERNEL_ERR_NAMES.get(rc, "unknown")
+            raise NativeKernelError(rc, f"riskforge_portfolio_scenarios failed: {name} ({rc})")
+
     def pnl(self, exposures, shocks):
         n_e = len(exposures)
         n_s = len(shocks)
@@ -168,8 +245,7 @@ class NativeScenarioKernel(ScenarioKernel):
         E = (ctypes.c_double * n_ed)(*eflat)
         S = (ctypes.c_double * n_sd)(*sflat)
         O = (ctypes.c_double * n_s)()
-        rc = self.fn(
-            KERNEL_ABI_VERSION,
+        self._invoke(
             E if n_e else None,
             n_e,
             n_ed,
@@ -179,10 +255,50 @@ class NativeScenarioKernel(ScenarioKernel):
             O if n_s else None,
             n_s,
         )
-        if rc != KERNEL_OK:
-            name = _KERNEL_ERR_NAMES.get(rc, "unknown")
-            raise NativeKernelError(rc, f"riskforge_portfolio_scenarios failed: {name} ({rc})")
         return list(O)
+
+    def pnl_from_arrays(
+        self,
+        exposures: object,
+        shocks: object,
+        out: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """Evaluate the kernel from packed NumPy buffers.
+
+        C-contiguous ``float64`` exposures/shocks/out are passed to the C ABI
+        without an extra pack copy. Shape is ``(n, stride)`` or packed 1-D.
+        ``out`` if given must be writable C-contiguous ``float64`` of length
+        ``n_shocks`` and is updated in place.
+        """
+        e_buf, n_e, n_ed = _native_f64_c_buffer(
+            exposures, KERNEL_EXPOSURE_STRIDE, name="exposures"
+        )
+        s_buf, n_s, n_sd = _native_f64_c_buffer(shocks, KERNEL_SHOCK_STRIDE, name="shocks")
+        if out is None:
+            out_buf = np.empty(n_s, dtype=np.float64)
+        else:
+            out_buf = np.asarray(out)
+            if (
+                out_buf.dtype != np.float64
+                or not out_buf.flags.c_contiguous
+                or out_buf.ndim != 1
+                or int(out_buf.size) != n_s
+            ):
+                raise NativeKernelError(
+                    KERNEL_ERR_LENGTH,
+                    "out must be C-contiguous float64 with shape (n_shocks,)",
+                )
+        self._invoke(
+            _c_double_ptr(e_buf),
+            n_e,
+            n_ed,
+            _c_double_ptr(s_buf),
+            n_s,
+            n_sd,
+            _c_double_ptr(out_buf) if n_s else None,
+            n_s,
+        )
+        return out_buf
 
 
 def scenario_kernel_backend(explicit: str | None = None) -> str:

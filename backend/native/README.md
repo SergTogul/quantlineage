@@ -36,7 +36,8 @@ Null / empty policy:
 - `n_exposures == 0` and `n_shocks > 0`: write `0.0` per shock (empty book).
 - Count `> 0` and pointer is `NULL`: `ERR_NULL` (out buffer unchanged).
 
-P&L math, thread pool, and (absent) SIMD are unchanged. `kernel_test` must compile
+P&L math and (absent) SIMD are unchanged. Tiny E×S stays serial (R0.17).
+`kernel_test` must compile
 `src/risk_kernel_capi.cpp` with the same flags as the baseline:
 
 ```bash
@@ -66,6 +67,11 @@ Thread count:
 | `RISKFORGE_KERNEL_THREADS=N` (`N>1`) | Up to `N` workers (capped by `n_shocks`) |
 | unset | `std::thread::hardware_concurrency` (min 1) |
 | C++ CLI `--threads T` | Same resolution (`0` = auto via env/hw) |
+| `n_exposures * n_shocks < 4096` | Always serial (R0.17; no per-call spawn) |
+
+`NativeScenarioKernel.pnl_from_arrays` passes C-contiguous `float64` NumPy
+buffers to the C ABI without an extra pack copy. `pnl()` still packs
+`Exposure`/`Shock` lists for the object API.
 
 Inner exposure reduction order for each shock matches the serial loop → numerical
 parity with single-thread (see `tests/kernel_test.cpp`,

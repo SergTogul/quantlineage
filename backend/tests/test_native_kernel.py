@@ -7,6 +7,7 @@ Coverage
 - Parallel ↔ serial (stdlib thread pool)
 - Edge cases: empty exposures/shocks, single shock, zeros, NaN propagation
 - R0.12.5 ABI version, error codes, length mismatch, wrap/tight-buffer, null/empty policy
+- R0.17 contiguous NumPy buffer path (no pack copy) and tiny-work serial policy
 
 Tolerances (M6.5)
 - ABI (this module): ``KERNEL_ABI_ABS_TOL`` / ``KERNEL_ABI_REL_TOL`` = 1e-12
@@ -39,6 +40,8 @@ from pathlib import Path
 
 import pytest
 
+import numpy as np
+
 from app.compute.kernel import (
     KERNEL_ABI_ABS_TOL,
     KERNEL_ABI_REL_TOL,
@@ -47,6 +50,7 @@ from app.compute.kernel import (
     KERNEL_ERR_LENGTH,
     KERNEL_ERR_NULL,
     KERNEL_OK,
+    KERNEL_PARALLEL_MIN_WORK,
     Exposure,
     NativeKernelError,
     NativeScenarioKernel,
@@ -140,7 +144,7 @@ def test_native_ctypes_parallel_matches_serial(tmp_path, monkeypatch):
     ]
     shocks = [
         Shock(-0.01 + 0.0001 * k, 2.0 - 0.01 * k, 5.0 + 0.1 * k, -0.002 + 0.00005 * k)
-        for k in range(256)
+        for k in range(2048)
     ]
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
     serial = NativeScenarioKernel(lib).pnl(exposures, shocks)
@@ -375,4 +379,162 @@ def test_native_empty_null_pointers_ok(tmp_path, monkeypatch):
     rc = native.fn(KERNEL_ABI_VERSION, None, 0, 0, s, 1, 4, out, 1)
     assert rc == KERNEL_OK
     assert out[0] == 0.0
+
+
+def _ptr_addr(p) -> int | None:
+    if not p:
+        return None
+    return ctypes.cast(p, ctypes.c_void_p).value
+
+
+def _spy_native_fn(native: NativeScenarioKernel) -> list[dict]:
+    """Capture buffer addresses passed into the C ABI (proves no extra copy)."""
+    captured: list[dict] = []
+    orig = native.fn
+
+    def spy(abi, exposures, n_e, n_ed, shocks, n_s, n_sd, out, n_out):
+        captured.append(
+            {
+                "e": _ptr_addr(exposures),
+                "s": _ptr_addr(shocks),
+                "o": _ptr_addr(out),
+            }
+        )
+        return orig(abi, exposures, n_e, n_ed, shocks, n_s, n_sd, out, n_out)
+
+    native.fn = spy
+    return captured
+
+
+def test_native_contiguous_numpy_no_copy_matches_python(tmp_path, monkeypatch):
+    """R0.17: C-contiguous float64 buffers go to the kernel without a pack copy."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    exposures = [
+        Exposure(1000, 200, 30, -10, 500),
+        Exposure(-300, 80, 10, 5, -200),
+    ]
+    shocks = [Shock(-0.1, 5, 20, -0.02), Shock(0.03, -2, -10, 0.01)]
+    e = np.array(
+        [[1000.0, 200.0, 30.0, -10.0, 500.0], [-300.0, 80.0, 10.0, 5.0, -200.0]],
+        dtype=np.float64,
+    )
+    s = np.array(
+        [[-0.1, 5.0, 20.0, -0.02], [0.03, -2.0, -10.0, 0.01]],
+        dtype=np.float64,
+    )
+    assert e.flags.c_contiguous and s.flags.c_contiguous
+    captured = _spy_native_fn(native)
+    actual = native.pnl_from_arrays(e, s)
+    assert captured, "native ABI must be invoked"
+    assert captured[0]["e"] == e.ctypes.data
+    assert captured[0]["s"] == s.ctypes.data
+    expected = PythonScenarioKernel().pnl(exposures, shocks)
+    assert _approx(actual.tolist(), expected)
+    assert _approx(actual.tolist(), native.pnl(exposures, shocks))
+
+
+def test_native_flat_1d_contiguous_numpy_no_copy(tmp_path, monkeypatch):
+    """R0.17: packed 1-D C-contiguous float64 is the same ABI layout, no copy."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    e = np.array([1000.0, 200.0, 30.0, -10.0, 500.0], dtype=np.float64)
+    s = np.array([-0.1, 5.0, 20.0, -0.02], dtype=np.float64)
+    captured = _spy_native_fn(native)
+    actual = native.pnl_from_arrays(e, s)
+    assert captured[0]["e"] == e.ctypes.data
+    assert captured[0]["s"] == s.ctypes.data
+    expected = PythonScenarioKernel().pnl(
+        [Exposure(1000, 200, 30, -10, 500)], [Shock(-0.1, 5, 20, -0.02)]
+    )
+    assert _approx(actual.tolist(), expected)
+
+
+def test_native_numpy_out_buffer_no_copy(tmp_path, monkeypatch):
+    """R0.17: caller-supplied C-contiguous float64 out is written in place."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    e = np.array([[1000.0, 200.0, 30.0, -10.0, 500.0]], dtype=np.float64)
+    s = np.array([[-0.1, 5.0, 20.0, -0.02]], dtype=np.float64)
+    out = np.full(1, 99.0, dtype=np.float64)
+    captured = _spy_native_fn(native)
+    result = native.pnl_from_arrays(e, s, out=out)
+    assert result is out
+    assert captured[0]["o"] == out.ctypes.data
+    expected = PythonScenarioKernel().pnl(
+        [Exposure(1000, 200, 30, -10, 500)], [Shock(-0.1, 5, 20, -0.02)]
+    )
+    assert _approx(out.tolist(), expected)
+
+
+def test_native_noncontiguous_numpy_matches_python(tmp_path, monkeypatch):
+    """R0.17: Fortran / strided arrays still match; they may copy."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    e_c = np.array(
+        [[1000.0, 200.0, 30.0, -10.0, 500.0], [-300.0, 80.0, 10.0, 5.0, -200.0]],
+        dtype=np.float64,
+    )
+    s_c = np.array(
+        [[-0.1, 5.0, 20.0, -0.02], [0.03, -2.0, -10.0, 0.01]],
+        dtype=np.float64,
+    )
+    e_f = np.asfortranarray(e_c)
+    s_f = np.asfortranarray(s_c)
+    assert not e_f.flags.c_contiguous
+    assert not s_f.flags.c_contiguous
+    captured = _spy_native_fn(native)
+    actual = native.pnl_from_arrays(e_f, s_f)
+    assert captured[0]["e"] != e_f.ctypes.data
+    assert captured[0]["s"] != s_f.ctypes.data
+    expected = PythonScenarioKernel().pnl(
+        [Exposure(1000, 200, 30, -10, 500), Exposure(-300, 80, 10, 5, -200)],
+        [Shock(-0.1, 5, 20, -0.02), Shock(0.03, -2, -10, 0.01)],
+    )
+    assert _approx(actual.tolist(), expected)
+
+
+def test_native_numpy_empty_and_shape_mismatch(tmp_path, monkeypatch):
+    """R0.17: empty arrays follow the ABI; wrong stride is KERNEL_ERR_LENGTH."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    e = np.zeros((0, 5), dtype=np.float64)
+    s = np.array([[0.01, 1.0, 2.0, -0.01]], dtype=np.float64)
+    assert _approx(native.pnl_from_arrays(e, s).tolist(), [0.0])
+    assert native.pnl_from_arrays(e, np.zeros((0, 4), dtype=np.float64)).tolist() == []
+
+    bad = np.zeros((2, 3), dtype=np.float64)
+    with pytest.raises(NativeKernelError) as exc:
+        native.pnl_from_arrays(bad, s)
+    assert exc.value.code == KERNEL_ERR_LENGTH
+
+
+def test_native_tiny_workload_matches_python_with_many_threads(tmp_path, monkeypatch):
+    """R0.17: 1×S Historical-VaR shape stays correct when THREADS>1 (serial path)."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    assert KERNEL_PARALLEL_MIN_WORK == 4096
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "8")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    exposures = [Exposure(1000, 200, 30, -10, 500)]
+    shocks = [Shock(-0.01 + 0.0001 * k, 2.0, 5.0, -0.002) for k in range(64)]
+    assert 1 * 64 < KERNEL_PARALLEL_MIN_WORK
+    expected = PythonScenarioKernel().pnl(exposures, shocks)
+    assert _approx(native.pnl(exposures, shocks), expected)
+    e = np.array([[1000.0, 200.0, 30.0, -10.0, 500.0]], dtype=np.float64)
+    s = np.array(
+        [[-0.01 + 0.0001 * k, 2.0, 5.0, -0.002] for k in range(64)],
+        dtype=np.float64,
+    )
+    assert _approx(native.pnl_from_arrays(e, s).tolist(), expected)
 
