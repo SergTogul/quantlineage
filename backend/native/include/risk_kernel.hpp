@@ -2,11 +2,11 @@
 
 // RiskForge scenario aggregation kernel (M6).
 //
-// Parallel strategy (M6.4): ONE approach only — C++20 standard-library thread
-// pool over contiguous shock partitions (std::jthread when available, else
-// std::thread + join-on-scope-exit). Not OpenMP (no -fopenmp / libomp; Apple
-// Clang often lacks bundled OpenMP *and* historically lacked std::jthread in
-// libc++). Do not mix strategies.
+// Parallel strategy (M6.4 / R0.17): ONE approach only — C++20 standard-library
+// thread pool over contiguous shock partitions (std::jthread when available,
+// else std::thread + join-on-scope-exit). Serial when workers<=1, n_shocks<=1,
+// or n_exposures*n_shocks < KERNEL_PARALLEL_MIN_WORK (tiny workloads do not
+// spawn threads). Not OpenMP. Do not mix strategies.
 //
 // Each out[j] is written by exactly one thread; inner exposure reduction order
 // matches the single-thread loop for numerical parity.
@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdlib>
+#include <limits>
 #include <thread>
 #include <vector>
 
@@ -34,6 +35,32 @@ struct Shock {
 
 /// Env override for auto thread count: RISKFORGE_KERNEL_THREADS (unsigned > 0).
 inline constexpr const char* KERNEL_THREADS_ENV = "RISKFORGE_KERNEL_THREADS";
+
+/// Below this E×S product the kernel stays serial (R0.17). Avoids per-call
+/// thread spawn on tiny books / short histories. Must match Python
+/// ``KERNEL_PARALLEL_MIN_WORK``.
+inline constexpr std::size_t KERNEL_PARALLEL_MIN_WORK = 4096;
+
+inline bool kernel_work_is_tiny(std::size_t n_exposures, std::size_t n_shocks) noexcept {
+  if (n_shocks <= 1 || n_exposures == 0) {
+    return true;
+  }
+  if (n_exposures > (std::numeric_limits<std::size_t>::max() / n_shocks)) {
+    return false;
+  }
+  return n_exposures * n_shocks < KERNEL_PARALLEL_MIN_WORK;
+}
+
+inline bool kernel_use_serial(std::size_t n_exposures, std::size_t n_shocks,
+                             unsigned workers) noexcept {
+  return workers <= 1 || kernel_work_is_tiny(n_exposures, n_shocks);
+}
+
+/// Test observability: last ``portfolio_scenarios_*_into`` used worker threads.
+inline bool& kernel_last_used_workers_flag() noexcept {
+  static bool flag = false;
+  return flag;
+}
 
 inline double scenario_pnl(const Exposure& e, const Shock& s) noexcept {
   return e.delta * s.equity_return + 0.5 * e.gamma * s.equity_return * s.equity_return +
@@ -106,10 +133,12 @@ inline void portfolio_scenarios_into(const Exposure* exposures, std::size_t n_ex
                                      const Shock* shocks, std::size_t n_shocks, double* out,
                                      unsigned n_threads = 0) {
   const unsigned workers = resolve_kernel_threads(n_threads);
-  if (workers <= 1 || n_shocks <= 1) {
+  if (kernel_use_serial(n_exposures, n_shocks, workers)) {
+    kernel_last_used_workers_flag() = false;
     portfolio_scenarios_serial_into(exposures, n_exposures, shocks, n_shocks, out);
     return;
   }
+  kernel_last_used_workers_flag() = true;
   const unsigned use = static_cast<unsigned>(
       std::min<std::size_t>(workers, n_shocks));
 #if RISKFORGE_HAS_JTHREAD
@@ -154,10 +183,12 @@ inline void portfolio_scenarios_flat_into(const double* exposures, std::size_t n
                                           const double* shocks, std::size_t n_shocks, double* out,
                                           unsigned n_threads = 0) {
   const unsigned workers = resolve_kernel_threads(n_threads);
-  if (workers <= 1 || n_shocks <= 1) {
+  if (kernel_use_serial(n_exposures, n_shocks, workers)) {
+    kernel_last_used_workers_flag() = false;
     portfolio_scenarios_flat_serial_into(exposures, n_exposures, shocks, n_shocks, out);
     return;
   }
+  kernel_last_used_workers_flag() = true;
   const unsigned use = static_cast<unsigned>(
       std::min<std::size_t>(workers, n_shocks));
 #if RISKFORGE_HAS_JTHREAD
