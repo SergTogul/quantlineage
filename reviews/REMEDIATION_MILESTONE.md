@@ -886,6 +886,8 @@ Explicitly document:
 
 Record reproducible current commands and results, not stale counts.
 
+R0.13 ROADMAP counts: COMPLETE (independent review APPROVE, `reviews/r0.13-roadmap-counts-independent-review.md`). Historical 160 tables untouched. Current gate remains recorded Phase A, not a live re-run.
+
 ---
 
 # P2 Work That Does Not Block R0

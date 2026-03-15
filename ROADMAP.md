@@ -26,7 +26,7 @@ Builtin **659** and QuantLib **688** are **not** contemporaneous two-engine resu
 | Playwright E2E | **12 passed** | Recorded baseline |
 | PostgreSQL smoke | **BLOCKED** (no Docker daemon on this host) | Environment block (recorded baseline) |
 
-Historical Progress tables below keep their original dated counts. The 2026-09-02 **160 passed** figure remains the R0.13.1 historical snapshot and was not rewritten.
+Historical Progress and workstream evidence tables below keep their original dated counts (including **160**, **519**, and later close-pass figures). Those tables are dated snapshots, **not** a live suite re-run. The 2026-09-02 **160 passed** figure remains the R0.13.1 historical snapshot and was not rewritten. Until a live matrix is recorded on a stated SHA/tree, the R0 count source is the **recorded Phase A baseline** above.
 
 ## Progress
 
@@ -48,7 +48,7 @@ Historical Progress tables below keep their original dated counts. The 2026-09-0
 | Workstream 12 — Documentation & Portfolio Presentation | **COMPLETE** (2026-09-03 — recruiter docs, architecture, methodology, performance, and limitations package) |
 | Workstream 13 — Final Portfolio Demo | **COMPLETE** (2026-09-03 — ) |
 
-Workstreams 0–13 record historical MVP delivery completions; independent review opened Milestone R0 for residual remediation.
+Workstreams 0–13 record historical MVP delivery completions. Workstream **COMPLETE** is not Milestone R0 **COMPLETE**; independent review opened Milestone R0 for residual remediation.
 
 ### Baseline verification (2026-09-02, local macOS — Lead Architect acceptance)
 
@@ -94,7 +94,7 @@ Trade (domain/models.py)
 6. **COMPLETE** (2026-09-02): ; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / ). transient GHA `e2e-playwright` failure on multi-factor reverse UI land must stay fixed (testid + exact heading) — see below. local mypy lint regression fixed on master (`11339c6`); GHA URL confirmation blocked by invalid `gh` keyring token (see )
 7. Multi-factor reverse stress = ray + coordinate descent (**not** a certified global optimum); methodology doc published at `docs/methodology/multi_factor_reverse_stress.md`. ** POSTPONED** — do not implement until Lead/user unblocks
 
-### Suite verification (2026-09-02, Lead Architect — local macOS)
+### Suite verification (2026-09-02, Lead Architect — local macOS; historical snapshot, not a live re-run)
 
 | Check | Result |
 |-------|--------|
