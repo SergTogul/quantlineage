@@ -446,6 +446,8 @@ class MarketSnapshot(FiniteInputMixin):
     dividend_yields: dict[str, FiniteFloat] = Field(default_factory=dict)
     projection_rates: dict[str, FiniteFloat] = Field(default_factory=dict)
     rate_spreads: dict[str, FiniteFloat] = Field(default_factory=dict)
+    ir_vols: dict[str, FiniteFloat] = Field(default_factory=dict)
+    ir_future_quotes: dict[str, FiniteFloat] = Field(default_factory=dict)
     # Named curve payloads: {name: {currency, curve_type, name, zeros}}
     curves: dict[str, dict] = Field(default_factory=dict)
     # Named vol surface payloads: {name: {asset_class, atm_vol, grid, ...}}
@@ -461,6 +463,8 @@ class MarketSnapshot(FiniteInputMixin):
         "dividend_yields",
         "projection_rates",
         "rate_spreads",
+        "ir_vols",
+        "ir_future_quotes",
         "curves",
         "vol_surfaces",
     )
@@ -497,6 +501,8 @@ class MarketSnapshot(FiniteInputMixin):
         "dividend_yields",
         "projection_rates",
         "rate_spreads",
+        "ir_vols",
+        "ir_future_quotes",
         "key_rates",
         "curves",
         "vol_surfaces",
@@ -745,6 +751,8 @@ class MarketSnapshot(FiniteInputMixin):
             "dividend_yields": _deep_unfreeze(self.dividend_yields),
             "projection_rates": _deep_unfreeze(self.projection_rates),
             "rate_spreads": _deep_unfreeze(self.rate_spreads),
+            "ir_vols": _deep_unfreeze(self.ir_vols),
+            "ir_future_quotes": _deep_unfreeze(self.ir_future_quotes),
             "curves": _deep_unfreeze(self.curves),
             "vol_surfaces": _deep_unfreeze(self.vol_surfaces),
         }

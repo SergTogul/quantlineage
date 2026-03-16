@@ -3,7 +3,8 @@
 Pricing adapters prefer:
 1. typed curve payloads in ``market.curves`` (discount vs projection);
 2. ``market.key_rates[ccy]`` rebuilt as a sparse :class:`YieldCurve`;
-3. scalar ``market.rates`` / ``projection_rates`` / trade marks.
+3. scalar ``market.rates`` / ``projection_rates``. Trade marks are only a
+   ``continuous_zero(..., fallback=)`` path when ``market is None``.
 
 Zero rates are continuously compounded (same convention as ``app.market.curves``).
 QuantLib types stay out of this module.
@@ -15,6 +16,7 @@ from typing import Mapping
 
 from app.domain.models import MarketSnapshot
 from app.market.curves import CurveNode, CurveType, YieldCurve, tenor_to_years
+from app.market.demo_snapshot import MissingMarketDataError
 
 
 def curve_from_payload(name: str, payload: Mapping) -> YieldCurve | None:
@@ -137,14 +139,51 @@ def continuous_zero(
 ) -> float:
     """Continuous zero at ``maturity_years``; scalar market / trade mark as fallback."""
     if market is not None:
-        curve = select_yield_curve(market, currency, prefer_projection=prefer_projection)
-        if curve is not None:
-            return float(curve.zero(maturity_years))
-        if prefer_projection and currency in market.projection_rates:
-            return float(market.projection_rates[currency])
-        if currency in market.rates:
-            return float(market.rates[currency])
+        resolved = _snapshot_zero(market, currency, maturity_years, prefer_projection=prefer_projection)
+        if resolved is not None:
+            return resolved
     return float(fallback)
+
+
+def required_continuous_zero(
+    market: MarketSnapshot,
+    currency: str,
+    maturity_years: float,
+    *,
+    prefer_projection: bool = False,
+) -> float:
+    """Continuous zero from snapshot curves / scalars; no trade-mark fallback."""
+    resolved = _snapshot_zero(market, currency, maturity_years, prefer_projection=prefer_projection)
+    if resolved is not None:
+        return resolved
+    if prefer_projection:
+        raise MissingMarketDataError(f"projection_rates[{currency}]") from None
+    raise MissingMarketDataError(f"rates[{currency}]") from None
+
+
+def required_ir_future_quote(market: MarketSnapshot, currency: str) -> float:
+    """STIR quoted futures rate from the snapshot; no trade-mark fallback."""
+    try:
+        return float(market.ir_future_quotes[currency])
+    except KeyError:
+        raise MissingMarketDataError(f"ir_future_quotes[{currency}]") from None
+
+
+def _snapshot_zero(
+    market: MarketSnapshot,
+    currency: str,
+    maturity_years: float,
+    *,
+    prefer_projection: bool,
+) -> float | None:
+    curve = select_yield_curve(market, currency, prefer_projection=prefer_projection)
+    if curve is not None:
+        return float(curve.zero(maturity_years))
+    if prefer_projection and currency in market.projection_rates:
+        return float(market.projection_rates[currency])
+    if currency in market.rates:
+        return float(market.rates[currency])
+    return None
 
 
 def discount_factor(

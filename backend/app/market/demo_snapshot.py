@@ -104,6 +104,13 @@ class DemoSampleMarksSnapshotAdapter:
                     "forward_rate",
                     position.forward_rate,
                 )
+                add(
+                    "ir_future_quotes",
+                    position.currency,
+                    position.id,
+                    "quoted_rate",
+                    position.quoted_rate,
+                )
             elif isinstance(position, CapFloorPosition):
                 add(
                     "rates",
@@ -119,6 +126,13 @@ class DemoSampleMarksSnapshotAdapter:
                     "forward_rate",
                     position.forward_rate,
                 )
+                add(
+                    "ir_vols",
+                    position.currency,
+                    position.id,
+                    "volatility",
+                    position.volatility,
+                )
             elif isinstance(position, SwaptionPosition):
                 add(
                     "rates",
@@ -133,6 +147,13 @@ class DemoSampleMarksSnapshotAdapter:
                     position.id,
                     "forward_swap_rate",
                     position.forward_swap_rate,
+                )
+                add(
+                    "ir_vols",
+                    position.currency,
+                    position.id,
+                    "volatility",
+                    position.volatility,
                 )
             elif isinstance(position, (FXForwardPosition, FXOptionPosition)):
                 add("fx_spots", position.pair, position.id, "spot", position.spot)
@@ -167,6 +188,8 @@ class DemoSampleMarksSnapshotAdapter:
             "rates": {},
             "projection_rates": {},
             "dividend_yields": {},
+            "ir_vols": {},
+            "ir_future_quotes": {},
         }
         for (group, key), proposed in candidates.items():
             first = proposed[0].value

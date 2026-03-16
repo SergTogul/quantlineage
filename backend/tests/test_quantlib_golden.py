@@ -598,7 +598,9 @@ def test_ql_ir_future_higher_forward_lowers_long_mv(ql_engine):
         maturity_years=0.25,
     )
     base = ql_engine.value(p).market_value
-    shocked = ql_engine.value(p, MarketSnapshot(rates={"USD": 0.045}))
+    shocked = ql_engine.value(
+        p, MarketSnapshot(rates={"USD": 0.045}, ir_future_quotes={"USD": 0.042})
+    )
     assert shocked.market_value < base
 
 
