@@ -367,6 +367,7 @@ _DEMO_MARKETS: dict[str, MarketSnapshot] = {
             }
         },
         projection_rates={"USD": 0.0425},
+        ir_future_quotes={"USD": 0.042},
     ),
     "global-macro": MarketSnapshot(
         id="demo:global-macro",
@@ -396,6 +397,7 @@ _DEMO_AGGREGATE_MARKETS: dict[str, MarketSnapshot] = {
     "rates-macro": MarketSnapshot(
         id="demo-aggregate:rates-macro",
         rates={"USD": 0.0425},
+        ir_future_quotes={"USD": 0.042},
     ),
     "global-macro": MarketSnapshot(
         id="demo-aggregate:global-macro",

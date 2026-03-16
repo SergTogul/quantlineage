@@ -391,7 +391,9 @@ def test_ir_future_matches_builtin_without_fallback(engine, monkeypatch):
     assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=1e-12, abs=1e-9)
     assert ql_v.dv01 == pytest.approx(builtin_v.dv01, rel=1e-12, abs=1e-9)
     # Long future: higher forward → lower MV
-    higher = engine.value(p, MarketSnapshot(rates={"USD": 0.045}))
+    higher = engine.value(
+        p, MarketSnapshot(rates={"USD": 0.045}, ir_future_quotes={"USD": 0.042})
+    )
     assert higher.market_value < ql_v.market_value
 
 
@@ -579,4 +581,176 @@ def test_quantlib_complete_snapshot_fx_prices_without_mutating_trade(engine):
     assert ql_opt.market_value != pytest.approx(engine.value(option).market_value, abs=1.0)
     assert forward.model_dump(mode="json") == original_fwd
     assert option.model_dump(mode="json") == original_opt
+
+
+def _bond_authority() -> BondPosition:
+    return BondPosition(
+        type="bond",
+        id="bond-auth",
+        issuer="UST",
+        face_value=1_000_000.0,
+        quantity=1.0,
+        maturity_years=5.0,
+        yield_rate=0.10,
+        duration=4.5,
+        currency="USD",
+    )
+
+
+def _swap_authority() -> SwapPosition:
+    return SwapPosition(
+        type="swap",
+        id="swap-auth",
+        currency="USD",
+        notional=1_000_000.0,
+        maturity_years=5.0,
+        fixed_rate=0.04,
+        market_swap_rate=0.10,
+        pay_fixed=True,
+        duration=4.0,
+    )
+
+
+def _ir_future_authority() -> InterestRateFuturePosition:
+    return InterestRateFuturePosition(
+        type="ir_future",
+        id="ed-auth",
+        currency="USD",
+        quantity=10.0,
+        pv01=25.0,
+        quoted_rate=0.10,
+        forward_rate=0.10,
+        maturity_years=0.25,
+    )
+
+
+def _cap_authority() -> CapFloorPosition:
+    return CapFloorPosition(
+        type="cap_floor",
+        id="cap-auth",
+        currency="USD",
+        notional=1_000_000.0,
+        strike=0.04,
+        maturity_years=2.0,
+        volatility=0.50,
+        option_type="cap",
+        forward_rate=0.10,
+        discount_rate=0.10,
+        payment_frequency_per_year=2,
+    )
+
+
+def _swaption_authority() -> SwaptionPosition:
+    return SwaptionPosition(
+        type="swaption",
+        id="swaption-auth",
+        currency="USD",
+        notional=1_000_000.0,
+        strike=0.04,
+        option_maturity_years=1.0,
+        swap_tenor_years=5.0,
+        volatility=0.50,
+        option_type="payer",
+        forward_swap_rate=0.10,
+        discount_rate=0.10,
+        payment_frequency_per_year=2,
+    )
+
+
+@pytest.mark.parametrize("book_factory", [_bond_authority, _swap_authority], ids=["bond", "swap"])
+@pytest.mark.parametrize(
+    "rates",
+    [{}, {"EUR": 0.03}],
+    ids=["empty-rates", "eur-only"],
+)
+def test_quantlib_missing_bond_swap_rate_raises_when_market_is_supplied(engine, book_factory, rates):
+    from app.market.demo_snapshot import MissingMarketDataError
+
+    market = MarketSnapshot(id="no-usd-rate", rates=rates)
+    with pytest.raises(MissingMarketDataError) as raised:
+        engine.value(book_factory(), market)
+    assert raised.value.factor_key == "rates[USD]"
+
+
+def test_quantlib_missing_ir_future_quote_raises_when_market_is_supplied(engine):
+    from app.market.demo_snapshot import MissingMarketDataError
+
+    market = MarketSnapshot(
+        id="no-usd-quote",
+        rates={"USD": 0.0425},
+        projection_rates={"USD": 0.0425},
+        ir_future_quotes={},
+    )
+    with pytest.raises(MissingMarketDataError) as raised:
+        engine.value(_ir_future_authority(), market)
+    assert raised.value.factor_key == "ir_future_quotes[USD]"
+
+
+@pytest.mark.parametrize("book_factory", [_cap_authority, _swaption_authority], ids=["cap", "swaption"])
+def test_quantlib_missing_ir_option_vol_raises_when_market_is_supplied(engine, book_factory):
+    from app.market.demo_snapshot import MissingMarketDataError
+
+    market = MarketSnapshot(
+        id="no-usd-ir-vol",
+        rates={"USD": 0.035},
+        projection_rates={"USD": 0.04},
+        ir_vols={},
+    )
+    with pytest.raises(MissingMarketDataError) as raised:
+        engine.value(book_factory(), market)
+    assert raised.value.factor_key == "ir_vols[USD]"
+
+
+def test_quantlib_complete_snapshot_rates_ir_prices_without_mutating_trade(engine):
+    bond = _bond_authority()
+    swap = _swap_authority()
+    future = _ir_future_authority()
+    cap = _cap_authority()
+    swaption = _swaption_authority()
+    originals = {
+        "bond": bond.model_dump(mode="json"),
+        "swap": swap.model_dump(mode="json"),
+        "future": future.model_dump(mode="json"),
+        "cap": cap.model_dump(mode="json"),
+        "swaption": swaption.model_dump(mode="json"),
+    }
+    rates_market = MarketSnapshot(id="rates-complete", rates={"USD": 0.04})
+    future_market = MarketSnapshot(
+        id="ed-complete",
+        rates={"USD": 0.0425},
+        projection_rates={"USD": 0.0425},
+        ir_future_quotes={"USD": 0.042},
+    )
+    ir_opt_market = MarketSnapshot(
+        id="ir-opt-complete",
+        rates={"USD": 0.035},
+        projection_rates={"USD": 0.04},
+        ir_vols={"USD": 0.20},
+    )
+    builtin = BuiltinPricingEngine()
+
+    ql_bond = engine.value(bond, rates_market)
+    ql_swap = engine.value(swap, rates_market)
+    ql_future = engine.value(future, future_market)
+    ql_cap = engine.value(cap, ir_opt_market)
+    ql_swaption = engine.value(swaption, ir_opt_market)
+
+    assert ql_bond.market_value == pytest.approx(
+        builtin.value(bond, rates_market).market_value, rel=1e-12, abs=1e-9
+    )
+    assert ql_swap.market_value != pytest.approx(engine.value(swap).market_value, abs=1.0)
+    assert ql_future.market_value == pytest.approx(
+        builtin.value(future, future_market).market_value, rel=1e-12, abs=1e-9
+    )
+    assert ql_cap.market_value == pytest.approx(
+        builtin.value(cap, ir_opt_market).market_value, rel=1e-12, abs=1e-8
+    )
+    assert ql_swaption.market_value == pytest.approx(
+        builtin.value(swaption, ir_opt_market).market_value, rel=1e-12, abs=1e-8
+    )
+    assert bond.model_dump(mode="json") == originals["bond"]
+    assert swap.model_dump(mode="json") == originals["swap"]
+    assert future.model_dump(mode="json") == originals["future"]
+    assert cap.model_dump(mode="json") == originals["cap"]
+    assert swaption.model_dump(mode="json") == originals["swaption"]
 

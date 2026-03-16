@@ -111,7 +111,9 @@ def test_ir_future_uses_projection_curve_tenor():
         maturity_years=1.0,
     )
     market = attach_standard_usd_curves(
-        MarketSnapshot(id="c", rates={"USD": 0.04}), ois_rate=0.04, sofr_rate=0.041
+        MarketSnapshot(id="c", rates={"USD": 0.04}, ir_future_quotes={"USD": 0.041}),
+        ois_rate=0.04,
+        sofr_rate=0.041,
     )
     base = builtin.value(pos, market).market_value
     assert base == pytest.approx(0.0, abs=1e-9)
