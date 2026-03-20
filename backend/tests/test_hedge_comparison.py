@@ -18,8 +18,10 @@ from app.main import app
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.stress import ScenarioComparisonEngine
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 _TOL = 1e-9
 _OBS = 80
@@ -92,8 +94,8 @@ def test_engine_deterministic():
     pricing = BuiltinPricingEngine()
     hedge = _flat_spy_hedge()
     scenarios = [StressScenario(name="VolUp", vol_shock=0.3)]
-    a = engine.compare(SAMPLE_PORTFOLIO, hedge, pricing, scenarios)
-    b = engine.compare(SAMPLE_PORTFOLIO, hedge, pricing, scenarios)
+    a = engine.compare(SAMPLE_PORTFOLIO, hedge, pricing, scenarios, market=SAMPLE_MARKET)
+    b = engine.compare(SAMPLE_PORTFOLIO, hedge, pricing, scenarios, market=SAMPLE_MARKET)
     assert a.model_dump() == b.model_dump()
 
 

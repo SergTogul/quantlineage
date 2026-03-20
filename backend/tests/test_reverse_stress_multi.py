@@ -30,8 +30,10 @@ from app.risk.reverse_stress_multi import (
     build_multi_reverse_scenario,
 )
 from app.risk.scenario_model import ScenarioCategory
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 
 @pytest.fixture
@@ -72,7 +74,9 @@ def test_multi_reverse_scenario_is_formal_reverse():
 
 def test_multi_factor_converges_to_target(engine, pricing):
     target = 0.01
-    result = engine.solve(SAMPLE_PORTFOLIO, pricing, target, factors=["equity", "vol"])
+    result = engine.solve(
+        SAMPLE_PORTFOLIO, pricing, target, factors=["equity", "vol"], market=SAMPLE_MARKET
+    )
     assert result.converged is True
     assert result.achieved_loss_pct + 1e-6 >= target
     assert result.objective_l2 is not None and result.objective_l2 >= 0.0
@@ -87,8 +91,12 @@ def test_multi_factor_converges_to_target(engine, pricing):
 
 
 def test_multi_factor_deterministic(engine, pricing):
-    a = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.015, factors=["equity", "rates", "vol"])
-    b = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.015, factors=["equity", "rates", "vol"])
+    a = engine.solve(
+        SAMPLE_PORTFOLIO, pricing, 0.015, factors=["equity", "rates", "vol"], market=SAMPLE_MARKET
+    )
+    b = engine.solve(
+        SAMPLE_PORTFOLIO, pricing, 0.015, factors=["equity", "rates", "vol"], market=SAMPLE_MARKET
+    )
     assert a.model_dump() == b.model_dump()
 
 
@@ -99,6 +107,7 @@ def test_multi_factor_no_solution(engine, pricing):
         0.50,
         factors=["equity"],
         max_shock=0.001,
+        market=SAMPLE_MARKET,
     )
     assert result.converged is False
     assert result.objective_l2 is None or result.objective_l2 >= 0.0
@@ -107,7 +116,9 @@ def test_multi_factor_no_solution(engine, pricing):
 
 def test_empty_portfolio_unreachable(engine, pricing):
     empty = Portfolio(id="empty", name="Empty", positions=[])
-    result = engine.solve(empty, pricing, 0.01, factors=["equity", "vol"])
+    result = engine.solve(
+        empty, pricing, 0.01, factors=["equity", "vol"], market=MarketSnapshot(id="empty")
+    )
     assert result.converged is False
     assert result.achieved_loss_pct == pytest.approx(0.0)
 
@@ -119,6 +130,7 @@ def test_weights_bias_solution(engine, pricing):
         0.01,
         factors=["equity", "vol"],
         weights={"equity": 1.0, "vol": 0.05},
+        market=SAMPLE_MARKET,
     )
     vol_heavy = engine.solve(
         SAMPLE_PORTFOLIO,
@@ -126,6 +138,7 @@ def test_weights_bias_solution(engine, pricing):
         0.01,
         factors=["equity", "vol"],
         weights={"equity": 0.05, "vol": 1.0},
+        market=SAMPLE_MARKET,
     )
     if eq_heavy.converged and vol_heavy.converged:
         eq_map = {s.factor: s.required_shock for s in eq_heavy.shocks}
@@ -137,7 +150,9 @@ def test_weights_bias_solution(engine, pricing):
 
 def test_invalid_factor_raises(engine, pricing):
     with pytest.raises(ValueError, match="unsupported"):
-        engine.solve(SAMPLE_PORTFOLIO, pricing, 0.01, factors=["commodity"])
+        engine.solve(
+            SAMPLE_PORTFOLIO, pricing, 0.01, factors=["commodity"], market=SAMPLE_MARKET
+        )
 
 
 def test_service_and_api(svc):

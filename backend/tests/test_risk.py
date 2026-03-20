@@ -25,7 +25,9 @@ def test_var_ordering_and_es():
 
 
 def test_stress_returns_position_breakdown():
-    results = StressEngine().run(SAMPLE_PORTFOLIO, BuiltinPricingEngine(), DEFAULT_SCENARIOS[:1])
+    results = StressEngine().run(
+        SAMPLE_PORTFOLIO, BuiltinPricingEngine(), DEFAULT_SCENARIOS[:1], market=SAMPLE_MARKET
+    )
     assert len(results) == 1
     assert len(results[0].by_position) == len(SAMPLE_PORTFOLIO.positions)
     assert abs(results[0].pnl - sum(results[0].by_position.values())) < 1e-8

@@ -26,6 +26,7 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
+from app.risk.historical import require_explicit_market
 from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory
 from app.sample import DemoAggregateMarketDataProvider
@@ -171,7 +172,7 @@ class ReverseStressEngine:
             raise ValueError(f"unsupported reverse-stress factor: {factor!r}")
         family: FactorFamily = factor  # type: ignore[assignment]
 
-        base_market = market if market is not None else self.market_data.snapshot(portfolio)
+        base_market = require_explicit_market(market)
         base_mv = _portfolio_mv(pricing_engine, portfolio, base_market)
         denom = abs(base_mv) or 1.0
         target_loss = float(target_loss_pct) * denom

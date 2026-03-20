@@ -35,10 +35,9 @@ from app.risk.hierarchy_placement import (
     resolve_desk,
     resolve_strategy,
 )
-from app.risk.historical import HistoricalRiskEngine
+from app.risk.historical import HistoricalRiskEngine, require_explicit_market
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
-from app.sample import demo_market_snapshot
 
 
 def _path(*parts: str) -> str:
@@ -160,7 +159,7 @@ class HierarchyEngine:
         market: MarketSnapshot | None = None,
     ) -> HierarchyNode:
         """Full metrics for one hierarchy node (no children)."""
-        root_market = market if market is not None else demo_market_snapshot(portfolio)
+        root_market = require_explicit_market(market)
         sub = portfolio_at(portfolio, ref)
         return self._node(
             sub.name,
@@ -178,7 +177,7 @@ class HierarchyEngine:
         market: MarketSnapshot | None = None,
     ) -> HierarchyNode:
         """Full Firm → … → Trade tree with NAV/Greeks/VaR/ES/stress/limits per node."""
-        root_market = market if market is not None else demo_market_snapshot(portfolio)
+        root_market = require_explicit_market(market)
         # desk -> strategy -> book -> [positions]
         tree: dict[str, dict[str, dict[str, list]]] = defaultdict(
             lambda: defaultdict(lambda: defaultdict(list))

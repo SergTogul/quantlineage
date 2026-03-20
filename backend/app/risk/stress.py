@@ -32,7 +32,7 @@ from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.risk.crisis_library import CRISIS_STRESS_SCENARIOS
 from app.risk.factors import RiskFactorEngine
-from app.risk.historical import HistoricalRiskEngine
+from app.risk.historical import HistoricalRiskEngine, require_explicit_market
 from app.risk.reverse_stress import ReverseStressEngine
 from app.risk.reverse_stress_multi import MultiFactorReverseStressEngine
 from app.risk.scenario_attribution import ScenarioAttributionEngine, ScenarioLike
@@ -145,7 +145,7 @@ class StressEngine:
         scenarios: list[StressScenario],
         market: MarketSnapshot | None = None,
     ) -> list[StressResult]:
-        market = market if market is not None else self.market_data.snapshot(portfolio)
+        market = require_explicit_market(market)
         base = {p.id: pricing_engine.value(p, market).market_value for p in portfolio.positions}
         output = []
         for scenario in scenarios:
@@ -174,7 +174,7 @@ class StressEngine:
             portfolio,
             pricing_engine,
             scenario,
-            market=market if market is not None else self.market_data.snapshot(portfolio),
+            market=require_explicit_market(market),
             by_trade_pnl=by_trade_pnl,
         )
 
@@ -185,7 +185,7 @@ class StressEngine:
         scenarios: list[StressScenario],
         market: MarketSnapshot | None = None,
     ) -> ScenarioEvaluationReport:
-        market = market if market is not None else self.market_data.snapshot(portfolio)
+        market = require_explicit_market(market)
         base_by_position = {p.id: pricing_engine.value(p, market).market_value for p in portfolio.positions}
         base_mv = sum(base_by_position.values())
         nav_denominator = abs(base_mv) or 1.0
@@ -324,6 +324,7 @@ class ScenarioComparisonEngine:
         methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
         market: MarketSnapshot | None = None,
     ) -> HedgeComparisonReport:
+        market = require_explicit_market(market)
         base_stress = self.engine.run(
             base_portfolio, pricing_engine, scenarios, market=market
         )

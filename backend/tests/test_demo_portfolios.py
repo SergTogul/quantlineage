@@ -190,11 +190,13 @@ def test_dropping_aggregate_dividend_yields_fails_closed_on_sample_options():
 
 
 def test_aggregate_stress_engine_prices_sample_and_equity_vol_books():
-    """Goldens still resolve DemoAggregateMarketDataProvider when market is omitted."""
+    """Goldens price against an explicit demo snapshot (no omitted-market inference)."""
     pricing = BuiltinPricingEngine()
     engine = StressEngine()
     for book in (SAMPLE_PORTFOLIO, EQUITY_VOL_PORTFOLIO):
-        results = engine.run(book, pricing, DEFAULT_SCENARIOS[:1])
+        results = engine.run(
+            book, pricing, DEFAULT_SCENARIOS[:1], market=demo_market_snapshot(book)
+        )
         assert len(results) == 1
         assert len(results[0].by_position) == len(book.positions)
 
