@@ -168,7 +168,7 @@ def test_stress_pnl_equals_sum_of_position_pnls(n, data, equity_shock):
         rates_shift_bps=0.0,
         fx_shock=0.0,
     )
-    results = stress.run(book, pricing, [scenario])
+    results = stress.run(book, pricing, [scenario], market=demo_market_snapshot(book))
     assert len(results) == 1
     assert results[0].pnl == pytest.approx(sum(results[0].by_position.values()), abs=1e-9)
 
@@ -178,7 +178,7 @@ def test_stress_pnl_equals_sum_of_position_pnls(n, data, equity_shock):
 def test_empty_stress_scenario_list_returns_empty(n, data):
     """M9.5: no scenarios → no stress results (empty portfolio allowed)."""
     book = _equity_book(n, data) if n else Portfolio(id="empty", name="empty", positions=[])
-    assert stress.run(book, pricing, []) == []
+    assert stress.run(book, pricing, [], market=demo_market_snapshot(book)) == []
 
 
 @given(
@@ -197,8 +197,9 @@ def test_long_equity_stress_pnl_monotone_in_equity_shock(qty, price, shock_a, sh
     )
     sa = StressScenario(id="a", name="a", equity_shock=shock_a)
     sb = StressScenario(id="b", name="b", equity_shock=shock_b)
-    ra = stress.run(book, pricing, [sa])[0].pnl
-    rb = stress.run(book, pricing, [sb])[0].pnl
+    market = demo_market_snapshot(book)
+    ra = stress.run(book, pricing, [sa], market=market)[0].pnl
+    rb = stress.run(book, pricing, [sb], market=market)[0].pnl
     if shock_a <= shock_b:
         assert ra <= rb + 1e-9
     else:

@@ -146,7 +146,8 @@ def test_resolve_desk_strategy_defaults():
 
 def test_build_firm_to_trade_tree():
     pricing = BuiltinPricingEngine()
-    root = _engine().build(_multi_desk_portfolio(), pricing)
+    pf = _multi_desk_portfolio()
+    root = _engine().build(pf, pricing, market=demo_market_snapshot(pf))
 
     assert root.level == "firm"
     assert root.name == "Acme Capital"
@@ -177,7 +178,8 @@ def test_build_firm_to_trade_tree():
 
 def test_market_value_reconciles_at_every_level():
     pricing = BuiltinPricingEngine()
-    root = _engine().build(_multi_desk_portfolio(), pricing)
+    pf = _multi_desk_portfolio()
+    root = _engine().build(pf, pricing, market=demo_market_snapshot(pf))
     _assert_mv_reconciles(root)
     # Spot check: three equities 1000 + 1000 + 1000
     assert math.isclose(root.market_value, 3000.0, abs_tol=1e-9)
@@ -198,7 +200,7 @@ def test_sample_portfolio_hierarchy_still_drills_to_trade():
 def test_empty_portfolio_zero_risk_tree():
     pricing = BuiltinPricingEngine()
     empty = Portfolio(id="empty", name="Empty", firm="F", positions=[])
-    root = _engine(observations=20).build(empty, pricing)
+    root = _engine(observations=20).build(empty, pricing, market=demo_market_snapshot(empty))
     assert root.level == "firm"
     assert root.market_value == 0.0
     assert root.var_99 == 0.0
@@ -347,7 +349,7 @@ def test_risk_at_includes_stress_and_limits():
         desk="Rates Desk",
         strategy="Carry",
     )
-    node = engine.risk_at(pf, pricing, ref)
+    node = engine.risk_at(pf, pricing, ref, market=demo_market_snapshot(pf))
     assert node.level == "strategy"
     assert node.stress
     assert node.limits

@@ -39,6 +39,7 @@ from app.domain.models import (
     Portfolio,
 )
 from app.interfaces.pricing import PricingEngine
+from app.risk.historical import require_explicit_market
 from app.risk.reverse_stress import (
     DEFAULT_LOSS_TOLERANCE,
     DEFAULT_MAX_ITERATIONS,
@@ -206,7 +207,7 @@ class MultiFactorReverseStressEngine:
         w = _normalize_weights(selected, weights)
         bounds = _resolve_bounds(selected, max_shock, max_shocks)
 
-        base_market = market if market is not None else self.market_data.snapshot(portfolio)
+        base_market = require_explicit_market(market)
         base_mv = _portfolio_mv(pricing_engine, portfolio, base_market)
         denom = abs(base_mv) or 1.0
         target_loss = float(target_loss_pct) * denom

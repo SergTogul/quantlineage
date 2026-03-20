@@ -25,7 +25,9 @@ from app.risk.factor_types import EquitySpot, EquityVol, RateZero
 from app.risk.scenario_attribution import ScenarioAttributionEngine
 from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory, ScenarioThreshold
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 
 def _two_book_portfolio() -> Portfolio:
@@ -254,7 +256,9 @@ def test_empty_portfolio_yields_empty_contributions():
 
 def test_stress_engine_evaluate_includes_contributions():
     pricing = BuiltinPricingEngine()
-    report = StressEngine().evaluate(SAMPLE_PORTFOLIO, pricing, DEFAULT_SCENARIOS[:2])
+    report = StressEngine().evaluate(
+        SAMPLE_PORTFOLIO, pricing, DEFAULT_SCENARIOS[:2], market=SAMPLE_MARKET
+    )
     for ev in report.evaluations:
         assert ev.contributions is not None
         assert math.isclose(ev.contributions.portfolio_pnl, ev.pnl, abs_tol=1e-9)

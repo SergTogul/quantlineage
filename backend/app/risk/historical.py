@@ -16,7 +16,7 @@ from app.risk.scenarios import historical_shocked_snapshots
 
 
 def require_explicit_market(market: MarketSnapshot | None) -> MarketSnapshot:
-    """Fail closed: production VaR / ES / full-reval must receive a snapshot."""
+    """Fail closed: production risk methods must receive a snapshot."""
     if market is None:
         raise ValueError("production risk calculation requires an explicit MarketSnapshot")
     return market
