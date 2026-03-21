@@ -867,7 +867,7 @@ A broken QuantLib installation cannot produce a green "full" CI run.
 Priority: **P2**  
 Risk types: PERFORMANCE, MAINTAINABILITY, NATIVE_SAFETY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.12.5 ABI fail-closed APPROVE; R0.17 `pnl_from_arrays` contiguous path + serial-below-4096 APPROVE. Remaining: Historical VaR still packs object `pnl()`; do not expand native VaR/QuantLib.)
+Status: **IN PROGRESS** (R0.12.5 ABI fail-closed APPROVE; contiguous `pnl_from_arrays` + serial-below-4096 APPROVE; native Historical VaR uses arrays APPROVE. Remaining: default kernel is still python/NumPy; do not expand native VaR/QuantLib.)
 
 Source findings:
 
