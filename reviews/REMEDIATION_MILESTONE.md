@@ -237,7 +237,8 @@ Related findings:
 | R0.2 VaR/ES/full-reval require explicit market | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-omit-market-independent-review.md`). |
 | R0.2 bond/swap/IR fail-closed | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-rates-ir-independent-review.md`). |
 | R0.2 hierarchy/stress/reverse require explicit market | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-hierarchy-stress-market-independent-review.md`). |
-| Remaining InstrumentTerms split | OPEN | Compatibility `*Position` DTOs remain. Deferred: golden snapshot-routing. |
+| R0.2.4 cache identity (all families) | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-terms-cache-independent-review.md`). |
+| Remaining typed InstrumentTerms / DTO mark removal | OPEN | Compatibility `*Position` DTOs remain. Deferred: golden snapshot-routing. |
 
 RF-001 remains **OPEN** until remaining families cannot silently fall back to trade-local marks and production methods no longer infer markets.
 
