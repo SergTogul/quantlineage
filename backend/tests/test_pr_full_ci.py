@@ -66,6 +66,7 @@ def test_pr_full_needs_production_relevant_jobs():
     extra = needed - set(REQUIRED_NEEDS)
     assert not extra, f"PR-FULL needs: must stay the six PR jobs; extra {sorted(extra)}"
     assert "quantlib-e2e" not in needed
+    assert "hierarchy-benchmark" not in needed
 
 
 def test_quantlib_hard_gate_still_requires_quantlib():

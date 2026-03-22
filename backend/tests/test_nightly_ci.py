@@ -23,6 +23,7 @@ NIGHTLY_JOB_IDS = (
     "postgres-two-worker",
     "full-reval-sample",
     "quantlib-e2e",
+    "hierarchy-benchmark",
 )
 
 
@@ -76,6 +77,7 @@ def test_pr_full_needs_does_not_include_nightly():
     leaked_ids = [job_id for job_id in NIGHTLY_JOB_IDS if job_id in needed]
     assert not leaked_ids, f"PR-FULL needs: must not include nightly job ids; found {leaked_ids}"
     assert "quantlib-e2e" not in needed
+    assert "hierarchy-benchmark" not in needed
     assert not re.search(r"(?im)^      - \S*nightly", block), (
         "PR-FULL needs: list must not name a nightly job id"
     )
@@ -191,3 +193,44 @@ def test_require_quantlib_skips_locally_when_missing(monkeypatch):
 
     with pytest.raises(pytest.skip.Exception):
         require_quantlib_for_nightly(_importer=_missing)
+
+
+def test_nightly_runs_hierarchy_benchmark():
+    text = _text(NIGHTLY_YML)
+    block = _job_block(text, "hierarchy-benchmark")
+    assert "benchmarks/run_hierarchy_bench.py" in block
+    assert "--json" in block
+    assert "hierarchy_python" in block
+    assert "checksum" in block
+    assert "n_nodes" in block
+    assert "n_positions" in block
+    assert "RISKFORGE_NIGHTLY" in block
+    assert "continue-on-error" not in block
+    assert "echo-only" not in block.lower()
+    assert "check_m6_sla.py" not in block
+
+
+def test_nightly_hierarchy_asserts_identity_not_sla():
+    block = _job_block(_text(NIGHTLY_YML), "hierarchy-benchmark")
+    assert "check_m6_sla.py" not in block
+    assert "checksum" in block
+    assert "2a51c37798de149329b37c58729c13302de6f902bcc26e3316542dab12537d1d" in block
+    assert "64000" in block
+    assert "SLA-sized" not in block
+    assert not re.search(r"(?im)^      - name:.*SLA", block)
+    assert not re.search(r"throughput\s*>\s*0", block)
+    assert "wall_ms >=" not in block
+
+
+def test_hierarchy_bench_script_is_identity_not_sla():
+    path = REPO_ROOT / "benchmarks" / "run_hierarchy_bench.py"
+    assert path.is_file(), "expected benchmarks/run_hierarchy_bench.py"
+    text = path.read_text(encoding="utf-8")
+    assert "HierarchyEngine" in text
+    assert "checksum" in text
+    assert not re.search(r"(?m)^\s*(import |from ).*check_m6_sla", text)
+    assert not re.search(r"check_m6_sla\.py\s", text)
+    assert not re.search(r"throughput\s*>\s*0", text)
+    assert "2a51c37798de149329b37c58729c13302de6f902bcc26e3316542dab12537d1d" in text
+    assert "EXPECTED_N_NODES" in text
+    assert "EXPECTED_MARKET_VALUE" in text
