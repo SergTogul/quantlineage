@@ -491,7 +491,9 @@ Related findings:
 - RF-007
 - RF-015
 
-## R0.6.1 Baseline benchmark first
+## R0.6.1 Baseline benchmark first — COMPLETE (2026-09-04)
+
+`benchmarks/run_full_reval_bench.py` + `backend/tests/test_full_reval_bench.py`. N=10×S=100 identity vs `full_revaluation_var_es`; `pnl_checksum` `6602fa69…`; `wall_ms` recorded only. Not in nightly/PR-FULL. N=100/1k, reuse, and N×S remain later. RF-007 stays open.
 
 Record current performance for:
 
