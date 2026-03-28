@@ -21,6 +21,7 @@ from app.domain.models import (
     RiskRun,
     RiskRunStatus,
     StressScenario,
+    as_of_wire,
 )
 from app.persistence.repositories import (
     LimitDefinitionRepository,
@@ -57,7 +58,7 @@ class InMemoryMarketSnapshotRepository(MarketSnapshotRepository):
             self._data[snapshot.id] = stored
             self._meta[snapshot.id] = {
                 "id": snapshot.id,
-                "as_of": snapshot.as_of,
+                "as_of": as_of_wire(snapshot.as_of),
                 "content_hash": snapshot.content_hash(),
                 "meta": dict(meta or {}),
                 "created_at": _utcnow().isoformat(),

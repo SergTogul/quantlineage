@@ -3,7 +3,7 @@
 Cache keys bind:
 - contractual trade economics (family terms projection; unknown families fail closed),
 - required market snapshot content hash,
-- parseable snapshot ``as_of`` (ISO ``YYYY-MM-DD`` or ``date``; labels omitted),
+- parseable snapshot ``as_of`` (``date`` or ISO ``YYYY-MM-DD``; engine labels omitted),
 - pricing configuration (engine identity + evaluation date + extras).
 
 A market bump produces a new ``content_hash`` and therefore a miss — no separate
@@ -35,6 +35,7 @@ from app.domain.models import (
     SwapPosition,
     SwaptionPosition,
     Valuation,
+    calendar_as_of,
 )
 from app.interfaces.pricing import PricingEngine
 
@@ -137,23 +138,13 @@ def trade_cache_key(position: Position) -> str:
 
 
 def _parseable_as_of(as_of: object) -> date | None:
-    """Return a calendar date from snapshot ``as_of``, or None for labels.
+    """Return a calendar date from snapshot ``as_of``, or None for engine labels.
 
-    Matches the QuantLib adapter contract: ISO ``YYYY-MM-DD`` and ``date``
-    objects are load-bearing; labels such as ``current`` / ``t0`` / ``later``
-    fall back to engine ``evaluation_date`` (already in ``PricingConfiguration``).
+    Matches the domain / QuantLib contract: ``date`` and ISO ``YYYY-MM-DD``
+    are load-bearing; ``current`` / ``t0`` fall back to engine
+    ``evaluation_date`` (already in ``PricingConfiguration``).
     """
-    if isinstance(as_of, date):
-        return as_of
-    if not isinstance(as_of, str):
-        return None
-    text = as_of.strip()
-    if not text or text.lower() == "current":
-        return None
-    try:
-        return date.fromisoformat(text)
-    except ValueError:
-        return None
+    return calendar_as_of(as_of)
 
 
 def market_cache_key(market: MarketSnapshot | None) -> str:

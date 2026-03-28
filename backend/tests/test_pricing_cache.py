@@ -60,7 +60,7 @@ def test_trade_and_market_keys_stable():
     assert trade_cache_key(p) == trade_cache_key(p.model_copy())
     # Labels stay equivalent; id is excluded. Parseable ISO as_of is not a label.
     labeled_other_id = MarketSnapshot(
-        id="other", as_of="later", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}
+        id="other", as_of="t0", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}
     )
     labeled_current = MarketSnapshot(
         id="third", as_of="current", equity_spots={"SPY": 100.0}, rates={"USD": 0.04}

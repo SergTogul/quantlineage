@@ -20,6 +20,7 @@ from app.domain.models import (
     SwapPosition,
     SwaptionPosition,
     Valuation,
+    calendar_as_of,
 )
 from app.interfaces.pricing import PricingEngine
 from app.market.demo_snapshot import MissingMarketDataError
@@ -57,18 +58,8 @@ class QuantLibUnavailableError(RuntimeError):
 
 
 def _parse_snapshot_as_of(as_of: object) -> date | None:
-    """Return a calendar date from snapshot ``as_of``, or None for labels."""
-    if isinstance(as_of, date):
-        return as_of
-    if not isinstance(as_of, str):
-        return None
-    text = as_of.strip()
-    if not text or text.lower() == "current":
-        return None
-    try:
-        return date.fromisoformat(text)
-    except ValueError:
-        return None
+    """Return a calendar date from snapshot ``as_of``, or None for engine labels."""
+    return calendar_as_of(as_of)
 
 
 def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
@@ -109,8 +100,9 @@ class QuantLibPricingEngine(PricingEngine):
 
     QuantLib Settings and IndexManager state are process-global.  All access is
     serialized by the module-level ``_QL_PROCESS_LOCK`` (shared by every engine
-    instance).  Parseable ``MarketSnapshot.as_of`` drives the evaluation date
-    for a valuation; otherwise the engine's ``evaluation_date`` is used.
+    instance).  A calendar ``MarketSnapshot.as_of`` (``date`` or ISO
+    ``YYYY-MM-DD``) drives the evaluation date for a valuation; engine labels
+    (``current`` / ``t0``) keep ``evaluation_date``.
     IndexManager histories are cleared on the outermost session exit so one
     valuation cannot leave fixings for the next.
 

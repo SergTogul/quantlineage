@@ -3,10 +3,10 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import Enum
 from types import MappingProxyType
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal, NoReturn, Union
 
 from pydantic import (
     AfterValidator,
@@ -14,6 +14,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    TypeAdapter,
     computed_field,
     field_serializer,
     model_validator,
@@ -119,6 +120,70 @@ FiniteFloat = Annotated[
     AfterValidator(_require_finite),
 ]
 FxPair = Annotated[str, AfterValidator(_require_fx_pair)]
+
+# Engine labels mean "use the pricing engine evaluation date". They must not be
+# rewritten to date.today() on the production path.
+AsOfLabel = Literal["current", "t0"]
+AS_OF_ENGINE_LABELS: frozenset[str] = frozenset({"current", "t0"})
+_AS_OF_ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _as_of_error() -> NoReturn:
+    raise PydanticCustomError(
+        "as_of_date",
+        "as_of must be an ISO calendar date YYYY-MM-DD or an engine label "
+        "(current, t0)",
+    )
+
+
+def _coerce_as_of(value: Any) -> date | AsOfLabel:
+    """Parse snapshot as-of. Fail closed; never default to wall-clock."""
+    if isinstance(value, datetime):
+        _as_of_error()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        lowered = text.lower()
+        if lowered in AS_OF_ENGINE_LABELS:
+            return lowered  # type: ignore[return-value]
+        if _AS_OF_ISO_RE.fullmatch(text):
+            try:
+                return date.fromisoformat(text)
+            except ValueError:
+                _as_of_error()
+        _as_of_error()
+    _as_of_error()
+
+
+AsOf = Annotated[date | AsOfLabel, BeforeValidator(_coerce_as_of)]
+_AS_OF_ADAPTER: TypeAdapter[date | AsOfLabel] = TypeAdapter(AsOf)
+
+
+def as_of_wire(as_of: date | AsOfLabel) -> str:
+    """API/persistence string form. Dates are ISO; labels stay labels."""
+    if type(as_of) is date:
+        return as_of.isoformat()
+    return str(as_of)
+
+
+def calendar_as_of(as_of: object) -> date | None:
+    """Calendar date for pricing; None means use the engine evaluation date.
+
+    ``datetime`` is a ``date`` subclass and is not accepted. ISO ``YYYY-MM-DD``
+    strings are parsed so cache/QuantLib stay aligned if validation is bypassed
+    (``model_construct``). Engine labels and anything else return None.
+    """
+    if type(as_of) is date:
+        return as_of
+    if isinstance(as_of, str):
+        text = as_of.strip()
+        if _AS_OF_ISO_RE.fullmatch(text):
+            try:
+                return date.fromisoformat(text)
+            except ValueError:
+                return None
+    return None
 
 
 def _deep_freeze(value: Any) -> Any:
@@ -423,6 +488,12 @@ class MarketSnapshot(FiniteInputMixin):
     ``vol_surfaces`` payloads) are recursively frozen via ``MappingProxyType``
     so in-place edits fail at every nesting level.
 
+    ``as_of`` is a calendar ``date`` or an explicit engine label
+    (``current`` / ``t0``). ISO ``YYYY-MM-DD`` strings coerce to ``date``.
+    Labels mean "use the pricing-engine evaluation date" and are never
+    rewritten to ``date.today()``. Unparseable values fail closed. Wire and
+    persistence keep a string via :func:`as_of_wire`.
+
     Bump units:
     - EquitySpot / FXSpot: relative return (0.01 = +1%)
     - EquityVol / FXVol: relative vol change (0.25 = +25% of current vol level)
@@ -436,7 +507,7 @@ class MarketSnapshot(FiniteInputMixin):
     model_config = ConfigDict(frozen=True)
 
     id: str = "current"
-    as_of: str = "current"
+    as_of: AsOf = "current"
     equity_spots: dict[str, FiniteFloat] = Field(default_factory=dict)
     equity_vols: dict[str, FiniteFloat] = Field(default_factory=dict)
     fx_spots: dict[str, FiniteFloat] = Field(default_factory=dict)
@@ -486,11 +557,16 @@ class MarketSnapshot(FiniteInputMixin):
 
         Pydantic v2 ``model_copy(update=...)`` does not re-run after validators, so
         plain dict updates would otherwise leave nested ``curves`` /
-        ``vol_surfaces`` mutable.
+        ``vol_surfaces`` mutable and ``as_of`` unparsed.
         """
         copied = super().model_copy(update=update, deep=deep)
+        object.__setattr__(copied, "as_of", _AS_OF_ADAPTER.validate_python(copied.as_of))
         MarketSnapshot._apply_nested_freeze(copied)
         return copied
+
+    @field_serializer("as_of")
+    def _ser_as_of(self, value: date | AsOfLabel) -> str:
+        return as_of_wire(value)
 
     @field_serializer(
         "equity_spots",

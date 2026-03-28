@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -86,7 +87,7 @@ def test_portfolio_and_trades_round_trip(session_factory):
 def test_market_snapshot_meta_and_data(session_factory):
     snap = MarketSnapshot(
         id="snap-1",
-        as_of="2026-09-02",
+        as_of=date(2026, 9, 2),
         equity_spots={"SPY": 400.0},
         rates={"USD": 0.04},
     )
@@ -100,6 +101,7 @@ def test_market_snapshot_meta_and_data(session_factory):
         assert meta["meta"]["source"] == "unit-test"
         loaded = repo.get("snap-1")
         assert loaded is not None
+        assert loaded.as_of == date(2026, 9, 2)
         assert math.isclose(loaded.equity_spots["SPY"], 400.0)
         # Nested freeze still applies after load.
         with pytest.raises(TypeError):

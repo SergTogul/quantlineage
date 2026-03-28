@@ -18,6 +18,7 @@ from app.domain.models import (
     RiskRun,
     RiskRunStatus,
     StressScenario,
+    as_of_wire,
 )
 from app.persistence.models import (
     LimitDefinitionRow,
@@ -118,7 +119,7 @@ class SqlAlchemyMarketSnapshotRepository(MarketSnapshotRepository):
         if row is None:
             row = MarketSnapshotRow(id=snapshot.id)
             self._session.add(row)
-        row.as_of = snapshot.as_of
+        row.as_of = as_of_wire(snapshot.as_of)
         row.content_hash = content_hash
         row.meta = dict(meta or {})
         row.data = data
