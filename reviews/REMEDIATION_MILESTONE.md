@@ -690,7 +690,9 @@ Related findings:
 - RF-007
 - RF-008
 
-## R0.10.1 Classify endpoints
+## R0.10.1 Classify endpoints — COMPLETE (2026-09-04)
+
+`backend/app/api/execution_class.py` is an OpenAPI bijection (32 owned routes). Listed heavy examples are HEAVY. `classify(..., methodology="FULL_REVALUATION")` upgrades `POST /risk/summary`. Not wired to routers. RF-015 stays open for R0.10.2 / R0.10.3.
 
 Cheap/interactive examples:
 
