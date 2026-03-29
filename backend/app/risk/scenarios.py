@@ -9,7 +9,9 @@ Pipeline:
 
 Approximation VaR paths (`LINEAR` / ``DELTA_GAMMA``) still consume raw observation
 arrays. ``FULL_REVALUATION`` historical VaR (M2.3) consumes shocked snapshots
-from this module via ``historical_shocked_snapshots``.
+from this module via ``iter_historical_shocked_snapshots`` (one snapshot at a
+time). ``historical_shocked_snapshots`` remains a list wrapper for callers
+that still need the materialized collection.
 
 Units (aligned with ``FactorObservationSeries`` and ``MarketSnapshot.bump``):
 - equity / FX: relative return (0.01 = +1%)
@@ -20,8 +22,8 @@ Units (aligned with ``FactorObservationSeries`` and ``MarketSnapshot.bump``):
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from app.domain.models import MarketSnapshot, ScenarioKind, StressScenario
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
@@ -152,12 +154,33 @@ def apply_market_scenario(base: MarketSnapshot, scenario: MarketScenario) -> Mar
     return out.model_copy(update={"id": f"{base.id}:{scenario.id}"})
 
 
+def iter_shocked_snapshots(
+    base: MarketSnapshot,
+    scenarios: Sequence[MarketScenario],
+) -> Iterator[MarketSnapshot]:
+    """Yield one shocked snapshot at a time (independent shocks, not cumulative)."""
+    for scenario in scenarios:
+        yield apply_market_scenario(base, scenario)
+
+
 def shocked_snapshots(
     base: MarketSnapshot,
     scenarios: Sequence[MarketScenario],
 ) -> list[MarketSnapshot]:
     """Apply each scenario to ``base`` (independent shocks, not cumulative)."""
-    return [apply_market_scenario(base, s) for s in scenarios]
+    return list(iter_shocked_snapshots(base, scenarios))
+
+
+def iter_historical_shocked_snapshots(
+    base: MarketSnapshot,
+    source: HistoricalMarketDataset | FactorObservationSeries,
+    *,
+    id_prefix: str = "hist",
+) -> Iterator[MarketSnapshot]:
+    """End-to-end: observations → scenarios → shocked snapshots, one at a time."""
+    yield from iter_shocked_snapshots(
+        base, historical_market_scenarios(base, source, id_prefix=id_prefix)
+    )
 
 
 def historical_shocked_snapshots(
@@ -167,7 +190,7 @@ def historical_shocked_snapshots(
     id_prefix: str = "hist",
 ) -> list[MarketSnapshot]:
     """End-to-end: observations → scenarios → shocked snapshots."""
-    return shocked_snapshots(base, historical_market_scenarios(base, source, id_prefix=id_prefix))
+    return list(iter_historical_shocked_snapshots(base, source, id_prefix=id_prefix))
 
 
 def to_stress_scenario(scenario: MarketScenario) -> StressScenario:
@@ -216,6 +239,8 @@ __all__ = [
     "historical_market_scenarios",
     "historical_shocked_snapshots",
     "iter_aggregate_changes",
+    "iter_historical_shocked_snapshots",
+    "iter_shocked_snapshots",
     "market_scenario_from_change",
     "shocked_snapshots",
     "to_stress_scenario",
