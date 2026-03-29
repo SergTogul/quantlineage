@@ -16,7 +16,7 @@ from app.domain.models import MarketSnapshot, Portfolio, Valuation, VaRMethodolo
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
-from app.risk.scenarios import historical_shocked_snapshots
+from app.risk.scenarios import iter_historical_shocked_snapshots
 
 
 def require_explicit_market(market: MarketSnapshot | None) -> MarketSnapshot:
@@ -229,12 +229,11 @@ def full_revaluation_pnl_series(
     revaluation is pricing-driven and outside the Exposure/Shock ABI.
     """
     base_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, base_market))
-    shocked = historical_shocked_snapshots(base_market, dataset)
-    pnls = np.empty(len(shocked), dtype=float)
-    for i, snap in enumerate(shocked):
+    pnls: list[float] = []
+    for snap in iter_historical_shocked_snapshots(base_market, dataset):
         shocked_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, snap))
-        pnls[i] = shocked_mv - base_mv
-    return pnls
+        pnls.append(shocked_mv - base_mv)
+    return np.asarray(pnls, dtype=float)
 
 
 class HistoricalRiskEngine(RiskEngine):

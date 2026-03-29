@@ -430,7 +430,7 @@ Create the shocked snapshot once per scenario, not once per trade.
 
 ## RF-007 — Full revaluation and contribution paths reconstruct N×S QuantLib work
 
-Status: **IN PROGRESS** (2026-09-04). R0.6.1 baseline identity bench APPROVE — `benchmarks/run_full_reval_bench.py` records shocked-PV − base-PV vs `full_revaluation_var_es` for N=10×S=100; `pnl_checksum` pin `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`. `wall_ms` recorded only. Not in nightly/PR-FULL. N=100/1k, reuse, and N×S architecture remain later work. Do not close.
+Status: **IN PROGRESS** (2026-09-04). R0.6.1 identity bench APPROVE. R0.6.2 stream APPROVE — `full_revaluation_pnl_series` and VaR full-reval iterate `iter_historical_shocked_snapshots`; list APIs remain wrappers. Independent P&L matches `[-100, 0, 50]`. Still N×S pricing. Not in nightly/PR-FULL. QuantLib reuse, process parallelism, contribution reuse, N=100/1k remain later. Do not close.
 
 Priority: **P0**  
 Risk types: PERFORMANCE, OPERABILITY, ARCHITECTURE  

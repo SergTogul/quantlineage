@@ -17,7 +17,7 @@ from app.interfaces.pricing import PricingEngine
 from app.risk.historical import approximate_pnl_series, require_explicit_market
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.marginal_var import parametric_component_var, parametric_marginal_var
-from app.risk.scenarios import historical_shocked_snapshots
+from app.risk.scenarios import iter_historical_shocked_snapshots
 
 
 class VaRAnalytics:
@@ -72,12 +72,11 @@ class VaRAnalytics:
         market: MarketSnapshot,
     ) -> dict[str, np.ndarray]:
         base = {p.id: pricing.value(p, market).market_value for p in portfolio.positions}
-        shocked = historical_shocked_snapshots(market, self.dataset)
-        out = {p.id: np.empty(len(shocked), dtype=float) for p in portfolio.positions}
-        for i, snap in enumerate(shocked):
+        collected: dict[str, list[float]] = {p.id: [] for p in portfolio.positions}
+        for snap in iter_historical_shocked_snapshots(market, self.dataset):
             for p in portfolio.positions:
-                out[p.id][i] = pricing.value(p, snap).market_value - base[p.id]
-        return out
+                collected[p.id].append(pricing.value(p, snap).market_value - base[p.id])
+        return {pid: np.asarray(vals, dtype=float) for pid, vals in collected.items()}
 
     def report(
         self,
