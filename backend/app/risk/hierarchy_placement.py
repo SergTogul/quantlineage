@@ -10,6 +10,40 @@ from __future__ import annotations
 from app.domain.models import HierarchyLevel, HierarchyRef, Portfolio, Position
 
 
+def _seg(value: str | None) -> str:
+    """Encode one id segment so ``/`` in a label cannot join adjacent parts."""
+    return (value or "").replace("%", "%25").replace("/", "%2F")
+
+
+def hierarchy_node_id(
+    level: HierarchyLevel | str,
+    *,
+    firm: str,
+    portfolio_id: str,
+    desk: str | None = None,
+    strategy: str | None = None,
+    book: str | None = None,
+    trade_id: str | None = None,
+) -> str:
+    """Stable Firm → … → Trade id; same scheme as ``portfolio_at`` Portfolio.id.
+
+    Every level is prefixed. Empty labels stay empty segments (not the
+    literals ``trade`` / ``book``). ``/`` inside a label is ``%2F``.
+    """
+    resolved = HierarchyLevel(level) if not isinstance(level, HierarchyLevel) else level
+    if resolved is HierarchyLevel.FIRM:
+        return f"firm:{_seg(firm)}"
+    if resolved is HierarchyLevel.PORTFOLIO:
+        return f"portfolio:{_seg(portfolio_id)}"
+    if resolved is HierarchyLevel.DESK:
+        return f"desk:{_seg(desk)}"
+    if resolved is HierarchyLevel.STRATEGY:
+        return f"strategy:{_seg(desk)}/{_seg(strategy)}"
+    if resolved is HierarchyLevel.BOOK:
+        return f"book:{_seg(desk)}/{_seg(strategy)}/{_seg(book)}"
+    return f"trade:{_seg(desk)}/{_seg(strategy)}/{_seg(book)}/{_seg(trade_id)}"
+
+
 def resolve_desk(position: Position, portfolio: Portfolio) -> str:
     desk = getattr(position, "desk", None)
     return desk if desk is not None else portfolio.desk
@@ -80,18 +114,34 @@ def portfolio_at(portfolio: Portfolio, ref: HierarchyRef) -> Portfolio:
         strategies = {resolve_strategy(p, portfolio) for p in positions}
         strategy = next(iter(strategies)) if len(strategies) == 1 else portfolio.strategy
     if ref.level is HierarchyLevel.FIRM:
-        node_id, name = f"firm:{portfolio.firm}", portfolio.firm
+        name = portfolio.firm
+        trade_id = None
     elif ref.level is HierarchyLevel.PORTFOLIO:
-        node_id, name = portfolio.id, portfolio.name
+        name = portfolio.name
+        trade_id = None
     elif ref.level is HierarchyLevel.DESK:
-        node_id, name = f"desk:{desk}", desk
+        name = desk
+        trade_id = None
     elif ref.level is HierarchyLevel.STRATEGY:
-        node_id, name = f"strategy:{desk}/{strategy}", strategy
+        name = strategy
+        trade_id = None
     elif ref.level is HierarchyLevel.BOOK:
-        node_id, name = f"book:{desk}/{strategy}/{ref.book}", ref.book or "book"
+        name = ref.book if ref.book else "book"
+        trade_id = None
     else:
-        trade_id = ref.trade_id or (positions[0].id if positions else "trade")
-        node_id, name = trade_id, trade_id
+        trade_id = ref.trade_id if ref.trade_id is not None else (
+            positions[0].id if positions else ""
+        )
+        name = trade_id if trade_id else "trade"
+    node_id = hierarchy_node_id(
+        ref.level,
+        firm=portfolio.firm,
+        portfolio_id=portfolio.id,
+        desk=desk,
+        strategy=strategy,
+        book=ref.book,
+        trade_id=trade_id,
+    )
     return Portfolio(
         id=node_id,
         name=name,
@@ -104,6 +154,7 @@ def portfolio_at(portfolio: Portfolio, ref: HierarchyRef) -> Portfolio:
 
 __all__ = [
     "filter_positions",
+    "hierarchy_node_id",
     "portfolio_at",
     "resolve_desk",
     "resolve_strategy",

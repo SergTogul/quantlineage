@@ -1281,8 +1281,13 @@ class HierarchyNode(BaseModel):
 
     Non-additive metrics are computed on the node sub-portfolio:
     ``var_95``, ``var_99``, ``expected_shortfall_99``, ``limits``.
+
+    ``id`` is the stable node key (aligned with ``portfolio_at`` sub-portfolio
+    ids). Default ``""`` keeps older payloads/OpenAPI clients parseable;
+    ``HierarchyEngine`` always populates it.
     """
 
+    id: str = ""
     name: str
     level: Literal["firm", "portfolio", "desk", "strategy", "book", "trade"]
     market_value: float
