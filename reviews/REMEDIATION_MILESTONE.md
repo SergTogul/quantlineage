@@ -445,9 +445,9 @@ Create a coherent registry or adapter mechanism that defines for each instrument
 
 Do not create an elaborate plugin framework.
 
-## R0.5.2 Remove silent production fallback
+## R0.5.2 Remove silent production fallback — COMPLETE (2026-09-04)
 
-QuantLib production mode must not silently switch to builtin pricing for an unknown instrument.
+`QuantLibPricingEngine.value` raises `TypeError` on an unhandled instrument. Builtin is not called from this path. RF-005 stays open for the four-macro history panel.
 
 Unsupported product should fail explicitly.
 
