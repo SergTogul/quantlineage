@@ -552,7 +552,9 @@ Related findings:
 
 - RF-008
 
-## R0.7.1 Stable hierarchy identifiers
+## R0.7.1 Stable hierarchy identifiers — COMPLETE (2026-09-04)
+
+Prefixed `HierarchyNode.id` aligned with `portfolio_at` via `hierarchy_node_id`. Uniqueness is structural (not fixture-only). RF-008 stays open for trade-grain artifacts and aggregate-instead-of-reprice.
 
 Create explicit IDs for:
 

@@ -481,6 +481,8 @@ Do not set a fake universal SLA until benchmark environments are controlled.
 
 ## RF-008 — Hierarchy recomputes full risk independently at every node
 
+Status: **IN PROGRESS** (2026-09-04). R0.7.1 stable node ids APPROVE — every `HierarchyNode` has a prefixed id (`portfolio:…`, `trade:{desk}/{strategy}/{book}/{id}`); empty labels stay empty segments; `/` encodes as `%2F`. Legal books that used to collide (`portfolio.id == trade.id`, `""` vs `"trade"`) are unique. Still full reprice per node (R0.7.2 / R0.7.3). Do not close.
+
 Priority: **P0**  
 Risk types: PERFORMANCE, ARCHITECTURE, OPERABILITY  
 Confidence: HIGH
