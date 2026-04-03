@@ -13,7 +13,9 @@ import pytest
 from app.domain.models import (
     BondPosition,
     CapFloorPosition,
+    EquityFuturePosition,
     EquityPosition,
+    EuropeanOptionPosition,
     FXForwardPosition,
     FXOptionPosition,
     InterestRateFuturePosition,
@@ -118,6 +120,36 @@ def test_equity_trade_key_excludes_legacy_spot_but_keeps_economics():
     )
     assert trade_cache_key(position) != trade_cache_key(
         position.model_copy(update={"quantity": 20.0})
+    )
+
+
+def _equity_future() -> EquityFuturePosition:
+    return EquityFuturePosition(
+        type="equity_future",
+        id="eqf1",
+        symbol="ES",
+        quantity=2.0,
+        spot=4500.0,
+        multiplier=50.0,
+        maturity_years=0.25,
+        risk_free_rate=0.04,
+        dividend_yield=0.015,
+    )
+
+
+def _equity_option() -> EuropeanOptionPosition:
+    return EuropeanOptionPosition(
+        type="european_option",
+        id="eqo1",
+        symbol="AAPL",
+        quantity=5.0,
+        spot=180.0,
+        strike=175.0,
+        maturity_years=0.5,
+        volatility=0.22,
+        risk_free_rate=0.04,
+        dividend_yield=0.005,
+        option_type="call",
     )
 
 
@@ -230,6 +262,8 @@ def _swaption() -> SwaptionPosition:
 @pytest.mark.parametrize(
     ("factory", "mark_update", "econ_update"),
     [
+        (_equity_future, {"spot": 4800.0, "risk_free_rate": 0.05, "dividend_yield": 0.02}, {"maturity_years": 0.5}),
+        (_equity_option, {"spot": 200.0, "volatility": 0.40, "risk_free_rate": 0.05}, {"strike": 190.0}),
         (_bond, {"yield_rate": 0.06, "duration": 3.0}, {"face_value": 2000.0}),
         (_swap, {"market_swap_rate": 0.06, "duration": 3.0}, {"notional": 2_000_000.0}),
         (_fx_forward, {"spot": 1.25, "domestic_rate": 0.05, "foreign_rate": 0.01}, {"strike": 1.20}),
@@ -238,7 +272,7 @@ def _swaption() -> SwaptionPosition:
         (_cap_floor, {"volatility": 0.35, "forward_rate": 0.04, "discount_rate": 0.05}, {"strike": 0.04}),
         (_swaption, {"volatility": 0.35, "forward_swap_rate": 0.04, "discount_rate": 0.05}, {"strike": 0.04}),
     ],
-    ids=["bond", "swap", "fx_forward", "fx_option", "ir_future", "cap_floor", "swaption"],
+    ids=["equity_future", "european_option", "bond", "swap", "fx_forward", "fx_option", "ir_future", "cap_floor", "swaption"],
 )
 def test_trade_key_excludes_snapshot_marks_but_keeps_economics(factory, mark_update, econ_update):
     position = factory()
@@ -255,12 +289,44 @@ def test_bond_and_swap_trade_keys_ignore_yield_and_par_marks():
     assert trade_cache_key(swap) != trade_cache_key(swap.model_copy(update={"fixed_rate": 0.05}))
 
 
+@pytest.mark.parametrize(
+    ("factory", "expected"),
+    [
+        (_equity, "e9a1a29cef3926e73f08d94692aa619e6da80ae7893af0e1eb0e691d586f1177"),
+        (_equity_future, "47fd3e9b6039a6fe14622e79ff85fe141644a0fee1dd58761621dea7599c8d3a"),
+        (_equity_option, "c162c5000dc5867308111f2fd7d002a490b8d728024a5d6afdf0b6b2476bb153"),
+        (_bond, "7f986bfbbcb48d624ec1be8200ca85fee373baaeb28e3be163118042b3c6a825"),
+        (_swap, "508caa7c5d1086b95681d6b423344183276a38857b1be55f8fb5adcc5c8400d0"),
+        (_fx_forward, "7791385343a37710dc5767ed4c96220a29fc7bd65310ed80a7c63d45fc49a680"),
+        (_fx_option, "28f1bbf2acf91dc2f63e931645a5ccefbe9b76c6d455b7ae963cbb7613e8da34"),
+        (_ir_future, "b542ed644164dbe3ed65a5979afc012eb8f35e712ae456bc6db6f04c859f52c7"),
+        (_cap_floor, "985a67f00dcc70b3c27cf91c0ad7b5e4f11c6a5c996458d42446721bd5f7fcb8"),
+        (_swaption, "32b2196454ffd45aaacf20a1d6000026ee346adfea237ab734949609f22f2d4e"),
+    ],
+    ids=[
+        "equity",
+        "equity_future",
+        "european_option",
+        "bond",
+        "swap",
+        "fx_forward",
+        "fx_option",
+        "ir_future",
+        "cap_floor",
+        "swaption",
+    ],
+)
+def test_trade_cache_key_preserves_deny_list_economics_identity(factory, expected):
+    """Hashed payload must match the pre-terms deny-list economics identity."""
+    assert trade_cache_key(factory()) == expected
+
+
 def test_unknown_position_family_is_fail_closed():
     class _UnknownPosition:
         def model_dump(self, mode="json"):
             return {"id": "x", "yield_rate": 0.04}
 
-    with pytest.raises(TypeError, match="no terms projection"):
+    with pytest.raises(TypeError, match="terms_from_position has no terms projection"):
         trade_cache_key(_UnknownPosition())  # type: ignore[arg-type]
 
 
