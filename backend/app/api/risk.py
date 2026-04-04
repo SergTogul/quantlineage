@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Query
 
+from app.api.dashboard import router as dashboard_router
 from app.api.deps import get_portfolio_service
 from app.api.errors import http_bad_request
 from app.api.openapi_examples import (
@@ -27,6 +28,7 @@ from app.domain.models import (
 from app.services.portfolio_service import PortfolioService
 
 router = APIRouter(prefix="/risk", tags=["risk"])
+router.include_router(dashboard_router)
 
 
 @router.post("/summary")
