@@ -10,16 +10,7 @@ async function json(url, options = {}) {
 }
 
 export async function loadDashboard() {
-  const portfolio = await json(`${API_V1}/portfolio`)
-  const body = JSON.stringify(portfolio)
-  const [summary, stress, threats, contributors, limits, factors, varReport, hierarchy, attribution] = await Promise.all([
-    json(`${API_V1}/risk/summary`, {method:'POST', body}), json(`${API_V1}/risk/stress`, {method:'POST', body}),
-    json(`${API_V1}/risk/stress/evaluate`, {method:'POST', body}), json(`${API_V1}/risk/contributors`, {method:'POST', body}),
-    json(`${API_V1}/risk/limits`, {method:'POST', body}), json(`${API_V1}/risk/factors`, {method:'POST', body}),
-    json(`${API_V1}/risk/var`, {method:'POST', body}), json(`${API_V1}/risk/hierarchy`, {method:'POST', body}),
-    json(`${API_V1}/risk/attribution/demo`, {method:'POST', body}),
-  ])
-  return {portfolio, summary, stress, threats, contributors, limits, factors, varReport, hierarchy, attribution}
+  return json(`${API_V1}/risk/dashboard`, {method: 'POST'})
 }
 
 export function evaluateCustomScenario(portfolio, scenario) {

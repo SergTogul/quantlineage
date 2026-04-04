@@ -714,9 +714,9 @@ Heavy/risk-run examples:
 - large scenario evaluation;
 - heavy contribution analysis.
 
-## R0.10.2 Dashboard batch/run result
+## R0.10.2 Dashboard batch/run result — COMPLETE (2026-09-04)
 
-Stop loading a dashboard by launching many overlapping calculations against the same book.
+`POST /risk/dashboard` returns the prior nine payload keys from one request. `loadDashboard()` calls that path only. Classified HEAVY; OpenAPI bijection updated. RF-015 stays open for R0.10.3 (request-thread / backpressure).
 
 Prefer one completed risk-run artifact or a coherent batch service.
 
