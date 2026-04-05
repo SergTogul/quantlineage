@@ -202,9 +202,16 @@ def test_alembic_upgrade_on_sqlite_file(tmp_path: Path):
     tables = set(inspect(engine).get_table_names())
     assert "portfolios" in tables
     assert "alembic_version" in tables
+    columns = {c["name"] for c in inspect(engine).get_columns("risk_runs")}
+    assert {
+        "historical_dataset_id",
+        "historical_dataset_version",
+        "as_of",
+        "calculation_config",
+    }.issubset(columns)
     with engine.connect() as conn:
         ver = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert ver == "002_risk_run_domain_fields"
+    assert ver == "003_risk_run_spec_fields"
 
 
 def test_no_quantlib_types_in_orm_modules():

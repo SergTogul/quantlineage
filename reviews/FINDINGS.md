@@ -527,6 +527,8 @@ Then:
 
 ## RF-009 — Risk-run reproducibility differs between API and worker execution
 
+Status: **IN PROGRESS** (2026-09-04). R0.8.1 spec fields APPROVE — `historical_dataset_id`/`version`, `as_of` (`date | current | t0`), `calculation_config` persist (Alembic `003`). Old rows load with `None`. Enqueue/API still do not populate the spec (R0.8.2). Do not close.
+
 Priority: **P0**  
 Risk types: CORRECTNESS, REPRODUCIBILITY, OPERABILITY  
 Confidence: HIGH
