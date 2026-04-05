@@ -466,7 +466,9 @@ RiskFactor -> observation/change
 
 Support per-name and per-tenor moves.
 
-## R0.5.4 Preserve demo compatibility
+## R0.5.4 Preserve demo compatibility — COMPLETE (2026-09-04)
+
+Demo and synthetic history expose `projection="four_macro_demo"` with `is_per_name_per_tenor_panel=False`. Observation arrays and VaR goldens unchanged. RF-005 stays open for R0.5.3.
 
 The existing four-column synthetic dataset may remain as:
 

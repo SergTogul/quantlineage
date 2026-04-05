@@ -339,7 +339,7 @@ Tests must fail for:
 
 ## RF-005 — Historical risk is a four-macro broadcast, not a factor-complete multi-asset model
 
-Status: **IN PROGRESS** (2026-09-04). R0.5.2 QuantLib unknown-instrument fail-closed APPROVE. R0.5.1 capability registry APPROVE — ten-family static table; unknown keys raise. Remaining: R0.5.3 per-factor historical panel (the four-macro hole). Do not close.
+Status: **IN PROGRESS** (2026-09-04). R0.5.2 QuantLib fail-closed APPROVE. R0.5.1 capability registry APPROVE. R0.5.4 demo-projection label APPROVE — shipped history is `projection="four_macro_demo"`, not a per-name panel. Remaining: R0.5.3 per-factor historical panel. Do not close.
 
 Priority: **P0**  
 Risk types: CORRECTNESS, METHODOLOGY, ARCHITECTURE  

@@ -14,6 +14,10 @@ replay of ``SyntheticHistoricalDataset(seed=7, observations=750)`` — **no live
 vendor feeds**). Load via ``load_demo_historical_dataset()`` or
 ``create_historical_dataset("demo")`` / env ``RISKFORGE_HISTORICAL_DATASET``.
 
+R0.5.4: the shipped four-column demo/synthetic series is a **demo projection /
+fixture** (``projection="four_macro_demo"``), not a per-name or per-tenor
+historical factor panel. RF-005 stays open until that panel exists (R0.5.3).
+
 This module does **not** depend on ``MarketSnapshot.key_rates`` or key-rate DV01
 semantics (those remain open Critical M1 items).
 """
@@ -23,6 +27,7 @@ from __future__ import annotations
 import csv
 import os
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -35,12 +40,30 @@ DEMO_HISTORICAL_DATASET_ID = "demo-historical-factors"
 DEMO_HISTORICAL_CSV_NAME = "demo_historical_factors.csv"
 HISTORICAL_DATASET_ENV = "RISKFORGE_HISTORICAL_DATASET"
 
+# MVP aggregate factor names matching FactorObservationSeries columns.
+# Not per-name spots and not per-tenor key rates (R0.5.3 / RF-005).
+MVP_AGGREGATE_FACTORS: tuple[str, ...] = ("equity", "vol", "rate", "fx")
+
 _REQUIRED_CSV_COLUMNS = (
     "equity_return",
     "vol_move",
     "rate_move_bps",
     "fx_return",
 )
+
+
+class HistoricalDatasetProjection(StrEnum):
+    """How a historical dataset maps onto the risk-factor space.
+
+    ``four_macro_demo`` is the shipped MVP: four aggregate series
+    (equity / vol / rate / fx). It is a demo projection / fixture, not a
+    per-name or per-tenor historical factor panel (R0.5.3 / RF-005).
+    """
+
+    FOUR_MACRO_DEMO = "four_macro_demo"
+
+
+FOUR_MACRO_DEMO_PROJECTION = HistoricalDatasetProjection.FOUR_MACRO_DEMO
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,43 +92,70 @@ class FactorObservationSeries:
     def n_observations(self) -> int:
         return int(len(self.equity_returns))
 
+    @property
+    def aggregate_factors(self) -> tuple[str, ...]:
+        """MVP aggregate factor names for the four series columns."""
+        return MVP_AGGREGATE_FACTORS
+
+
+class _FourMacroDemoLabels:
+    """R0.5.4 label contract shared by shipped four-column datasets."""
+
+    projection: HistoricalDatasetProjection
+
+    @property
+    def is_per_name_per_tenor_panel(self) -> bool:
+        """False for ``four_macro_demo`` — R0.5.3 panel is not implemented."""
+        return self.projection != HistoricalDatasetProjection.FOUR_MACRO_DEMO
+
+    @property
+    def aggregate_factors(self) -> tuple[str, ...]:
+        return MVP_AGGREGATE_FACTORS
+
 
 @runtime_checkable
 class HistoricalMarketDataset(Protocol):
     """Source of historical factor observations for risk engines."""
+
+    projection: HistoricalDatasetProjection
 
     def factor_observations(self) -> FactorObservationSeries:
         """Return aligned factor move series (deterministic for a given source)."""
 
 
 @dataclass(frozen=True, slots=True)
-class ArrayHistoricalDataset:
+class ArrayHistoricalDataset(_FourMacroDemoLabels):
     """Explicit observation arrays (tests, fixtures, future file loaders)."""
 
     series: FactorObservationSeries
+    projection: HistoricalDatasetProjection = FOUR_MACRO_DEMO_PROJECTION
 
     def factor_observations(self) -> FactorObservationSeries:
         return self.series
 
 
 @dataclass(frozen=True, slots=True)
-class FileHistoricalDataset:
+class FileHistoricalDataset(_FourMacroDemoLabels):
     """Factor observations loaded from a CSV (demo / replay / fixtures)."""
 
     series: FactorObservationSeries
     dataset_id: str = "file"
     source_path: str | None = None
+    projection: HistoricalDatasetProjection = FOUR_MACRO_DEMO_PROJECTION
 
     def factor_observations(self) -> FactorObservationSeries:
         return self.series
 
 
 @dataclass(frozen=True, slots=True)
-class SyntheticHistoricalDataset:
+class SyntheticHistoricalDataset(_FourMacroDemoLabels):
     """Deterministic synthetic factor history (MVP stand-in for a market dataset).
 
     Distributions match the legacy inline RNG in ``HistoricalRiskEngine`` /
     ``VaRAnalytics`` so existing seeded risk results remain numerically stable.
+
+    Labeled ``projection="four_macro_demo"``: four aggregate series, not a
+    per-name / per-tenor panel.
     """
 
     seed: int = 7
@@ -118,6 +168,7 @@ class SyntheticHistoricalDataset:
     rate_bps_std: float = 7.0
     fx_mean: float = 0.0
     fx_std: float = 0.006
+    projection: HistoricalDatasetProjection = FOUR_MACRO_DEMO_PROJECTION
 
     def factor_observations(self) -> FactorObservationSeries:
         if self.observations < 1:
@@ -183,18 +234,28 @@ def load_csv_historical_dataset(
     path: str | Path,
     *,
     dataset_id: str = "file",
+    projection: HistoricalDatasetProjection = FOUR_MACRO_DEMO_PROJECTION,
 ) -> FileHistoricalDataset:
-    """Wrap ``load_factor_observations_csv`` as a ``HistoricalMarketDataset``."""
+    """Wrap ``load_factor_observations_csv`` as a ``HistoricalMarketDataset``.
+
+    Four-column CSVs are the ``four_macro_demo`` projection unless a future
+    loader supplies a different label (R0.5.3 panel is not implemented here).
+    """
     csv_path = Path(path).resolve()
     return FileHistoricalDataset(
         series=load_factor_observations_csv(csv_path),
         dataset_id=dataset_id,
         source_path=str(csv_path),
+        projection=projection,
     )
 
 
 def load_demo_historical_dataset() -> FileHistoricalDataset:
     """Load the packaged demo historical factor dataset (M10.2).
+
+    Returns a ``FileHistoricalDataset`` labeled
+    ``projection="four_macro_demo"`` — a fixture, not a per-name / per-tenor
+    panel.
 
     Usage::
 
@@ -209,7 +270,11 @@ def load_demo_historical_dataset() -> FileHistoricalDataset:
             f"demo historical dataset not found at {path}; "
             "expected repo data/demo_historical_factors.csv"
         )
-    return load_csv_historical_dataset(path, dataset_id=DEMO_HISTORICAL_DATASET_ID)
+    return load_csv_historical_dataset(
+        path,
+        dataset_id=DEMO_HISTORICAL_DATASET_ID,
+        projection=FOUR_MACRO_DEMO_PROJECTION,
+    )
 
 
 def create_historical_dataset(
@@ -228,6 +293,8 @@ def create_historical_dataset(
 
     ``HistoricalRiskEngine()`` with ``dataset=None`` still defaults to
     ``SyntheticHistoricalDataset`` for backward-compatible ctor behavior.
+
+    Demo and synthetic sources are labeled ``projection="four_macro_demo"``.
     """
     raw = source if source is not None else os.getenv(HISTORICAL_DATASET_ENV, "demo")
     resolved = (raw or "demo").strip()
@@ -248,10 +315,13 @@ def create_historical_dataset(
 __all__ = [
     "DEMO_HISTORICAL_CSV_NAME",
     "DEMO_HISTORICAL_DATASET_ID",
+    "FOUR_MACRO_DEMO_PROJECTION",
     "HISTORICAL_DATASET_ENV",
+    "MVP_AGGREGATE_FACTORS",
     "ArrayHistoricalDataset",
     "FactorObservationSeries",
     "FileHistoricalDataset",
+    "HistoricalDatasetProjection",
     "HistoricalMarketDataset",
     "SyntheticHistoricalDataset",
     "create_historical_dataset",
