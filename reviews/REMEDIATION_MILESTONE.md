@@ -453,7 +453,9 @@ Do not create an elaborate plugin framework.
 
 Unsupported product should fail explicitly.
 
-## R0.5.3 Per-factor historical observations
+## R0.5.3 Per-factor historical observations — COMPLETE (type, 2026-09-04)
+
+`HistoricalFactorPanel` is the typed date × `RiskFactor` contract. Two equities and two USD tenors can move independently in one observation. Not wired into `HistoricalRiskEngine` / VaR. Demo four-macro history unchanged. RF-005 stays open.
 
 Replace the four-macro-only history abstraction with a typed factor panel.
 
