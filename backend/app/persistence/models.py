@@ -139,7 +139,9 @@ class RiskRunRow(Base):
 
     Domain ``RiskRun`` maps ``completed_at``→``finished_at`` and ``error``→
     ``error_message``. First-class M5.2 columns: ``pricing_engine_version``,
-    ``methodology``, ``scenario_set``.
+    ``methodology``, ``scenario_set``. Spec columns (R0.8.1):
+    ``historical_dataset_id``, ``historical_dataset_version``, ``as_of``,
+    ``calculation_config`` — nullable so pre-spec rows still load.
     """
 
     __tablename__ = "risk_runs"
@@ -162,6 +164,12 @@ class RiskRunRow(Base):
     pricing_engine_version: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     methodology: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     scenario_set: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    historical_dataset_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    historical_dataset_version: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True
+    )
+    as_of: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    calculation_config: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

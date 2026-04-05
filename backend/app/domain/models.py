@@ -1480,6 +1480,20 @@ def _utcnow_domain() -> datetime:
     return datetime.now(UTC)
 
 
+class RiskRunCalculationConfig(BaseModel):
+    """Deterministic calculation knobs captured on a RiskRun.
+
+    Observations and methodology extras only — no free-form secrets or
+    vendor credentials. Unknown keys are rejected (``extra='forbid'``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    observations: int | None = Field(default=None, ge=1, le=5000)
+    seed: int | None = None
+    confidence: float | None = Field(default=None, gt=0.0, lt=1.0)
+
+
 class RiskRun(BaseModel):
     """Domain DTO for a persisted / async risk computation (M5.2).
 
@@ -1488,8 +1502,11 @@ class RiskRun(BaseModel):
     - ``error`` ↔ ``error_message``
     - ``result_refs`` ↔ ``risk_results`` (``result_type`` + row ``id``)
     - ``pricing_engine_version``, ``methodology``, ``scenario_set`` are first-class
-      columns (Alembic ``002_risk_run_domain_fields``); ``run_type`` / ``request``
-      remain the generic envelope for M5.3/M5.4.
+      columns (Alembic ``002_risk_run_domain_fields``)
+    - ``historical_dataset_id``, ``historical_dataset_version``, ``as_of``,
+      ``calculation_config`` are first-class spec columns
+      (Alembic ``003_risk_run_spec_fields``); omitted remains valid for old rows.
+    - ``run_type`` / ``request`` remain the generic envelope for M5.3/M5.4.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1503,11 +1520,21 @@ class RiskRun(BaseModel):
     pricing_engine_version: str | None = None
     methodology: VaRMethodology | None = None
     scenario_set: list[str] = Field(default_factory=list)
+    historical_dataset_id: str | None = None
+    historical_dataset_version: str | None = None
+    as_of: AsOf | None = None
+    calculation_config: RiskRunCalculationConfig | None = None
     status: RiskRunStatus = RiskRunStatus.QUEUED
     result_refs: list[RiskResultRef] = Field(default_factory=list)
     error: str | None = None
     run_type: str = Field(default="summary", min_length=1)
     request: dict[str, Any] = Field(default_factory=dict)
+
+    @field_serializer("as_of")
+    def _ser_as_of(self, value: date | AsOfLabel | None) -> str | None:
+        if value is None:
+            return None
+        return as_of_wire(value)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -1528,6 +1555,13 @@ class RiskRun(BaseModel):
                 raise ValueError("scenario_set entries must be non-empty")
         if self.pricing_engine_version is not None and not self.pricing_engine_version.strip():
             raise ValueError("pricing_engine_version must be non-empty when set")
+        if self.historical_dataset_id is not None and not self.historical_dataset_id.strip():
+            raise ValueError("historical_dataset_id must be non-empty when set")
+        if (
+            self.historical_dataset_version is not None
+            and not self.historical_dataset_version.strip()
+        ):
+            raise ValueError("historical_dataset_version must be non-empty when set")
 
         if self.started_at is not None and self.completed_at is not None:
             if self.completed_at < self.started_at:
@@ -1627,6 +1661,10 @@ class RiskRunView(BaseModel):
                     "pricing_engine_version": None,
                     "methodology": None,
                     "scenario_set": [],
+                    "historical_dataset_id": None,
+                    "historical_dataset_version": None,
+                    "as_of": None,
+                    "calculation_config": None,
                     "error_message": None,
                     "created_at": "2026-09-02T17:00:00+00:00",
                     "started_at": None,
@@ -1647,6 +1685,10 @@ class RiskRunView(BaseModel):
     pricing_engine_version: str | None = None
     methodology: VaRMethodology | None = None
     scenario_set: list[str] = Field(default_factory=list)
+    historical_dataset_id: str | None = None
+    historical_dataset_version: str | None = None
+    as_of: str | None = None
+    calculation_config: RiskRunCalculationConfig | None = None
     error_message: str | None = None
     created_at: str | None = None
     started_at: str | None = None
@@ -1685,6 +1727,10 @@ class RiskRunView(BaseModel):
             pricing_engine_version=run.pricing_engine_version,
             methodology=run.methodology,
             scenario_set=list(run.scenario_set),
+            historical_dataset_id=run.historical_dataset_id,
+            historical_dataset_version=run.historical_dataset_version,
+            as_of=as_of_wire(run.as_of) if run.as_of is not None else None,
+            calculation_config=run.calculation_config,
             error_message=run.error,
             created_at=run.created_at.isoformat() if run.created_at else None,
             started_at=run.started_at.isoformat() if run.started_at else None,

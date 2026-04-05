@@ -200,21 +200,13 @@ class InMemoryRiskRunRepository(RiskRunRepository):
                 err = None
             elif error is not None:
                 err = error
-            updated = RiskRun(
-                id=row.id,
-                portfolio_id=row.portfolio_id,
-                market_snapshot_id=row.market_snapshot_id,
-                created_at=row.created_at,
-                started_at=started_at,
-                completed_at=completed_at,
-                pricing_engine_version=row.pricing_engine_version,
-                methodology=row.methodology,
-                scenario_set=list(row.scenario_set),
-                status=status,
-                result_refs=list(row.result_refs),
-                error=err,
-                run_type=row.run_type,
-                request=dict(row.request),
+            updated = row.model_copy(
+                update={
+                    "started_at": started_at,
+                    "completed_at": completed_at,
+                    "status": status,
+                    "error": err,
+                }
             )
             self._runs[run_id] = updated
             return updated.model_copy(deep=True)
