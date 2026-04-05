@@ -19,6 +19,7 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import (
     DEMO_HISTORICAL_DATASET_ID,
+    FOUR_MACRO_DEMO_PROJECTION,
     SyntheticHistoricalDataset,
     create_historical_dataset,
     demo_historical_dataset_path,
@@ -71,6 +72,8 @@ def test_load_demo_historical_dataset_is_deterministic_and_sized():
     sb = b.factor_observations()
     assert sa.n_observations == 750
     assert a.dataset_id == DEMO_HISTORICAL_DATASET_ID
+    assert a.projection == FOUR_MACRO_DEMO_PROJECTION
+    assert a.is_per_name_per_tenor_panel is False
     np.testing.assert_array_equal(sa.equity_returns, sb.equity_returns)
     np.testing.assert_array_equal(sa.vol_moves, sb.vol_moves)
     np.testing.assert_array_equal(sa.rate_moves_bps, sb.rate_moves_bps)
