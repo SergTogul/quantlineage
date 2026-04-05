@@ -571,7 +571,9 @@ Book
 Trade
 ```
 
-## R0.7.2 Trade-grain calculation artifact
+## R0.7.2 Trade-grain calculation artifact — COMPLETE (2026-09-04)
+
+`TradeCalculationArtifact` is the reusable per-trade type (PV, additive Greeks, stress P&L by scenario, optional historical vector). Hierarchy still full-reprices each node. RF-008 stays open for R0.7.3.
 
 A risk run should be able to produce/reuse:
 
