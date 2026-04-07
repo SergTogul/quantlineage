@@ -1,6 +1,6 @@
-"""R0.8.1: first-class deterministic RiskRun specification fields.
+"""R0.8.1 persistence + R0.8.2 enqueue/submit spec population.
 
-Does not close RF-009 (API vs worker factories are R0.8.2).
+Does not close RF-009 (server-owned identity and typed request schemas remain).
 """
 
 from __future__ import annotations
@@ -30,6 +30,13 @@ from app.persistence.sqlalchemy_repos import (
     SqlAlchemyRiskRunRepository,
 )
 from app.persistence.testing import make_sqlite_session_factory
+from app.services.risk_factories import (
+    DEFAULT_HISTORICAL_DATASET_VERSION,
+    build_portfolio_service,
+    resolve_run_spec,
+)
+from app.services.risk_run_service import RiskRunService
+from app.services.risk_run_worker import RiskRunWorker
 
 
 def _ts() -> datetime:
@@ -204,3 +211,151 @@ def test_risk_run_view_exposes_spec_fields():
     assert view.as_of == "2026-09-02"
     assert view.calculation_config is not None
     assert view.calculation_config.observations == 750
+
+
+def _tiny_book() -> Portfolio:
+    return Portfolio(
+        id="p-enqueue",
+        name="Enqueue Book",
+        positions=[
+            EquityPosition(type="equity", id="eq-1", symbol="AAPL", quantity=1, price=100.0)
+        ],
+    )
+
+
+def test_enqueue_persists_explicit_spec_fields():
+    repo = InMemoryRiskRunRepository()
+    svc = RiskRunService(repo)
+    run = svc.enqueue(
+        run_id="enq-spec",
+        portfolio_id="p-enqueue",
+        historical_dataset_id="demo-historical-factors",
+        historical_dataset_version="v1",
+        as_of=date(2026, 9, 2),
+        calculation_config=RiskRunCalculationConfig(
+            observations=750,
+            seed=7,
+            confidence=0.99,
+        ),
+    )
+    assert run.historical_dataset_id == "demo-historical-factors"
+    assert run.historical_dataset_version == "v1"
+    assert run.as_of == date(2026, 9, 2)
+    assert run.calculation_config is not None
+    assert run.calculation_config.confidence == pytest.approx(0.99)
+
+    loaded = repo.get("enq-spec")
+    assert loaded is not None
+    assert loaded.model_dump() == run.model_dump()
+
+
+def test_enqueue_without_spec_kwargs_stays_valid():
+    repo = InMemoryRiskRunRepository()
+    svc = RiskRunService(repo)
+    run = svc.enqueue(run_id="enq-old", portfolio_id="p-enqueue")
+    assert run.status == RiskRunStatus.QUEUED
+    assert run.historical_dataset_id is None
+    assert run.historical_dataset_version is None
+    assert run.as_of is None
+    assert run.calculation_config is None
+
+
+def test_submit_with_request_spec_persists_columns():
+    repo = InMemoryRiskRunRepository()
+    worker = RiskRunWorker(build_portfolio_service(), repo=repo, max_workers=1)
+    view = worker.submit(
+        portfolio=_tiny_book(),
+        run_type="summary",
+        execute=False,
+        request={
+            "methodology": "DELTA_GAMMA",
+            "historical_dataset_id": "demo-historical-factors",
+            "historical_dataset_version": "v1",
+            "as_of": "2026-09-02",
+            "calculation_config": {
+                "observations": 750,
+                "seed": 7,
+                "confidence": 0.99,
+            },
+        },
+    )
+    worker.shutdown(wait=False)
+    assert view.historical_dataset_id == "demo-historical-factors"
+    assert view.historical_dataset_version == "v1"
+    assert view.as_of == "2026-09-02"
+    assert view.calculation_config is not None
+    assert view.calculation_config.observations == 750
+    assert view.calculation_config.seed == 7
+    assert view.calculation_config.confidence == pytest.approx(0.99)
+
+    stored = repo.get(view.id)
+    assert stored is not None
+    assert stored.historical_dataset_id == "demo-historical-factors"
+    assert stored.historical_dataset_version == "v1"
+    assert stored.as_of == date(2026, 9, 2)
+    assert stored.calculation_config is not None
+    assert stored.calculation_config.confidence == pytest.approx(0.99)
+
+
+@pytest.mark.parametrize("as_of", ["current", "t0", "2026-01-15"])
+def test_submit_parses_as_of_from_request(as_of: str):
+    repo = InMemoryRiskRunRepository()
+    worker = RiskRunWorker(build_portfolio_service(), repo=repo, max_workers=1)
+    view = worker.submit(
+        portfolio=_tiny_book(),
+        execute=False,
+        request={"as_of": as_of},
+    )
+    worker.shutdown(wait=False)
+    stored = repo.get(view.id)
+    assert stored is not None
+    if as_of in {"current", "t0"}:
+        assert stored.as_of == as_of
+        assert view.as_of == as_of
+    else:
+        assert stored.as_of == date(2026, 1, 15)
+        assert view.as_of == "2026-01-15"
+
+
+def test_submit_without_request_spec_records_factory_dataset():
+    repo = InMemoryRiskRunRepository()
+    service = build_portfolio_service()
+    factory_spec = resolve_run_spec(risk_engine=service.risk)
+    worker = RiskRunWorker(service, repo=repo, max_workers=1)
+    view = worker.submit(portfolio=_tiny_book(), run_type="summary", execute=False)
+    worker.shutdown(wait=False)
+
+    assert view.historical_dataset_id == factory_spec.historical_dataset_id
+    assert view.historical_dataset_version == factory_spec.historical_dataset_version
+    assert view.historical_dataset_id is not None
+    assert view.historical_dataset_version == DEFAULT_HISTORICAL_DATASET_VERSION
+
+    stored = repo.get(view.id)
+    assert stored is not None
+    populated = [
+        stored.historical_dataset_id,
+        stored.historical_dataset_version,
+        stored.as_of,
+        stored.calculation_config,
+    ]
+    assert any(value is not None for value in populated)
+    assert stored.historical_dataset_id == factory_spec.historical_dataset_id
+    assert stored.calculation_config is not None
+    assert factory_spec.calculation_config is not None
+    assert stored.calculation_config.observations == factory_spec.calculation_config.observations
+    assert stored.calculation_config.seed == factory_spec.calculation_config.seed
+
+
+def test_submit_unparseable_as_of_does_not_fail_enqueue():
+    repo = InMemoryRiskRunRepository()
+    worker = RiskRunWorker(build_portfolio_service(), repo=repo, max_workers=1)
+    view = worker.submit(
+        portfolio=_tiny_book(),
+        execute=False,
+        request={"as_of": "later"},
+    )
+    worker.shutdown(wait=False)
+    stored = repo.get(view.id)
+    assert stored is not None
+    assert stored.as_of is None
+    assert stored.historical_dataset_id is not None

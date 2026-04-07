@@ -13,7 +13,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, Callable, Mapping
 
-from app.domain.models import RiskRun, RiskRunStatus, VaRMethodology
+from app.domain.models import (
+    AsOf,
+    RiskRun,
+    RiskRunCalculationConfig,
+    RiskRunStatus,
+    VaRMethodology,
+)
 from app.persistence.repositories import RiskRunRepository
 
 Clock = Callable[[], datetime]
@@ -116,8 +122,12 @@ class RiskRunService:
         pricing_engine_version: str | None = None,
         methodology: VaRMethodology | None = None,
         scenario_set: list[str] | None = None,
+        historical_dataset_id: str | None = None,
+        historical_dataset_version: str | None = None,
+        as_of: AsOf | None = None,
+        calculation_config: RiskRunCalculationConfig | None = None,
     ) -> RiskRun:
-        """Create a run in ``QUEUED``."""
+        """Create a run in ``QUEUED``. Spec fields are optional (pre-R0.8.2 callers)."""
         run = RiskRun(
             id=run_id,
             portfolio_id=portfolio_id,
@@ -125,6 +135,10 @@ class RiskRunService:
             pricing_engine_version=pricing_engine_version,
             methodology=methodology,
             scenario_set=list(scenario_set or []),
+            historical_dataset_id=historical_dataset_id,
+            historical_dataset_version=historical_dataset_version,
+            as_of=as_of,
+            calculation_config=calculation_config,
             status=RiskRunStatus.QUEUED,
             run_type=run_type,
             request=dict(request or {}),

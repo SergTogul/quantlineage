@@ -38,7 +38,9 @@ from app.persistence.sqlalchemy_repos import (
     SqlAlchemyPortfolioRepository,
     SqlAlchemyRiskRunRepository,
 )
+from app.risk.historical import HistoricalRiskEngine
 from app.services.portfolio_service import PortfolioService
+from app.services.risk_factories import resolve_run_spec
 from app.services.risk_run_service import (
     InvalidRiskRunTransition,
     RiskRunNotFound,
@@ -235,6 +237,11 @@ class RiskRunWorker:
         rid = run_id or str(uuid.uuid4())
         req = dict(request or {})
         methodology = _parse_methodology(req)
+        engine = getattr(self._portfolio_service, "risk", None)
+        spec = resolve_run_spec(
+            req,
+            risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None,
+        )
 
         def _enqueue(svc: RiskRunService) -> RiskRun:
             return svc.enqueue(
@@ -244,6 +251,10 @@ class RiskRunWorker:
                 request=req,
                 market_snapshot_id=market_snapshot_id,
                 methodology=methodology,
+                historical_dataset_id=spec.historical_dataset_id,
+                historical_dataset_version=spec.historical_dataset_version,
+                as_of=spec.as_of,
+                calculation_config=spec.calculation_config,
             )
 
         # SQLAlchemy risk_runs.portfolio_id FK requires the portfolio row to exist.

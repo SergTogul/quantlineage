@@ -8,7 +8,8 @@ partitioned — scale by running more of this entrypoint, not by a QuantLib
 thread pool.
 
 Runs the same ``RiskRunWorker`` + SQLAlchemy session factory as the API
-lifespan, claiming ``QUEUED`` rows from shared Postgres via
+lifespan, with pricing/historical engines from ``build_portfolio_service``,
+claiming ``QUEUED`` rows from shared Postgres via
 ``claim_queued`` (``FOR UPDATE SKIP LOCKED``).
 
 Usage (Compose)::
@@ -37,9 +38,7 @@ import time
 
 from app.persistence.config import get_configured_database_url
 from app.persistence.wiring import build_persistence_wiring
-from app.pricing.factory import create_pricing_engine
-from app.risk.historical import HistoricalRiskEngine
-from app.services.portfolio_service import PortfolioService
+from app.services.risk_factories import build_portfolio_service
 from app.services.risk_run_worker import RiskRunWorker
 
 logger = logging.getLogger("riskforge.worker")
@@ -75,7 +74,7 @@ def main() -> int:
         logger.error("persistence wiring failed (database URL set but disabled?)")
         return 2
 
-    service = PortfolioService(create_pricing_engine(), HistoricalRiskEngine())
+    service = build_portfolio_service()
     worker = RiskRunWorker(service, session_factory=wiring.session_factory)
     interval = _poll_interval_s()
     batch = _poll_batch()

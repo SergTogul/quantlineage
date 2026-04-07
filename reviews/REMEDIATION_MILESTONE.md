@@ -624,7 +624,9 @@ RiskRun must reference:
 - as-of;
 - calculation config.
 
-## R0.8.2 Same factories in API and worker
+## R0.8.2 Same factories in API and worker — COMPLETE (2026-09-04)
+
+`build_portfolio_service()` is the shared API/worker construction path. Enqueue persists factory-resolved (or request) spec columns. Request dataset id does not rebind the engine. RF-009 stays open for R0.8.3 / R0.8.4.
 
 API interactive path and worker must resolve historical data/pricing config through the same dependency construction.
 
