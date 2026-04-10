@@ -527,7 +527,7 @@ Then:
 
 ## RF-009 — Risk-run reproducibility differs between API and worker execution
 
-Status: **IN PROGRESS** (2026-09-04). R0.8.1 spec fields APPROVE. R0.8.2 same factories APPROVE — API and worker call `build_portfolio_service()`; enqueue writes dataset / as-of / calculation-config columns. A request dataset id does not switch the process engine. Remaining: R0.8.3 server-owned identity, R0.8.4 typed requests. Do not close.
+Status: **IN PROGRESS** (2026-09-04). R0.8.1–R0.8.2 APPROVE. R0.8.3 identity APPROVE — `create`/`update` are distinct; persist submit create-if-absents or attaches the stored book and does not upsert. Remaining: R0.8.4 typed requests (request dataset id still does not rebind the engine). Do not close.
 
 Priority: **P0**  
 Risk types: CORRECTNESS, REPRODUCIBILITY, OPERABILITY  

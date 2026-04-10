@@ -630,7 +630,9 @@ RiskRun must reference:
 
 API interactive path and worker must resolve historical data/pricing config through the same dependency construction.
 
-## R0.8.3 Server-owned persistence identity
+## R0.8.3 Server-owned persistence identity — COMPLETE (2026-09-04)
+
+`PortfolioRepository.create` fails if the id exists; `update` fails if missing. Persist `RiskRunWorker.submit` create-if-absents or attaches the stored book (does not upsert). Legacy `save` remains an upsert for seed callers. RF-009 stays open for R0.8.4. RF-013 stays open.
 
 Separate:
 

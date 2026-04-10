@@ -190,6 +190,18 @@ class RiskRunWorker:
         with session_scope(self._session_factory) as session:
             return SqlAlchemyPortfolioRepository(session).get(portfolio_id)
 
+    def _book_for_run(self, portfolio: Portfolio) -> Portfolio:
+        """Create-if-absent; attach the stored book when the id already exists."""
+        if self._session_factory is None:
+            return portfolio
+        with session_scope(self._session_factory) as session:
+            repo = SqlAlchemyPortfolioRepository(session)
+            stored = repo.get(portfolio.id)
+            if stored is not None:
+                return stored
+            repo.create(portfolio)
+            return portfolio
+
     def _to_view(self, run: RiskRun) -> RiskRunView:
         payloads = self._with_service(lambda svc: svc.get_result_payloads(run.id))
         view = RiskRunView.from_risk_run(run, payloads=payloads or {})
@@ -243,10 +255,12 @@ class RiskRunWorker:
             risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None,
         )
 
+        book = self._book_for_run(portfolio)
+
         def _enqueue(svc: RiskRunService) -> RiskRun:
             return svc.enqueue(
                 run_id=rid,
-                portfolio_id=portfolio.id,
+                portfolio_id=book.id,
                 run_type=run_type,
                 request=req,
                 market_snapshot_id=market_snapshot_id,
@@ -257,14 +271,9 @@ class RiskRunWorker:
                 calculation_config=spec.calculation_config,
             )
 
-        # SQLAlchemy risk_runs.portfolio_id FK requires the portfolio row to exist.
-        if self._session_factory is not None:
-            with session_scope(self._session_factory) as session:
-                SqlAlchemyPortfolioRepository(session).save(portfolio)
-
         run = self._with_service(_enqueue)
         with self._portfolios_lock:
-            self._portfolios[rid] = portfolio.model_copy(deep=True)
+            self._portfolios[rid] = book.model_copy(deep=True)
 
         should_execute = (not external_worker_enabled()) if execute is None else bool(execute)
         if should_execute:

@@ -19,10 +19,34 @@ from app.domain.models import (
 )
 
 
+class PortfolioAlreadyExists(ValueError):
+    """``create`` was called with an id that is already stored."""
+
+    def __init__(self, portfolio_id: str) -> None:
+        self.portfolio_id = portfolio_id
+        super().__init__(f"portfolio already exists: {portfolio_id}")
+
+
+class PortfolioNotFound(ValueError):
+    """``update`` was called with an id that is not stored."""
+
+    def __init__(self, portfolio_id: str) -> None:
+        self.portfolio_id = portfolio_id
+        super().__init__(f"portfolio not found: {portfolio_id}")
+
+
 class PortfolioRepository(ABC):
     @abstractmethod
+    def create(self, portfolio: Portfolio) -> Portfolio:
+        """Insert a new portfolio. Raise if the id already exists."""
+
+    @abstractmethod
+    def update(self, portfolio: Portfolio) -> Portfolio:
+        """Replace an existing portfolio. Raise if the id is missing."""
+
+    @abstractmethod
     def save(self, portfolio: Portfolio) -> Portfolio:
-        """Upsert portfolio header and replace trades from positions."""
+        """Legacy upsert. Prefer :meth:`create` / :meth:`update` for identity-safe writes."""
 
     @abstractmethod
     def get(self, portfolio_id: str) -> Portfolio | None:
