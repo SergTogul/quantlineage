@@ -339,7 +339,7 @@ Tests must fail for:
 
 ## RF-005 — Historical risk is a four-macro broadcast, not a factor-complete multi-asset model
 
-Status: **IN PROGRESS** (2026-09-04). R0.5.1–R0.5.2 / R0.5.4 APPROVE. R0.5.3 panel type APPROVE — `HistoricalFactorPanel` can hold two equities and two rate tenors independently (`projection="per_factor"`). Production VaR still consumes four-macro demo. Remaining: wire the panel into `HistoricalRiskEngine`. Do not close.
+Status: **IN PROGRESS** (2026-09-04). R0.5.1–R0.5.2 / R0.5.4 APPROVE. R0.5.3 type + opt-in wiring APPROVE — `factor_panel=` applies independent name/tenor shocks; missing required factors fail closed. Default `HistoricalRiskEngine()` / factory / demo VaR still four-macro. Remaining: switch the production default to the panel. Do not close.
 
 Priority: **P0**  
 Risk types: CORRECTNESS, METHODOLOGY, ARCHITECTURE  

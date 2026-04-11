@@ -18,6 +18,12 @@ Units (aligned with ``FactorObservationSeries`` and ``MarketSnapshot.bump``):
 - vol: relative change of vol level (0.07 ≈ +7% of current vol)
 - rates: observation series stores **basis points**; bump uses **decimal**
   (1bp → ``RateZero(..., "ALL")`` with amount ``1/10000``)
+
+Opt-in ``HistoricalFactorPanel`` path (R0.5.3 leftover):
+``iter_panel_shocked_snapshots`` applies per-name / per-tenor panel columns
+without broadcasting four-macro aggregates. Default
+``iter_historical_shocked_snapshots`` is unchanged. Rate panel units stay
+basis points and are converted here before bump.
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
 from app.domain.models import MarketSnapshot, ScenarioKind, StressScenario
+from app.risk.factor_panel import FactorPanelObservation, HistoricalFactorPanel
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
 from app.risk.historical_data import FactorObservationSeries, HistoricalMarketDataset
 
@@ -193,6 +200,77 @@ def historical_shocked_snapshots(
     return list(iter_historical_shocked_snapshots(base, source, id_prefix=id_prefix))
 
 
+def panel_amount_to_bump(factor: RiskFactor, amount: float) -> float:
+    """Convert a panel change into ``MarketSnapshot.bump`` units.
+
+    Panel rate moves are basis points (``1.0`` = +1bp); bump uses decimal
+    rate (``0.0001`` = +1bp). Equity / FX / vol stay relative.
+    """
+    if isinstance(factor, RateZero):
+        return float(amount) / 10000.0
+    return float(amount)
+
+
+def factor_changes_from_panel_observation(
+    observation: FactorPanelObservation,
+) -> tuple[FactorChange, ...]:
+    """One panel row → typed shocks. Zero-amount moves are omitted."""
+    shocks: list[FactorChange] = []
+    for factor, amount in observation.changes.items():
+        bump = panel_amount_to_bump(factor, amount)
+        if bump:
+            shocks.append(FactorChange(factor, bump))
+    return tuple(shocks)
+
+
+def market_scenario_from_panel_observation(
+    observation: FactorPanelObservation,
+    *,
+    index: int,
+    id_prefix: str = "hist_panel",
+) -> MarketScenario:
+    """Build a typed ``MarketScenario`` from one per-factor panel row."""
+    return MarketScenario(
+        id=f"{id_prefix}_{index}",
+        name=f"Panel observation {index}",
+        shocks=factor_changes_from_panel_observation(observation),
+        kind=ScenarioKind.HISTORICAL_STYLE,
+        description=(
+            "Per-factor historical replay from HistoricalFactorPanel "
+            "(not a four-macro broadcast)."
+        ),
+        observation_index=index,
+    )
+
+
+def historical_market_scenarios_from_panel(
+    panel: HistoricalFactorPanel,
+    *,
+    id_prefix: str = "hist_panel",
+) -> list[MarketScenario]:
+    """One ``MarketScenario`` per panel date; shocks stay per name / tenor."""
+    return [
+        market_scenario_from_panel_observation(obs, index=i, id_prefix=id_prefix)
+        for i, obs in enumerate(panel.observations)
+    ]
+
+
+def iter_panel_shocked_snapshots(
+    base: MarketSnapshot,
+    panel: HistoricalFactorPanel,
+    *,
+    id_prefix: str = "hist_panel",
+) -> Iterator[MarketSnapshot]:
+    """Apply per-factor panel moves to ``base`` (independent, not cumulative).
+
+    Does **not** broadcast one equity/rate aggregate onto every name/tenor.
+    Missing snapshot marks fail closed via ``MarketSnapshot.bump``.
+    """
+    yield from iter_shocked_snapshots(
+        base, historical_market_scenarios_from_panel(panel, id_prefix=id_prefix)
+    )
+
+
 def to_stress_scenario(scenario: MarketScenario) -> StressScenario:
     """Convert typed shocks to ``StressScenario`` dict fields for ``shock_snapshot``.
 
@@ -236,12 +314,17 @@ __all__ = [
     "MarketScenario",
     "apply_market_scenario",
     "expand_aggregate_change",
+    "factor_changes_from_panel_observation",
     "historical_market_scenarios",
+    "historical_market_scenarios_from_panel",
     "historical_shocked_snapshots",
     "iter_aggregate_changes",
     "iter_historical_shocked_snapshots",
+    "iter_panel_shocked_snapshots",
     "iter_shocked_snapshots",
     "market_scenario_from_change",
+    "market_scenario_from_panel_observation",
+    "panel_amount_to_bump",
     "shocked_snapshots",
     "to_stress_scenario",
 ]
