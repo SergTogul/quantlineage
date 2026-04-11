@@ -483,7 +483,7 @@ Do not set a fake universal SLA until benchmark environments are controlled.
 
 ## RF-008 — Hierarchy recomputes full risk independently at every node
 
-Status: **IN PROGRESS** (2026-09-04). R0.7.1 stable node ids APPROVE. R0.7.2 trade-grain artifact type APPROVE — `TradeCalculationArtifact` holds PV, additive Greeks, stress P&L, optional historical vector; hierarchy does not consume it. Remaining: R0.7.3 aggregate-instead-of-reprice. Do not close.
+Status: **IN PROGRESS** (2026-09-04). R0.7.1–R0.7.2 APPROVE. R0.7.3 consume path APPROVE — complete artifact maps sum additive metrics without pricing; incomplete maps fail closed. Default / `PortfolioService.hierarchy` still reprices. Remaining: produce artifacts once per run; node VaR/ES from vectors. Do not close.
 
 Priority: **P0**  
 Risk types: PERFORMANCE, ARCHITECTURE, OPERABILITY  
