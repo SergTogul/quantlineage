@@ -46,6 +46,7 @@ from app.risk.stress import (
     ScenarioComparisonEngine,
     StressEngine,
 )
+from app.risk.trade_artifacts import TradeCalculationArtifact
 from app.risk.var import VaRAnalytics
 from app.sample import DemoPortfolioMarketDataProvider
 
@@ -280,8 +281,25 @@ class PortfolioService:
         )
 
     def hierarchy(self, portfolio):
+        """Build the firm tree from one valuation per trade (R0.7.3 leftover).
+
+        PV and additive Greeks come from ``self.pricing.value`` once per
+        position. Stress P&L is left empty: ``self.stresses`` would snapshot
+        again and ``StressEngine.run`` would re-call ``value`` plus
+        ``shocked_value`` per scenario (once-per-trade, not once-per-node, but
+        not value-once). ``HierarchyEngine`` sums the empty maps. VaR / ES
+        stay omitted on the artifact path (not invented).
+        """
+        market = self.market_snapshot(portfolio)
+        artifacts = {
+            position.id: TradeCalculationArtifact.from_valuation(
+                self.pricing.value(position, market),
+                trade_id=position.id,
+            )
+            for position in portfolio.positions
+        }
         return self.hierarchy_engine.build(
-            portfolio, self.pricing, market=self.market_snapshot(portfolio)
+            portfolio, self.pricing, market=market, artifacts=artifacts
         )
     def attribution(self, request): return self.attribution_engine.explain(request,self.pricing)
     def risk_change_attribution(
