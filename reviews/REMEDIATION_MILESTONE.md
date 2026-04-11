@@ -586,7 +586,7 @@ A risk run should be able to produce/reuse:
 
 ## R0.7.3 Aggregate instead of reprice — COMPLETE (opt-in consume, 2026-09-04)
 
-`HierarchyEngine.build` / `risk_at` accept a complete `artifacts` map and sum PV / additive Greeks / stress P&L without pricing. Default omitted-artifacts path still full-reprices. Node VaR/ES from vectors and production wiring remain leftover. RF-008 stays open.
+`HierarchyEngine.build` / `risk_at` accept a complete `artifacts` map and sum PV / additive Greeks / stress P&L without pricing. `PortfolioService.hierarchy` now produces that map (one `value` per position). Node VaR/ES from vectors remain leftover. RF-008 stays open.
 
 - additive metrics sum;
 - stress sums from trade P&Ls;
