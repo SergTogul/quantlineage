@@ -736,7 +736,9 @@ Heavy/risk-run examples:
 
 Prefer one completed risk-run artifact or a coherent batch service.
 
-## R0.10.3 Queue/backpressure
+## R0.10.3 Queue/backpressure — COMPLETE (refuse-gate, 2026-09-04)
+
+When `RISKFORGE_EXTERNAL_WORKER=1` or `RISKFORGE_HEAVY_INLINE=0`, FULL_REVALUATION summary and `POST /risk/dashboard` refuse request-thread compute (HTTP 400 `Invalid request`, `details.use=/risk/runs`). Other HEAVY routes still inline. RF-015 stays open.
 
 Bound:
 
