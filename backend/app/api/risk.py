@@ -65,6 +65,7 @@ def risk_var(
     methodology: VaRMethodology = Query(default=VaRMethodology.DELTA_GAMMA),
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> VaRReport:
+    reject_inline_heavy(route="POST /risk/var")
     return service.var_report(portfolio, methodology=methodology)
 
 
@@ -83,6 +84,7 @@ def risk_es(
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> ESContributionReport:
     """Historical Expected Shortfall contributions by position / book / desk / strategy / factor (M2.5)."""
+    reject_inline_heavy(route="POST /risk/es")
     return service.es_contributions(portfolio, methodology=methodology)
 
 
@@ -93,6 +95,7 @@ def risk_var_compare(
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     """Compare LINEAR / DELTA_GAMMA / FULL_REVALUATION historical VaR (M2.4)."""
+    reject_inline_heavy(route="POST /risk/var/compare")
     return service.compare_var_methodologies(portfolio, observations=observations)
 
 
@@ -117,6 +120,7 @@ def risk_what_if(
 
     Mounted at ``/risk/what-if`` and ``/api/v1/risk/what-if`` (M7.2 dual-mount).
     """
+    reject_inline_heavy(route="POST /risk/what-if")
     try:
         return service.what_if(request, methodology=methodology)
     except ValueError as exc:
@@ -128,6 +132,7 @@ def risk_hierarchy(
     portfolio: Portfolio,
     service: PortfolioService = Depends(get_portfolio_service),
 ):
+    reject_inline_heavy(route="POST /risk/hierarchy")
     return service.hierarchy(portfolio)
 
 
@@ -136,6 +141,7 @@ def risk_query(
     request: RiskQueryRequest,
     service: PortfolioService = Depends(get_portfolio_service),
 ):
+    reject_inline_heavy(route="POST /risk/query")
     return service.query(request.portfolio, request.question)
 
 
@@ -144,4 +150,5 @@ def risk_contributors(
     portfolio: Portfolio,
     service: PortfolioService = Depends(get_portfolio_service),
 ):
+    reject_inline_heavy(route="POST /risk/contributors")
     return service.contributors(portfolio)

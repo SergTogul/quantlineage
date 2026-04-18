@@ -1,9 +1,9 @@
 """R0.10.3 / RF-015 leftover: HEAVY work must not monopolize the request thread.
 
 When Compose / production-shaped deploys set ``RISKFORGE_EXTERNAL_WORKER=1``
-(or ``RISKFORGE_HEAVY_INLINE=0``), inline FULL_REVALUATION summary and the
-dashboard batch refuse request-thread compute and point clients at
-``POST /risk/runs``. INTERACTIVE LINEAR / DELTA_GAMMA summary stays sync.
+(or ``RISKFORGE_HEAVY_INLINE=0``), HEAVY ``/risk/*`` handlers refuse
+request-thread compute and point clients at ``POST /risk/runs``.
+INTERACTIVE LINEAR / DELTA_GAMMA summary stays sync.
 """
 
 from __future__ import annotations
@@ -105,3 +105,92 @@ def test_interactive_summary_stays_sync_when_external_worker(
         )
         assert response.status_code == 200, response.text
         assert response.json()["portfolio_id"] == book["id"]
+
+
+# Leftover HEAVY handlers in risk.py (R0.10.3 review leftover). The route
+# itself is HEAVY — LINEAR / default methodology is still refused.
+_LEFTOVER_HEAVY_PORTFOLIO_PATHS = (
+    "/api/v1/risk/var",
+    "/api/v1/risk/es",
+    "/api/v1/risk/var/compare",
+    "/api/v1/risk/hierarchy",
+    "/api/v1/risk/contributors",
+    "/risk/var",
+    "/risk/hierarchy",
+)
+
+
+@pytest.mark.parametrize("path", _LEFTOVER_HEAVY_PORTFOLIO_PATHS)
+def test_leftover_heavy_portfolio_routes_refused_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        response = client.post(path, json=book)
+        _assert_refused_inline(response)
+
+
+def test_var_linear_refused_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``POST /risk/var`` is HEAVY even with LINEAR (unlike summary)."""
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        response = client.post(
+            "/api/v1/risk/var",
+            params={"methodology": "LINEAR"},
+            json=book,
+        )
+        _assert_refused_inline(response)
+
+
+def test_what_if_refused_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        body = {
+            "portfolio": book,
+            "methodology": "DELTA_GAMMA",
+            "changes": [{"operation": "remove", "position_id": book["positions"][0]["id"]}],
+        }
+        response = client.post("/api/v1/risk/what-if", json=body)
+        _assert_refused_inline(response)
+
+
+def test_query_refused_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        response = client.post(
+            "/api/v1/risk/query",
+            json={"portfolio": book, "question": "What is 99% VaR?"},
+        )
+        _assert_refused_inline(response)
+
+
+def test_leftover_heavy_refused_when_heavy_inline_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
+    monkeypatch.setenv("RISKFORGE_HEAVY_INLINE", "0")
+    with TestClient(app) as client:
+        book = client.get("/portfolio").json()
+        response = client.post("/risk/es", json=book)
+        _assert_refused_inline(response)
+
+
+def test_interactive_factors_stays_sync_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        response = client.post("/api/v1/risk/factors", json=book)
+        assert response.status_code == 200, response.text
