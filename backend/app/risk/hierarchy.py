@@ -9,9 +9,13 @@ Node-level metrics (computed on the position subset, not summed):
   var_95, var_99, expected_shortfall_99, limits.
 
 When ``artifacts`` is supplied to ``build`` / ``risk_at``, additive fields are
-summed from ``TradeCalculationArtifact`` and pricing is not invoked. VaR / ES
-and limits are omitted on that path (not invented). An incomplete map fails
-closed. Omitting ``artifacts`` keeps the historical full-reprice path.
+summed from ``TradeCalculationArtifact`` and pricing is not invoked. Node
+VaR / ES come from the summed ``historical_pnl`` vector (same loss = -P&L
+quantile convention as ``HistoricalRiskEngine.calculate`` / ``test_var_es_golden.py``).
+Limits stay omitted. An incomplete map fails closed. Mixed present/absent
+historical vectors fail closed via ``TradeCalculationArtifact.add``. All-omitted
+vectors keep VaR / ES at zero. Omitting ``artifacts`` keeps the historical
+full-reprice path.
 
 Position-level ``desk`` / ``strategy`` override portfolio defaults when set.
 Placement helpers live in ``hierarchy_placement`` (re-exported here for API stability).
@@ -21,6 +25,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+
+import numpy as np
 
 from app.domain.models import (
     HierarchyLevel,
@@ -133,6 +139,33 @@ def _scenario_ids(
                 seen.add(scenario)
                 ordered.append(scenario)
     return tuple(ordered)
+
+
+def _var_es_from_historical_pnl(
+    pnl: Sequence[float] | None,
+) -> tuple[float, float, float]:
+    """VaR 95/99 and ES 99 from a historical P&L vector.
+
+    Same convention as ``HistoricalRiskEngine.calculate`` and the historical
+    method in ``VaRAnalytics.report`` (``var.py`` inlines this; there is no
+    extracted helper). Goldens: ``test_var_es_golden.py``.
+
+    - loss = -P&L
+    - ``numpy.quantile`` default linear interpolation
+    - VaR and ES floored at zero
+    - ES is the mean of losses greater than or equal to 99% VaR
+    """
+    if pnl is None:
+        return 0.0, 0.0, 0.0
+    series = np.asarray(pnl, dtype=float)
+    if series.size == 0:
+        return 0.0, 0.0, 0.0
+    losses = -series
+    var_95 = float(max(0.0, np.quantile(losses, 0.95)))
+    var_99 = float(max(0.0, np.quantile(losses, 0.99)))
+    tail = losses[losses >= var_99]
+    es_99 = float(max(0.0, tail.mean() if len(tail) else var_99))
+    return var_95, var_99, es_99
 
 
 def _stress_from_artifacts(
@@ -267,6 +300,9 @@ class HierarchyEngine:
         scenario_ids: Sequence[str],
     ) -> HierarchyNode:
         summed = _sum_artifacts(portfolio.positions, artifacts, node_id)
+        var_95, var_99, es_99 = _var_es_from_historical_pnl(
+            None if summed is None else summed.historical_pnl
+        )
         return HierarchyNode(
             id=node_id,
             name=name,
@@ -278,9 +314,9 @@ class HierarchyEngine:
             vega=0.0 if summed is None else float(summed.vega),
             dv01=0.0 if summed is None else float(summed.dv01),
             fx_delta=0.0 if summed is None else float(summed.fx_delta),
-            var_95=0.0,
-            var_99=0.0,
-            expected_shortfall_99=0.0,
+            var_95=var_95,
+            var_99=var_99,
+            expected_shortfall_99=es_99,
             stress=_stress_from_artifacts(
                 summed, portfolio.positions, artifacts, scenario_ids
             ),
