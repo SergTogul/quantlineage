@@ -2,10 +2,13 @@
 
 ``hierarchy()`` must value each position once and pass a complete artifact
 map into ``HierarchyEngine.build``. It must not reprice once per hierarchy
-node. Artifact-path VaR / ES stay omitted (zeros); do not invent them.
+node. Per-trade historical P&L is attached once (``approximate_pnl_series``
+on already-valued Greeks); node VaR / ES are VaR / ES of the summed vector.
 
 Conventions:
 - Additive: parent == sum(children) within abs 1e-9 for MV and Greeks
+- VaR / ES: loss = -P&L; numpy.quantile default linear; floor at 0;
+  ES = mean of losses >= VaR (same as ``test_var_es_golden.py``)
 - Sign: same as Valuation / HierarchyNode (currency PV and Greeks)
 - Two-trade same-desk book has 7 nodes (firm…book + two trades)
 """
@@ -14,9 +17,12 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+import pytest
+
 from app.domain.models import EquityPosition, HierarchyNode, Portfolio
 from app.pricing.builtin import BuiltinPricingEngine
-from app.risk.historical import HistoricalRiskEngine
+from app.risk.historical import HistoricalRiskEngine, approximate_pnl_series
 from app.risk.trade_artifacts import TradeCalculationArtifact
 from app.sample import demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
@@ -125,14 +131,53 @@ def test_hierarchy_parent_additives_equal_sum_of_trade_valuations():
     assert math.isclose(root.fx_delta, expected.fx_delta, abs_tol=1e-9)
 
 
-def test_hierarchy_artifact_path_does_not_invent_var_es():
-    pf = _two_trade_book()
-    root = PortfolioService(
-        BuiltinPricingEngine(),
-        HistoricalRiskEngine(seed=1, observations=20),
-    ).hierarchy(pf)
+def _var_es_from_pnl(pnl: np.ndarray) -> tuple[float, float, float]:
+    """Independent golden-convention VaR 95/99 and ES 99."""
+    losses = -np.asarray(pnl, dtype=float)
+    var_95 = float(max(0.0, np.quantile(losses, 0.95)))
+    var_99 = float(max(0.0, np.quantile(losses, 0.99)))
+    tail = losses[losses >= var_99]
+    es_99 = float(max(0.0, tail.mean() if len(tail) else var_99))
+    return var_95, var_99, es_99
 
-    assert root.var_95 == 0.0
-    assert root.var_99 == 0.0
-    assert root.expected_shortfall_99 == 0.0
+
+def test_hierarchy_artifact_path_var_es_equals_summed_trade_vectors():
+    """Node VaR/ES = golden VaR/ES of the summed per-trade historical vectors.
+
+    Independent reconstruction: one ``approximate_pnl_series`` per already-
+    valued trade (same seed/observations/methodology as the service). Does
+    not invent numbers. Limits stay omitted.
+    """
+    pf = _two_trade_book()
+    pricing = _CountingPricing()
+    engine = HistoricalRiskEngine(seed=1, observations=20)
+    svc = PortfolioService(pricing, engine)
+    market = svc.market_snapshot(pf)
+    obs = engine.dataset.factor_observations()
+    series = []
+    for position in pf.positions:
+        valuation = BuiltinPricingEngine().value(position, market)
+        series.append(
+            approximate_pnl_series(
+                delta=valuation.delta,
+                gamma=valuation.gamma,
+                vega=valuation.vega,
+                dv01=valuation.dv01,
+                fx_delta=valuation.fx_delta,
+                equity_ret=obs.equity_returns,
+                vol_pct=obs.vol_moves,
+                rates_bps=obs.rate_moves_bps,
+                fx_ret=obs.fx_returns,
+                methodology=engine.methodology,
+            )
+        )
+    expected_95, expected_99, expected_es = _var_es_from_pnl(series[0] + series[1])
+
+    root = svc.hierarchy(pf)
+
+    assert pricing.value_calls == len(pf.positions)
+    assert root.var_95 == pytest.approx(expected_95, rel=0, abs=1e-12)
+    assert root.var_99 == pytest.approx(expected_99, rel=0, abs=1e-12)
+    assert root.expected_shortfall_99 == pytest.approx(expected_es, rel=0, abs=1e-12)
+    assert root.var_99 != 0.0
     assert root.limits == []

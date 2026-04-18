@@ -483,7 +483,7 @@ Do not set a fake universal SLA until benchmark environments are controlled.
 
 ## RF-008 — Hierarchy recomputes full risk independently at every node
 
-Status: **IN PROGRESS** (2026-09-04). R0.7.1–R0.7.3 APPROVE including live producer — `PortfolioService.hierarchy` values each trade once and passes artifacts (2 `value` calls vs 7 nodes on the fixture). Artifact-path VaR/ES stay omitted zeros; stress maps are empty. Remaining: node VaR/ES from historical vectors. Do not close.
+Status: **IN PROGRESS** (2026-09-04). R0.7.1–R0.7.3 APPROVE including live producer and artifact-path node VaR/ES from the summed historical vector (same convention as `HistoricalRiskEngine.calculate`). Live hierarchy is one `value` per position; parent VaR is VaR of the sum, not the sum of child VaRs. Remaining: default no-artifact `HierarchyEngine.build` still independently reprices every node. Do not close.
 
 Priority: **P0**  
 Risk types: PERFORMANCE, ARCHITECTURE, OPERABILITY  
