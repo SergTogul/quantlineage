@@ -30,8 +30,7 @@ from app.domain.models import (
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.stress import StressEngine
-from app.sample import demo_market_snapshot
-from app.interfaces.pricing import LegacyDemoPricingAdapter
+from tests.market_fixtures import equity_spot_market, usd_rate_market
 
 engine = BuiltinPricingEngine()
 
@@ -62,6 +61,10 @@ def _discounted_intrinsic(
     return max(forward_strike - forward_spot, 0.0)
 
 
+def _opt_market(spot: float, r: float, q: float, vol: float, symbol: str = "XYZ") -> MarketSnapshot:
+    return equity_spot_market(symbol, spot, rate=r, dividend_yield=q, vol=vol)
+
+
 positive_qty = st.floats(min_value=1.0, max_value=500.0, allow_nan=False, allow_infinity=False)
 nonzero_qty = st.floats(min_value=-500.0, max_value=500.0, allow_nan=False, allow_infinity=False).filter(
     lambda q: abs(q) >= 1.0
@@ -90,15 +93,11 @@ def test_call_unit_delta_in_0_1(quantity, spot, strike, maturity, vol, r, q):
         id="call",
         symbol="XYZ",
         quantity=quantity,
-        spot=spot,
         strike=strike,
         maturity_years=maturity,
-        volatility=vol,
-        risk_free_rate=r,
-        dividend_yield=q,
         option_type="call",
     )
-    v = LegacyDemoPricingAdapter(engine).value(opt)
+    v = engine.value(opt, _opt_market(spot, r, q, vol))
     unit = _unit_delta(v.delta, quantity, spot)
     assert 0.0 <= unit <= 1.0 + 1e-12
 
@@ -119,15 +118,11 @@ def test_put_unit_delta_in_neg1_0(quantity, spot, strike, maturity, vol, r, q):
         id="put",
         symbol="XYZ",
         quantity=quantity,
-        spot=spot,
         strike=strike,
         maturity_years=maturity,
-        volatility=vol,
-        risk_free_rate=r,
-        dividend_yield=q,
         option_type="put",
     )
-    v = LegacyDemoPricingAdapter(engine).value(opt)
+    v = engine.value(opt, _opt_market(spot, r, q, vol))
     unit = _unit_delta(v.delta, quantity, spot)
     assert -1.0 - 1e-12 <= unit <= 0.0
 
@@ -151,15 +146,11 @@ def test_european_option_price_ge_discounted_intrinsic(
         id="opt",
         symbol="XYZ",
         quantity=quantity,
-        spot=spot,
         strike=strike,
         maturity_years=maturity,
-        volatility=vol,
-        risk_free_rate=r,
-        dividend_yield=q,
         option_type=option_type,
     )
-    v = LegacyDemoPricingAdapter(engine).value(opt)
+    v = engine.value(opt, _opt_market(spot, r, q, vol))
     unit_price = v.market_value / quantity
     intrinsic = _discounted_intrinsic(spot, strike, maturity, r, q, option_type)
     # Small absolute slack for floating-point BS evaluation near deep OTM.
@@ -178,18 +169,18 @@ def test_european_option_price_ge_discounted_intrinsic(
 def test_bond_price_decreases_when_yield_increases(face, qty, maturity, y_low, y_bump, duration):
     assume(1.0 + y_low > 0.0)
     assume(1.0 + y_low + y_bump > 0.0)
-    base = BondPosition(
+    bond = BondPosition(
         type="bond",
         id="b",
         issuer="UST",
         face_value=face,
         quantity=qty,
         maturity_years=maturity,
-        yield_rate=y_low,
         duration=duration,
     )
-    higher = base.model_copy(update={"yield_rate": y_low + y_bump})
-    assert LegacyDemoPricingAdapter(engine).value(higher).market_value < LegacyDemoPricingAdapter(engine).value(base).market_value
+    base_m = usd_rate_market(y_low)
+    higher_m = usd_rate_market(y_low + y_bump)
+    assert engine.value(bond, higher_m).market_value < engine.value(bond, base_m).market_value
 
 
 @given(
@@ -211,12 +202,12 @@ def test_payer_economics_swap_pv_increases_when_rates_rise(
         notional=notional,
         maturity_years=maturity,
         fixed_rate=fixed,
-        market_swap_rate=m_low,
         pay_fixed=True,
         duration=duration,
     )
-    higher = swap.model_copy(update={"market_swap_rate": m_low + m_bump})
-    assert LegacyDemoPricingAdapter(engine).value(higher).market_value > LegacyDemoPricingAdapter(engine).value(swap).market_value
+    base_m = usd_rate_market(m_low)
+    higher_m = usd_rate_market(m_low + m_bump)
+    assert engine.value(swap, higher_m).market_value > engine.value(swap, base_m).market_value
 
 
 @given(
@@ -226,13 +217,16 @@ def test_payer_economics_swap_pv_increases_when_rates_rise(
 @_PROP
 def test_portfolio_pv_equals_sum_of_trade_pvs(n_equities, data):
     positions = []
+    equity_spots: dict[str, float] = {}
     for i in range(n_equities):
         qty = data.draw(st.floats(min_value=-200.0, max_value=200.0).filter(lambda q: abs(q) >= 1.0))
         price = data.draw(st.floats(min_value=5.0, max_value=800.0, allow_nan=False, allow_infinity=False))
+        symbol = f"S{i}"
+        equity_spots[symbol] = price
         positions.append(
-            EquityPosition(type="equity", id=f"eq-{i}", symbol=f"S{i}", quantity=qty, price=price)
+            EquityPosition(type="equity", id=f"eq-{i}", symbol=symbol, quantity=qty)
         )
-    # Mix in one rates trade so aggregation is not equity-only.
+    y = data.draw(st.floats(min_value=0.01, max_value=0.08))
     positions.append(
         BondPosition(
             type="bond",
@@ -241,18 +235,19 @@ def test_portfolio_pv_equals_sum_of_trade_pvs(n_equities, data):
             face_value=data.draw(st.floats(min_value=10_000.0, max_value=1_000_000.0)),
             quantity=1.0,
             maturity_years=data.draw(st.floats(min_value=1.0, max_value=10.0)),
-            yield_rate=data.draw(st.floats(min_value=0.01, max_value=0.08)),
             duration=data.draw(st.floats(min_value=0.5, max_value=9.0)),
         )
     )
     portfolio = Portfolio(id="prop", name="prop", positions=positions)
-    from app.market.demo_snapshot import DemoSampleMarksSnapshotAdapter
-
-    market = DemoSampleMarksSnapshotAdapter().snapshot(portfolio)
+    market = MarketSnapshot(
+        id="prop-mkt",
+        equity_spots=equity_spots,
+        rates={"USD": y},
+    )
     vals = engine.value_portfolio(portfolio, market)
     assert len(vals) == len(positions)
     assert sum(v.market_value for v in vals) == pytest.approx(
-        sum(LegacyDemoPricingAdapter(engine).value(p).market_value for p in positions), abs=1e-9, rel=0
+        sum(engine.value(p, market).market_value for p in positions), abs=1e-9, rel=0
     )
 
 
@@ -266,20 +261,24 @@ def test_zero_shock_produces_zero_stress_pnl(quantity, price):
         id="zero-shock",
         name="zero-shock",
         positions=[
-            EquityPosition(type="equity", id="eq", symbol="ABC", quantity=quantity, price=price),
+            EquityPosition(type="equity", id="eq", symbol="ABC", quantity=quantity),
             EuropeanOptionPosition(
                 type="european_option",
                 id="opt",
                 symbol="ABC",
                 quantity=quantity,
-                spot=price,
                 strike=price,
                 maturity_years=1.0,
-                volatility=0.2,
-                risk_free_rate=0.03,
                 option_type="call",
             ),
         ],
+    )
+    market = MarketSnapshot(
+        id="zero-mkt",
+        equity_spots={"ABC": price},
+        equity_vols={"ABC": 0.2},
+        rates={"USD": 0.03},
+        dividend_yields={"ABC": 0.0},
     )
     zero = StressScenario(
         id="zero",
@@ -289,9 +288,7 @@ def test_zero_shock_produces_zero_stress_pnl(quantity, price):
         rates_shift_bps=0.0,
         fx_shock=0.0,
     )
-    results = StressEngine().run(
-        portfolio, engine, [zero], market=demo_market_snapshot(portfolio)
-    )
+    results = StressEngine().run(portfolio, engine, [zero], market=market)
     assert len(results) == 1
     assert results[0].pnl == pytest.approx(0.0, abs=1e-9)
     assert all(pnl == pytest.approx(0.0, abs=1e-9) for pnl in results[0].by_position.values())
@@ -353,19 +350,16 @@ def test_option_cash_greeks_match_finite_difference(
         id="fd",
         symbol="XYZ",
         quantity=quantity,
-        spot=spot,
         strike=strike,
         maturity_years=maturity,
-        volatility=vol,
-        risk_free_rate=r,
-        dividend_yield=q,
         option_type=option_type,
     )
-    v = LegacyDemoPricingAdapter(engine).value(opt)
+    market = _opt_market(spot, r, q, vol)
+    v = engine.value(opt, market)
     h = spot * 1e-4
     pv0 = v.market_value
-    pv_up = LegacyDemoPricingAdapter(engine).value(opt.model_copy(update={"spot": spot + h})).market_value
-    pv_dn = LegacyDemoPricingAdapter(engine).value(opt.model_copy(update={"spot": spot - h})).market_value
+    pv_up = engine.value(opt, _opt_market(spot + h, r, q, vol)).market_value
+    pv_dn = engine.value(opt, _opt_market(spot - h, r, q, vol)).market_value
     cash_delta_fd = spot * (pv_up - pv_dn) / (2.0 * h)
     cash_gamma_fd = (spot * spot) * (pv_up - 2.0 * pv0 + pv_dn) / (h * h)
     assert cash_delta_fd == pytest.approx(v.delta, rel=5e-3, abs=1e-2)
@@ -373,7 +367,7 @@ def test_option_cash_greeks_match_finite_difference(
 
     # Central FD on vol, scaled to one absolute vol point (matches Valuation.vega).
     vol_h = 1e-4
-    pv_vol_up = LegacyDemoPricingAdapter(engine).value(opt.model_copy(update={"volatility": vol + vol_h})).market_value
-    pv_vol_dn = LegacyDemoPricingAdapter(engine).value(opt.model_copy(update={"volatility": vol - vol_h})).market_value
+    pv_vol_up = engine.value(opt, _opt_market(spot, r, q, vol + vol_h)).market_value
+    pv_vol_dn = engine.value(opt, _opt_market(spot, r, q, vol - vol_h)).market_value
     vega_fd = (pv_vol_up - pv_vol_dn) / (2.0 * vol_h) * 0.01
     assert vega_fd == pytest.approx(v.vega, rel=5e-3, abs=1e-2)

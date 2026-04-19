@@ -12,23 +12,23 @@
       "strategy": "Vol Trading",
       "stress": [
         {
-          "pnl": -72441.17243727,
+          "pnl": -72409.6007034,
           "scenario": "Equities -10%"
         },
         {
-          "pnl": 576.58825456,
+          "pnl": 533.70458811,
           "scenario": "Rates +100bp"
         },
         {
-          "pnl": 685.95918662,
+          "pnl": 1343.68623587,
           "scenario": "Vol +25%"
         },
         {
-          "pnl": -105124.53610505,
+          "pnl": -104529.01995035,
           "scenario": "Equities -15% / Vol +40%"
         },
         {
-          "pnl": -138805.83542679,
+          "pnl": -138480.00804084,
           "scenario": "Combined Crisis"
         }
       ],
@@ -76,7 +76,7 @@
           "scenario": "Equities -10%"
         },
         {
-          "pnl": -90169.10124911,
+          "pnl": -91803.15475222,
           "scenario": "Rates +100bp"
         },
         {
@@ -88,7 +88,7 @@
           "scenario": "Equities -15% / Vol +40%"
         },
         {
-          "pnl": -110802.40445013,
+          "pnl": -112820.64340219,
           "scenario": "Combined Crisis"
         }
       ],
@@ -136,7 +136,7 @@
           "scenario": "Equities -10%"
         },
         {
-          "pnl": 91908.55626896,
+          "pnl": 93097.67213957,
           "scenario": "Rates +100bp"
         },
         {
@@ -148,7 +148,7 @@
           "scenario": "Equities -15% / Vol +40%"
         },
         {
-          "pnl": -85855.66340862,
+          "pnl": -84386.75736622,
           "scenario": "Combined Crisis"
         }
       ],

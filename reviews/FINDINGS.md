@@ -1,7 +1,7 @@
 # RiskForge Consolidated Engineering Findings
 
 Date: 2026-09-03  
-Status: R0 IN PROGRESS — Phase B (R0.2-A APPROVE; RF-001 still open)  
+Status: R0 IN PROGRESS — Phase B COMPLETE (RF-001 CLOSED)  
 Inputs:
 
 - `architecture-review.md`
@@ -112,7 +112,7 @@ Pricing tests are strong. VaR/ES tests are broad but do not yet pin exact quanti
 Priority: **P0**  
 Risk types: CORRECTNESS, ARCHITECTURE, MAINTAINABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.2-A APPROVE; equity+FX+bond/swap/IR fail closed on supplied market; dashboard and VaR/ES/hierarchy/stress/reverse/decompose require explicit market; R0.2.4 cache identity hashes economics only; R0.2.1 typed `InstrumentTerms` APPROVE; `trade_cache_key` hashes `terms_from_position`; QuantLib and Builtin `value()` / ABC `value_portfolio` / `shocked_value` require an explicit `MarketSnapshot` (omit/`None` raise). Remaining: compatibility `*Position` DTOs still carry mark fields; `LegacyDemoPricingAdapter` / sample-mark adapter still read them.)
+Status: **CLOSED** (2026-09-04). Phase B APPROVE (`reviews/r0.2-strip-dto-marks-independent-review.md`): `*Position` DTOs are economics-only (`extra='forbid'`); Builtin/QuantLib price from terms + `MarketSnapshot` via `SimpleNamespace` working views; production `value` / `value_portfolio` / `shocked_value` require an explicit snapshot; `LegacyDemoPricingAdapter` removed; ad-hoc `demo_market_snapshot` / `DemoSampleMarksSnapshotAdapter` raise `SampleMarksRemovedError`; canned demo marks live only in `_DEMO_*` snapshots. Full suite 1208 passed / 4 skipped. Residual: bond/swap `duration` remains a derived Position shortcut (not a live mark); `PortfolioService` defaults to the demo market provider unless `market_data=` is injected.
 
 Source findings:
 

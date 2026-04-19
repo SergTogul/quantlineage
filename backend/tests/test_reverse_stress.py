@@ -167,19 +167,19 @@ def test_service_and_api_compatibility():
     assert result.pnl < 0
     assert result.convergence is not None
 
-    client = TestClient(app)
-    portfolio = client.get("/portfolio").json()
-    rev = client.post(
-        "/risk/stress/reverse",
-        json={"portfolio": portfolio, "target_loss_pct": 0.01, "factor": "equity"},
-    )
-    assert rev.status_code == 200, rev.text
-    body = rev.json()
-    assert body["converged"] is True
-    assert body["required_shock"] is not None
-    assert "target_loss" in body
-    assert "pnl" in body
-    assert body["convergence"]["method"] == "binary_search"
+    with TestClient(app) as client:
+        portfolio = client.get("/portfolio").json()
+        rev = client.post(
+            "/risk/stress/reverse",
+            json={"portfolio": portfolio, "target_loss_pct": 0.01, "factor": "equity"},
+        )
+        assert rev.status_code == 200, rev.text
+        body = rev.json()
+        assert body["converged"] is True
+        assert body["required_shock"] is not None
+        assert "target_loss" in body
+        assert "pnl" in body
+        assert body["convergence"]["method"] == "binary_search"
 
 
 def test_invalid_factor_raises(engine, pricing):

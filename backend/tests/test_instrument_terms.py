@@ -41,12 +41,10 @@ def _equity() -> EquityPosition:
         id="eq1",
         symbol="SPY",
         quantity=10.0,
-        price=100.0,
         sector="Index",
         book="Equity",
         desk="Delta",
-        strategy="Core",
-    )
+        strategy="Core")
 
 
 def _equity_future() -> EquityFuturePosition:
@@ -55,16 +53,12 @@ def _equity_future() -> EquityFuturePosition:
         id="eqf1",
         symbol="ES",
         quantity=2.0,
-        spot=4500.0,
         multiplier=50.0,
         maturity_years=0.25,
-        risk_free_rate=0.04,
-        dividend_yield=0.015,
         sector="Index",
         book="Equity Derivatives",
         desk="Futures",
-        strategy="Beta",
-    )
+        strategy="Beta")
 
 
 def _equity_option() -> EuropeanOptionPosition:
@@ -73,18 +67,13 @@ def _equity_option() -> EuropeanOptionPosition:
         id="eqo1",
         symbol="AAPL",
         quantity=5.0,
-        spot=180.0,
         strike=175.0,
         maturity_years=0.5,
-        volatility=0.22,
-        risk_free_rate=0.04,
-        dividend_yield=0.005,
         option_type="call",
         sector="Tech",
         book="Equity Derivatives",
         desk="Options",
-        strategy="Vol",
-    )
+        strategy="Vol")
 
 
 def _bond() -> BondPosition:
@@ -95,13 +84,11 @@ def _bond() -> BondPosition:
         face_value=1000.0,
         quantity=2.0,
         maturity_years=5.0,
-        yield_rate=0.04,
         duration=4.5,
         currency="USD",
         book="Rates",
         desk="Rates Cash",
-        strategy="Govvies",
-    )
+        strategy="Govvies")
 
 
 def _swap() -> SwapPosition:
@@ -112,13 +99,11 @@ def _swap() -> SwapPosition:
         notional=1_000_000.0,
         maturity_years=5.0,
         fixed_rate=0.035,
-        market_swap_rate=0.040,
         pay_fixed=True,
         duration=4.0,
         book="Rates Derivatives",
         desk="Swaps",
-        strategy="Pay",
-    )
+        strategy="Pay")
 
 
 def _fx_forward() -> FXForwardPosition:
@@ -127,15 +112,11 @@ def _fx_forward() -> FXForwardPosition:
         id="fxf1",
         pair="EURUSD",
         notional_base=1_000_000.0,
-        spot=1.10,
         strike=1.08,
         maturity_years=0.5,
-        domestic_rate=0.04,
-        foreign_rate=0.03,
         book="FX",
         desk="FX Cash",
-        strategy="Forwards",
-    )
+        strategy="Forwards")
 
 
 def _fx_option() -> FXOptionPosition:
@@ -144,17 +125,12 @@ def _fx_option() -> FXOptionPosition:
         id="fxo1",
         pair="EURUSD",
         notional_base=1_000_000.0,
-        spot=1.10,
         strike=1.10,
         maturity_years=0.5,
-        volatility=0.12,
-        domestic_rate=0.04,
-        foreign_rate=0.03,
         option_type="put",
         book="FX Derivatives",
         desk="FX Vol",
-        strategy="Hedge",
-    )
+        strategy="Hedge")
 
 
 def _ir_future() -> InterestRateFuturePosition:
@@ -164,13 +140,10 @@ def _ir_future() -> InterestRateFuturePosition:
         currency="USD",
         quantity=10.0,
         pv01=25.0,
-        quoted_rate=0.04,
-        forward_rate=0.041,
         maturity_years=0.25,
         book="Rates Derivatives",
         desk="STIR",
-        strategy="Curve",
-    )
+        strategy="Curve")
 
 
 def _cap_floor() -> CapFloorPosition:
@@ -182,15 +155,11 @@ def _cap_floor() -> CapFloorPosition:
         quantity=1.0,
         strike=0.03,
         maturity_years=2.0,
-        volatility=0.20,
         option_type="cap",
-        forward_rate=0.032,
-        discount_rate=0.04,
         payment_frequency_per_year=2,
         book="Rates Derivatives",
         desk="IR Vol",
-        strategy="Caps",
-    )
+        strategy="Caps")
 
 
 def _swaption() -> SwaptionPosition:
@@ -203,15 +172,11 @@ def _swaption() -> SwaptionPosition:
         strike=0.03,
         option_maturity_years=1.0,
         swap_tenor_years=5.0,
-        volatility=0.20,
         option_type="payer",
-        forward_swap_rate=0.032,
-        discount_rate=0.04,
         payment_frequency_per_year=2,
         book="Rates Derivatives",
         desk="IR Vol",
-        strategy="Swaptions",
-    )
+        strategy="Swaptions")
 
 
 # Live observables / derived duration that trade_cache_key already excludes.
@@ -397,7 +362,11 @@ def test_every_family_round_trips_economics_and_omits_marks(
     for field in mark_fields:
         assert field not in dumped
         assert field not in type(terms).model_fields
-        assert field in type(position).model_fields
+        # Phase B: live marks are gone from Position; duration remains as DV01 shortcut.
+        if field == "duration":
+            assert field in type(position).model_fields
+        else:
+            assert field not in type(position).model_fields
 
 
 @pytest.mark.parametrize(
@@ -405,12 +374,22 @@ def test_every_family_round_trips_economics_and_omits_marks(
     _FAMILY_CASES,
     ids=[row[0] for row in _FAMILY_CASES],
 )
-def test_positions_that_differ_only_in_marks_produce_identical_terms(
+def test_positions_reject_live_mark_updates(
     family, factory, _terms_cls, _mark_fields, mark_update, _econ_update
 ):
+    from pydantic import ValidationError
+
     position = factory()
-    other = position.model_copy(update=mark_update)
-    assert terms_from_position(position) == terms_from_position(other)
+    # duration-only updates remain valid; live marks must raise on (re)construction.
+    live = {k: v for k, v in mark_update.items() if k != "duration"}
+    if live:
+        payload = position.model_dump(mode="python")
+        payload.update(live)
+        with pytest.raises(ValidationError):
+            type(position).model_validate(payload)
+    if "duration" in mark_update:
+        other = position.model_copy(update={"duration": mark_update["duration"]})
+        assert terms_from_position(position) == terms_from_position(other)
 
 
 @pytest.mark.parametrize(

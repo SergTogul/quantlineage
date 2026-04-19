@@ -20,15 +20,18 @@ from app.risk.reverse_stress_multi import MultiFactorReverseStressEngine
 from app.risk.scenario_attribution import ScenarioAttributionEngine
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.risk.var import VaRAnalytics
-from app.sample import demo_market_snapshot
-
 PRICING = BuiltinPricingEngine()
 BOOK = Portfolio(
     id="omit-market",
     name="omit-market",
     positions=[
-        EquityPosition(type="equity", id="unit", symbol="UNIT", quantity=1.0, price=1.0)
+        EquityPosition(type="equity", id="unit", symbol="UNIT", quantity=1.0)
     ],
+)
+UNIT_MARKET = MarketSnapshot(
+    id="omit-unit",
+    equity_spots={"UNIT": 1.0},
+    rates={"USD": 0.04},
 )
 HIERARCHY = HierarchyEngine(HistoricalRiskEngine(seed=1, observations=8))
 STRESS = StressEngine()
@@ -64,7 +67,7 @@ def test_es_empty_book_omitted_market_raises() -> None:
 
 
 def test_explicit_market_still_values() -> None:
-    market = demo_market_snapshot(BOOK)
+    market = UNIT_MARKET
     result = HistoricalRiskEngine(seed=1, observations=8).calculate(
         BOOK, PRICING, market=market
     )
@@ -160,7 +163,7 @@ def test_scenario_attribution_decompose_empty_book_omitted_market_raises() -> No
 
 
 def test_hierarchy_stress_reverse_explicit_market_still_values() -> None:
-    market = demo_market_snapshot(BOOK)
+    market = UNIT_MARKET
     root = HIERARCHY.build(BOOK, PRICING, market=market)
     assert root.market_value == pytest.approx(1.0)
     node = HIERARCHY.risk_at(BOOK, PRICING, FIRM_REF, market=market)

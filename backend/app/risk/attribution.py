@@ -144,26 +144,26 @@ def _greek_buckets_for_position(
 
     sym = _equity_symbol(position)
     if sym is not None:
-        s0 = float(previous.equity_spots.get(sym, getattr(position, "spot", getattr(position, "price", 0.0))))
+        s0 = float(previous.equity_spots.get(sym, 0.0))
         s1 = float(current.equity_spots.get(sym, s0))
         ret = _spot_return(s0, s1)
         out[DRIVER_DELTA] += val.delta * ret
         out[DRIVER_GAMMA] += 0.5 * val.gamma * ret * ret
         if isinstance(position, EuropeanOptionPosition):
-            v0 = float(previous.equity_vols.get(sym, position.volatility))
+            v0 = float(previous.equity_vols.get(sym, 0.0))
             v1 = float(current.equity_vols.get(sym, v0))
             # Valuation.vega is P&L per 1 absolute vol point (0.01).
             out[DRIVER_VEGA] += val.vega * (v1 - v0) * 100.0
 
     pair = _fx_pair(position)
     if pair is not None:
-        f0 = float(previous.fx_spots.get(pair, getattr(position, "spot", 0.0)))
+        f0 = float(previous.fx_spots.get(pair, 0.0))
         f1 = float(current.fx_spots.get(pair, f0))
         fx_ret = _spot_return(f0, f1)
         out[DRIVER_FX] += val.fx_delta * fx_ret
         out[DRIVER_GAMMA] += 0.5 * val.gamma * fx_ret * fx_ret
         if isinstance(position, FXOptionPosition):
-            v0 = float(previous.fx_vols.get(pair, position.volatility))
+            v0 = float(previous.fx_vols.get(pair, 0.0))
             v1 = float(current.fx_vols.get(pair, v0))
             out[DRIVER_VEGA] += val.vega * (v1 - v0) * 100.0
 

@@ -13,95 +13,43 @@ Conventions:
 - Sign: negative Marginal VaR means increasing the position reduces parametric VaR
 - Tolerances: analytical equality abs 1e-9; FD vs analytical rel 5e-2 / abs 1e-4
 """
-
 from __future__ import annotations
-
 import math
-
 import numpy as np
-
-from app.domain.models import (
-    EquityPosition,
-    EuropeanOptionPosition,
-    Portfolio,
-    VaRMethodology,
-)
+from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot, Portfolio, VaRMethodology
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.marginal_var import finite_difference_marginal_var, parametric_marginal_vars
 from app.risk.var import VaRAnalytics
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
-
+from tests.market_fixtures import equity_spots_market
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
-
-def _mixed_series(n: int = 100) -> FactorObservationSeries:
+def _mixed_series(n: int=100) -> FactorObservationSeries:
     rng = np.random.default_rng(11)
-    return FactorObservationSeries(
-        equity_returns=rng.normal(-0.001, 0.02, n),
-        vol_moves=rng.normal(0.0, 0.08, n),
-        rate_moves_bps=rng.normal(0.0, 4.0, n),
-        fx_returns=rng.normal(0.0, 0.008, n),
-    )
+    return FactorObservationSeries(equity_returns=rng.normal(-0.001, 0.02, n), vol_moves=rng.normal(0.0, 0.08, n), rate_moves_bps=rng.normal(0.0, 4.0, n), fx_returns=rng.normal(0.0, 0.008, n))
 
+def _mvar_market() -> MarketSnapshot:
+    return equity_spots_market({'SPY': 100.0}, vols={'SPY': 0.25})
 
 def _book() -> Portfolio:
-    return Portfolio(
-        id="mvar_book",
-        name="Marginal VaR Book",
-        positions=[
-            EquityPosition(
-                type="equity",
-                id="eq",
-                symbol="SPY",
-                quantity=800,
-                price=100.0,
-            ),
-            EuropeanOptionPosition(
-                type="european_option",
-                id="put",
-                symbol="SPY",
-                quantity=400,
-                spot=100.0,
-                strike=95.0,
-                maturity_years=0.5,
-                volatility=0.27,
-                risk_free_rate=0.04,
-                option_type="put",
-            ),
-        ],
-    )
-
+    return Portfolio(id='mvar_book', name='Marginal VaR Book', positions=[EquityPosition(type='equity', id='eq', symbol='SPY', quantity=800), EuropeanOptionPosition(type='european_option', id='put', symbol='SPY', quantity=400, strike=95.0, maturity_years=0.5, option_type='put')])
 
 def test_marginal_var_equals_component_at_unit_weights_delta_gamma():
     pricing = BuiltinPricingEngine()
     book = _book()
-    report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(
-        book,
-        pricing,
-        confidence=0.99,
-        methodology=VaRMethodology.DELTA_GAMMA,
-        market=demo_market_snapshot(book),
-    )
-    assert all(hasattr(c, "marginal_var") for c in report.contributions)
+    report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(book, pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA, market=_mvar_market())
+    assert all((hasattr(c, 'marginal_var') for c in report.contributions))
     for c in report.contributions:
-        assert math.isclose(c.marginal_var, c.component_var, rel_tol=1e-9, abs_tol=1e-9)
-
+        assert math.isclose(c.marginal_var, c.component_var, rel_tol=1e-09, abs_tol=1e-09)
 
 def test_marginal_var_equals_component_under_full_revaluation():
     pricing = BuiltinPricingEngine()
-    report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(
-        SAMPLE_PORTFOLIO,
-        pricing,
-        confidence=0.95,
-        methodology=VaRMethodology.FULL_REVALUATION,
-        market=SAMPLE_MARKET,
-    )
-    pvar = next(m.var for m in report.methods if m.method == "parametric")
+    report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(SAMPLE_PORTFOLIO, pricing, confidence=0.95, methodology=VaRMethodology.FULL_REVALUATION, market=SAMPLE_MARKET)
+    pvar = next((m.var for m in report.methods if m.method == 'parametric'))
     assert pvar > 0
     for c in report.contributions:
-        assert math.isclose(c.marginal_var, c.component_var, rel_tol=1e-9, abs_tol=1e-9)
-
+        assert math.isclose(c.marginal_var, c.component_var, rel_tol=1e-09, abs_tol=1e-09)
 
 def test_parametric_marginal_matches_finite_difference():
     """Independent FD check of ∂VaR/∂w_i on synthetic P&L series."""
@@ -109,27 +57,16 @@ def test_parametric_marginal_matches_finite_difference():
     n = 200
     x1 = rng.normal(0, 1.0, n)
     x2 = 0.4 * x1 + rng.normal(0, 0.8, n)
-    pos = {"a": x1, "b": x2}
-    z = 2.3263478740408408  # ~ Φ⁻¹(0.99)
+    pos = {'a': x1, 'b': x2}
+    z = 2.3263478740408408
     analytical = parametric_marginal_vars(pos, z)
     for pid in pos:
-        fd = finite_difference_marginal_var(pos, pid, z, epsilon=1e-5)
-        assert math.isclose(analytical[pid], fd, rel_tol=5e-2, abs_tol=1e-4)
-
+        fd = finite_difference_marginal_var(pos, pid, z, epsilon=1e-05)
+        assert math.isclose(analytical[pid], fd, rel_tol=0.05, abs_tol=0.0001)
 
 def test_zero_risk_portfolio_has_zero_marginal_var():
     z = np.zeros(50)
-    series = FactorObservationSeries(
-        equity_returns=z.copy(),
-        vol_moves=z.copy(),
-        rate_moves_bps=z.copy(),
-        fx_returns=z.copy(),
-    )
+    series = FactorObservationSeries(equity_returns=z.copy(), vol_moves=z.copy(), rate_moves_bps=z.copy(), fx_returns=z.copy())
     book = _book()
-    report = VaRAnalytics(dataset=ArrayHistoricalDataset(series)).report(
-        book,
-        BuiltinPricingEngine(),
-        methodology=VaRMethodology.DELTA_GAMMA,
-        market=demo_market_snapshot(book),
-    )
-    assert all(c.marginal_var == 0.0 for c in report.contributions)
+    report = VaRAnalytics(dataset=ArrayHistoricalDataset(series)).report(book, BuiltinPricingEngine(), methodology=VaRMethodology.DELTA_GAMMA, market=_mvar_market())
+    assert all((c.marginal_var == 0.0 for c in report.contributions))

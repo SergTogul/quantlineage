@@ -29,6 +29,7 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
+from app.market.snapshot import MarketDataProvider
 from app.risk.attribution import AttributionEngine
 from app.risk.es import ESContributionAnalytics
 from app.risk.factors import RiskFactorEngine
@@ -78,10 +79,16 @@ def position_label(position: Position) -> str:
 
 
 class PortfolioService:
-    def __init__(self, pricing: PricingEngine, risk: RiskEngine):
+    def __init__(
+        self,
+        pricing: PricingEngine,
+        risk: RiskEngine,
+        *,
+        market_data: MarketDataProvider | None = None,
+    ):
         self.pricing = pricing
         self.risk = risk
-        self.market_data = DemoPortfolioMarketDataProvider()
+        self.market_data = market_data or DemoPortfolioMarketDataProvider()
         self.stress_engine = StressEngine()
         self.reverse_stress_engine = ReverseStressEngine()
         self.multi_reverse_stress_engine = MultiFactorReverseStressEngine()

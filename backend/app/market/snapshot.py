@@ -13,11 +13,11 @@ class MarketDataProvider(ABC):
 
 
 class PositionMarketDataProvider(MarketDataProvider):
-    """Deprecated compatibility name for validated demo sample-mark adaptation.
+    """Deprecated name retained for import compatibility.
 
-    Compatibility choice for R0.2-A: the default wrapper raises on competing
-    marks. Demo portfolios use ``sample.demo_market_snapshot`` explicitly; no
-    legacy last-writer-wins mode remains on the production-facing API.
+    Sample marks no longer live on Position DTOs. ``snapshot`` always raises
+    ``SampleMarksRemovedError``; callers must supply an explicit
+    ``MarketSnapshot`` (or use ``sample.demo_market_snapshot`` for canned demos).
     """
 
     def snapshot(self, portfolio: Portfolio) -> MarketSnapshot:
