@@ -31,6 +31,7 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.stress import StressEngine
 from app.sample import demo_market_snapshot
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 engine = BuiltinPricingEngine()
 
@@ -97,7 +98,7 @@ def test_call_unit_delta_in_0_1(quantity, spot, strike, maturity, vol, r, q):
         dividend_yield=q,
         option_type="call",
     )
-    v = engine.value(opt)
+    v = LegacyDemoPricingAdapter(engine).value(opt)
     unit = _unit_delta(v.delta, quantity, spot)
     assert 0.0 <= unit <= 1.0 + 1e-12
 
@@ -126,7 +127,7 @@ def test_put_unit_delta_in_neg1_0(quantity, spot, strike, maturity, vol, r, q):
         dividend_yield=q,
         option_type="put",
     )
-    v = engine.value(opt)
+    v = LegacyDemoPricingAdapter(engine).value(opt)
     unit = _unit_delta(v.delta, quantity, spot)
     assert -1.0 - 1e-12 <= unit <= 0.0
 
@@ -158,7 +159,7 @@ def test_european_option_price_ge_discounted_intrinsic(
         dividend_yield=q,
         option_type=option_type,
     )
-    v = engine.value(opt)
+    v = LegacyDemoPricingAdapter(engine).value(opt)
     unit_price = v.market_value / quantity
     intrinsic = _discounted_intrinsic(spot, strike, maturity, r, q, option_type)
     # Small absolute slack for floating-point BS evaluation near deep OTM.
@@ -188,7 +189,7 @@ def test_bond_price_decreases_when_yield_increases(face, qty, maturity, y_low, y
         duration=duration,
     )
     higher = base.model_copy(update={"yield_rate": y_low + y_bump})
-    assert engine.value(higher).market_value < engine.value(base).market_value
+    assert LegacyDemoPricingAdapter(engine).value(higher).market_value < LegacyDemoPricingAdapter(engine).value(base).market_value
 
 
 @given(
@@ -215,7 +216,7 @@ def test_payer_economics_swap_pv_increases_when_rates_rise(
         duration=duration,
     )
     higher = swap.model_copy(update={"market_swap_rate": m_low + m_bump})
-    assert engine.value(higher).market_value > engine.value(swap).market_value
+    assert LegacyDemoPricingAdapter(engine).value(higher).market_value > LegacyDemoPricingAdapter(engine).value(swap).market_value
 
 
 @given(
@@ -245,10 +246,13 @@ def test_portfolio_pv_equals_sum_of_trade_pvs(n_equities, data):
         )
     )
     portfolio = Portfolio(id="prop", name="prop", positions=positions)
-    vals = engine.value_portfolio(portfolio)
+    from app.market.demo_snapshot import DemoSampleMarksSnapshotAdapter
+
+    market = DemoSampleMarksSnapshotAdapter().snapshot(portfolio)
+    vals = engine.value_portfolio(portfolio, market)
     assert len(vals) == len(positions)
     assert sum(v.market_value for v in vals) == pytest.approx(
-        sum(engine.value(p).market_value for p in positions), abs=1e-9, rel=0
+        sum(LegacyDemoPricingAdapter(engine).value(p).market_value for p in positions), abs=1e-9, rel=0
     )
 
 
@@ -357,11 +361,11 @@ def test_option_cash_greeks_match_finite_difference(
         dividend_yield=q,
         option_type=option_type,
     )
-    v = engine.value(opt)
+    v = LegacyDemoPricingAdapter(engine).value(opt)
     h = spot * 1e-4
     pv0 = v.market_value
-    pv_up = engine.value(opt.model_copy(update={"spot": spot + h})).market_value
-    pv_dn = engine.value(opt.model_copy(update={"spot": spot - h})).market_value
+    pv_up = LegacyDemoPricingAdapter(engine).value(opt.model_copy(update={"spot": spot + h})).market_value
+    pv_dn = LegacyDemoPricingAdapter(engine).value(opt.model_copy(update={"spot": spot - h})).market_value
     cash_delta_fd = spot * (pv_up - pv_dn) / (2.0 * h)
     cash_gamma_fd = (spot * spot) * (pv_up - 2.0 * pv0 + pv_dn) / (h * h)
     assert cash_delta_fd == pytest.approx(v.delta, rel=5e-3, abs=1e-2)
@@ -369,7 +373,7 @@ def test_option_cash_greeks_match_finite_difference(
 
     # Central FD on vol, scaled to one absolute vol point (matches Valuation.vega).
     vol_h = 1e-4
-    pv_vol_up = engine.value(opt.model_copy(update={"volatility": vol + vol_h})).market_value
-    pv_vol_dn = engine.value(opt.model_copy(update={"volatility": vol - vol_h})).market_value
+    pv_vol_up = LegacyDemoPricingAdapter(engine).value(opt.model_copy(update={"volatility": vol + vol_h})).market_value
+    pv_vol_dn = LegacyDemoPricingAdapter(engine).value(opt.model_copy(update={"volatility": vol - vol_h})).market_value
     vega_fd = (pv_vol_up - pv_vol_dn) / (2.0 * vol_h) * 0.01
     assert vega_fd == pytest.approx(v.vega, rel=5e-3, abs=1e-2)

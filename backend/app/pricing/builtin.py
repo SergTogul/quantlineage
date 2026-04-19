@@ -36,6 +36,7 @@ from app.pricing.curve_rates import (
     required_continuous_zero,
     required_ir_future_quote,
 )
+from app.risk.historical import require_explicit_market
 from app.pricing.surface_vol import (
     required_equity_option_vol,
     required_fx_option_vol,
@@ -222,15 +223,15 @@ class BuiltinPricingEngine(PricingEngine):
     """
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
+        market = require_explicit_market(market)
         try:
             terms = terms_from_position(position)
         except TypeError:
             raise TypeError(f"Unsupported position: {type(position)!r}") from None
 
+        # Snapshot is the sole mark authority; leftover DTO marks are ignored.
         updates = _economics_from_terms(position, terms)
-        if market is not None:
-            # Snapshot is the sole mark authority; leftover DTO marks are ignored.
-            updates.update(_snapshot_marks_from_terms(terms, market))
+        updates.update(_snapshot_marks_from_terms(terms, market))
         working = position.model_copy(update=updates)
 
         if isinstance(terms, EquityTerms):
@@ -240,17 +241,9 @@ class BuiltinPricingEngine(PricingEngine):
                 delta=terms.quantity * working.price,
             )
         if isinstance(terms, EquityFutureTerms):
-            s = (
-                working.spot
-                if market is None
-                else _required_equity_spot(market, terms.symbol)
-            )
-            if market is None:
-                r = working.risk_free_rate
-                q = working.dividend_yield
-            else:
-                r = _required_settlement_rate(market, terms.currency)
-                q = _required_dividend_yield(market, terms.symbol)
+            s = _required_equity_spot(market, terms.symbol)
+            r = _required_settlement_rate(market, terms.currency)
+            q = _required_dividend_yield(market, terms.symbol)
             f = s * math.exp((r - q) * terms.maturity_years)
             mv = terms.quantity * terms.multiplier * f
             return Valuation(
@@ -266,14 +259,9 @@ class BuiltinPricingEngine(PricingEngine):
         if isinstance(terms, SwapTerms):
             return self._swap(working, market)
         if isinstance(terms, FXForwardTerms):
-            if market is None:
-                s = working.spot
-                rd = working.domestic_rate
-                rf = working.foreign_rate
-            else:
-                s = _required_fx_spot(market, terms.pair)
-                rd = _required_settlement_rate(market, terms.pair[-3:])
-                rf = _required_settlement_rate(market, terms.pair[:3])
+            s = _required_fx_spot(market, terms.pair)
+            rd = _required_settlement_rate(market, terms.pair[-3:])
+            rf = _required_settlement_rate(market, terms.pair[:3])
             forward = s * math.exp((rd - rf) * terms.maturity_years)
             pv = terms.notional_base * (forward - terms.strike) * math.exp(-rd * terms.maturity_years)
             return Valuation(
@@ -291,7 +279,7 @@ class BuiltinPricingEngine(PricingEngine):
             return self._swaption(working, market)
         raise TypeError(f"Unsupported position: {type(working)!r}")
 
-    def _bond(self, p: BondPosition, market: MarketSnapshot | None) -> Valuation:
+    def _bond(self, p: BondPosition, market: MarketSnapshot) -> Valuation:
         df = discount_factor(
             market, p.currency, p.maturity_years, fallback_yield=p.yield_rate
         )
@@ -300,46 +288,32 @@ class BuiltinPricingEngine(PricingEngine):
             pv = p.face_value * p.quantity * df
         else:
             # Scalar path: continuous Actual365Fixed (QL ZeroCouponBond parity).
-            if market is None:
-                y = p.yield_rate
-            else:
-                y = required_continuous_zero(market, p.currency, p.maturity_years)
+            y = required_continuous_zero(market, p.currency, p.maturity_years)
             t = _act365_fixed_years(p.maturity_years)
             pv = p.face_value * p.quantity * math.exp(-y * t)
         return Valuation(position_id=p.id, market_value=pv, dv01=-p.duration * pv * 0.0001)
 
-    def _swap(self, p: SwapPosition, market: MarketSnapshot | None) -> Valuation:
+    def _swap(self, p: SwapPosition, market: MarketSnapshot) -> Valuation:
         # pay_fixed=True → standard payer: PV rises when the market swap rate rises.
         # Curve / key-rate zeros at maturity mark the floating/par rate when attached.
-        if market is None:
-            m = p.market_swap_rate
-        else:
-            m = required_continuous_zero(market, p.currency, p.maturity_years)
+        m = required_continuous_zero(market, p.currency, p.maturity_years)
         sign = 1.0 if p.pay_fixed else -1.0
         annuity = p.notional * p.duration
         pv = sign * (m - p.fixed_rate) * annuity
         return Valuation(position_id=p.id, market_value=pv, dv01=sign * annuity * 0.0001)
 
-    def _equity_option(self, p: EuropeanOptionPosition, market: MarketSnapshot | None) -> Valuation:
-        s = p.spot if market is None else _required_equity_spot(market, p.symbol)
-        sigma = (
-            p.volatility
-            if market is None
-            else required_equity_option_vol(
-                market,
-                name=p.symbol,
-                maturity_years=p.maturity_years,
-                strike=p.strike,
-                spot=s,
-            )
+    def _equity_option(self, p: EuropeanOptionPosition, market: MarketSnapshot) -> Valuation:
+        s = _required_equity_spot(market, p.symbol)
+        sigma = required_equity_option_vol(
+            market,
+            name=p.symbol,
+            maturity_years=p.maturity_years,
+            strike=p.strike,
+            spot=s,
         )
-        if market is None:
-            r = p.risk_free_rate
-            q = p.dividend_yield
-        else:
-            currency = _equity_settlement_currency(p)
-            r = _required_settlement_rate(market, currency)
-            q = _required_dividend_yield(market, p.symbol)
+        currency = _equity_settlement_currency(p)
+        r = _required_settlement_rate(market, currency)
+        q = _required_dividend_yield(market, p.symbol)
         k,t = p.strike,p.maturity_years
         sqrt_t=math.sqrt(t); d1=(math.log(s/k)+(r-q+0.5*sigma*sigma)*t)/(sigma*sqrt_t); d2=d1-sigma*sqrt_t
         dr,dq=math.exp(-r*t),math.exp(-q*t)
@@ -348,23 +322,17 @@ class BuiltinPricingEngine(PricingEngine):
         gamma=dq*_pdf(d1)/(s*sigma*sqrt_t); vega=s*dq*_pdf(d1)*sqrt_t
         return Valuation(position_id=p.id,market_value=p.quantity*price,delta=p.quantity*delta*s,gamma=p.quantity*gamma*s*s,vega=p.quantity*vega*0.01)
 
-    def _fx_option(self, p: FXOptionPosition, market: MarketSnapshot | None) -> Valuation:
-        if market is None:
-            s = p.spot
-            sigma = p.volatility
-            rd = p.domestic_rate
-            rf = p.foreign_rate
-        else:
-            s = _required_fx_spot(market, p.pair)
-            sigma = required_fx_option_vol(
-                market,
-                name=p.pair,
-                maturity_years=p.maturity_years,
-                strike=p.strike,
-                spot=s,
-            )
-            rd = _required_settlement_rate(market, p.pair[-3:])
-            rf = _required_settlement_rate(market, p.pair[:3])
+    def _fx_option(self, p: FXOptionPosition, market: MarketSnapshot) -> Valuation:
+        s = _required_fx_spot(market, p.pair)
+        sigma = required_fx_option_vol(
+            market,
+            name=p.pair,
+            maturity_years=p.maturity_years,
+            strike=p.strike,
+            spot=s,
+        )
+        rd = _required_settlement_rate(market, p.pair[-3:])
+        rf = _required_settlement_rate(market, p.pair[:3])
         t,k=p.maturity_years,p.strike; sqrt_t=math.sqrt(t)
         d1=(math.log(s/k)+(rd-rf+0.5*sigma*sigma)*t)/(sigma*sqrt_t); d2=d1-sigma*sqrt_t
         if p.option_type=="call": unit=s*math.exp(-rf*t)*_cdf(d1)-k*math.exp(-rd*t)*_cdf(d2); d=math.exp(-rf*t)*_cdf(d1)
@@ -372,48 +340,41 @@ class BuiltinPricingEngine(PricingEngine):
         gamma=math.exp(-rf*t)*_pdf(d1)/(s*sigma*sqrt_t); vega=s*math.exp(-rf*t)*_pdf(d1)*sqrt_t
         return Valuation(position_id=p.id,market_value=p.notional_base*unit,fx_delta=p.notional_base*d*s,gamma=p.notional_base*gamma*s*s,vega=p.notional_base*vega*0.01)
 
-    def _ir_future(self, p: InterestRateFuturePosition, market: MarketSnapshot | None) -> Valuation:
+    def _ir_future(self, p: InterestRateFuturePosition, market: MarketSnapshot) -> Valuation:
         # Long STIR future: profits when the forward rate falls vs the quoted futures rate.
         # Units: pv01 is $ per contract per 1bp; rates are decimals.
         # Prefer projection curve / key rates at maturity when attached.
-        if market is None:
-            fwd = p.forward_rate
-            quoted = p.quoted_rate
-        else:
-            fwd = required_continuous_zero(
-                market,
-                p.currency,
-                p.maturity_years,
-                prefer_projection=True,
-            )
-            quoted = required_ir_future_quote(market, p.currency)
+        fwd = required_continuous_zero(
+            market,
+            p.currency,
+            p.maturity_years,
+            prefer_projection=True,
+        )
+        quoted = required_ir_future_quote(market, p.currency)
         mv = p.quantity * p.pv01 * (quoted - fwd) * 10000.0
         return Valuation(position_id=p.id, market_value=mv, dv01=-p.quantity * p.pv01)
 
     def _cap_floor_components(
         self,
         p: CapFloorPosition,
-        market: MarketSnapshot | None,
+        market: MarketSnapshot,
         *,
         rate_shift: float = 0.0,
         vol_shift: float = 0.0,
     ) -> tuple[float, float]:
         periods = max(1, round(p.maturity_years * p.payment_frequency_per_year))
         accrual = p.maturity_years / periods
-        if market is None:
-            sigma = max(1e-8, p.volatility + vol_shift)
-        else:
-            sigma = max(
-                1e-8,
-                required_ir_option_vol(
-                    market,
-                    name=p.currency,
-                    maturity_years=p.maturity_years,
-                    strike=p.strike,
-                    forward=p.forward_rate,
-                )
-                + vol_shift,
+        sigma = max(
+            1e-8,
+            required_ir_option_vol(
+                market,
+                name=p.currency,
+                maturity_years=p.maturity_years,
+                strike=p.strike,
+                forward=p.forward_rate,
             )
+            + vol_shift,
+        )
         unit_pv = 0.0
         unit_vega = 0.0
 
@@ -422,21 +383,17 @@ class BuiltinPricingEngine(PricingEngine):
             # Spot-start approximation: first reset/exercise is clamped to one
             # calendar day, matching the adapter's existing short-option policy.
             option_expiry = max(1.0 / 365.0, payment_time - accrual)
-            if market is None:
-                forward = p.forward_rate + rate_shift
-                discount_rate = p.discount_rate + rate_shift
-            else:
-                forward = required_continuous_zero(
-                    market,
-                    p.currency,
-                    option_expiry,
-                    prefer_projection=True,
-                ) + rate_shift
-                discount_rate = required_continuous_zero(
-                    market,
-                    p.currency,
-                    payment_time,
-                ) + rate_shift
+            forward = required_continuous_zero(
+                market,
+                p.currency,
+                option_expiry,
+                prefer_projection=True,
+            ) + rate_shift
+            discount_rate = required_continuous_zero(
+                market,
+                p.currency,
+                payment_time,
+            ) + rate_shift
             if forward <= 0.0:
                 raise ValueError("Black cap/floor pricing requires a positive forward rate")
             df = math.exp(-discount_rate * payment_time)
@@ -455,7 +412,7 @@ class BuiltinPricingEngine(PricingEngine):
         scale = p.quantity * p.notional
         return scale * unit_pv, scale * unit_vega * 0.01
 
-    def _cap_floor(self, p: CapFloorPosition, market: MarketSnapshot | None) -> Valuation:
+    def _cap_floor(self, p: CapFloorPosition, market: MarketSnapshot) -> Valuation:
         pv, vega = self._cap_floor_components(p, market)
         bumped, _ = self._cap_floor_components(p, market, rate_shift=0.0001)
         return Valuation(position_id=p.id, market_value=pv, vega=vega, dv01=bumped - pv)
@@ -463,46 +420,41 @@ class BuiltinPricingEngine(PricingEngine):
     def _swaption_components(
         self,
         p: SwaptionPosition,
-        market: MarketSnapshot | None,
+        market: MarketSnapshot,
         *,
         rate_shift: float = 0.0,
         vol_shift: float = 0.0,
     ) -> tuple[float, float]:
         periods = max(1, round(p.swap_tenor_years * p.payment_frequency_per_year))
         accrual = p.swap_tenor_years / periods
-        if market is None:
-            sigma = max(1e-8, p.volatility + vol_shift)
-            forward = p.forward_swap_rate + rate_shift
-            discount_rate = p.discount_rate + rate_shift
-        else:
-            sigma = max(
-                1e-8,
-                required_ir_option_vol(
-                    market,
-                    name=p.currency,
-                    maturity_years=p.option_maturity_years,
-                    strike=p.strike,
-                    forward=p.forward_swap_rate,
-                )
-                + vol_shift,
+        sigma = max(
+            1e-8,
+            required_ir_option_vol(
+                market,
+                name=p.currency,
+                maturity_years=p.option_maturity_years,
+                strike=p.strike,
+                forward=p.forward_swap_rate,
             )
-            forward = (
-                required_continuous_zero(
-                    market,
-                    p.currency,
-                    p.option_maturity_years,
-                    prefer_projection=True,
-                )
-                + rate_shift
+            + vol_shift,
+        )
+        forward = (
+            required_continuous_zero(
+                market,
+                p.currency,
+                p.option_maturity_years,
+                prefer_projection=True,
             )
-            discount_rate = (
-                required_continuous_zero(
-                    market,
-                    p.currency,
-                    p.option_maturity_years + p.swap_tenor_years,
-                )
-                + rate_shift
+            + rate_shift
+        )
+        discount_rate = (
+            required_continuous_zero(
+                market,
+                p.currency,
+                p.option_maturity_years + p.swap_tenor_years,
             )
+            + rate_shift
+        )
         if forward <= 0.0:
             raise ValueError("Black swaption pricing requires a positive forward swap rate")
 
@@ -526,7 +478,7 @@ class BuiltinPricingEngine(PricingEngine):
         vega = scale * annuity * forward * _pdf(d1) * sqrt_t * 0.01
         return pv, vega
 
-    def _swaption(self, p: SwaptionPosition, market: MarketSnapshot | None) -> Valuation:
+    def _swaption(self, p: SwaptionPosition, market: MarketSnapshot) -> Valuation:
         pv, vega = self._swaption_components(p, market)
         bumped, _ = self._swaption_components(p, market, rate_shift=0.0001)
         return Valuation(position_id=p.id, market_value=pv, vega=vega, dv01=bumped - pv)

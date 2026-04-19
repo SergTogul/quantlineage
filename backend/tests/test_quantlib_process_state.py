@@ -17,6 +17,7 @@ from datetime import date
 
 import pytest
 from tests.quantlib_gate import import_quantlib
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 ql = import_quantlib()
 
@@ -199,7 +200,7 @@ def test_swap_valuation_does_not_leave_ibor_fixings():
     mgr.clearHistories()
     engine = QuantLibPricingEngine(evaluation_date=date(2024, 6, 14))
     try:
-        engine.value(_swap())
+        LegacyDemoPricingAdapter(engine).value(_swap())
         assert list(mgr.histories()) == []
     finally:
         mgr.clearHistories()
@@ -212,9 +213,9 @@ def test_second_swap_valuation_does_not_see_prior_fixings():
     early = QuantLibPricingEngine(evaluation_date=date(2020, 1, 2))
     late = QuantLibPricingEngine(evaluation_date=date(2024, 6, 14))
     try:
-        early.value(_swap())
+        LegacyDemoPricingAdapter(early).value(_swap())
         assert list(mgr.histories()) == []
-        late.value(_swap())
+        LegacyDemoPricingAdapter(late).value(_swap())
         assert list(mgr.histories()) == []
     finally:
         mgr.clearHistories()

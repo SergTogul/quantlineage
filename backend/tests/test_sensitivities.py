@@ -25,6 +25,7 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, RateZero
 from app.risk.sensitivities import FUTURE_MEASURES, SensitivityEngine
 from app.sample import SAMPLE_PORTFOLIO
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 pricing = BuiltinPricingEngine()
 
@@ -39,7 +40,7 @@ def test_equity_cash_delta_matches_analytic():
     measures = engine.calculate_position(pos, pricing, measures=("delta",))
     assert len(measures) == 1
     assert measures[0].factor == EquitySpot("ABC")
-    analytic = pricing.value(pos).delta
+    analytic = LegacyDemoPricingAdapter(pricing).value(pos).delta
     _close(measures[0].value, analytic, rel=1e-6, abs_tol=1e-6)
 
 
@@ -56,7 +57,7 @@ def test_option_delta_gamma_vega_vs_analytic():
         risk_free_rate=0.03,
         option_type="call",
     )
-    analytic = pricing.value(pos)
+    analytic = LegacyDemoPricingAdapter(pricing).value(pos)
     # Tighter spot bump for gamma accuracy on BS.
     engine = SensitivityEngine(spot_bump=0.005, vol_bump=0.01)
     out = {m.name: m for m in engine.calculate_position(pos, pricing, measures=("delta", "gamma", "vega"))}
@@ -79,7 +80,7 @@ def test_bond_dv01_sign_and_scale():
         yield_rate=0.04,
         duration=8.0,
     )
-    analytic = pricing.value(pos).dv01
+    analytic = LegacyDemoPricingAdapter(pricing).value(pos).dv01
     engine = SensitivityEngine(rate_bump_bps=1.0)
     measures = engine.calculate_position(pos, pricing, measures=("dv01",))
     assert len(measures) == 1
@@ -190,7 +191,7 @@ def test_fx_delta_forward_and_option():
     engine = SensitivityEngine(spot_bump=0.001)
     m = engine.calculate_position(fwd, pricing, measures=("fx_delta",))[0]
     assert m.factor == FXSpot("EURUSD")
-    _close(m.value, pricing.value(fwd).fx_delta, rel=0.02, abs_tol=50.0)
+    _close(m.value, LegacyDemoPricingAdapter(pricing).value(fwd).fx_delta, rel=0.02, abs_tol=50.0)
 
     opt = FXOptionPosition(
         type="fx_option",
@@ -204,7 +205,7 @@ def test_fx_delta_forward_and_option():
         option_type="call",
     )
     m2 = engine.calculate_position(opt, pricing, measures=("fx_delta",))[0]
-    _close(m2.value, pricing.value(opt).fx_delta, rel=0.05, abs_tol=100.0)
+    _close(m2.value, LegacyDemoPricingAdapter(pricing).value(opt).fx_delta, rel=0.05, abs_tol=100.0)
 
 
 def test_swap_dv01_matches_analytic_linear():
@@ -218,7 +219,7 @@ def test_swap_dv01_matches_analytic_linear():
         pay_fixed=True,
         duration=4.3,
     )
-    analytic = pricing.value(pos).dv01
+    analytic = LegacyDemoPricingAdapter(pricing).value(pos).dv01
     engine = SensitivityEngine(rate_bump_bps=1.0)
     fd = engine.calculate_position(pos, pricing, measures=("dv01",))[0].value
     # Linear in rate → FD exact.
