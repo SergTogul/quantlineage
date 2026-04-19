@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from statistics import NormalDist
+from types import SimpleNamespace
 
 from app.domain.instrument_terms import (
     BondTerms,
@@ -18,15 +19,8 @@ from app.domain.instrument_terms import (
     terms_from_position,
 )
 from app.domain.models import (
-    BondPosition,
-    CapFloorPosition,
-    EuropeanOptionPosition,
-    FXOptionPosition,
-    InterestRateFuturePosition,
     MarketSnapshot,
     Position,
-    SwapPosition,
-    SwaptionPosition,
     Valuation,
 )
 from app.interfaces.pricing import PricingEngine
@@ -79,12 +73,6 @@ def _required_fx_spot(market: MarketSnapshot, pair: str) -> float:
         return market.fx_spots[pair]
     except KeyError:
         raise MissingMarketDataError(f"fx_spots[{pair}]") from None
-
-
-def _economics_from_terms(position: Position, terms: InstrumentTerms) -> dict:
-    """Copy contractual terms onto Position field names (marks stay off terms)."""
-    fields = type(position).model_fields
-    return {name: value for name, value in terms.model_dump().items() if name in fields}
 
 
 def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -> dict:
@@ -204,6 +192,18 @@ def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -
     return {}
 
 
+def _pricing_view(
+    position: Position, terms: InstrumentTerms, market: MarketSnapshot
+) -> SimpleNamespace:
+    """Terms + snapshot marks (+ Position duration when present). Never reads DTO marks."""
+    attrs = dict(terms.model_dump())
+    attrs.update(_snapshot_marks_from_terms(terms, market))
+    duration = getattr(position, "duration", None)
+    if duration is not None:
+        attrs["duration"] = duration
+    return SimpleNamespace(**attrs)
+
+
 def _act365_fixed_years(maturity_years: float) -> float:
     """Actual/365 Fixed year fraction matching QuantLib ZeroCouponBond.
 
@@ -229,10 +229,8 @@ class BuiltinPricingEngine(PricingEngine):
         except TypeError:
             raise TypeError(f"Unsupported position: {type(position)!r}") from None
 
-        # Snapshot is the sole mark authority; leftover DTO marks are ignored.
-        updates = _economics_from_terms(position, terms)
-        updates.update(_snapshot_marks_from_terms(terms, market))
-        working = position.model_copy(update=updates)
+        # Snapshot is the sole mark authority; working view never reads Position marks.
+        working = _pricing_view(position, terms, market)
 
         if isinstance(terms, EquityTerms):
             return Valuation(
@@ -277,9 +275,9 @@ class BuiltinPricingEngine(PricingEngine):
             return self._cap_floor(working, market)
         if isinstance(terms, SwaptionTerms):
             return self._swaption(working, market)
-        raise TypeError(f"Unsupported position: {type(working)!r}")
+        raise TypeError(f"Unsupported position: {type(position)!r}")
 
-    def _bond(self, p: BondPosition, market: MarketSnapshot) -> Valuation:
+    def _bond(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         df = discount_factor(
             market, p.currency, p.maturity_years, fallback_yield=p.yield_rate
         )
@@ -293,7 +291,7 @@ class BuiltinPricingEngine(PricingEngine):
             pv = p.face_value * p.quantity * math.exp(-y * t)
         return Valuation(position_id=p.id, market_value=pv, dv01=-p.duration * pv * 0.0001)
 
-    def _swap(self, p: SwapPosition, market: MarketSnapshot) -> Valuation:
+    def _swap(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         # pay_fixed=True → standard payer: PV rises when the market swap rate rises.
         # Curve / key-rate zeros at maturity mark the floating/par rate when attached.
         m = required_continuous_zero(market, p.currency, p.maturity_years)
@@ -302,7 +300,7 @@ class BuiltinPricingEngine(PricingEngine):
         pv = sign * (m - p.fixed_rate) * annuity
         return Valuation(position_id=p.id, market_value=pv, dv01=sign * annuity * 0.0001)
 
-    def _equity_option(self, p: EuropeanOptionPosition, market: MarketSnapshot) -> Valuation:
+    def _equity_option(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         s = _required_equity_spot(market, p.symbol)
         sigma = required_equity_option_vol(
             market,
@@ -322,7 +320,7 @@ class BuiltinPricingEngine(PricingEngine):
         gamma=dq*_pdf(d1)/(s*sigma*sqrt_t); vega=s*dq*_pdf(d1)*sqrt_t
         return Valuation(position_id=p.id,market_value=p.quantity*price,delta=p.quantity*delta*s,gamma=p.quantity*gamma*s*s,vega=p.quantity*vega*0.01)
 
-    def _fx_option(self, p: FXOptionPosition, market: MarketSnapshot) -> Valuation:
+    def _fx_option(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         s = _required_fx_spot(market, p.pair)
         sigma = required_fx_option_vol(
             market,
@@ -340,7 +338,7 @@ class BuiltinPricingEngine(PricingEngine):
         gamma=math.exp(-rf*t)*_pdf(d1)/(s*sigma*sqrt_t); vega=s*math.exp(-rf*t)*_pdf(d1)*sqrt_t
         return Valuation(position_id=p.id,market_value=p.notional_base*unit,fx_delta=p.notional_base*d*s,gamma=p.notional_base*gamma*s*s,vega=p.notional_base*vega*0.01)
 
-    def _ir_future(self, p: InterestRateFuturePosition, market: MarketSnapshot) -> Valuation:
+    def _ir_future(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         # Long STIR future: profits when the forward rate falls vs the quoted futures rate.
         # Units: pv01 is $ per contract per 1bp; rates are decimals.
         # Prefer projection curve / key rates at maturity when attached.
@@ -356,7 +354,7 @@ class BuiltinPricingEngine(PricingEngine):
 
     def _cap_floor_components(
         self,
-        p: CapFloorPosition,
+        p: SimpleNamespace,
         market: MarketSnapshot,
         *,
         rate_shift: float = 0.0,
@@ -412,14 +410,14 @@ class BuiltinPricingEngine(PricingEngine):
         scale = p.quantity * p.notional
         return scale * unit_pv, scale * unit_vega * 0.01
 
-    def _cap_floor(self, p: CapFloorPosition, market: MarketSnapshot) -> Valuation:
+    def _cap_floor(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         pv, vega = self._cap_floor_components(p, market)
         bumped, _ = self._cap_floor_components(p, market, rate_shift=0.0001)
         return Valuation(position_id=p.id, market_value=pv, vega=vega, dv01=bumped - pv)
 
     def _swaption_components(
         self,
-        p: SwaptionPosition,
+        p: SimpleNamespace,
         market: MarketSnapshot,
         *,
         rate_shift: float = 0.0,
@@ -478,7 +476,7 @@ class BuiltinPricingEngine(PricingEngine):
         vega = scale * annuity * forward * _pdf(d1) * sqrt_t * 0.01
         return pv, vega
 
-    def _swaption(self, p: SwaptionPosition, market: MarketSnapshot) -> Valuation:
+    def _swaption(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         pv, vega = self._swaption_components(p, market)
         bumped, _ = self._swaption_components(p, market, rate_shift=0.0001)
         return Valuation(position_id=p.id, market_value=pv, vega=vega, dv01=bumped - pv)

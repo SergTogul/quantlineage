@@ -9,7 +9,6 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
-from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 svc=PortfolioService(BuiltinPricingEngine(),HistoricalRiskEngine())
 client=TestClient(app)
@@ -26,7 +25,8 @@ def test_market_snapshot_and_instrument_specific_shock():
 
 def test_extended_derivatives_price_and_have_risk():
     pricing=BuiltinPricingEngine()
-    vals={p.id:LegacyDemoPricingAdapter(pricing).value(p) for p in SAMPLE_PORTFOLIO.positions}
+    market=demo_market_snapshot(SAMPLE_PORTFOLIO)
+    vals={p.id:pricing.value(p, market) for p in SAMPLE_PORTFOLIO.positions}
     assert vals["fut-es"].delta != 0
     assert vals["fxf-eurusd"].fx_delta != 0
     assert vals["fxo-eurusd"].vega != 0

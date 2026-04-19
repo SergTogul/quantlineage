@@ -4,6 +4,7 @@ import math
 from contextlib import contextmanager
 from datetime import date, timedelta
 from threading import RLock
+from types import SimpleNamespace
 
 from app.domain.instrument_terms import (
     BondTerms,
@@ -20,18 +21,9 @@ from app.domain.instrument_terms import (
     terms_from_position,
 )
 from app.domain.models import (
-    BondPosition,
-    CapFloorPosition,
-    EquityFuturePosition,
-    EuropeanOptionPosition,
-    FXForwardPosition,
-    FXOptionPosition,
-    InterestRateFuturePosition,
     MarketSnapshot,
     Position,
     StressScenario,
-    SwapPosition,
-    SwaptionPosition,
     Valuation,
     calendar_as_of,
 )
@@ -102,12 +94,6 @@ def _required_fx_spot(market: MarketSnapshot, pair: str) -> float:
         return market.fx_spots[pair]
     except KeyError:
         raise MissingMarketDataError(f"fx_spots[{pair}]") from None
-
-
-def _economics_from_terms(position: Position, terms: InstrumentTerms) -> dict:
-    """Copy contractual terms onto Position field names (marks stay off terms)."""
-    fields = type(position).model_fields
-    return {name: value for name, value in terms.model_dump().items() if name in fields}
 
 
 def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -> dict:
@@ -227,6 +213,18 @@ def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -
     return {}
 
 
+def _pricing_view(
+    position: Position, terms: InstrumentTerms, market: MarketSnapshot
+) -> SimpleNamespace:
+    """Terms + snapshot marks (+ Position duration when present). Never reads DTO marks."""
+    attrs = dict(terms.model_dump())
+    attrs.update(_snapshot_marks_from_terms(terms, market))
+    duration = getattr(position, "duration", None)
+    if duration is not None:
+        attrs["duration"] = duration
+    return SimpleNamespace(**attrs)
+
+
 class QuantLibPricingEngine(PricingEngine):
     """QuantLib-backed valuation adapter.
 
@@ -303,10 +301,8 @@ class QuantLibPricingEngine(PricingEngine):
         parsed_as_of = _parse_snapshot_as_of(market.as_of)
         if parsed_as_of is not None:
             session_date = parsed_as_of
-        # Snapshot is the sole mark authority; leftover DTO marks are ignored.
-        updates = _economics_from_terms(position, terms)
-        updates.update(_snapshot_marks_from_terms(terms, market))
-        working = position.model_copy(update=updates)
+        # Snapshot is the sole mark authority; working view never reads Position marks.
+        working = _pricing_view(position, terms, market)
 
         with self._session(evaluation_date=session_date):
             if isinstance(terms, EquityTerms):
@@ -335,7 +331,7 @@ class QuantLibPricingEngine(PricingEngine):
                 return self._fx_option(working, market)
             raise TypeError(
                 f"unsupported instrument for QuantLib production pricing: "
-                f"{type(working).__name__}"
+                f"{type(position).__name__}"
             )
 
     def _flat_curve(self, rate: float):
@@ -419,7 +415,7 @@ class QuantLibPricingEngine(PricingEngine):
         ql_surface.enableExtrapolation()
         return ql.BlackVolTermStructureHandle(ql_surface)
 
-    def _option(self, p: EuropeanOptionPosition, market: MarketSnapshot | None = None) -> Valuation:
+    def _option(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
         spot = ql.QuoteHandle(ql.SimpleQuote(p.spot))
         risk_free = self._flat_curve(p.risk_free_rate)
         dividend = self._flat_curve(p.dividend_yield)
@@ -455,7 +451,7 @@ class QuantLibPricingEngine(PricingEngine):
             vega=p.quantity * unit_vega * 0.01,
         )
 
-    def _bond_npv(self, p: BondPosition, yield_rate: float, curve_handle=None) -> float:
+    def _bond_npv(self, p: SimpleNamespace, yield_rate: float, curve_handle=None) -> float:
         settlement_days = 0
         calendar = ql.NullCalendar()
         bond = ql.ZeroCouponBond(
@@ -471,7 +467,7 @@ class QuantLibPricingEngine(PricingEngine):
         bond.setPricingEngine(ql.DiscountingBondEngine(handle))
         return p.quantity * bond.NPV()
 
-    def _bond(self, p: BondPosition, market: MarketSnapshot | None = None) -> Valuation:
+    def _bond(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
         curve = self._curve_handle(market, p.currency, p.yield_rate)
         pv = self._bond_npv(p, p.yield_rate, curve)
         # Analytic 1bp parallel on the trade yield for DV01 reporting
@@ -486,7 +482,7 @@ class QuantLibPricingEngine(PricingEngine):
             if fixing_date <= eval_dt:
                 index.addFixing(fixing_date, rate, True)
 
-    def _swap_npv(self, p: SwapPosition, market_rate: float, curve_handle=None) -> float:
+    def _swap_npv(self, p: SimpleNamespace, market_rate: float, curve_handle=None) -> float:
         start = self._ql_date(self.evaluation_date)
         maturity = self._maturity_date(p.maturity_years)
         calendar = ql.NullCalendar()
@@ -529,13 +525,13 @@ class QuantLibPricingEngine(PricingEngine):
         swap.setPricingEngine(ql.DiscountingSwapEngine(curve))
         return swap.NPV()
 
-    def _swap(self, p: SwapPosition, market: MarketSnapshot | None = None) -> Valuation:
+    def _swap(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
         curve = self._curve_handle(market, p.currency, p.market_swap_rate)
         pv = self._swap_npv(p, p.market_swap_rate, curve)
         bumped = self._swap_npv(p, p.market_swap_rate + 0.0001)
         return Valuation(position_id=p.id, market_value=pv, dv01=bumped - pv)
 
-    def _equity_future(self, p: EquityFuturePosition) -> Valuation:
+    def _equity_future(self, p: SimpleNamespace) -> Valuation:
         # CIP/carry via QL FlatForward DFs (not a QL Futures/ForwardTrade instrument).
         # F = S * DF_q / DF_r; Time(years) discount matches Builtin exactly.
         t = p.maturity_years
@@ -551,7 +547,7 @@ class QuantLibPricingEngine(PricingEngine):
             dv01=mv * t * 0.0001,
         )
 
-    def _fx_forward(self, p: FXForwardPosition) -> Valuation:
+    def _fx_forward(self, p: SimpleNamespace) -> Valuation:
         # CIP parity via QL FlatForward DFs (not a QL ForwardTrade instrument):
         # N * (F - K) * DF_d with F = S * DF_f / DF_d; Time discount matches Builtin.
         t = p.maturity_years
@@ -567,7 +563,7 @@ class QuantLibPricingEngine(PricingEngine):
             fx_delta=p.notional_base * p.spot,
         )
 
-    def _fx_option(self, p: FXOptionPosition, market: MarketSnapshot | None = None) -> Valuation:
+    def _fx_option(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
         # Garman–Kohlhagen ≡ Black–Scholes–Merton with foreign rate as dividend yield.
         # Exercise date from _maturity_date (T < ~1/365 clamps to 1 calendar day).
         spot = ql.QuoteHandle(ql.SimpleQuote(p.spot))
@@ -605,7 +601,7 @@ class QuantLibPricingEngine(PricingEngine):
             vega=p.notional_base * unit_vega * 0.01,
         )
 
-    def _ir_future(self, p: InterestRateFuturePosition) -> Valuation:
+    def _ir_future(self, p: SimpleNamespace) -> Valuation:
         # Algebraic STIR mark (same as Builtin). QuantLib Futures/ForwardRateAgreement
         # wiring waits on production curves (M1.4). Kept inside the QL adapter session
         # so evaluation-date locking stays consistent with other instruments.
@@ -614,7 +610,7 @@ class QuantLibPricingEngine(PricingEngine):
 
     def _cap_floor_components(
         self,
-        p: CapFloorPosition,
+        p: SimpleNamespace,
         market: MarketSnapshot | None,
         *,
         rate_shift: float = 0.0,
@@ -662,7 +658,7 @@ class QuantLibPricingEngine(PricingEngine):
         scale = p.quantity * p.notional
         return scale * unit_pv, scale * unit_vega * 0.01
 
-    def _cap_floor(self, p: CapFloorPosition, market: MarketSnapshot | None) -> Valuation:
+    def _cap_floor(self, p: SimpleNamespace, market: MarketSnapshot | None) -> Valuation:
         # Native QuantLib Black formula per optionlet; no QuantLib objects leave this adapter.
         pv, vega = self._cap_floor_components(p, market)
         bumped, _ = self._cap_floor_components(p, market, rate_shift=0.0001)
@@ -670,7 +666,7 @@ class QuantLibPricingEngine(PricingEngine):
 
     def _swaption_components(
         self,
-        p: SwaptionPosition,
+        p: SimpleNamespace,
         market: MarketSnapshot | None,
         *,
         rate_shift: float = 0.0,
@@ -722,7 +718,7 @@ class QuantLibPricingEngine(PricingEngine):
         )
         return pv, vega
 
-    def _swaption(self, p: SwaptionPosition, market: MarketSnapshot | None) -> Valuation:
+    def _swaption(self, p: SimpleNamespace, market: MarketSnapshot | None) -> Valuation:
         # Native QuantLib Black formula on a deterministic flat par-swap annuity.
         pv, vega = self._swaption_components(p, market)
         bumped, _ = self._swaption_components(p, market, rate_shift=0.0001)

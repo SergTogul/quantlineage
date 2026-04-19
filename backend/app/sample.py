@@ -1,8 +1,8 @@
 """In-code demo portfolios and their explicit market snapshots.
 
-No live market-data vendor feeds. Legacy positions retain synthetic sample marks,
-but production demo risk uses deliberate snapshots rather than merging those
-marks with last-writer-wins semantics.
+No live market-data vendor feeds. Demo positions carry contractual economics only; live marks live
+exclusively in ``_DEMO_MARKETS`` / ``_DEMO_AGGREGATE_MARKETS``
+(and explicit test snapshots).
 
 Themes (ROADMAP M10.1):
 - Equity Vol — cash equity + options + index future (vol / skew book)
@@ -50,7 +50,6 @@ EQUITY_VOL_PORTFOLIO = Portfolio.model_validate(
                 "id": "eq-nvda",
                 "symbol": "NVDA",
                 "quantity": 800,
-                "price": 118.50,
                 "sector": "Technology",
             },
             {
@@ -58,7 +57,6 @@ EQUITY_VOL_PORTFOLIO = Portfolio.model_validate(
                 "id": "eq-spy",
                 "symbol": "SPY",
                 "quantity": 600,
-                "price": 565.00,
                 "sector": "ETF",
             },
             {
@@ -66,11 +64,8 @@ EQUITY_VOL_PORTFOLIO = Portfolio.model_validate(
                 "id": "opt-spy-put",
                 "symbol": "SPY",
                 "quantity": 400,
-                "spot": 565.00,
                 "strike": 540.0,
                 "maturity_years": 0.5,
-                "volatility": 0.22,
-                "risk_free_rate": 0.04,
                 "option_type": "put",
                 "sector": "ETF",
             },
@@ -79,11 +74,8 @@ EQUITY_VOL_PORTFOLIO = Portfolio.model_validate(
                 "id": "opt-nvda-call",
                 "symbol": "NVDA",
                 "quantity": -250,
-                "spot": 118.50,
                 "strike": 130.0,
                 "maturity_years": 0.35,
-                "volatility": 0.46,
-                "risk_free_rate": 0.04,
                 "option_type": "call",
                 "sector": "Technology",
             },
@@ -92,11 +84,8 @@ EQUITY_VOL_PORTFOLIO = Portfolio.model_validate(
                 "id": "opt-spy-call-short",
                 "symbol": "SPY",
                 "quantity": -200,
-                "spot": 565.00,
                 "strike": 580.0,
                 "maturity_years": 0.25,
-                "volatility": 0.18,
-                "risk_free_rate": 0.04,
                 "option_type": "call",
                 "sector": "ETF",
             },
@@ -105,7 +94,6 @@ EQUITY_VOL_PORTFOLIO = Portfolio.model_validate(
                 "id": "fut-es",
                 "symbol": "SPY",
                 "quantity": 15,
-                "spot": 565.0,
                 "multiplier": 50.0,
                 "maturity_years": 0.25,
             },
@@ -128,7 +116,6 @@ RATES_MACRO_PORTFOLIO = Portfolio.model_validate(
                 "face_value": 3_000_000,
                 "quantity": 1,
                 "maturity_years": 1.9,
-                "yield_rate": 0.043,
                 "duration": 1.85,
             },
             {
@@ -138,7 +125,6 @@ RATES_MACRO_PORTFOLIO = Portfolio.model_validate(
                 "face_value": 2_000_000,
                 "quantity": 1,
                 "maturity_years": 9.5,
-                "yield_rate": 0.041,
                 "duration": 7.8,
             },
             {
@@ -148,7 +134,6 @@ RATES_MACRO_PORTFOLIO = Portfolio.model_validate(
                 "notional": 8_000_000,
                 "maturity_years": 2.0,
                 "fixed_rate": 0.042,
-                "market_swap_rate": 0.043,
                 "pay_fixed": True,
                 "duration": 1.9,
             },
@@ -159,7 +144,6 @@ RATES_MACRO_PORTFOLIO = Portfolio.model_validate(
                 "notional": 5_000_000,
                 "maturity_years": 5.0,
                 "fixed_rate": 0.039,
-                "market_swap_rate": 0.041,
                 "pay_fixed": False,
                 "duration": 4.3,
             },
@@ -170,7 +154,6 @@ RATES_MACRO_PORTFOLIO = Portfolio.model_validate(
                 "notional": 3_000_000,
                 "maturity_years": 10.0,
                 "fixed_rate": 0.040,
-                "market_swap_rate": 0.0415,
                 "pay_fixed": True,
                 "duration": 8.2,
             },
@@ -180,8 +163,6 @@ RATES_MACRO_PORTFOLIO = Portfolio.model_validate(
                 "currency": "USD",
                 "quantity": 40,
                 "pv01": 25.0,
-                "quoted_rate": 0.042,
-                "forward_rate": 0.0425,
                 "maturity_years": 0.25,
             },
         ],
@@ -201,7 +182,6 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
                 "id": "eq-nvda",
                 "symbol": "NVDA",
                 "quantity": 1200,
-                "price": 118.50,
                 "sector": "Technology",
             },
             {
@@ -209,7 +189,6 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
                 "id": "eq-spy",
                 "symbol": "SPY",
                 "quantity": 900,
-                "price": 565.00,
                 "sector": "ETF",
             },
             {
@@ -217,11 +196,8 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
                 "id": "opt-spy-put",
                 "symbol": "SPY",
                 "quantity": 500,
-                "spot": 565.00,
                 "strike": 540.0,
                 "maturity_years": 0.5,
-                "volatility": 0.22,
-                "risk_free_rate": 0.04,
                 "option_type": "put",
                 "sector": "ETF",
             },
@@ -230,11 +206,8 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
                 "id": "opt-nvda-call",
                 "symbol": "NVDA",
                 "quantity": -350,
-                "spot": 118.50,
                 "strike": 130.0,
                 "maturity_years": 0.35,
-                "volatility": 0.46,
-                "risk_free_rate": 0.04,
                 "option_type": "call",
                 "sector": "Technology",
             },
@@ -245,7 +218,6 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
                 "face_value": 2_000_000,
                 "quantity": 1,
                 "maturity_years": 9.5,
-                "yield_rate": 0.041,
                 "duration": 7.8,
             },
             {
@@ -255,7 +227,6 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
                 "notional": 5_000_000,
                 "maturity_years": 5.0,
                 "fixed_rate": 0.039,
-                "market_swap_rate": 0.041,
                 "pay_fixed": True,
                 "duration": 4.3,
             },
@@ -264,7 +235,6 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
                 "id": "fut-es",
                 "symbol": "SPY",
                 "quantity": 20,
-                "spot": 565.0,
                 "multiplier": 50.0,
                 "maturity_years": 0.25,
             },
@@ -273,21 +243,16 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
                 "id": "fxf-eurusd",
                 "pair": "EURUSD",
                 "notional_base": 1_000_000,
-                "spot": 1.10,
                 "strike": 1.105,
                 "maturity_years": 0.5,
-                "domestic_rate": 0.04,
-                "foreign_rate": 0.03,
             },
             {
                 "type": "fx_option",
                 "id": "fxo-eurusd",
                 "pair": "EURUSD",
                 "notional_base": 250_000,
-                "spot": 1.10,
                 "strike": 1.12,
                 "maturity_years": 0.4,
-                "volatility": 0.12,
                 "option_type": "call",
             },
         ],
@@ -424,14 +389,17 @@ def _matching_demo_id(portfolio: Portfolio) -> str | None:
 
 
 def demo_market_snapshot(portfolio: Portfolio) -> MarketSnapshot:
-    """Resolve an explicit demo snapshot, otherwise validate legacy sample marks."""
+    """Resolve a canned demo snapshot; ad-hoc books must supply their own market."""
     demo_id = _matching_demo_id(portfolio)
     if demo_id is not None:
         return _DEMO_MARKETS[demo_id]
 
-    from app.market.demo_snapshot import DemoSampleMarksSnapshotAdapter
+    from app.market.demo_snapshot import SampleMarksRemovedError
 
-    return DemoSampleMarksSnapshotAdapter().snapshot(portfolio)
+    raise SampleMarksRemovedError(
+        "sample marks no longer live on Position DTOs; "
+        "supply an explicit MarketSnapshot (or use a canned demo portfolio id)"
+    )
 
 
 def demo_aggregate_market_snapshot(portfolio: Portfolio) -> MarketSnapshot:

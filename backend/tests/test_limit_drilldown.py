@@ -36,7 +36,6 @@ from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.sensitivities import SensitivityEngine
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService, position_label
-from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
@@ -58,7 +57,6 @@ def _tiny_breach_portfolio() -> Portfolio:
                 id="big",
                 symbol="AAA",
                 quantity=1000,
-                price=100.0,
                 book="Core",
             ),
             EquityPosition(
@@ -66,10 +64,17 @@ def _tiny_breach_portfolio() -> Portfolio:
                 id="small",
                 symbol="BBB",
                 quantity=10,
-                price=10.0,
                 book="Core",
             ),
         ],
+    )
+
+
+def _tiny_breach_market() -> MarketSnapshot:
+    return MarketSnapshot(
+        id="conc-mkt",
+        equity_spots={"AAA": 100.0, "BBB": 10.0},
+        rates={"USD": 0.04},
     )
 
 
@@ -106,13 +111,19 @@ def test_enrich_matches_limit_result_fields():
 
 def test_breach_drilldown_shows_utilization_and_contributors():
     portfolio = _tiny_breach_portfolio()
+    market = _tiny_breach_market()
     tight = [RiskLimit(metric="single_position_pct", limit=50.0)]
-    report = _svc().limit_drilldown(
-        portfolio=portfolio,
+    pricing = BuiltinPricingEngine()
+    engine = LimitDrilldownEngine(HistoricalRiskEngine(seed=1, observations=40))
+    report = engine.report(
+        portfolio,
+        pricing,
         limits=tight,
         metric="single_position_pct",
         breaches_only=True,
         top_n=2,
+        label_fn=position_label,
+        market=market,
     )
     assert len(report.items) == 1
     item = report.items[0]
@@ -130,17 +141,23 @@ def test_breach_drilldown_shows_utilization_and_contributors():
 
 def test_hierarchy_scoped_path():
     portfolio = _tiny_breach_portfolio()
+    market = _tiny_breach_market()
     ref = HierarchyRef(
         level=HierarchyLevel.DESK,
         firm="Acme",
         portfolio_id="conc",
         desk="Equity Desk",
     )
-    report = _svc().limit_drilldown(
-        portfolio=portfolio,
+    pricing = BuiltinPricingEngine()
+    engine = LimitDrilldownEngine(HistoricalRiskEngine(seed=1, observations=40))
+    report = engine.report(
+        portfolio,
+        pricing,
         hierarchy=ref,
         limits=[RiskLimit(metric="single_position_pct", limit=50.0)],
         breaches_only=False,
+        label_fn=position_label,
+        market=market,
     )
     assert report.hierarchy_level == "desk"
     assert report.hierarchy_node == "Acme/conc/Equity Desk"
@@ -170,6 +187,7 @@ def test_dv01_contributors_rank_by_abs_greek():
         "dv01",
         top_n=3,
         label_fn=position_label,
+        market=SAMPLE_MARKET,
     )
     assert contribs
     amounts = [abs(c.risk_amount) for c in contribs]
@@ -263,7 +281,6 @@ def _kr_bond_book() -> tuple[Portfolio, MarketSnapshot]:
                 face_value=1_000_000,
                 quantity=1,
                 maturity_years=10.0,
-                yield_rate=0.04,
                 # Understate analytic DV01 vs true 10Y ZCB sensitivity.
                 duration=1.5,
                 book="Core",
@@ -275,7 +292,6 @@ def _kr_bond_book() -> tuple[Portfolio, MarketSnapshot]:
                 face_value=1_000_000,
                 quantity=1,
                 maturity_years=2.0,
-                yield_rate=0.03,
                 # Overstate analytic DV01 vs true 2Y ZCB sensitivity.
                 duration=12.0,
                 book="Core",
@@ -364,7 +380,6 @@ def test_key_rate_dv01_contributors_fallback_matches_parallel_without_key_rates(
         face_value=1_000_000,
         quantity=1,
         maturity_years=10.0,
-        yield_rate=0.04,
         duration=8.0,
     )
     equity = EquityPosition(
@@ -372,18 +387,24 @@ def test_key_rate_dv01_contributors_fallback_matches_parallel_without_key_rates(
         id="e",
         symbol="SPY",
         quantity=10,
-        price=100.0,
+    )
+    market = MarketSnapshot(
+        id="flat-mkt",
+        rates={"USD": 0.04},
+        equity_spots={"SPY": 100.0},
     )
     portfolio = Portfolio(id="flat", name="flat", positions=[bond, equity])
     sens = SensitivityEngine(rate_bump_bps=1.0)
-    kr_m = sens.calculate_position(bond, pricing, measures=("key_rate_dv01",))[0]
-    dv01_m = sens.calculate_position(bond, pricing, measures=("dv01",))[0]
+    kr_m = sens.calculate_position(bond, pricing, measures=("key_rate_dv01",), market=market)[0]
+    dv01_m = sens.calculate_position(bond, pricing, measures=("dv01",), market=market)[0]
     assert kr_m.method == "bump_revalue_parallel_fallback"
     assert abs(kr_m.value) == pytest.approx(abs(dv01_m.value), rel=1e-9, abs=1e-9)
     # Analytic Valuation.dv01 uses duration field — not the FD reference.
-    assert abs(LegacyDemoPricingAdapter(pricing).value(bond).dv01) != pytest.approx(abs(kr_m.value), rel=1e-3)
+    assert abs(pricing.value(bond, market).dv01) != pytest.approx(abs(kr_m.value), rel=1e-3)
 
-    kr = contributors_for_metric(portfolio, pricing, "key_rate_dv01", top_n=2)
+    kr = contributors_for_metric(
+        portfolio, pricing, "key_rate_dv01", top_n=2, market=market
+    )
     assert [c.position_id for c in kr] == ["b", "e"]
     assert kr[0].risk_amount == pytest.approx(abs(kr_m.value), rel=1e-9, abs=1e-9)
     assert kr[1].risk_amount == pytest.approx(0.0, abs=1e-9)

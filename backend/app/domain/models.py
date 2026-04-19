@@ -277,108 +277,112 @@ class PositionHierarchyMixin(FiniteInputMixin):
 
     ``None`` inherits :attr:`Portfolio.desk` / :attr:`Portfolio.strategy`
     (backward-compatible default). Explicit strings enable multi-desk books.
+    Live market marks are forbidden on Position DTOs (``extra='forbid'``).
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     desk: str | None = None
     strategy: str | None = None
 
 
 class EquityPosition(PositionHierarchyMixin):
+    """Cash equity economics. Live spot lives on ``MarketSnapshot.equity_spots``."""
+
     type: Literal["equity"]
     id: str
     symbol: str
     quantity: FiniteFloat
-    price: FiniteFloat
     sector: str = "Other"
     book: str = "Equity"
 
 
 class EquityFuturePosition(PositionHierarchyMixin):
+    """Equity index future economics. Spot / carry rates live on the snapshot."""
+
     type: Literal["equity_future"]
     id: str
     symbol: str
     quantity: FiniteFloat
-    spot: FiniteFloat
     multiplier: FiniteFloat = 50.0
     maturity_years: FiniteFloat = Field(default=0.25, gt=0)
-    risk_free_rate: FiniteFloat = 0.04
-    dividend_yield: FiniteFloat = 0.0
     sector: str = "Index"
     book: str = "Equity Derivatives"
 
 
 class EuropeanOptionPosition(PositionHierarchyMixin):
+    """European equity option economics. Spot / vol / rates live on the snapshot."""
+
     type: Literal["european_option"]
     id: str
     symbol: str
     quantity: FiniteFloat
-    spot: FiniteFloat
     strike: FiniteFloat
     maturity_years: FiniteFloat = Field(gt=0)
-    volatility: FiniteFloat = Field(gt=0)
-    risk_free_rate: FiniteFloat = 0.04
-    dividend_yield: FiniteFloat = 0.0
     option_type: Literal["call", "put"]
     sector: str = "Other"
     book: str = "Equity Derivatives"
 
 
 class BondPosition(PositionHierarchyMixin):
+    """Zero-bond economics. Yield marks live on the snapshot; ``duration`` is a DV01 shortcut."""
+
     type: Literal["bond"]
     id: str
     issuer: str
     face_value: FiniteFloat = Field(gt=0)
     quantity: FiniteFloat = 1.0
     maturity_years: FiniteFloat = Field(gt=0)
-    yield_rate: FiniteFloat
     duration: FiniteFloat = Field(gt=0)
     currency: str = "USD"
     book: str = "Rates"
 
 
 class SwapPosition(PositionHierarchyMixin):
+    """IRS economics. Market swap rate lives on the snapshot; ``duration`` is a DV01 shortcut."""
+
     type: Literal["swap"]
     id: str
     currency: str = "USD"
     notional: FiniteFloat = Field(gt=0)
     maturity_years: FiniteFloat = Field(gt=0)
     fixed_rate: FiniteFloat
-    market_swap_rate: FiniteFloat
     pay_fixed: bool = True
     duration: FiniteFloat = Field(gt=0)
     book: str = "Rates Derivatives"
 
 
 class FXForwardPosition(PositionHierarchyMixin):
+    """FX forward economics. Spot and funding rates live on the snapshot."""
+
     type: Literal["fx_forward"]
     id: str
     pair: FxPair
     notional_base: FiniteFloat
-    spot: FiniteFloat = Field(gt=0)
     strike: FiniteFloat = Field(gt=0)
     maturity_years: FiniteFloat = Field(gt=0)
-    domestic_rate: FiniteFloat = 0.04
-    foreign_rate: FiniteFloat = 0.03
     book: str = "FX"
 
 
 class FXOptionPosition(PositionHierarchyMixin):
+    """FX option economics. Spot / vol / funding rates live on the snapshot."""
+
     type: Literal["fx_option"]
     id: str
     pair: FxPair
     notional_base: FiniteFloat
-    spot: FiniteFloat = Field(gt=0)
     strike: FiniteFloat = Field(gt=0)
     maturity_years: FiniteFloat = Field(gt=0)
-    volatility: FiniteFloat = Field(gt=0)
-    domestic_rate: FiniteFloat = 0.04
-    foreign_rate: FiniteFloat = 0.03
     option_type: Literal["call", "put"]
     book: str = "FX Derivatives"
 
 
 class InterestRateFuturePosition(PositionHierarchyMixin):
-    """Exchange-traded short-rate future (simplified STIR-style mark)."""
+    """Exchange-traded short-rate future economics (STIR-style).
+
+    Quoted / forward rates live on the snapshot; ``pv01`` is a contractual
+    contract multiplier convention, not a live mark.
+    """
 
     type: Literal["ir_future"]
     id: str
@@ -386,8 +390,6 @@ class InterestRateFuturePosition(PositionHierarchyMixin):
     quantity: FiniteFloat
     # Dollar value of a 1bp move per contract (e.g. 25 for classic Eurodollar).
     pv01: FiniteFloat = Field(default=25.0, gt=0)
-    quoted_rate: FiniteFloat
-    forward_rate: FiniteFloat
     maturity_years: FiniteFloat = Field(gt=0)
     book: str = "Rates Derivatives"
 
@@ -396,11 +398,12 @@ class CapFloorPosition(PositionHierarchyMixin):
     """Vanilla interest-rate cap/floor as a flat-forward Black-76 optionlet strip.
 
     Conventions are intentionally explicit for the M1.9 slice:
-    rates/strike/volatility are decimals, notional is currency notional,
+    rates/strike are decimals, notional is currency notional,
     ``option_type='cap'`` is a long cap and ``'floor'`` is a long floor, and
     equal accrual periods are generated from ``maturity_years`` and
-    ``payment_frequency_per_year``. The lognormal Black model requires positive
-    strike and forward rates; richer IR-vol cube/exercise schedules are deferred.
+    ``payment_frequency_per_year``. Live forward / discount / vol marks live
+    on the snapshot. The lognormal Black model requires positive strike and
+    forward rates; richer IR-vol cube/exercise schedules are deferred.
     """
 
     type: Literal["cap_floor"]
@@ -410,10 +413,7 @@ class CapFloorPosition(PositionHierarchyMixin):
     quantity: FiniteFloat = 1.0
     strike: FiniteFloat = Field(gt=0)
     maturity_years: FiniteFloat = Field(gt=0)
-    volatility: FiniteFloat = Field(gt=0)
     option_type: Literal["cap", "floor"]
-    forward_rate: FiniteFloat = Field(gt=0)
-    discount_rate: FiniteFloat = 0.04
     payment_frequency_per_year: int = Field(default=2, ge=1, le=12)
     book: str = "Rates Derivatives"
 
@@ -421,12 +421,12 @@ class CapFloorPosition(PositionHierarchyMixin):
 class SwaptionPosition(PositionHierarchyMixin):
     """Vanilla European swaption on a flat-rate par swap representation.
 
-    Conventions are intentionally narrow for the M1.9 slice: rates, strike,
-    and volatility are decimals; ``option_type='payer'`` is a call on the
-    forward swap rate and ``'receiver'`` is a put; the underlying swap annuity
-    is generated from equal fixed-leg periods over ``swap_tenor_years`` after
-    ``option_maturity_years``. Explicit date schedules and IR vol cubes are
-    deferred.
+    Conventions are intentionally narrow for the M1.9 slice: rates and strike
+    are decimals; ``option_type='payer'`` is a call on the forward swap rate
+    and ``'receiver'`` is a put; the underlying swap annuity is generated from
+    equal fixed-leg periods over ``swap_tenor_years`` after
+    ``option_maturity_years``. Live forward / discount / vol marks live on the
+    snapshot. Explicit date schedules and IR vol cubes are deferred.
     """
 
     type: Literal["swaption"]
@@ -437,10 +437,7 @@ class SwaptionPosition(PositionHierarchyMixin):
     strike: FiniteFloat = Field(gt=0)
     option_maturity_years: FiniteFloat = Field(gt=0)
     swap_tenor_years: FiniteFloat = Field(gt=0)
-    volatility: FiniteFloat = Field(gt=0)
     option_type: Literal["payer", "receiver"]
-    forward_swap_rate: FiniteFloat = Field(gt=0)
-    discount_rate: FiniteFloat = 0.04
     payment_frequency_per_year: int = Field(default=2, ge=1, le=12)
     book: str = "Rates Derivatives"
 
