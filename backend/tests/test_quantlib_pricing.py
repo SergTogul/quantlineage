@@ -28,6 +28,7 @@ from app.market.vol_surfaces import (
 )
 from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.quantlib import QuantLibPricingEngine
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 
 @pytest.fixture
@@ -48,7 +49,7 @@ def _forbid_builtin_fallback(monkeypatch):
 
 def test_equity_value(engine):
     p = EquityPosition(type="equity", id="e", symbol="ABC", quantity=10, price=25)
-    v = engine.value(p)
+    v = LegacyDemoPricingAdapter(engine).value(p)
     assert v.market_value == 250
     assert v.delta == 250
 
@@ -59,8 +60,8 @@ def test_european_option_matches_builtin_closely(engine):
         spot=100, strike=100, maturity_years=1, volatility=.2,
         risk_free_rate=.03, option_type="call"
     )
-    ql_v = engine.value(p)
-    builtin_v = BuiltinPricingEngine().value(p)
+    ql_v = LegacyDemoPricingAdapter(engine).value(p)
+    builtin_v = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=2e-3)
     assert ql_v.delta == pytest.approx(builtin_v.delta, rel=2e-3)
     assert ql_v.gamma == pytest.approx(builtin_v.gamma, rel=2e-3)
@@ -70,7 +71,7 @@ def test_european_option_matches_builtin_closely(engine):
 def test_long_zero_coupon_bond_has_negative_dv01(engine):
     p = BondPosition(type="bond", id="b", issuer="UST", face_value=1_000_000,
                      maturity_years=5, yield_rate=.04, duration=4.5)
-    v = engine.value(p)
+    v = LegacyDemoPricingAdapter(engine).value(p)
     assert v.market_value > 0
     assert v.dv01 < 0
 
@@ -78,8 +79,8 @@ def test_long_zero_coupon_bond_has_negative_dv01(engine):
 def test_pay_fixed_swap_value_increases_when_rates_rise(engine):
     p = SwapPosition(type="swap", id="s", notional=1_000_000, maturity_years=5,
                      fixed_rate=.04, market_swap_rate=.04, pay_fixed=True, duration=4)
-    base = engine.value(p).market_value
-    higher = engine.value(p.model_copy(update={"market_swap_rate": .05})).market_value
+    base = LegacyDemoPricingAdapter(engine).value(p).market_value
+    higher = LegacyDemoPricingAdapter(engine).value(p.model_copy(update={"market_swap_rate": .05})).market_value
     assert higher > base
 
 
@@ -90,7 +91,13 @@ def test_stress_revalues_option(engine):
         risk_free_rate=.03, option_type="put"
     )
     scenario = StressScenario(name="down-vol-up", equity_shock=-.1, vol_shock=.25)
-    assert engine.shocked_value(p, scenario) != engine.value(p).market_value
+    from app.market.demo_snapshot import DemoSampleMarksSnapshotAdapter
+    from app.domain.models import Portfolio
+
+    market = DemoSampleMarksSnapshotAdapter().snapshot(
+        Portfolio(id="legacy_single", name="legacy_single", positions=[p])
+    )
+    assert engine.shocked_value(p, scenario, market) != LegacyDemoPricingAdapter(engine).value(p).market_value
 
 
 def test_equity_future_matches_builtin_without_fallback(engine, monkeypatch):
@@ -105,9 +112,9 @@ def test_equity_future_matches_builtin_without_fallback(engine, monkeypatch):
         risk_free_rate=0.04,
         dividend_yield=0.01,
     )
-    builtin_v = BuiltinPricingEngine().value(p)
+    builtin_v = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     _forbid_builtin_fallback(monkeypatch)
-    ql_v = engine.value(p)
+    ql_v = LegacyDemoPricingAdapter(engine).value(p)
     # Algebraic identity via Time-based FlatForward DFs — require near-exact parity.
     assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=1e-12, abs=1e-9)
     assert ql_v.delta == pytest.approx(builtin_v.delta, rel=1e-12, abs=1e-9)
@@ -126,9 +133,9 @@ def test_fx_forward_matches_builtin_without_fallback(engine, monkeypatch):
         domestic_rate=0.04,
         foreign_rate=0.03,
     )
-    builtin_v = BuiltinPricingEngine().value(p)
+    builtin_v = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     _forbid_builtin_fallback(monkeypatch)
-    ql_v = engine.value(p)
+    ql_v = LegacyDemoPricingAdapter(engine).value(p)
     assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=1e-12, abs=1e-9)
     assert ql_v.fx_delta == pytest.approx(builtin_v.fx_delta, rel=1e-12, abs=1e-9)
 
@@ -148,9 +155,9 @@ def test_fx_option_matches_builtin_without_fallback(engine, monkeypatch):
         foreign_rate=0.03,
         option_type="put",
     )
-    builtin_v = BuiltinPricingEngine().value(p)
+    builtin_v = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     _forbid_builtin_fallback(monkeypatch)
-    ql_v = engine.value(p)
+    ql_v = LegacyDemoPricingAdapter(engine).value(p)
     # Date-rounded exercise vs continuous T — allow modest relative gap.
     assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=5e-3)
     assert ql_v.fx_delta == pytest.approx(builtin_v.fx_delta, rel=5e-3)
@@ -171,9 +178,9 @@ def test_fx_option_sub_day_maturity_uses_one_day_exercise(engine, monkeypatch):
         volatility=0.12,
         option_type="call",
     )
-    builtin_v = BuiltinPricingEngine().value(p)
+    builtin_v = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     _forbid_builtin_fallback(monkeypatch)
-    ql_v = engine.value(p)
+    ql_v = LegacyDemoPricingAdapter(engine).value(p)
     assert ql_v.market_value > 0.0
     # Builtin uses continuous T → near-zero; QL one-day clamp diverges by design.
     assert abs(ql_v.market_value - builtin_v.market_value) > abs(builtin_v.market_value)
@@ -371,7 +378,7 @@ def test_extended_instruments_respect_market_snapshot(engine, monkeypatch):
             rel=5e-3 if isinstance(position, FXOptionPosition) else 1e-12,
             abs=1e-6,
         )
-    assert engine.value(future, market).market_value > engine.value(future).market_value
+    assert engine.value(future, market).market_value > LegacyDemoPricingAdapter(engine).value(future).market_value
 
 
 def test_ir_future_matches_builtin_without_fallback(engine, monkeypatch):
@@ -385,9 +392,9 @@ def test_ir_future_matches_builtin_without_fallback(engine, monkeypatch):
         forward_rate=0.040,
         maturity_years=0.25,
     )
-    builtin_v = BuiltinPricingEngine().value(p)
+    builtin_v = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     _forbid_builtin_fallback(monkeypatch)
-    ql_v = engine.value(p)
+    ql_v = LegacyDemoPricingAdapter(engine).value(p)
     assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=1e-12, abs=1e-9)
     assert ql_v.dv01 == pytest.approx(builtin_v.dv01, rel=1e-12, abs=1e-9)
     # Long future: higher forward → lower MV
@@ -411,9 +418,9 @@ def test_cap_floor_matches_builtin_without_fallback(engine, monkeypatch):
         discount_rate=0.035,
         payment_frequency_per_year=2,
     )
-    builtin_v = BuiltinPricingEngine().value(p)
+    builtin_v = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     _forbid_builtin_fallback(monkeypatch)
-    ql_v = engine.value(p)
+    ql_v = LegacyDemoPricingAdapter(engine).value(p)
     assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=1e-12, abs=1e-8)
     assert ql_v.vega == pytest.approx(builtin_v.vega, rel=1e-12, abs=1e-8)
     assert ql_v.dv01 == pytest.approx(builtin_v.dv01, rel=1e-12, abs=1e-8)
@@ -434,9 +441,9 @@ def test_swaption_matches_builtin_without_fallback(engine, monkeypatch):
         discount_rate=0.035,
         payment_frequency_per_year=2,
     )
-    builtin_v = BuiltinPricingEngine().value(p)
+    builtin_v = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     _forbid_builtin_fallback(monkeypatch)
-    ql_v = engine.value(p)
+    ql_v = LegacyDemoPricingAdapter(engine).value(p)
     assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=1e-12, abs=1e-8)
     assert ql_v.vega == pytest.approx(builtin_v.vega, rel=1e-12, abs=1e-8)
     assert ql_v.dv01 == pytest.approx(builtin_v.dv01, rel=1e-12, abs=1e-8)
@@ -577,8 +584,8 @@ def test_quantlib_complete_snapshot_fx_prices_without_mutating_trade(engine):
     assert ql_opt.market_value == pytest.approx(
         builtin.value(option, market).market_value, rel=5e-3
     )
-    assert ql_fwd.market_value != pytest.approx(engine.value(forward).market_value, abs=1.0)
-    assert ql_opt.market_value != pytest.approx(engine.value(option).market_value, abs=1.0)
+    assert ql_fwd.market_value != pytest.approx(LegacyDemoPricingAdapter(engine).value(forward).market_value, abs=1.0)
+    assert ql_opt.market_value != pytest.approx(LegacyDemoPricingAdapter(engine).value(option).market_value, abs=1.0)
     assert forward.model_dump(mode="json") == original_fwd
     assert option.model_dump(mode="json") == original_opt
 
@@ -738,7 +745,7 @@ def test_quantlib_complete_snapshot_rates_ir_prices_without_mutating_trade(engin
     assert ql_bond.market_value == pytest.approx(
         builtin.value(bond, rates_market).market_value, rel=1e-12, abs=1e-9
     )
-    assert ql_swap.market_value != pytest.approx(engine.value(swap).market_value, abs=1.0)
+    assert ql_swap.market_value != pytest.approx(LegacyDemoPricingAdapter(engine).value(swap).market_value, abs=1.0)
     assert ql_future.market_value == pytest.approx(
         builtin.value(future, future_market).market_value, rel=1e-12, abs=1e-9
     )

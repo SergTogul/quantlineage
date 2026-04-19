@@ -60,6 +60,7 @@ from app.domain.models import (
 )
 from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.quantlib import QuantLibPricingEngine
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 _N = NormalDist()
 
@@ -148,7 +149,7 @@ def test_ql_option_matches_analytic_bs(ql_engine, option_type, spot, strike, t, 
         option_type=option_type,
     )
     expected = qty * _bs_price(spot, strike, t, r, q, vol, option_type)
-    v = ql_engine.value(p)
+    v = LegacyDemoPricingAdapter(ql_engine).value(p)
     assert v.market_value == pytest.approx(expected, rel=_OPT_REL, abs=_OPT_ABS)
 
 
@@ -167,8 +168,8 @@ def test_ql_option_matches_builtin_golden(ql_engine, option_type):
         dividend_yield=0.01,
         option_type=option_type,
     )
-    ql_v = ql_engine.value(p)
-    bi_v = BuiltinPricingEngine().value(p)
+    ql_v = LegacyDemoPricingAdapter(ql_engine).value(p)
+    bi_v = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     assert ql_v.market_value == pytest.approx(bi_v.market_value, rel=_OPT_REL)
     assert ql_v.delta == pytest.approx(bi_v.delta, rel=_OPT_REL)
     assert ql_v.gamma == pytest.approx(bi_v.gamma, rel=_OPT_REL)
@@ -202,7 +203,7 @@ def test_ql_option_edge_evaluation_dates_match_analytic(eval_d):
         option_type="call",
     )
     expected = qty * _bs_price(spot, strike, t, r, q, vol, "call")
-    assert engine.value(p).market_value == pytest.approx(expected, rel=_OPT_REL, abs=_OPT_ABS)
+    assert LegacyDemoPricingAdapter(engine).value(p).market_value == pytest.approx(expected, rel=_OPT_REL, abs=_OPT_ABS)
 
 
 def test_ql_option_near_one_day_tenor_finite(ql_engine):
@@ -220,7 +221,7 @@ def test_ql_option_near_one_day_tenor_finite(ql_engine):
         risk_free_rate=0.03,
         option_type="call",
     )
-    v = ql_engine.value(p)
+    v = LegacyDemoPricingAdapter(ql_engine).value(p)
     assert math.isfinite(v.market_value)
     assert v.market_value > 0.0
     # Analytic continuous-T reference still within option band (same calendar day).
@@ -246,7 +247,7 @@ def test_ql_zero_coupon_bond_matches_continuous_actual365(ql_engine, eval_date):
         duration=4.5,
     )
     expected = _continuous_zc_bond_pv(face, y, eval_date, t)
-    v = ql_engine.value(p)
+    v = LegacyDemoPricingAdapter(ql_engine).value(p)
     assert v.market_value == pytest.approx(expected, rel=_BOND_CONTINUOUS_REL)
     assert v.dv01 < 0
     # Analytic 1bp bump on continuous DF
@@ -295,8 +296,8 @@ def test_builtin_ql_bond_tenor_ladder_scalar_parity(ql_engine, eval_date, years)
         duration=max(0.1, years * 0.9),
     )
     expected = _continuous_zc_bond_pv(face, y, eval_date, years)
-    ql_pv = ql_engine.value(p).market_value
-    bi_pv = builtin.value(p).market_value
+    ql_pv = LegacyDemoPricingAdapter(ql_engine).value(p).market_value
+    bi_pv = LegacyDemoPricingAdapter(builtin).value(p).market_value
     assert ql_pv == pytest.approx(expected, rel=_BOND_CONTINUOUS_REL)
     assert bi_pv == pytest.approx(expected, rel=_BOND_CONTINUOUS_REL)
     assert bi_pv == pytest.approx(ql_pv, rel=_BOND_CONTINUOUS_REL)
@@ -315,7 +316,7 @@ def test_ql_bond_tenor_ladder_matches_continuous(ql_engine, eval_date, years):
         duration=max(0.1, years * 0.9),
     )
     expected = _continuous_zc_bond_pv(face, y, eval_date, years)
-    assert ql_engine.value(p).market_value == pytest.approx(expected, rel=_BOND_CONTINUOUS_REL)
+    assert LegacyDemoPricingAdapter(ql_engine).value(p).market_value == pytest.approx(expected, rel=_BOND_CONTINUOUS_REL)
 
 
 def test_ql_bond_higher_yield_lowers_pv(ql_engine):
@@ -328,8 +329,8 @@ def test_ql_bond_higher_yield_lowers_pv(ql_engine):
         yield_rate=0.03,
         duration=4.5,
     )
-    low = ql_engine.value(p).market_value
-    high = ql_engine.value(p.model_copy(update={"yield_rate": 0.05})).market_value
+    low = LegacyDemoPricingAdapter(ql_engine).value(p).market_value
+    high = LegacyDemoPricingAdapter(ql_engine).value(p.model_copy(update={"yield_rate": 0.05})).market_value
     assert high < low
 
 
@@ -350,8 +351,8 @@ def test_ql_pay_fixed_swap_rises_when_rates_rise(ql_engine):
         pay_fixed=True,
         duration=4,
     )
-    base = ql_engine.value(p).market_value
-    higher = ql_engine.value(p.model_copy(update={"market_swap_rate": 0.05})).market_value
+    base = LegacyDemoPricingAdapter(ql_engine).value(p).market_value
+    higher = LegacyDemoPricingAdapter(ql_engine).value(p.model_copy(update={"market_swap_rate": 0.05})).market_value
     assert higher > base
 
 
@@ -372,7 +373,7 @@ def test_ql_at_market_payer_swap_near_zero(ql_engine):
         pay_fixed=True,
         duration=4,
     )
-    v = ql_engine.value(p)
+    v = LegacyDemoPricingAdapter(ql_engine).value(p)
     assert abs(v.market_value) / notional < 0.005
     assert v.dv01 > 0  # payer: +1bp rates → positive PV change
 
@@ -389,8 +390,8 @@ def test_ql_receive_fixed_opposite_payer(ql_engine):
         duration=4,
     )
     receiver = payer.model_copy(update={"id": "rcv", "pay_fixed": False})
-    pv_p = ql_engine.value(payer).market_value
-    pv_r = ql_engine.value(receiver).market_value
+    pv_p = LegacyDemoPricingAdapter(ql_engine).value(payer).market_value
+    pv_r = LegacyDemoPricingAdapter(ql_engine).value(receiver).market_value
     assert pv_p == pytest.approx(-pv_r, rel=1e-10, abs=1e-6)
     assert pv_p > 0  # pay fixed below market
 
@@ -407,7 +408,7 @@ def test_ql_swap_tenors_payer_dv01_positive(ql_engine, years):
         pay_fixed=True,
         duration=max(0.5, years * 0.8),
     )
-    assert ql_engine.value(p).dv01 > 0
+    assert LegacyDemoPricingAdapter(ql_engine).value(p).dv01 > 0
 
 
 # ---------------------------------------------------------------------------
@@ -438,9 +439,9 @@ def test_ql_equity_future_matches_cip_algebra(ql_engine, spot, mult, t, r, q, qt
     )
     forward = spot * math.exp((r - q) * t)
     expected_mv = qty * mult * forward
-    v = ql_engine.value(p)
+    v = LegacyDemoPricingAdapter(ql_engine).value(p)
     assert v.market_value == pytest.approx(expected_mv, rel=_CIP_REL, abs=_CIP_ABS)
-    bi = BuiltinPricingEngine().value(p)
+    bi = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     assert v.market_value == pytest.approx(bi.market_value, rel=_CIP_REL, abs=_CIP_ABS)
     assert v.delta == pytest.approx(bi.delta, rel=_CIP_REL, abs=_CIP_ABS)
     assert v.dv01 == pytest.approx(expected_mv * t * 0.0001, rel=_CIP_REL, abs=_CIP_ABS)
@@ -469,9 +470,9 @@ def test_ql_fx_forward_matches_cip_algebra(ql_engine, spot, strike, t, rd, rf, n
     )
     forward = spot * math.exp((rd - rf) * t)
     expected = notional * (forward - strike) * math.exp(-rd * t)
-    v = ql_engine.value(p)
+    v = LegacyDemoPricingAdapter(ql_engine).value(p)
     assert v.market_value == pytest.approx(expected, rel=_CIP_REL, abs=_CIP_ABS)
-    bi = BuiltinPricingEngine().value(p)
+    bi = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     assert v.market_value == pytest.approx(bi.market_value, rel=_CIP_REL, abs=_CIP_ABS)
     assert v.fx_delta == pytest.approx(notional * spot, rel=_CIP_REL, abs=_CIP_ABS)
 
@@ -495,7 +496,7 @@ def test_ql_fx_forward_respects_market_snapshot(ql_engine):
     ql_v = ql_engine.value(p, market)
     bi_v = BuiltinPricingEngine().value(p, market)
     assert ql_v.market_value == pytest.approx(bi_v.market_value, rel=_CIP_REL, abs=_CIP_ABS)
-    assert ql_v.market_value != pytest.approx(ql_engine.value(p).market_value, abs=1.0)
+    assert ql_v.market_value != pytest.approx(LegacyDemoPricingAdapter(ql_engine).value(p).market_value, abs=1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -520,9 +521,9 @@ def test_ql_fx_option_matches_garman_kohlhagen(ql_engine, option_type):
         option_type=option_type,
     )
     expected = notional * _gk_price(spot, strike, t, rd, rf, vol, option_type)
-    v = ql_engine.value(p)
+    v = LegacyDemoPricingAdapter(ql_engine).value(p)
     assert v.market_value == pytest.approx(expected, rel=_OPT_REL, abs=_OPT_ABS)
-    bi = BuiltinPricingEngine().value(p)
+    bi = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     assert v.market_value == pytest.approx(bi.market_value, rel=_OPT_REL)
     assert v.fx_delta == pytest.approx(bi.fx_delta, rel=_OPT_REL)
 
@@ -551,7 +552,7 @@ def test_ql_fx_option_moneyness_ladder(ql_engine, option_type, spot, strike, t):
         option_type=option_type,
     )
     expected = notional * _gk_price(spot, strike, t, rd, rf, vol, option_type)
-    assert ql_engine.value(p).market_value == pytest.approx(expected, rel=_OPT_REL, abs=_OPT_ABS)
+    assert LegacyDemoPricingAdapter(ql_engine).value(p).market_value == pytest.approx(expected, rel=_OPT_REL, abs=_OPT_ABS)
 
 
 # ---------------------------------------------------------------------------
@@ -579,10 +580,10 @@ def test_ql_ir_future_matches_stir_algebra(ql_engine, qty, pv01, quoted, forward
         maturity_years=0.25,
     )
     expected = qty * pv01 * (quoted - forward) * 10000.0
-    v = ql_engine.value(p)
+    v = LegacyDemoPricingAdapter(ql_engine).value(p)
     assert v.market_value == pytest.approx(expected, rel=_CIP_REL, abs=_CIP_ABS)
     assert v.dv01 == pytest.approx(-qty * pv01, rel=_CIP_REL, abs=_CIP_ABS)
-    bi = BuiltinPricingEngine().value(p)
+    bi = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(p)
     assert v.market_value == pytest.approx(bi.market_value, rel=_CIP_REL, abs=_CIP_ABS)
 
 
@@ -597,7 +598,7 @@ def test_ql_ir_future_higher_forward_lowers_long_mv(ql_engine):
         forward_rate=0.040,
         maturity_years=0.25,
     )
-    base = ql_engine.value(p).market_value
+    base = LegacyDemoPricingAdapter(ql_engine).value(p).market_value
     shocked = ql_engine.value(
         p, MarketSnapshot(rates={"USD": 0.045}, ir_future_quotes={"USD": 0.042})
     )
@@ -623,8 +624,8 @@ def test_ql_golden_deterministic_replay(ql_engine):
         risk_free_rate=0.03,
         option_type="call",
     )
-    a = ql_engine.value(p).model_dump()
-    b = ql_engine.value(p).model_dump()
+    a = LegacyDemoPricingAdapter(ql_engine).value(p).model_dump()
+    b = LegacyDemoPricingAdapter(ql_engine).value(p).model_dump()
     assert a == b
 
 

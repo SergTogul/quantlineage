@@ -328,7 +328,7 @@ def test_supplied_snapshot_beats_trade_local_equity_future_spot() -> None:
     )
 
     valuation = BuiltinPricingEngine().value(position, market)
-    local = BuiltinPricingEngine().value(position)
+    local = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position)
 
     assert valuation.market_value != local.market_value
     assert valuation.market_value != position.quantity * position.multiplier * position.spot
@@ -346,7 +346,7 @@ def test_supplied_snapshot_beats_trade_local_equity_option_spot() -> None:
     )
 
     valuation = BuiltinPricingEngine().value(position, market)
-    local = BuiltinPricingEngine().value(position)
+    local = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position)
 
     assert valuation.market_value != local.market_value
     assert position.model_dump(mode="json") == original
@@ -366,7 +366,7 @@ def test_quantlib_supplied_snapshot_beats_trade_local_equity_future_spot() -> No
     engine = QuantLibPricingEngine()
 
     valuation = engine.value(position, market)
-    local = engine.value(position)
+    local = LegacyDemoPricingAdapter(engine).value(position)
 
     assert valuation.market_value != local.market_value
     assert position.model_dump(mode="json") == original
@@ -387,7 +387,7 @@ def test_quantlib_supplied_snapshot_beats_trade_local_equity_option_spot() -> No
     engine = QuantLibPricingEngine()
 
     valuation = engine.value(position, market)
-    local = engine.value(position)
+    local = LegacyDemoPricingAdapter(engine).value(position)
 
     assert valuation.market_value != local.market_value
     assert position.model_dump(mode="json") == original
@@ -451,7 +451,7 @@ def test_supplied_snapshot_equity_vols_price_without_mutating_trade() -> None:
     )
 
     valuation = BuiltinPricingEngine().value(position, market)
-    local = BuiltinPricingEngine().value(position)
+    local = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position)
 
     assert valuation.market_value != local.market_value
     assert position.model_dump(mode="json") == original
@@ -472,7 +472,7 @@ def test_quantlib_supplied_snapshot_equity_vols_price_without_mutating_trade() -
     engine = QuantLibPricingEngine()
 
     valuation = engine.value(position, market)
-    local = engine.value(position)
+    local = LegacyDemoPricingAdapter(engine).value(position)
 
     assert valuation.market_value != local.market_value
     assert position.model_dump(mode="json") == original
@@ -482,8 +482,8 @@ def test_equity_option_uses_trade_local_vol_when_market_is_none() -> None:
     _, position = _option_book()
     original = position.model_dump(mode="json")
 
-    valuation = BuiltinPricingEngine().value(position)
-    richer = BuiltinPricingEngine().value(position.model_copy(update={"volatility": 0.40}))
+    valuation = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position)
+    richer = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position.model_copy(update={"volatility": 0.40}))
 
     assert richer.market_value > valuation.market_value
     assert position.model_dump(mode="json") == original
@@ -503,7 +503,7 @@ def test_option_surface_quote_satisfies_vol_without_equity_vols() -> None:
     )
 
     valuation = BuiltinPricingEngine().value(position, market)
-    local = BuiltinPricingEngine().value(position)
+    local = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position)
 
     assert valuation.market_value != local.market_value
     assert position.model_dump(mode="json") == original
@@ -631,7 +631,7 @@ def test_supplied_snapshot_beats_trade_local_equity_future_rate_and_div() -> Non
     _, position = _future_book()
     original = position.model_dump(mode="json")
     pricing = BuiltinPricingEngine()
-    local = pricing.value(position)
+    local = LegacyDemoPricingAdapter(pricing).value(position)
 
     rate_market = MarketSnapshot(
         id="auth-rate",
@@ -655,7 +655,7 @@ def test_supplied_snapshot_beats_trade_local_equity_option_rate_and_div() -> Non
     _, position = _option_book()
     original = position.model_dump(mode="json")
     pricing = BuiltinPricingEngine()
-    local = pricing.value(position)
+    local = LegacyDemoPricingAdapter(pricing).value(position)
 
     rate_market = MarketSnapshot(
         id="auth-rate",
@@ -684,7 +684,7 @@ def test_quantlib_supplied_snapshot_beats_trade_local_equity_future_rate_and_div
     _, position = _future_book()
     original = position.model_dump(mode="json")
     engine = QuantLibPricingEngine()
-    local = engine.value(position)
+    local = LegacyDemoPricingAdapter(engine).value(position)
 
     rate_market = MarketSnapshot(
         id="auth-rate",
@@ -711,7 +711,7 @@ def test_quantlib_supplied_snapshot_beats_trade_local_equity_option_rate_and_div
     _, position = _option_book()
     original = position.model_dump(mode="json")
     engine = QuantLibPricingEngine()
-    local = engine.value(position)
+    local = LegacyDemoPricingAdapter(engine).value(position)
 
     rate_market = MarketSnapshot(
         id="auth-rate",
@@ -744,11 +744,11 @@ def test_equity_family_uses_trade_local_rate_and_div_when_market_is_none(
     _, position = book_factory()
     original = position.model_dump(mode="json")
 
-    valuation = BuiltinPricingEngine().value(position)
-    richer_rate = BuiltinPricingEngine().value(
+    valuation = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position)
+    richer_rate = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(
         position.model_copy(update={"risk_free_rate": 0.08})
     )
-    richer_div = BuiltinPricingEngine().value(
+    richer_div = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(
         position.model_copy(update={"dividend_yield": 0.05})
     )
 

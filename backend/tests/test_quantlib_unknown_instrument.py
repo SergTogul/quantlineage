@@ -10,6 +10,7 @@ from datetime import date
 
 import pytest
 from tests.quantlib_gate import import_quantlib
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 ql = import_quantlib()
 
@@ -41,12 +42,8 @@ def engine():
 def test_unknown_instrument_raises_without_builtin_fallback(engine, monkeypatch):
     _forbid_builtin_fallback(monkeypatch)
 
-    with pytest.raises(TypeError, match="unsupported instrument") as excinfo:
+    with pytest.raises(ValueError, match="explicit MarketSnapshot"):
         engine.value(_UnknownPosition())  # type: ignore[arg-type]
-
-    message = str(excinfo.value)
-    assert "QuantLib" in message
-    assert "_UnknownPosition" in message
 
 
 def test_unknown_instrument_raises_when_market_is_supplied(engine, monkeypatch):
@@ -55,5 +52,9 @@ def test_unknown_instrument_raises_when_market_is_supplied(engine, monkeypatch):
     _forbid_builtin_fallback(monkeypatch)
     market = MarketSnapshot(id="m", as_of="t0", equity_spots={}, rates={})
 
-    with pytest.raises(TypeError, match="unsupported instrument"):
+    with pytest.raises(TypeError, match="unsupported instrument") as excinfo:
         engine.value(_UnknownPosition(), market)  # type: ignore[arg-type]
+
+    message = str(excinfo.value)
+    assert "QuantLib" in message
+    assert "_UnknownPosition" in message
