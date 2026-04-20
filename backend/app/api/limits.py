@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends
 
+from app.api.backpressure import reject_inline_heavy
 from app.api.deps import get_portfolio_service
 from app.api.errors import http_bad_request
 from app.api.openapi_examples import LIMITS_DRILLDOWN_BODY_EXAMPLES, RESP_LIMITS_DRILLDOWN
@@ -20,6 +21,7 @@ def risk_limits(
     portfolio: Portfolio,
     service: PortfolioService = Depends(get_portfolio_service),
 ):
+    reject_inline_heavy(route="POST /risk/limits")
     return service.limits(portfolio)
 
 

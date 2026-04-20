@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends
 
+from app.api.backpressure import reject_inline_heavy
 from app.api.deps import get_portfolio_service
 from app.api.openapi_examples import CHANGE_ATTR_BODY_EXAMPLES, RESP_CHANGE_ATTR
 from app.domain.models import (
@@ -24,6 +25,7 @@ def risk_attribution(
     request: AttributionRequest,
     service: PortfolioService = Depends(get_portfolio_service),
 ):
+    reject_inline_heavy(route="POST /risk/attribution")
     return service.attribution(request)
 
 
@@ -32,6 +34,7 @@ def risk_attribution_demo(
     portfolio: Portfolio,
     service: PortfolioService = Depends(get_portfolio_service),
 ):
+    reject_inline_heavy(route="POST /risk/attribution/demo")
     return service.demo_attribution(portfolio)
 
 
@@ -49,4 +52,5 @@ def risk_change_attribution(
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> RiskChangeAttributionReport:
     """Risk-metric change waterfall (VaR/ES drivers) — separate from P&L Explain (M4.4)."""
+    reject_inline_heavy(route="POST /risk/change-attribution")
     return service.risk_change_attribution(request)

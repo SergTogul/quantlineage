@@ -10,6 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends
 
+from app.api.backpressure import reject_inline_heavy
 from app.api.deps import (
     get_baseline_stress_scenarios,
     get_default_market_snapshot,
@@ -66,6 +67,7 @@ def risk_stress(
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> list[StressResult]:
     """Baseline stress P&L over DI DEFAULT scenarios (M5.9 follow-up)."""
+    reject_inline_heavy(route="POST /risk/stress")
     return service.stresses(portfolio, scenarios)
 
 
@@ -95,6 +97,7 @@ def risk_stress_custom(
     request: CustomStressRequest,
     service: PortfolioService = Depends(get_portfolio_service),
 ):
+    reject_inline_heavy(route="POST /risk/stress/custom")
     return service.stresses(request.portfolio, request.scenarios)
 
 
@@ -112,6 +115,7 @@ def risk_stress_formal_custom(
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> list[StressResult]:
     """Accept formal Scenario wire; adapt to StressScenario for StressEngine (M3.8)."""
+    reject_inline_heavy(route="POST /risk/stress/formal/custom")
     return service.stresses(request.portfolio, wires_to_stress(request.scenarios))
 
 
@@ -122,6 +126,7 @@ def risk_stress_evaluate(
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     """Threat evaluation over DI-backed scenario defaults (M5.9)."""
+    reject_inline_heavy(route="POST /risk/stress/evaluate")
     return service.threat_evaluation(portfolio, scenarios)
 
 
@@ -130,6 +135,7 @@ def risk_stress_evaluate_custom(
     request: CustomStressRequest,
     service: PortfolioService = Depends(get_portfolio_service),
 ):
+    reject_inline_heavy(route="POST /risk/stress/evaluate/custom")
     return service.threat_evaluation(request.portfolio, request.scenarios)
 
 
@@ -145,6 +151,7 @@ def risk_stress_formal_evaluate_custom(
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     """Accept formal Scenario wire; adapt to StressScenario for threat evaluate (M3.8)."""
+    reject_inline_heavy(route="POST /risk/stress/formal/evaluate/custom")
     return service.threat_evaluation(
         request.portfolio, wires_to_stress(request.scenarios)
     )
@@ -163,6 +170,7 @@ def risk_stress_reverse(
     ],
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> ReverseStressResult:
+    reject_inline_heavy(route="POST /risk/stress/reverse")
     return service.reverse_stress(
         request.portfolio,
         request.target_loss_pct,
@@ -184,6 +192,7 @@ def risk_stress_reverse_multi(
     ],
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> MultiFactorReverseStressResult:
+    reject_inline_heavy(route="POST /risk/stress/reverse/multi")
     return service.reverse_stress_multi(
         request.portfolio,
         request.target_loss_pct,
@@ -207,6 +216,7 @@ def risk_stress_compare(
     ],
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> HedgeComparisonReport:
+    reject_inline_heavy(route="POST /risk/stress/compare")
     return service.compare_scenarios(
         request.portfolio,
         request.hedged_portfolio,
