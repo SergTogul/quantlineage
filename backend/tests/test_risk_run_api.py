@@ -133,11 +133,87 @@ def test_worker_fails_run_on_execution_error(tiny_portfolio):
     assert last.error_message == 'Risk run failed'
     assert 'boom' not in (last.error_message or '')
 
+DASHBOARD_BATCH_KEYS = {
+    "portfolio",
+    "summary",
+    "stress",
+    "threats",
+    "contributors",
+    "limits",
+    "factors",
+    "varReport",
+    "hierarchy",
+    "attribution",
+}
+
+
 def test_execute_run_type_dispatch(tiny_portfolio):
     svc = PortfolioService(create_pricing_engine(), HistoricalRiskEngine(), market_data=FixedMarketProvider(equity_spot_market('AAPL', 190.0)))
     for run_type in sorted(SUPPORTED_RUN_TYPES):
         payload = execute_run_type(svc, run_type=run_type, portfolio=tiny_portfolio, request={'methodology': 'DELTA_GAMMA'})
         assert isinstance(payload, dict)
+
+
+def test_dashboard_in_supported_run_types():
+    assert "dashboard" in SUPPORTED_RUN_TYPES
+
+
+def test_poll_until_completed_with_dashboard_batch_payload():
+    """Live HTTP: dashboard run stores DashboardBatchResponse keys; lists stay lists."""
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio")
+        assert book.status_code == 200
+        portfolio = book.json()
+        created = client.post(
+            "/risk/runs",
+            json={
+                "portfolio": portfolio,
+                "run_type": "dashboard",
+                "request": {},
+            },
+        )
+        assert created.status_code == 202
+        run_id = created.json()["id"]
+        done = _wait_terminal(client, run_id, timeout_s=120.0)
+        assert done["status"] == "COMPLETED", done
+        assert done["run_type"] == "dashboard"
+        assert done["error_message"] is None
+        assert len(done["results"]) == 1
+        assert done["results"][0]["result_type"] == "dashboard"
+        payload = done["results"][0]["payload"]
+        assert set(payload) == DASHBOARD_BATCH_KEYS
+        assert isinstance(payload["stress"], list)
+        assert payload["stress"]
+        assert isinstance(payload["contributors"], list)
+        assert isinstance(payload["limits"], list)
+        assert isinstance(payload["factors"], list)
+        assert isinstance(payload["threats"], dict)
+        assert "evaluations" in payload["threats"]
+        assert "items" not in payload["threats"]
+        assert isinstance(payload["summary"], dict)
+        assert isinstance(payload["varReport"], dict)
+        assert isinstance(payload["hierarchy"], dict)
+        assert isinstance(payload["attribution"], dict)
+        assert isinstance(payload["portfolio"], dict)
+        assert payload["portfolio"]["id"] == portfolio["id"]
+
+
+def test_api_v1_dashboard_run_type():
+    with TestClient(app) as client:
+        portfolio = client.get("/api/v1/portfolio").json()
+        created = client.post(
+            "/api/v1/risk/runs",
+            json={
+                "portfolio": portfolio,
+                "run_type": "dashboard",
+            },
+        )
+        assert created.status_code == 202
+        done = _wait_terminal(client, created.json()["id"], timeout_s=120.0)
+        assert done["status"] == "COMPLETED"
+        payload = done["results"][0]["payload"]
+        assert set(payload) == DASHBOARD_BATCH_KEYS
+        assert isinstance(payload["stress"], list)
 
 def test_worker_with_sqlalchemy_session_factory(tiny_portfolio, tmp_path):
     """Persistence wiring path: SQLAlchemy repo + RiskRunService lifecycle."""

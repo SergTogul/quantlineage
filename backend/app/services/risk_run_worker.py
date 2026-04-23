@@ -59,6 +59,7 @@ SUPPORTED_RUN_TYPES = frozenset(
         "limits",
         "hierarchy",
         "contributors",
+        "dashboard",
     }
 )
 
@@ -76,6 +77,25 @@ def _serialize_result(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {"value": value}
+
+
+def _serialize_dashboard_result(batch: dict[str, Any]) -> dict[str, Any]:
+    """JSON-ready dashboard batch: lists stay lists (not ``{"items": ...}``).
+
+    Matches ``DashboardBatchResponse`` top-level keys for App.jsx / loadDashboard.
+    """
+
+    def _cell(value: Any) -> Any:
+        if isinstance(value, BaseModel):
+            return value.model_dump(mode="json")
+        if isinstance(value, list):
+            return [
+                item.model_dump(mode="json") if isinstance(item, BaseModel) else item
+                for item in value
+            ]
+        return value
+
+    return {key: _cell(value) for key, value in batch.items()}
 
 
 def _parse_methodology(request: dict[str, Any]) -> VaRMethodology | None:
@@ -119,6 +139,8 @@ def execute_run_type(
         return _serialize_result(portfolio_service.hierarchy(portfolio))
     if run_type == "contributors":
         return _serialize_result(portfolio_service.contributors(portfolio))
+    if run_type == "dashboard":
+        return _serialize_dashboard_result(portfolio_service.dashboard(portfolio))
     raise ValueError(f"unsupported run_type {run_type!r}")
 
 
