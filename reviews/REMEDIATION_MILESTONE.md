@@ -738,7 +738,7 @@ Prefer one completed risk-run artifact or a coherent batch service.
 
 ## R0.10.3 Queue/backpressure — COMPLETE (refuse-gate, 2026-09-04)
 
-When `RISKFORGE_EXTERNAL_WORKER=1` or `RISKFORGE_HEAVY_INLINE=0`, FULL_REVALUATION summary, dashboard, leftover `risk.py` HEAVY routes, and HEAVY stress / attribution / limits refuse request-thread compute (HTTP 400 `Invalid request`, `details.use=/risk/runs`). `run_type=dashboard` on `POST /risk/runs` returns the coherent batch payload (lists stay arrays). Compose `loadDashboard()` still POSTs dashboard only. RF-015 stays open.
+When `RISKFORGE_EXTERNAL_WORKER=1` or `RISKFORGE_HEAVY_INLINE=0`, FULL_REVALUATION summary, dashboard, leftover `risk.py` HEAVY routes, and HEAVY stress / attribution / limits refuse request-thread compute (HTTP 400 `Invalid request`, `details.use=/risk/runs`). `run_type=dashboard` on `POST /risk/runs` returns the coherent batch payload (lists stay arrays). Compose `loadDashboard()` falls back to that RiskRun path on refuse. Other interactive HEAVY UI POSTs still sync. RF-015 stays open.
 
 Bound:
 

@@ -1,16 +1,98 @@
+import { RISK_RUN_POLL_MS, isRiskRunTerminal, riskRunStatus } from './lib/risk.mjs'
+
 /** Canonical API prefix (M7.6 / M8). Bodies unchanged vs legacy dual-mount. */
 export const API_V1 = '/api/v1'
 
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
-async function json(url, options = {}) {
-  const res = await fetch(`${BASE}${url}`, {headers: {'Content-Type':'application/json'}, ...options})
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-  return res.json()
+async function parseJsonBody(res) {
+  const text = await res.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
 }
 
+function httpError(res, body) {
+  const err = new Error(`${res.status} ${res.statusText}`)
+  err.status = res.status
+  err.body = body
+  return err
+}
+
+/** HEAVY inline refuse: HTTP 400 with details.use pointing at /risk/runs. */
+function isHeavyInlineRefuse(err) {
+  return (
+    err?.status === 400 &&
+    err?.body &&
+    typeof err.body === 'object' &&
+    err.body.details?.use === '/risk/runs'
+  )
+}
+
+async function json(url, options = {}) {
+  const res = await fetch(`${BASE}${url}`, {headers: {'Content-Type':'application/json'}, ...options})
+  const body = await parseJsonBody(res)
+  if (!res.ok) throw httpError(res, body)
+  return body
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function pollRiskRunUntilTerminal(runId) {
+  let run = await getRiskRun(runId)
+  while (!isRiskRunTerminal(run)) {
+    await sleep(RISK_RUN_POLL_MS)
+    run = await getRiskRun(runId)
+  }
+  return run
+}
+
+function dashboardPayloadFromRun(run) {
+  const results = Array.isArray(run?.results) ? run.results : []
+  const typed = results.find((r) => r?.result_type === 'dashboard')
+  const entry = typed ?? (results.length === 1 ? results[0] : null)
+  const payload = entry?.payload
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Dashboard risk run completed without a usable payload')
+  }
+  return payload
+}
+
+async function loadDashboardViaRiskRun() {
+  const portfolio = await getPortfolio()
+  const created = await createRiskRun(portfolio, { run_type: 'dashboard' })
+  const runId = created?.id
+  if (!runId) throw new Error('Risk run create response missing id')
+  const run = isRiskRunTerminal(created)
+    ? created
+    : await pollRiskRunUntilTerminal(runId)
+  if (riskRunStatus(run) === 'FAILED') {
+    throw new Error(run.error_message || `Risk run ${runId} FAILED`)
+  }
+  return dashboardPayloadFromRun(run)
+}
+
+/**
+ * Coherent dashboard batch (10 keys). Prefer sync POST /risk/dashboard;
+ * when HEAVY inline is refused, fall back to GET /portfolio + dashboard RiskRun.
+ */
 export async function loadDashboard() {
-  return json(`${API_V1}/risk/dashboard`, {method: 'POST'})
+  try {
+    return await json(`${API_V1}/risk/dashboard`, { method: 'POST' })
+  } catch (err) {
+    if (!isHeavyInlineRefuse(err)) throw err
+    return loadDashboardViaRiskRun()
+  }
+}
+
+/** Demo / default book → Portfolio (GET /portfolio). */
+export function getPortfolio() {
+  return json(`${API_V1}/portfolio`)
 }
 
 export function evaluateCustomScenario(portfolio, scenario) {
