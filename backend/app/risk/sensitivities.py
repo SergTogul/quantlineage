@@ -46,6 +46,7 @@ from app.risk.factor_types import (
     factor_sort_key,
 )
 from app.risk.factors import RiskFactorEngine
+from app.risk.shock_units import bps_to_decimal_rate
 from app.sample import DemoPortfolioMarketDataProvider
 
 MeasureName = Literal[
@@ -173,7 +174,7 @@ class SensitivityEngine:
         """Parallel +1bp-style shock: scalar rates + key_rates + matching curve zeros."""
         if currency not in market.rates:
             return market
-        amount = bps / 10_000.0
+        amount = bps_to_decimal_rate(bps)
         return market.bump(RateZero(currency=currency, tenor="PARALLEL"), amount)
 
     @staticmethod
@@ -185,7 +186,7 @@ class SensitivityEngine:
         touch scalar ``rates[ccy]``). Otherwise fall back to parallel.
         """
         if KEY_RATE_CURVES_CONSUMED_BY_PRICING and _key_rate_tenor_available(market, currency, tenor):
-            return market.bump(RateZero(currency=currency, tenor=tenor), bps / 10_000.0)
+            return market.bump(RateZero(currency=currency, tenor=tenor), bps_to_decimal_rate(bps))
         return SensitivityEngine._bump_parallel_rate(market, currency, bps)
 
     @staticmethod
