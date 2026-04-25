@@ -29,6 +29,7 @@ from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero
 from app.risk.historical import require_explicit_market
 from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory
+from app.risk.shock_units import bps_to_decimal_rate
 from app.sample import DemoAggregateMarketDataProvider
 
 FactorFamily = Literal["equity", "rates", "vol", "fx"]
@@ -56,15 +57,15 @@ def from_wire_bound(factor: FactorFamily, max_shock: float) -> float:
     """Interpret request ``max_shock`` as internal search magnitude.
 
     For equity/vol/fx, ``max_shock`` is already relative. For rates the API
-    historically passed the same relative-style bound (e.g. 0.80) which this
-    engine maps to ``0.80 * 1000 = 800`` bp — callers that pass an explicit
-    bp bound (> 1) are also accepted.
+    historically passes the same relative-style bound (e.g. ``0.80``), which
+    ``to_wire_shock`` maps to ``0.80 * 1000 = 800`` bp. Always treat rates
+    ``max_shock`` as that legacy relative-style magnitude — never guess bp from
+    magnitude (``500`` is not reinterpreted as 500 bp; pass ``0.5`` for 500 bp).
+
+    ``factor`` selects which family's wire unit applies at the call site; it does
+    not change the numeric interpretation of ``max_shock`` itself.
     """
-    if factor != "rates":
-        return float(max_shock)
-    # Heuristic: values > 1 are treated as bp (e.g. max_shock=500 → 500bp).
-    if max_shock > 1.0:
-        return float(max_shock) / RATES_BP_SCALE
+    _ = factor
     return float(max_shock)
 
 
@@ -95,8 +96,8 @@ def build_single_factor_shocks(
         for pair in base.fx_spots:
             shocks.append(FactorShock(FXSpot(pair), -float(magnitude)))
     elif factor == "rates":
-        # magnitude * RATES_BP_SCALE bp → decimal zero = bp / 10000
-        decimal = float(magnitude) * RATES_BP_SCALE / 10000.0
+        # magnitude * RATES_BP_SCALE bp → absolute decimal zero via shock_units
+        decimal = bps_to_decimal_rate(float(magnitude) * RATES_BP_SCALE)
         for ccy in base.rates:
             shocks.append(FactorShock(RateZero(currency=ccy, tenor="ALL"), decimal))
     else:

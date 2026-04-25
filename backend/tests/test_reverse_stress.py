@@ -10,7 +10,8 @@ Acceptance:
 Units / sign:
 - equity / fx: relative adverse down-move; ``required_shock`` is magnitude
 - vol: relative vol-up; ``required_shock`` is magnitude
-- rates: ``required_shock`` in bp (legacy scale: max_shock=0.80 → 800bp bound)
+- rates: ``required_shock`` in bp (legacy scale: max_shock=0.80 → 800bp bound;
+  always relative-style magnitude — never ``max_shock > 1`` → bp heuristic)
 - loss = max(0, -pnl); loss_pct = loss / |base_mv|
 - Tolerances: abs 1e-6 on loss fraction; abs 1e-4 on pnl / |NAV| reconciliation
 """
@@ -143,7 +144,11 @@ def test_vol_reverse_stress_returns_relative_shock(engine, pricing):
 def test_rates_wire_units_bp(engine, pricing):
     assert to_wire_shock("rates", 0.1) == pytest.approx(100.0)
     assert from_wire_bound("rates", 0.80) == pytest.approx(0.80)
-    assert from_wire_bound("rates", 500.0) == pytest.approx(0.5)  # explicit bp bound
+    # Breaking change (R0.4.3-B / RF-004): no magnitude heuristic. ``500`` is
+    # *not* reinterpreted as 500 bp; pass ``0.5`` → 500 bp via RATES_BP_SCALE.
+    assert from_wire_bound("rates", 500.0) == pytest.approx(500.0)
+    assert to_wire_shock("rates", 0.5) == pytest.approx(500.0)
+    assert from_wire_bound("rates", 0.5) == pytest.approx(0.5)
 
     result = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.002, "rates", 0.8, market=SAMPLE_MARKET)
     assert result.shock_unit == "bp"
@@ -152,6 +157,27 @@ def test_rates_wire_units_bp(engine, pricing):
         # Bound is 800bp when max_shock=0.8
         assert 0 < result.required_shock <= 800.0 + 1e-6
         assert result.convergence.search_bound == pytest.approx(800.0)
+
+
+def test_rates_from_wire_bound_no_magnitude_heuristic():
+    """RF-004: unit choice must not depend on whether max_shock > 1."""
+    import inspect
+
+    import app.risk.reverse_stress as reverse_stress_mod
+
+    source = inspect.getsource(from_wire_bound)
+    assert "max_shock > 1" not in source
+    assert "/ RATES_BP_SCALE" not in source
+    # Same pass-through for ≤1 and >1; wire bp only via to_wire_shock scale.
+    assert from_wire_bound("rates", 0.80) == pytest.approx(0.80)
+    assert from_wire_bound("rates", 1.0) == pytest.approx(1.0)
+    assert from_wire_bound("rates", 1.01) == pytest.approx(1.01)
+    assert from_wire_bound("rates", 500.0) == pytest.approx(500.0)
+    assert from_wire_bound("rates", 500.0) != pytest.approx(0.5)
+    assert to_wire_shock("rates", from_wire_bound("rates", 0.5)) == pytest.approx(500.0)
+    # Equity/vol/fx also pass through without magnitude branching.
+    assert from_wire_bound("equity", 500.0) == pytest.approx(500.0)
+    assert "if max_shock > 1.0" not in inspect.getsource(reverse_stress_mod)
 
 
 def test_service_and_api_compatibility():

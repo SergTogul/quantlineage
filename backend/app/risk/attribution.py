@@ -49,6 +49,7 @@ from app.domain.models import (
     Valuation,
 )
 from app.interfaces.pricing import PricingEngine
+from app.risk.shock_units import decimal_rate_to_bps, relative_vol_move_to_vol_points
 from app.sample import DemoAggregateMarketDataProvider
 
 # Stable driver labels (API / UI). Residual stays on AttributionReport.residual.
@@ -152,8 +153,9 @@ def _greek_buckets_for_position(
         if isinstance(position, EuropeanOptionPosition):
             v0 = float(previous.equity_vols.get(sym, 0.0))
             v1 = float(current.equity_vols.get(sym, v0))
-            # Valuation.vega is P&L per 1 absolute vol point (0.01).
-            out[DRIVER_VEGA] += val.vega * (v1 - v0) * 100.0
+            # Valuation.vega is P&L per 1 absolute vol point (0.01 decimal vol).
+            # Absolute vol delta uses the same ×100 scale as relative→points.
+            out[DRIVER_VEGA] += val.vega * relative_vol_move_to_vol_points(v1 - v0)
 
     pair = _fx_pair(position)
     if pair is not None:
@@ -165,13 +167,13 @@ def _greek_buckets_for_position(
         if isinstance(position, FXOptionPosition):
             v0 = float(previous.fx_vols.get(pair, 0.0))
             v1 = float(current.fx_vols.get(pair, v0))
-            out[DRIVER_VEGA] += val.vega * (v1 - v0) * 100.0
+            out[DRIVER_VEGA] += val.vega * relative_vol_move_to_vol_points(v1 - v0)
 
     ccy = _rate_currency(position)
     if ccy is not None and val.dv01:
         r0 = float(previous.rates.get(ccy, 0.0))
         r1 = float(current.rates.get(ccy, r0))
-        out[DRIVER_RATES] += val.dv01 * (r1 - r0) * 10000.0
+        out[DRIVER_RATES] += val.dv01 * decimal_rate_to_bps(r1 - r0)
 
     out[DRIVER_THETA] += _theta_for_position(position, pricing, previous, val.market_value, dt_years)
     return out
