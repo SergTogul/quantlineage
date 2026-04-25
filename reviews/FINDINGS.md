@@ -292,7 +292,7 @@ This safety net must land **before** structural risk-engine changes.
 Priority: **P0**  
 Risk types: CORRECTNESS, ARCHITECTURE, TEST_GAP  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-09). R0.1.3 unit goldens; R0.4.3-A APPROVE — canonical `shock_units` helpers wired into `approximate_pnl_series` and SensitivityEngine rate bumps (no numerical change). Remaining: R0.4.3-B (finish conversion call sites / no magnitude heuristics), R0.4.2 Scenario converge, R0.4.4–R0.4.5 one-pass / price-many, R0.4.1 typed markets. Do not close.
+Status: **IN PROGRESS** (2026-09-09). R0.1.3 unit goldens; R0.4.3-A APPROVE — canonical `shock_units` helpers; R0.4.3-B COMPLETE — remaining risk-layer conversion call sites + reverse-stress magnitude heuristic removed. Remaining: R0.4.2 Scenario converge, R0.4.4–R0.4.5 one-pass / price-many, R0.4.1 typed markets. Do not close.
 
 Source findings:
 

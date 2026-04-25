@@ -299,7 +299,7 @@ def _panel_linear_contribution(factor: RiskFactor, valuation: Valuation, move: f
     if isinstance(factor, FXSpot):
         return float(valuation.fx_delta) * move
     if isinstance(factor, (EquityVol, FXVol)):
-        return float(valuation.vega) * (move * 100.0)
+        return float(valuation.vega) * relative_vol_move_to_vol_points(move)
     if isinstance(factor, RateZero):
         return float(valuation.dv01) * move
     raise TypeError(f"unsupported risk factor type: {type(factor)!r}")

@@ -399,7 +399,9 @@ Keep legacy wire adapters only during the migration.
 
 ## R0.4.3 Explicit shock units
 
-R0.4.3-A COMPLETE (2026-09-09): `app.risk.shock_units` owns bp↔decimal and relative-vol→vol-points; approximate P&L and SensitivityEngine rate bumps convert through helpers. Dual vol conventions remain documented (FactorShock relative vs FD absolute). RF-004 stays open for R0.4.3-B+.
+R0.4.3-A COMPLETE (2026-09-09): `app.risk.shock_units` owns bp↔decimal and relative-vol→vol-points; approximate P&L and SensitivityEngine rate bumps convert through helpers. Dual vol conventions remain documented (FactorShock relative vs FD absolute).
+
+R0.4.3-B COMPLETE (2026-09-09): remaining risk-layer conversion call sites wired; reverse-stress `from_wire_bound` magnitude heuristic removed (**breaking**: rates `max_shock` is always the relative-style bound). RF-004 stays open for R0.4.2+.
 
 Every factor shock must have one unambiguous internal convention.
 
