@@ -8,6 +8,12 @@ Shock application rule (charter): transform a base ``MarketSnapshot`` via
 ``MarketSnapshot.apply`` / ``bump`` — never embed instrument pricing in
 scenario code.
 
+Engine-facing shocks are ``FactorShock`` amounts in ``MarketSnapshot.bump``
+units (see ``FactorShock`` and ``app.risk.shock_units``). Legacy
+``StressScenario`` bp fields (``rates_shift_bps`` / ``rate_shocks_bps``)
+convert only at the adapter boundary via ``bps_to_decimal_rate`` /
+``decimal_rate_to_bps`` — expand/collapse must not inline bp↔decimal scales.
+
 Legacy ``StressScenario`` (flat scalar/dict fields) remains the wire/API shape
 for existing stress endpoints. M3.8 adds formal ``ScenarioWire`` under
 ``/api/v1/risk/stress/formal/*`` and ``GET .../scenarios/formal`` (see
@@ -25,6 +31,7 @@ from typing import Any, Mapping, Sequence
 from app.domain.models import MarketSnapshot, ScenarioKind, StressScenario
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
 from app.risk.scenarios import FactorChange, MarketScenario
+from app.risk.shock_units import bps_to_decimal_rate, decimal_rate_to_bps
 
 
 class ScenarioCategory(str, Enum):
@@ -198,7 +205,8 @@ def _expand_stress_to_shocks(stress: StressScenario, base: MarketSnapshot) -> tu
     """Expand legacy scalar/dict StressScenario fields onto factors in ``base``.
 
     Order matches ``shock_snapshot``: equity spots, equity vols, FX spots,
-    FX vols, then parallel rates.
+    FX vols, then parallel rates. Rate bp fields convert to decimal bump
+    amounts via :func:`bps_to_decimal_rate` at this adapter boundary only.
     """
     shocks: list[FactorShock] = []
     for sym in base.equity_spots:
@@ -220,7 +228,9 @@ def _expand_stress_to_shocks(stress: StressScenario, base: MarketSnapshot) -> tu
     for ccy in base.rates:
         bps = stress.rate_shocks_bps.get(ccy, stress.rates_shift_bps)
         if bps:
-            shocks.append(FactorShock(RateZero(currency=ccy, tenor="ALL"), float(bps) / 10000.0))
+            shocks.append(
+                FactorShock(RateZero(currency=ccy, tenor="ALL"), bps_to_decimal_rate(float(bps)))
+            )
     return tuple(shocks)
 
 
@@ -255,6 +265,8 @@ def scenario_to_stress(scenario: Scenario) -> StressScenario:
 
     Aggregate scalar fields stay at zero; per-name dicts carry moves so
     ``shock_snapshot(base, scenario_to_stress(s))`` matches ``apply_scenario``.
+    Rate decimal bump amounts convert back to bp via
+    :func:`decimal_rate_to_bps` at this adapter boundary only.
     """
     equity_shocks: dict[str, float] = {}
     vol_shocks: dict[str, float] = {}
@@ -272,7 +284,7 @@ def scenario_to_stress(scenario: Scenario) -> StressScenario:
         elif isinstance(factor, FXSpot):
             fx_shocks[factor.pair] = amount
         elif isinstance(factor, RateZero):
-            rate_shocks_bps[factor.currency] = amount * 10000.0
+            rate_shocks_bps[factor.currency] = decimal_rate_to_bps(amount)
         else:
             raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
     return StressScenario(

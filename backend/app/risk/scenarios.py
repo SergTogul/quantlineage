@@ -16,8 +16,10 @@ that still need the materialized collection.
 Units (aligned with ``FactorObservationSeries`` and ``MarketSnapshot.bump``):
 - equity / FX: relative return (0.01 = +1%)
 - vol: relative change of vol level (0.07 ≈ +7% of current vol)
-- rates: observation series stores **basis points**; bump uses **decimal**
-  (1bp → ``RateZero(..., "ALL")`` with amount ``1/10000``)
+- rates: observation / panel stores **basis points**; engine-facing
+  ``FactorChange`` / bump uses **decimal** via
+  :func:`app.risk.shock_units.bps_to_decimal_rate` at expand boundaries
+  (1bp → ``RateZero(..., "ALL")`` with amount ``0.0001``)
 
 Opt-in ``HistoricalFactorPanel`` path (R0.5.3 leftover):
 ``iter_panel_shocked_snapshots`` applies per-name / per-tenor panel columns
@@ -35,6 +37,7 @@ from app.domain.models import MarketSnapshot, ScenarioKind, StressScenario
 from app.risk.factor_panel import FactorPanelObservation, HistoricalFactorPanel
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
 from app.risk.historical_data import FactorObservationSeries, HistoricalMarketDataset
+from app.risk.shock_units import bps_to_decimal_rate, decimal_rate_to_bps
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,7 +116,7 @@ def expand_aggregate_change(
             shocks.append(FactorChange(FXVol(pair=pair), vol))
     bps = change.rate_move_bps
     if bps:
-        decimal_shift = bps / 10000.0
+        decimal_shift = bps_to_decimal_rate(bps)
         for ccy in base.rates:
             shocks.append(FactorChange(RateZero(currency=ccy, tenor="ALL"), decimal_shift))
     return tuple(shocks)
@@ -204,10 +207,10 @@ def panel_amount_to_bump(factor: RiskFactor, amount: float) -> float:
     """Convert a panel change into ``MarketSnapshot.bump`` units.
 
     Panel rate moves are basis points (``1.0`` = +1bp); bump uses decimal
-    rate (``0.0001`` = +1bp). Equity / FX / vol stay relative.
+    rate via :func:`bps_to_decimal_rate`. Equity / FX / vol stay relative.
     """
     if isinstance(factor, RateZero):
-        return float(amount) / 10000.0
+        return bps_to_decimal_rate(amount)
     return float(amount)
 
 
@@ -293,7 +296,7 @@ def to_stress_scenario(scenario: MarketScenario) -> StressScenario:
         elif isinstance(factor, FXSpot):
             fx_shocks[factor.pair] = amount
         elif isinstance(factor, RateZero):
-            rate_shocks_bps[factor.currency] = amount * 10000.0
+            rate_shocks_bps[factor.currency] = decimal_rate_to_bps(amount)
         else:
             raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
     return StressScenario(
