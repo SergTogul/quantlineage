@@ -26,6 +26,7 @@ from app.domain.models import (
 from app.interfaces.pricing import PricingEngine
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
 from app.risk.historical import require_explicit_market
+from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import (
     FactorShock,
     Scenario,
@@ -101,8 +102,11 @@ def _portfolio_pnl_by_position(
     market: MarketSnapshot,
     base_by_position: dict[str, float],
 ) -> dict[str, float]:
+    # One shocked snapshot per scenario (or isolated-factor sub-scenario), then
+    # revalue every position — do not rebuild via shocked_value per trade.
+    shocked = apply_scenario(market, stress)
     return {
-        p.id: pricing.shocked_value(p, stress, market) - base_by_position[p.id]
+        p.id: pricing.value(p, shocked).market_value - base_by_position[p.id]
         for p in portfolio.positions
     }
 

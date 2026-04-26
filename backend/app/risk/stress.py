@@ -5,8 +5,9 @@ Multi-factor snapshot shocks (equity / rates / FX / vol) live in
 ``app.risk.crisis_library`` (M3.3) as formal HISTORICAL_APPROXIMATION scenarios.
 Single-factor reverse stress lives in ``app.risk.reverse_stress`` (M3.5).
 Multi-factor reverse stress lives in ``app.risk.reverse_stress_multi`` (M3.6).
-``PricingEngine.shocked_value`` applies scenarios via ``shock_snapshot`` →
-``apply_scenario``.
+Stress loops apply each scenario once via ``apply_scenario``, then revalue
+every position on that shared shocked snapshot (``PricingEngine.value``).
+``PricingEngine.shocked_value`` remains available for single-position callers.
 """
 
 from __future__ import annotations
@@ -149,8 +150,9 @@ class StressEngine:
         base = {p.id: pricing_engine.value(p, market).market_value for p in portfolio.positions}
         output = []
         for scenario in scenarios:
+            shocked = apply_scenario(market, scenario)
             by_position = {
-                p.id: pricing_engine.shocked_value(p, scenario, market) - base[p.id]
+                p.id: pricing_engine.value(p, shocked).market_value - base[p.id]
                 for p in portfolio.positions
             }
             output.append(StressResult(
@@ -192,8 +194,9 @@ class StressEngine:
         evaluations: list[StressEvaluation] = []
 
         for index, scenario in enumerate(scenarios):
+            shocked = apply_scenario(market, scenario)
             by_position = {
-                p.id: pricing_engine.shocked_value(p, scenario, market) - base_by_position[p.id]
+                p.id: pricing_engine.value(p, shocked).market_value - base_by_position[p.id]
                 for p in portfolio.positions
             }
             pnl = sum(by_position.values())
