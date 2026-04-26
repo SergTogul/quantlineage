@@ -612,15 +612,18 @@ class MarketSnapshot(FiniteInputMixin):
 
         return FxMarket(spots=self.fx_spots)
 
-    def _bump_rate_zero(self, factor, amount: float) -> MarketSnapshot:
-        """Parallel vs tenor RateZero shock (see class docstring)."""
+    def _staging_maps(self) -> dict[str, Any]:
+        """Mutable plain-dict copies of all nested map fields (unfrozen once)."""
+        return {name: _deep_unfreeze(getattr(self, name)) for name in self._NESTED_MAP_FIELDS}
+
+    def _stage_rate_zero(self, staging: dict[str, Any], factor, amount: float, current_id: str) -> str:
+        """Parallel vs tenor RateZero shock into staging (see class docstring)."""
         ccy = factor.currency
         tenor = factor.tenor
         parallel = tenor in _RATE_PARALLEL_TENORS
-
-        rates = dict(self.rates)
-        key_rates = {c: dict(tenors) for c, tenors in self.key_rates.items()}
-        curves = {name: _deep_unfreeze(payload) for name, payload in self.curves.items()}
+        rates = staging["rates"]
+        key_rates = staging["key_rates"]
+        curves = staging["curves"]
 
         if parallel:
             if ccy not in rates:
@@ -631,14 +634,7 @@ class MarketSnapshot(FiniteInputMixin):
             for name, payload in list(curves.items()):
                 if _curve_matches_currency(payload, ccy):
                     curves[name] = _bump_curve_zeros(payload, amount, tenor=None)
-            return self.model_copy(
-                update={
-                    "id": f"{self.id}:bump:{factor.key}:{tenor}",
-                    "rates": rates,
-                    "key_rates": key_rates,
-                    "curves": curves,
-                }
-            )
+            return f"{current_id}:bump:{factor.key}:{tenor}"
 
         # Tenor-specific: key_rates + curve zeros only — never parallel-shift rates[ccy].
         touched = False
@@ -657,76 +653,75 @@ class MarketSnapshot(FiniteInputMixin):
                 f"tenor {tenor!r} not in key_rates or curves for {ccy}; "
                 f"use RateZero({ccy!r}, 'PARALLEL') or 'ALL' for a parallel shock"
             )
-        return self.model_copy(
-            update={
-                "id": f"{self.id}:bump:{factor.key}:{tenor}",
-                "key_rates": key_rates,
-                "curves": curves,
-            }
-        )
+        return f"{current_id}:bump:{factor.key}:{tenor}"
 
-    def bump(self, factor, amount: float) -> MarketSnapshot:
-        """Return a new snapshot with one typed factor shocked."""
+    def _stage_shock(self, staging: dict[str, Any], factor, amount: float, current_id: str) -> str:
+        """Apply one typed shock to staging maps; return the bump-chained id."""
         from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero
 
         if isinstance(factor, EquitySpot):
-            spots = dict(self.equity_spots)
+            spots = staging["equity_spots"]
             if factor.symbol not in spots:
                 raise KeyError(f"equity spot not in snapshot: {factor.symbol}")
             spots[factor.symbol] = spots[factor.symbol] * (1.0 + amount)
-            return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "equity_spots": spots})
+            return f"{current_id}:bump:{factor.key}"
         if isinstance(factor, FXSpot):
-            spots = dict(self.fx_spots)
+            spots = staging["fx_spots"]
             if factor.pair not in spots:
                 raise KeyError(f"fx spot not in snapshot: {factor.pair}")
             spots[factor.pair] = spots[factor.pair] * (1.0 + amount)
-            return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "fx_spots": spots})
+            return f"{current_id}:bump:{factor.key}"
         if isinstance(factor, EquityVol):
-            vols = dict(self.equity_vols)
+            vols = staging["equity_vols"]
             if factor.underlying not in vols:
                 raise KeyError(f"equity vol not in snapshot: {factor.underlying}")
             vols[factor.underlying] = max(1e-6, vols[factor.underlying] * (1.0 + amount))
-            surfaces = {name: _deep_unfreeze(payload) for name, payload in self.vol_surfaces.items()}
+            surfaces = staging["vol_surfaces"]
             payload = surfaces.get(factor.underlying)
             if payload is not None and _vol_surface_matches_asset_class(payload, "equity"):
                 surfaces[factor.underlying] = _bump_vol_surface_payload(payload, factor, amount)
                 vols[factor.underlying] = float(surfaces[factor.underlying]["atm_vol"])
-                return self.model_copy(
-                    update={
-                        "id": f"{self.id}:bump:{factor.key}",
-                        "equity_vols": vols,
-                        "vol_surfaces": surfaces,
-                    }
-                )
-            return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "equity_vols": vols})
+            return f"{current_id}:bump:{factor.key}"
         if isinstance(factor, FXVol):
-            vols = dict(self.fx_vols)
+            vols = staging["fx_vols"]
             if factor.pair not in vols:
                 raise KeyError(f"fx vol not in snapshot: {factor.pair}")
             vols[factor.pair] = max(1e-6, vols[factor.pair] * (1.0 + amount))
-            surfaces = {name: _deep_unfreeze(payload) for name, payload in self.vol_surfaces.items()}
+            surfaces = staging["vol_surfaces"]
             payload = surfaces.get(factor.pair)
             if payload is not None and _vol_surface_matches_asset_class(payload, "fx"):
                 surfaces[factor.pair] = _bump_vol_surface_payload(payload, factor, amount)
                 vols[factor.pair] = float(surfaces[factor.pair]["atm_vol"])
-                return self.model_copy(
-                    update={
-                        "id": f"{self.id}:bump:{factor.key}",
-                        "fx_vols": vols,
-                        "vol_surfaces": surfaces,
-                    }
-                )
-            return self.model_copy(update={"id": f"{self.id}:bump:{factor.key}", "fx_vols": vols})
+            return f"{current_id}:bump:{factor.key}"
         if isinstance(factor, RateZero):
-            return self._bump_rate_zero(factor, amount)
+            return self._stage_rate_zero(staging, factor, amount, current_id)
         raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
 
+    def bump(self, factor, amount: float) -> MarketSnapshot:
+        """Return a new snapshot with one typed factor shocked."""
+        return self.apply([(factor, amount)])
+
     def apply(self, shocks: list) -> MarketSnapshot:
-        """Apply an ordered sequence of ``(RiskFactor, amount)`` shocks."""
-        out = self
+        """Apply an ordered sequence of ``(RiskFactor, amount)`` shocks.
+
+        Stages all nested maps once, applies every shock with the same
+        semantics as historical per-factor ``bump``, then constructs one new
+        immutable snapshot (single ``model_copy`` / nested freeze). Empty
+        ``shocks`` returns ``self``.
+
+        Id policy: each shock appends the same ``:bump:…`` suffix that a
+        successive ``bump`` would, so ``apply(shocks).id`` matches the final
+        id of sequential bumping. Callers that assign a scenario id (e.g.
+        ``apply_scenario``) may ``model_copy`` the id afterward.
+        """
+        if not shocks:
+            return self
+        staging = self._staging_maps()
+        new_id = self.id
         for factor, amount in shocks:
-            out = out.bump(factor, amount)
-        return out
+            new_id = self._stage_shock(staging, factor, amount, new_id)
+        update = {"id": new_id, **staging}
+        return self.model_copy(update=update)
 
     def diff(self, other: MarketSnapshot) -> dict[str, float]:
         """Content diff vs ``other`` (self → other).

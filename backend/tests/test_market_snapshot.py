@@ -182,6 +182,100 @@ def test_apply_multiple_shocks():
     assert out.fx_spots["EURUSD"] == pytest.approx(1.10 * 0.95)
 
 
+def _sequential_bump(base: MarketSnapshot, shocks: list) -> MarketSnapshot:
+    out = base
+    for factor, amount in shocks:
+        out = out.bump(factor, amount)
+    return out
+
+
+def test_apply_mark_parity_vs_sequential_bump_multifactor():
+    """R0.4.4: one-pass apply must match sequential bump marks exactly."""
+    base = attach_vol_surface(
+        attach_standard_usd_curves(
+            MarketSnapshot(
+                id="base",
+                equity_spots={"SPY": 100.0, "NVDA": 50.0},
+                equity_vols={"SPY": 0.20},
+                fx_spots={"EURUSD": 1.10},
+                fx_vols={"EURUSD": 0.10},
+                rates={"USD": 0.04, "EUR": 0.03},
+                key_rates={"EUR": {"10Y": 0.03}},
+            )
+        ),
+        build_equity_vol_surface("SPY", 0.20),
+    )
+    shocks = [
+        (EquitySpot("SPY"), -0.10),
+        (EquitySpot("NVDA"), 0.05),
+        (EquityVol(underlying="SPY"), 0.25),
+        (FXSpot("EURUSD"), -0.05),
+        (FXVol(pair="EURUSD"), 0.10),
+        (RateZero(currency="USD", tenor="PARALLEL"), 0.0025),
+        (RateZero(currency="USD", tenor="10Y"), 0.001),
+        (RateZero(currency="EUR", tenor="ALL"), 0.0015),
+    ]
+    via_apply = base.apply(shocks)
+    via_seq = _sequential_bump(base, shocks)
+
+    assert via_apply.equity_spots == via_seq.equity_spots
+    assert via_apply.equity_vols == via_seq.equity_vols
+    assert via_apply.fx_spots == via_seq.fx_spots
+    assert via_apply.fx_vols == via_seq.fx_vols
+    assert via_apply.rates == via_seq.rates
+    assert via_apply.key_rates == via_seq.key_rates
+    assert via_apply.curves == via_seq.curves
+    assert via_apply.vol_surfaces == via_seq.vol_surfaces
+    assert via_apply.content_hash() == via_seq.content_hash()
+    # Id policy: apply chains the same ``:bump:`` id segments as sequential bump
+    # so the final id matches the last bump in the chain (documented on apply).
+    assert via_apply.id == via_seq.id
+
+
+def test_apply_freezes_once_not_per_factor(monkeypatch):
+    """R0.4.4: multi-factor apply must not model_copy/freeze once per factor."""
+    base = MarketSnapshot(
+        id="base",
+        equity_spots={"A": 10.0, "B": 20.0, "C": 30.0, "D": 40.0},
+        rates={"USD": 0.04},
+    )
+    shocks = [
+        (EquitySpot("A"), 0.01),
+        (EquitySpot("B"), 0.02),
+        (EquitySpot("C"), -0.01),
+        (EquitySpot("D"), 0.03),
+        (RateZero(currency="USD", tenor="PARALLEL"), 0.0001),
+    ]
+    assert len(shocks) > 1
+
+    copy_calls = {"n": 0}
+    freeze_calls = {"n": 0}
+    real_copy = MarketSnapshot.model_copy
+    real_freeze = MarketSnapshot._apply_nested_freeze
+
+    def counting_copy(self, *args, **kwargs):
+        copy_calls["n"] += 1
+        return real_copy(self, *args, **kwargs)
+
+    def counting_freeze(self):
+        freeze_calls["n"] += 1
+        return real_freeze(self)
+
+    monkeypatch.setattr(MarketSnapshot, "model_copy", counting_copy)
+    monkeypatch.setattr(MarketSnapshot, "_apply_nested_freeze", counting_freeze)
+
+    out = base.apply(shocks)
+    k = len(shocks)
+    # O(1) boundary: at most one model_copy and a small constant of freezes
+    # (constructor/validator + model_copy path), not one per factor.
+    assert copy_calls["n"] <= 1, f"model_copy called {copy_calls['n']} times for {k} shocks"
+    assert freeze_calls["n"] <= 2, f"_apply_nested_freeze called {freeze_calls['n']} times for {k} shocks"
+    assert copy_calls["n"] < k
+    assert freeze_calls["n"] < k
+    assert out.equity_spots["A"] == pytest.approx(10.1)
+    assert out.rates["USD"] == pytest.approx(0.0401)
+
+
 def test_diff_identical_is_empty():
     a = MarketSnapshot(equity_spots={"SPY": 100.0}, rates={"USD": 0.04})
     b = MarketSnapshot(equity_spots={"SPY": 100.0}, rates={"USD": 0.04})
