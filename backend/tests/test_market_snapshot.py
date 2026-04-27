@@ -419,16 +419,72 @@ def test_shock_snapshot_matches_typed_apply():
 
 
 def test_submarket_views_expose_grouped_marks():
+    """R0.4.1-A: typed views are the canonical grouped inspection API."""
+    from types import MappingProxyType
+
+    from app.market.markets import EquityMarket, FxMarket, RateMarket, VolMarket
+
     snap = MarketSnapshot(
         equity_spots={"SPY": 100.0},
         equity_vols={"SPY": 0.2},
         fx_spots={"EURUSD": 1.1},
         fx_vols={"EURUSD": 0.1},
         rates={"USD": 0.04},
+        dividend_yields={"SPY": 0.015},
+        projection_rates={"USD": 0.041},
+        rate_spreads={"USD": 0.001},
         key_rates={"USD": {"10Y": 0.041}},
+        vol_surfaces={"SPY": {"asset_class": "equity", "atm_vol": 0.2}},
     )
-    assert snap.equity.spots["SPY"] == 100.0
-    assert snap.vol.equity["SPY"] == 0.2
-    assert snap.fx.spots["EURUSD"] == 1.1
-    assert snap.rates_market.discount["USD"] == 0.04
-    assert snap.rates_market.key_rates["USD"]["10Y"] == 0.041
+
+    equity = snap.equity
+    rates = snap.rates_market
+    vol = snap.vol
+    fx = snap.fx
+
+    assert isinstance(equity, EquityMarket)
+    assert isinstance(rates, RateMarket)
+    assert isinstance(vol, VolMarket)
+    assert isinstance(fx, FxMarket)
+
+    assert equity.spots is snap.equity_spots
+    assert equity.dividend_yields is snap.dividend_yields
+    assert equity.spots["SPY"] == 100.0
+    assert equity.dividend_yields["SPY"] == 0.015
+
+    assert rates.discount is snap.rates
+    assert rates.projection is snap.projection_rates
+    assert rates.spreads is snap.rate_spreads
+    assert rates.key_rates is snap.key_rates
+    assert rates.discount["USD"] == 0.04
+    assert rates.projection["USD"] == 0.041
+    assert rates.spreads["USD"] == 0.001
+    assert rates.key_rates["USD"]["10Y"] == 0.041
+
+    assert vol.equity is snap.equity_vols
+    assert vol.fx is snap.fx_vols
+    assert vol.surfaces is snap.vol_surfaces
+    assert vol.equity["SPY"] == 0.2
+    assert vol.fx["EURUSD"] == 0.1
+    assert vol.surfaces["SPY"]["atm_vol"] == 0.2
+
+    assert fx.spots is snap.fx_spots
+    assert fx.spots["EURUSD"] == 1.1
+
+    # Frozen dataclass + MappingProxy-backed nested marks.
+    with pytest.raises(Exception):
+        equity.spots = {}  # type: ignore[misc]
+    with pytest.raises(Exception):
+        rates.discount = {}  # type: ignore[misc]
+    assert isinstance(equity.spots, MappingProxyType)
+    assert isinstance(rates.key_rates, MappingProxyType)
+    assert isinstance(vol.surfaces, MappingProxyType)
+    assert isinstance(fx.spots, MappingProxyType)
+    with pytest.raises(TypeError):
+        equity.spots["SPY"] = 1.0  # type: ignore[index]
+    with pytest.raises(TypeError):
+        rates.key_rates["USD"]["10Y"] = 0.99  # type: ignore[index]
+    with pytest.raises(TypeError):
+        vol.surfaces["SPY"]["atm_vol"] = 0.99  # type: ignore[index]
+    with pytest.raises(TypeError):
+        fx.spots["EURUSD"] = 0.0  # type: ignore[index]

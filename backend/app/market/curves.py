@@ -7,7 +7,8 @@ surface; adapters may consume ``to_dict()`` / ``df`` / ``zero`` later.
 Conventions
 -----------
 - Zero rates: continuously compounded absolute decimal (0.04 = 4%).
-- Shifts: basis points (25 = +0.0025 absolute).
+- Shifts: basis points (25 = +0.0025 absolute), converted via
+  ``app.risk.shock_units.bps_to_decimal_rate`` (no inline bp-to-decimal scale).
 - Key tenors: 1Y, 2Y, 5Y, 7Y, 10Y, 20Y, 30Y.
 """
 
@@ -16,6 +17,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from typing import Literal, Mapping
+
+from app.risk.shock_units import bps_to_decimal_rate
 
 CurveType = Literal["discount", "projection"]
 BootstrapInstrumentKind = Literal["deposit", "simple", "zero"]
@@ -162,7 +165,7 @@ class YieldCurve:
 
     def parallel_shift_bps(self, bps: float) -> YieldCurve:
         """Add ``bps`` to every pillar (immutable)."""
-        shift = bps / 10_000.0
+        shift = bps_to_decimal_rate(bps)
         nodes = tuple(
             CurveNode(tenor=n.tenor, years=n.years, zero_rate=n.zero_rate + shift)
             for n in self.nodes
@@ -178,7 +181,7 @@ class YieldCurve:
         """Bump a single key tenor; linear zero interpolation yields a tent bump."""
         if tenor not in TENOR_YEARS:
             raise KeyError(f"unknown key tenor: {tenor}")
-        shift = bps / 10_000.0
+        shift = bps_to_decimal_rate(bps)
         nodes = tuple(
             CurveNode(
                 tenor=n.tenor,

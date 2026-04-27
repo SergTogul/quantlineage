@@ -585,12 +585,14 @@ class MarketSnapshot(FiniteInputMixin):
 
     @property
     def equity(self):
+        """Canonical typed equity sub-market view (``app.market.markets.EquityMarket``)."""
         from app.market.markets import EquityMarket
 
         return EquityMarket(spots=self.equity_spots, dividend_yields=self.dividend_yields)
 
     @property
     def rates_market(self):
+        """Canonical typed rates sub-market view (``app.market.markets.RateMarket``)."""
         from app.market.markets import RateMarket
 
         return RateMarket(
@@ -602,12 +604,14 @@ class MarketSnapshot(FiniteInputMixin):
 
     @property
     def vol(self):
+        """Canonical typed vol sub-market view (``app.market.markets.VolMarket``)."""
         from app.market.markets import VolMarket
 
         return VolMarket(equity=self.equity_vols, fx=self.fx_vols, surfaces=self.vol_surfaces)
 
     @property
     def fx(self):
+        """Canonical typed FX sub-market view (``app.market.markets.FxMarket``)."""
         from app.market.markets import FxMarket
 
         return FxMarket(spots=self.fx_spots)
