@@ -292,7 +292,7 @@ This safety net must land **before** structural risk-engine changes.
 Priority: **P0**  
 Risk types: CORRECTNESS, ARCHITECTURE, TEST_GAP  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-08). R0.1.3 unit goldens; R0.4.3-A APPROVE — canonical `shock_units` helpers; R0.4.3-B COMPLETE — remaining risk-layer conversion call sites + reverse-stress magnitude heuristic removed; R0.4.2-A COMPLETE — scenario expand/collapse uses `shock_units` + stress↔formal parity golden; R0.4.4 COMPLETE — one-pass `MarketSnapshot.apply` (freeze once); R0.4.5 COMPLETE — StressEngine scenario-once-price-many (RF-006 still open for full acceptance); R0.4.1-A COMPLETE — typed sub-market views pinned + curve bp shifts via `bps_to_decimal_rate` (flat dict storage retained). Remaining: R0.4.2 full Scenario converge, further R0.4.1 typed nesting if needed. Do not close.
+Status: **IN PROGRESS** (2026-09-08). R0.1.3 unit goldens; R0.4.3-A APPROVE — canonical `shock_units` helpers; R0.4.3-B COMPLETE — remaining risk-layer conversion call sites + reverse-stress magnitude heuristic removed; R0.4.2-A COMPLETE — scenario expand/collapse uses `shock_units` + stress↔formal parity golden; R0.4.4 COMPLETE — one-pass `MarketSnapshot.apply` (freeze once); R0.4.5 COMPLETE — StressEngine scenario-once-price-many; R0.4.6 CLOSED RF-006 acceptance structural proofs; R0.4.1-A COMPLETE — typed sub-market views pinned + curve bp shifts via `bps_to_decimal_rate` (flat dict storage retained). Remaining: R0.4.2 full Scenario converge, further R0.4.1 typed nesting if needed. Do not close.
 
 Source findings:
 
@@ -390,7 +390,7 @@ Keep the current four-column dataset as an explicitly documented projection/demo
 Priority: **P0**  
 Risk types: PERFORMANCE, ARCHITECTURE, CORRECTNESS  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-09). R0.4.4 — `MarketSnapshot.apply` stages all nested maps once, applies every shock with bump semantics, then a single `model_copy` / nested freeze (not once-per-factor). Mark + bump-chain id parity vs sequential `bump`; structural O(1) freeze/copy assert. R0.4.5 COMPLETE — `StressEngine.run` / `evaluate` and scenario attribution apply each scenario once, then revalue all positions on the shared shocked snapshot (structural once-per-scenario assert). Still open: full RF-006 acceptance (bench × scenario count, contribution invariants). Do not close.
+Status: **CLOSED** (2026-09-09). R0.4.4 — one-pass `MarketSnapshot.apply` (stage all shocks, single `model_copy` / nested freeze). R0.4.5 — StressEngine / attribution scenario-once-price-many. R0.4.6 acceptance residual — structural proofs: multi-factor apply `model_copy` == 1 and freeze ∈ [1,2] for K≥5 (not O(K)); `StressEngine.run` / `evaluate` `apply_scenario` count == S for P×S (not P×S); contribution sum↔portfolio P&L + interaction residual already pinned in `test_scenario_attribution.py`. Evidence: `tests/test_market_snapshot.py::test_apply_freezes_once_not_per_factor`, `tests/test_stress.py` once-per-scenario + P×S counters, `tests/test_scenario_attribution.py` reconcile helpers / `test_single_factor_interaction_near_zero` / `test_risk_factor_contributions_reconcile_with_interaction`. Report: `reviews/r0.4.6-rf006-acceptance-report.md`. Wall-clock N×S reval remains RF-007.
 
 Source findings:
 
@@ -423,11 +423,11 @@ Create the shocked snapshot once per scenario, not once per trade.
 
 ### Acceptance evidence
 
-- exact parity with existing scenario semantics;
-- one freeze/copy per scenario rather than per factor;
-- benchmark factor count × scenario count;
-- zero shock and unrelated-factor invariants remain exact;
-- contribution tests prove a factor cannot disappear into an unexplained `interaction` bucket.
+- exact parity with existing scenario semantics; **met** (R0.4.4 mark/id parity + stress numerical parity)
+- one freeze/copy per scenario rather than per factor; **met** (`test_apply_freezes_once_not_per_factor`: `model_copy == 1`, freeze ∈ [1,2] for K≥5)
+- benchmark factor count × scenario count; **met via structural counters** (P×S → S applies in `test_stress.py`; wall-clock N×S pricing is RF-007)
+- zero shock and unrelated-factor invariants remain exact; **met** (existing snapshot/stress suites)
+- contribution tests prove a factor cannot disappear into an unexplained `interaction` bucket; **met** (`test_scenario_attribution.py`: reconcile + `test_single_factor_interaction_near_zero`)
 
 ---
 

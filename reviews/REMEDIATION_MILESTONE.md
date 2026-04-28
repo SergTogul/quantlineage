@@ -429,7 +429,7 @@ No magnitude heuristic may decide units.
 
 ## R0.4.4 One-pass snapshot transformation — COMPLETE (2026-09-09)
 
-`MarketSnapshot.apply` unfreezes nested maps once, stages all `(RiskFactor, amount)` shocks with bump semantics, then a single `model_copy` / nested freeze. `bump` is the one-factor API via `apply([(f, a)])`. Mark + bump-chain id parity vs sequential bump; structural O(1) freeze/copy test. RF-006 stays open for R0.4.5 + full acceptance.
+`MarketSnapshot.apply` unfreezes nested maps once, stages all `(RiskFactor, amount)` shocks with bump semantics, then a single `model_copy` / nested freeze. `bump` is the one-factor API via `apply([(f, a)])`. Mark + bump-chain id parity vs sequential bump; structural O(1) freeze/copy test (R0.4.6: lower+upper band for K≥5).
 
 ## R0.4.5 Scenario once, price many — COMPLETE (2026-09-09)
 
@@ -437,15 +437,24 @@ No magnitude heuristic may decide units.
 `MarketSnapshot` per scenario via `apply_scenario`, then revalue every position
 with `PricingEngine.value` on that shared snapshot. Structural monkeypatch
 asserts N positions × 1 scenario → one `apply_scenario` call; stress numerical
-parity retained. RF-006 stays open for full acceptance (bench × scenario count,
-contribution invariants).
+parity retained.
+
+## R0.4.6 RF-006 acceptance residual — COMPLETE (2026-09-09)
+
+Structural factor×scenario evidence (monkeypatch counters, not wall-clock):
+multi-factor apply `model_copy` == 1 / freeze ∈ [1,2] for K≥5; `run` /
+`evaluate` apply count == S for P×S; contribution sum↔P&L + interaction residual
+cited from existing `test_scenario_attribution.py`. RF-006 **CLOSED**.
+Report: `reviews/r0.4.6-rf006-acceptance-report.md`. N×S full-reval cost remains RF-007.
 
 ### Exit criteria
 
 - semantic parity tests pass;
 - structural once-per-scenario assert for StressEngine position loops;
 - factor count no longer causes repeated whole-snapshot copy/refreeze per factor
-  (R0.4.4).
+  (R0.4.4);
+- P×S apply count == S (R0.4.6);
+- contribution reconciliation pinned (existing attribution suite / R0.4.6 cite).
 
 ---
 

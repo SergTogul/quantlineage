@@ -165,3 +165,107 @@ def test_stress_evaluate_applies_scenario_once_not_per_position(monkeypatch) -> 
         f"(total apply calls={len(calls)})"
     )
     assert len(report.evaluations[0].by_position) == n_positions
+
+
+def test_stress_run_apply_count_equals_scenario_count_not_pxs(monkeypatch) -> None:
+    """RF-006: P positions × S scenarios → apply_scenario == S (not P×S)."""
+    n_positions = 5
+    n_scenarios = 3
+    book = Portfolio(
+        id="pxs-run",
+        name="pxs-run",
+        positions=[
+            EquityPosition(
+                type="equity",
+                id=f"eq-{i}",
+                symbol="UNIT",
+                quantity=float(i + 1),
+            )
+            for i in range(n_positions)
+        ],
+    )
+    market = MarketSnapshot(
+        id="pxs-run-mkt",
+        as_of="2024-01-02",
+        equity_spots={"UNIT": 100.0},
+    )
+    scenarios = [
+        StressScenario(id=f"eq_shock_{i}", name=f"Equities {pct:.0%}", equity_shock=pct)
+        for i, pct in enumerate((-0.05, -0.10, 0.08))
+    ]
+    assert len(scenarios) == n_scenarios
+
+    real_apply = stress_mod.apply_scenario
+    calls: list[object] = []
+
+    def counting_apply(base, scen, **kwargs):
+        calls.append(scen)
+        return real_apply(base, scen, **kwargs)
+
+    monkeypatch.setattr(stress_mod, "apply_scenario", counting_apply)
+
+    results = ENGINE.run(book, PRICING, scenarios, market=market)
+    assert len(results) == n_scenarios
+    assert len(calls) == n_scenarios, (
+        f"expected {n_scenarios} apply_scenario calls for {n_scenarios} scenarios, "
+        f"got {len(calls)} (would be {n_positions * n_scenarios} if per-position)"
+    )
+    assert len(calls) != n_positions * n_scenarios
+    for result in results:
+        assert len(result.by_position) == n_positions
+
+
+def test_stress_evaluate_apply_count_scales_with_scenarios_not_positions(
+    monkeypatch,
+) -> None:
+    """RF-006: evaluate full-scenario applies == S for P×S (not P×S)."""
+    n_positions = 4
+    n_scenarios = 3
+    book = Portfolio(
+        id="pxs-eval",
+        name="pxs-eval",
+        positions=[
+            EquityPosition(
+                type="equity",
+                id=f"eq-{i}",
+                symbol="UNIT",
+                quantity=float(i + 1),
+            )
+            for i in range(n_positions)
+        ],
+    )
+    market = MarketSnapshot(
+        id="pxs-eval-mkt",
+        as_of="2024-01-02",
+        equity_spots={"UNIT": 100.0},
+    )
+    scenarios = [
+        StressScenario(id=f"eq_eval_{i}", name=f"Equities {pct:.0%}", equity_shock=pct)
+        for i, pct in enumerate((-0.05, -0.10, 0.08))
+    ]
+    assert len(scenarios) == n_scenarios
+    scenario_ids = {s.id for s in scenarios}
+
+    real_apply = stress_mod.apply_scenario
+    calls: list[object] = []
+
+    def counting_apply(base, scen, **kwargs):
+        calls.append(scen)
+        return real_apply(base, scen, **kwargs)
+
+    monkeypatch.setattr(stress_mod, "apply_scenario", counting_apply)
+
+    report = ENGINE.evaluate(book, PRICING, scenarios, market=market)
+    assert len(report.evaluations) == n_scenarios
+    # Position P&L path: one full-scenario apply per scenario. Factor-isolated
+    # applies (if any) use different Scenario ids — not P×S full rebuilds.
+    full_scenario_applies = sum(
+        1 for s in calls if getattr(s, "id", None) in scenario_ids
+    )
+    assert full_scenario_applies == n_scenarios, (
+        f"expected {n_scenarios} full-scenario applies, got {full_scenario_applies} "
+        f"(total apply calls={len(calls)}; P×S would be {n_positions * n_scenarios})"
+    )
+    assert full_scenario_applies != n_positions * n_scenarios
+    for ev in report.evaluations:
+        assert len(ev.by_position) == n_positions
