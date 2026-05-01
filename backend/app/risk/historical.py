@@ -38,9 +38,9 @@ from app.risk.factor_types import (
     RateZero,
     RiskFactor,
 )
-from app.risk.shock_units import relative_vol_move_to_vol_points
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.scenarios import iter_historical_shocked_snapshots, iter_panel_shocked_snapshots
+from app.risk.shock_units import relative_vol_move_to_vol_points
 
 
 def require_explicit_market(market: MarketSnapshot | None) -> MarketSnapshot:
@@ -403,11 +403,12 @@ class HistoricalRiskEngine(RiskEngine):
     Default dataset is :class:`SyntheticHistoricalDataset` (deterministic RNG)
     so MVP results stay reproducible without an external market-data feed.
 
-    Opt-in ``factor_panel`` (R0.5.3 leftover): when supplied, LINEAR /
-    DELTA_GAMMA / FULL_REVALUATION consume per-name and per-tenor panel
-    columns instead of ``dataset.factor_observations()``. Default
-    ``HistoricalRiskEngine()`` leaves this ``None`` and stays on the
-    four-macro demo path. RF-005 remains open until that default changes.
+    ``factor_panel`` (R0.5.3): when supplied, LINEAR / DELTA_GAMMA /
+    FULL_REVALUATION consume per-name and per-tenor panel columns instead of
+    ``dataset.factor_observations()``. Production
+    :func:`app.services.risk_factories.build_historical_risk_engine` wires a
+    seeded synthetic panel. Bare ``HistoricalRiskEngine()`` /
+    ``factor_panel=None`` keeps the labeled ``four_macro_demo`` dataset path.
     """
 
     def __init__(

@@ -105,7 +105,7 @@ class _FourMacroDemoLabels:
 
     @property
     def is_per_name_per_tenor_panel(self) -> bool:
-        """False for ``four_macro_demo`` — R0.5.3 panel is not implemented."""
+        """False for ``four_macro_demo`` — aggregate projection, not a per-factor panel."""
         return self.projection != HistoricalDatasetProjection.FOUR_MACRO_DEMO
 
     @property

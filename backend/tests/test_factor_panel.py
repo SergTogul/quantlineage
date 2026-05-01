@@ -1,7 +1,8 @@
 """R0.5.3 / RF-005 leftover — typed per-factor historical observation panel.
 
-The panel is the real type. It is not wired into HistoricalRiskEngine / VaR.
-Demo four-macro history stays `projection="four_macro_demo"`. Do not close RF-005.
+Production factory wires a synthetic panel via ``create_synthetic_factor_panel``.
+Demo four-macro history stays `projection="four_macro_demo"` as a labeled
+fixture. Bare ``HistoricalRiskEngine()`` without ``factor_panel`` stays four-macro.
 """
 
 from __future__ import annotations
@@ -11,12 +12,14 @@ from datetime import date
 import pytest
 
 from app.risk.factor_panel import (
+    DEFAULT_PRODUCTION_PANEL_FACTORS,
     EQUITY_CHANGE_UNIT,
     PER_FACTOR_PANEL_PROJECTION,
     RATE_CHANGE_UNIT,
     FactorPanelObservation,
     HistoricalFactorPanel,
     change_unit,
+    create_synthetic_factor_panel,
 )
 from app.risk.factor_types import EquitySpot, RateZero
 
@@ -99,6 +102,21 @@ def test_units_match_historical_data_conventions():
     assert change_unit(AAA) == EQUITY_CHANGE_UNIT
     assert change_unit(USD_2Y) == RATE_CHANGE_UNIT
     assert change_unit(USD_10Y) == RATE_CHANGE_UNIT
+
+
+def test_synthetic_panel_columns_are_independent_not_broadcast():
+    """Default universe: NVDA vs SPY and USD 2Y vs 10Y are not identical series."""
+    panel = create_synthetic_factor_panel(seed=7, observations=64)
+    assert panel.is_per_name_per_tenor_panel is True
+    assert panel.projection == PER_FACTOR_PANEL_PROJECTION
+    assert len(panel.factors) == len(DEFAULT_PRODUCTION_PANEL_FACTORS)
+    nvda = EquitySpot("NVDA")
+    spy = EquitySpot("SPY")
+    assert any(panel.change(d, nvda) != panel.change(d, spy) for d in panel.dates)
+    assert any(panel.change(d, USD_2Y) != panel.change(d, USD_10Y) for d in panel.dates)
+    again = create_synthetic_factor_panel(seed=7, observations=64)
+    assert again.change(panel.dates[0], nvda) == panel.change(panel.dates[0], nvda)
+    assert again.change(panel.dates[0], USD_2Y) == panel.change(panel.dates[0], USD_2Y)
 
 
 def test_duplicate_equity_in_one_row_fails_closed():
