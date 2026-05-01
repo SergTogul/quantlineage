@@ -10,9 +10,11 @@ and per-tenor rate zeros with independent numeric moves. It is **not** the
 four-macro demo projection (``projection != "four_macro_demo"``) and
 ``is_per_name_per_tenor_panel`` is True.
 
-Not wired into ``HistoricalRiskEngine``, VaR, or the demo CSV loader.
-Production risk still consumes ``projection="four_macro_demo"`` until a later
-slice.
+Production API/worker wiring (``build_historical_risk_engine``) passes a
+seeded synthetic panel from :func:`create_synthetic_factor_panel`. Bare
+``HistoricalRiskEngine()`` / explicit ``factor_panel=None`` still uses the
+labeled ``four_macro_demo`` dataset path. Demo/synthetic CSV datasets remain
+``projection="four_macro_demo"`` fixtures (R0.5.4).
 
 Units (match ``historical_data.py`` / ``FactorObservationSeries``):
 
@@ -31,9 +33,11 @@ mismatched date/row/column lengths.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from types import MappingProxyType
 from typing import Mapping, Sequence
+
+import numpy as np
 
 from app.risk.factor_types import (
     EquitySpot,
@@ -52,12 +56,46 @@ RATE_CHANGE_UNIT = "basis_points"
 VOL_CHANGE_UNIT = "relative_vol"
 FX_CHANGE_UNIT = "relative_return"
 
+# Documented default universe for the production synthetic panel (demo books).
+# Independent RNG streams per column — never a silent broadcast of one equity
+# or one rate series onto every name/tenor.
+DEFAULT_PRODUCTION_PANEL_FACTORS: tuple[RiskFactor, ...] = (
+    EquitySpot("NVDA"),
+    EquitySpot("SPY"),
+    EquityVol(underlying="NVDA"),
+    EquityVol(underlying="SPY"),
+    RateZero("USD", "0Y"),
+    RateZero("USD", "2Y"),
+    RateZero("USD", "5Y"),
+    RateZero("USD", "10Y"),
+    FXSpot("EURUSD"),
+    FXVol(pair="EURUSD"),
+)
+
+# Match SyntheticHistoricalDataset distribution knobs (per factor family).
+_EQUITY_MEAN = 0.0002
+_EQUITY_STD = 0.013
+_VOL_MEAN = 0.0
+_VOL_STD = 0.07
+_RATE_BPS_MEAN = 0.0
+_RATE_BPS_STD = 7.0
+_FX_MEAN = 0.0
+_FX_STD = 0.006
+
 _UNIT_BY_TYPE: dict[type, str] = {
     EquitySpot: EQUITY_CHANGE_UNIT,
     FXSpot: FX_CHANGE_UNIT,
     EquityVol: VOL_CHANGE_UNIT,
     FXVol: VOL_CHANGE_UNIT,
     RateZero: RATE_CHANGE_UNIT,
+}
+
+_DIST_BY_TYPE: dict[type, tuple[float, float]] = {
+    EquitySpot: (_EQUITY_MEAN, _EQUITY_STD),
+    EquityVol: (_VOL_MEAN, _VOL_STD),
+    RateZero: (_RATE_BPS_MEAN, _RATE_BPS_STD),
+    FXSpot: (_FX_MEAN, _FX_STD),
+    FXVol: (_VOL_MEAN, _VOL_STD),
 }
 
 
@@ -230,7 +268,46 @@ class HistoricalFactorPanel:
         return cls.from_pairs(dates, rows)
 
 
+def _distribution_for(factor: RiskFactor) -> tuple[float, float]:
+    try:
+        return _DIST_BY_TYPE[type(factor)]
+    except KeyError:
+        raise TypeError(f"unsupported risk factor type: {type(factor)!r}") from None
+
+
+def create_synthetic_factor_panel(
+    *,
+    seed: int = 7,
+    observations: int = 750,
+    factors: Sequence[RiskFactor] | None = None,
+    start: date = date(2022, 1, 3),
+) -> HistoricalFactorPanel:
+    """Build a deterministic per-factor panel with independent column streams.
+
+    Each factor gets its own RNG child of ``SeedSequence(seed)`` so two equities
+    or two rate tenors are not copies of one series. Columns default to
+    :data:`DEFAULT_PRODUCTION_PANEL_FACTORS` (demo NVDA/SPY, USD tenors, EURUSD).
+
+    This is synthetic stand-in history — not a live market-data vendor feed.
+    """
+    if observations < 1:
+        raise ValueError("observations must be >= 1")
+    column_factors = tuple(factors) if factors is not None else DEFAULT_PRODUCTION_PANEL_FACTORS
+    if not column_factors:
+        raise ValueError("empty factor panel: at least one factor column is required")
+    # Independent streams: spawn one child seed per column (not a shared draw).
+    child_seeds = np.random.SeedSequence(seed).spawn(len(column_factors))
+    changes: dict[RiskFactor, list[float]] = {}
+    for factor, child in zip(column_factors, child_seeds, strict=True):
+        mean, std = _distribution_for(factor)
+        rng = np.random.default_rng(child)
+        changes[factor] = rng.normal(mean, std, observations).tolist()
+    dates = tuple(start + timedelta(days=i) for i in range(observations))
+    return HistoricalFactorPanel.from_columns(dates, changes)
+
+
 __all__ = [
+    "DEFAULT_PRODUCTION_PANEL_FACTORS",
     "EQUITY_CHANGE_UNIT",
     "FX_CHANGE_UNIT",
     "PER_FACTOR_PANEL_PROJECTION",
@@ -239,5 +316,6 @@ __all__ = [
     "FactorPanelObservation",
     "HistoricalFactorPanel",
     "change_unit",
+    "create_synthetic_factor_panel",
     "panel_factor_identity",
 ]

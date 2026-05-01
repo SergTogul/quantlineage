@@ -484,9 +484,9 @@ Do not create an elaborate plugin framework.
 
 Unsupported product should fail explicitly.
 
-## R0.5.3 Per-factor historical observations — COMPLETE (type, 2026-09-04)
+## R0.5.3 Per-factor historical observations — COMPLETE (type + production default, 2026-09-08)
 
-`HistoricalFactorPanel` is the typed date × `RiskFactor` contract. Opt-in `HistoricalRiskEngine(factor_panel=…)` applies independent name/tenor shocks. Default factory / demo VaR still four-macro. RF-005 stays open until that default switches.
+`HistoricalFactorPanel` is the typed date × `RiskFactor` contract. Opt-in `HistoricalRiskEngine(factor_panel=…)` applies independent name/tenor shocks. Production `build_historical_risk_engine()` wires `create_synthetic_factor_panel` (independent columns for the documented demo universe). Bare ctor / `factor_panel=None` and labeled datasets stay `four_macro_demo`. **RF-005 CLOSED** (2026-09-09); residual contribution-trace → R0.5.5.
 
 Replace the four-macro-only history abstraction with a typed factor panel.
 
@@ -501,7 +501,7 @@ Support per-name and per-tenor moves.
 
 ## R0.5.4 Preserve demo compatibility — COMPLETE (2026-09-04)
 
-Demo and synthetic history expose `projection="four_macro_demo"` with `is_per_name_per_tenor_panel=False`. Observation arrays and VaR goldens unchanged. RF-005 stays open for R0.5.3.
+Demo and synthetic history expose `projection="four_macro_demo"` with `is_per_name_per_tenor_panel=False`. Observation arrays and VaR goldens unchanged. Production VaR uses the panel via the factory (R0.5.3); these datasets remain labeled fixtures.
 
 The existing four-column synthetic dataset may remain as:
 

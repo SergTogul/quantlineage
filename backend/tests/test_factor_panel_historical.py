@@ -1,22 +1,35 @@
-"""R0.5.3 leftover — opt-in HistoricalFactorPanel wiring into historical risk.
+"""R0.5.3 leftover — HistoricalFactorPanel wiring into historical risk.
 
-Default ``HistoricalRiskEngine()`` / ``create_historical_dataset()`` stay on
-``projection="four_macro_demo"``. This file exercises an explicit panel-backed
-path so two names or two tenors can shock independently.
-
-RF-005 stays open until the default production path uses the panel.
+Bare ``HistoricalRiskEngine()`` / ``factor_panel=None`` stays on
+``projection="four_macro_demo"``. Production
+``build_historical_risk_engine()`` wires a seeded per-factor panel
+(see ``test_risk_factories.py``).
 """
 from __future__ import annotations
+
 from datetime import date
+
 import numpy as np
 import pytest
-from app.domain.models import BondPosition, EquityPosition, MarketSnapshot, Portfolio, VaRMethodology
+
+from app.domain.models import (
+    BondPosition,
+    EquityPosition,
+    MarketSnapshot,
+    Portfolio,
+    VaRMethodology,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_panel import HistoricalFactorPanel
 from app.risk.factor_types import EquitySpot, RateZero
-from app.risk.historical import HistoricalRiskEngine, approximate_pnl_from_panel, full_revaluation_pnl_from_panel
+from app.risk.historical import (
+    HistoricalRiskEngine,
+    approximate_pnl_from_panel,
+    full_revaluation_pnl_from_panel,
+)
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.scenarios import iter_panel_shocked_snapshots
+
 AAA = EquitySpot('AAA')
 BBB = EquitySpot('BBB')
 USD_2Y = RateZero('USD', '2Y')
@@ -114,8 +127,8 @@ def test_missing_required_rate_tenor_fails_closed():
     with pytest.raises(ValueError, match='missing required factor'):
         approximate_pnl_from_panel(book, PRICING, market, panel, methodology=VaRMethodology.LINEAR)
 
-def test_default_historical_engine_has_no_panel_and_broadcasts():
-    """Default constructor still uses four-macro factor_observations()."""
+def test_bare_historical_engine_has_no_panel_and_broadcasts():
+    """Bare constructor (no factory) still uses four-macro factor_observations()."""
     engine = HistoricalRiskEngine()
     assert engine.factor_panel is None
     book, market = _equity_book()
