@@ -20,7 +20,8 @@ from app.services.risk_run_worker import SUPPORTED_RUN_TYPES, RiskRunWorker, exe
 def client():
     from app.api import deps
     previous = deps.portfolio_service.market_data
-    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market("AAPL", 190.0))
+    # Production panel covers NVDA/SPY (not AAPL); keep fixtures panel-compatible.
+    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market("NVDA", 190.0))
     try:
         with TestClient(app) as c:
             yield c
@@ -29,7 +30,7 @@ def client():
 
 @pytest.fixture
 def tiny_portfolio() -> Portfolio:
-    return Portfolio(id='async-book', name='Async Book', positions=[EquityPosition(type='equity', id='eq-1', symbol='AAPL', quantity=10)])
+    return Portfolio(id='async-book', name='Async Book', positions=[EquityPosition(type='equity', id='eq-1', symbol='NVDA', quantity=10)])
 
 def _wait_terminal(client: TestClient, run_id: str, *, timeout_s: float=30.0) -> dict:
     deadline = time.time() + timeout_s
@@ -110,6 +111,173 @@ def test_validation_rejects_empty_run_type(client, tiny_portfolio):
     resp = client.post('/risk/runs', json={'portfolio': tiny_portfolio.model_dump(mode='json'), 'run_type': ''})
     assert resp.status_code == 422
 
+
+def test_typed_request_rejects_unknown_keys(client, tiny_portfolio):
+    resp = client.post(
+        '/risk/runs',
+        json={
+            'portfolio': tiny_portfolio.model_dump(mode='json'),
+            'run_type': 'summary',
+            'request': {'methodology': 'DELTA_GAMMA', 'not_a_real_knob': 1},
+        },
+    )
+    assert resp.status_code == 422
+    err = resp.json()
+    assert err['code'] == 'validation_error'
+
+
+def test_typed_request_rejects_bad_methodology(client, tiny_portfolio):
+    resp = client.post(
+        '/risk/runs',
+        json={
+            'portfolio': tiny_portfolio.model_dump(mode='json'),
+            'run_type': 'var',
+            'request': {'methodology': 'NOT_A_METHOD'},
+        },
+    )
+    assert resp.status_code == 422
+    err = resp.json()
+    assert err['code'] == 'validation_error'
+
+
+def test_typed_request_rejects_unknown_dataset_id(client, tiny_portfolio):
+    resp = client.post(
+        '/risk/runs',
+        json={
+            'portfolio': tiny_portfolio.model_dump(mode='json'),
+            'run_type': 'summary',
+            'request': {'historical_dataset_id': 'does-not-exist-dataset'},
+        },
+    )
+    assert resp.status_code == 400
+    err = resp.json()
+    assert err['code'] == 'bad_request'
+    assert err['message'] == 'Invalid request'
+
+
+def test_typed_request_accepts_matching_dataset_id(client, tiny_portfolio):
+    from app.risk.historical_data import DEMO_HISTORICAL_DATASET_ID
+
+    resp = client.post(
+        '/risk/runs',
+        json={
+            'portfolio': tiny_portfolio.model_dump(mode='json'),
+            'run_type': 'summary',
+            'request': {
+                'methodology': 'DELTA_GAMMA',
+                'historical_dataset_id': DEMO_HISTORICAL_DATASET_ID,
+                'historical_dataset_version': 'v1',
+            },
+        },
+    )
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body['historical_dataset_id'] == DEMO_HISTORICAL_DATASET_ID
+    assert body['historical_dataset_version'] == 'v1'
+    assert body['request']['historical_dataset_id'] == DEMO_HISTORICAL_DATASET_ID
+
+
+def test_typed_request_rebinds_synthetic_dataset_id(client, tiny_portfolio, monkeypatch):
+    """Client-supplied synthetic id must select that dataset, not silently keep demo."""
+    monkeypatch.delenv('RISKFORGE_HISTORICAL_DATASET', raising=False)
+    from app.services.risk_factories import SYNTHETIC_HISTORICAL_DATASET_ID
+
+    created = client.post(
+        '/risk/runs',
+        json={
+            'portfolio': tiny_portfolio.model_dump(mode='json'),
+            'run_type': 'summary',
+            'request': {
+                'methodology': 'DELTA_GAMMA',
+                'historical_dataset_id': SYNTHETIC_HISTORICAL_DATASET_ID,
+            },
+        },
+    )
+    assert created.status_code == 202, created.text
+    body = created.json()
+    assert body['historical_dataset_id'] == SYNTHETIC_HISTORICAL_DATASET_ID
+    done = _wait_terminal(client, body['id'])
+    assert done['status'] == 'COMPLETED', done
+    assert done['historical_dataset_id'] == SYNTHETIC_HISTORICAL_DATASET_ID
+    assert done['results'][0]['result_type'] == 'summary'
+
+
+def test_typed_request_rejects_missing_csv_dataset_path(client, tiny_portfolio, tmp_path):
+    missing = tmp_path / 'missing-factors.csv'
+    resp = client.post(
+        '/risk/runs',
+        json={
+            'portfolio': tiny_portfolio.model_dump(mode='json'),
+            'run_type': 'summary',
+            'request': {'historical_dataset_id': str(missing)},
+        },
+    )
+    assert resp.status_code == 400
+    err = resp.json()
+    assert err['code'] == 'bad_request'
+    assert err['message'] == 'Invalid request'
+
+
+def test_typed_request_rejects_ambiguous_file_dataset_id(client, tiny_portfolio, monkeypatch):
+    monkeypatch.delenv('RISKFORGE_HISTORICAL_DATASET', raising=False)
+    resp = client.post(
+        '/risk/runs',
+        json={
+            'portfolio': tiny_portfolio.model_dump(mode='json'),
+            'run_type': 'summary',
+            'request': {'historical_dataset_id': 'file'},
+        },
+    )
+    assert resp.status_code == 400
+    err = resp.json()
+    assert err['code'] == 'bad_request'
+
+
+def test_typed_request_rebinds_csv_path_dataset(client, tiny_portfolio, tmp_path, monkeypatch):
+    """Process CSV A + request CSV B must COMPLETE on B's identity, never A's."""
+    monkeypatch.delenv('RISKFORGE_HISTORICAL_DATASET', raising=False)
+    from app.api import deps
+    from app.risk.historical_data import file_csv_dataset_id
+    from app.services.risk_factories import build_portfolio_service
+
+    path_a = tmp_path / 'process_a.csv'
+    path_b = tmp_path / 'request_b.csv'
+    for path, equity in ((path_a, 0.01), (path_b, -0.05)):
+        path.write_text(
+            'date,equity_return,vol_move,rate_move_bps,fx_return\n'
+            f'2024-01-02,{equity},0.0,1.0,0.001\n'
+            '2024-01-03,-0.02,0.05,-2.0,-0.001\n',
+            encoding='utf-8',
+        )
+
+    previous = deps.portfolio_service
+    deps.portfolio_service = build_portfolio_service(historical_dataset_id=str(path_a))
+    deps.portfolio_service.market_data = previous.market_data
+    try:
+        created = client.post(
+            '/risk/runs',
+            json={
+                'portfolio': tiny_portfolio.model_dump(mode='json'),
+                'run_type': 'summary',
+                'request': {
+                    'methodology': 'DELTA_GAMMA',
+                    'historical_dataset_id': str(path_b),
+                },
+            },
+        )
+        assert created.status_code == 202, created.text
+        body = created.json()
+        expected_b = file_csv_dataset_id(path_b)
+        assert body['historical_dataset_id'] == expected_b
+        assert body['historical_dataset_id'] != file_csv_dataset_id(path_a)
+        done = _wait_terminal(client, body['id'])
+        assert done['status'] == 'COMPLETED', done
+        assert done['historical_dataset_id'] == expected_b
+        assert done['results'][0]['result_type'] == 'summary'
+    finally:
+        deps.portfolio_service = previous
+
+
 def test_worker_fails_run_on_execution_error(tiny_portfolio):
 
     class BoomService:
@@ -148,7 +316,7 @@ DASHBOARD_BATCH_KEYS = {
 
 
 def test_execute_run_type_dispatch(tiny_portfolio):
-    svc = PortfolioService(create_pricing_engine(), HistoricalRiskEngine(), market_data=FixedMarketProvider(equity_spot_market('AAPL', 190.0)))
+    svc = PortfolioService(create_pricing_engine(), HistoricalRiskEngine(), market_data=FixedMarketProvider(equity_spot_market('NVDA', 190.0)))
     for run_type in sorted(SUPPORTED_RUN_TYPES):
         payload = execute_run_type(svc, run_type=run_type, portfolio=tiny_portfolio, request={'methodology': 'DELTA_GAMMA'})
         assert isinstance(payload, dict)
@@ -221,7 +389,7 @@ def test_worker_with_sqlalchemy_session_factory(tiny_portfolio, tmp_path):
     factory = make_sqlite_session_factory(url)
     with session_scope(factory) as session:
         SqlAlchemyPortfolioRepository(session).save(tiny_portfolio)
-    svc = PortfolioService(create_pricing_engine(), HistoricalRiskEngine(), market_data=FixedMarketProvider(equity_spot_market('AAPL', 190.0)))
+    svc = PortfolioService(create_pricing_engine(), HistoricalRiskEngine(), market_data=FixedMarketProvider(equity_spot_market('NVDA', 190.0)))
     worker = RiskRunWorker(svc, session_factory=factory, max_workers=1)
     view = worker.submit(portfolio=tiny_portfolio, run_type='summary')
     run_id = view.id

@@ -309,12 +309,23 @@ def _spy_demo_surface() -> dict:
     ).to_dict()
 
 
+# Production HistoricalFactorPanel (DEFAULT_PRODUCTION_PANEL_FACTORS) shocks every
+# RateZero column via MarketSnapshot.apply on FULL_REVALUATION. Demo key_rates
+# must include USD 0Y/2Y/5Y/10Y or panel apply fail-closes (HTTP 500 on /risk/es).
+_PANEL_USD_KEY_RATES: dict[str, float] = {
+    "0Y": 0.04,
+    "2Y": 0.043,
+    "5Y": 0.041,
+    "10Y": 0.0415,
+}
+
 _DEMO_MARKETS: dict[str, MarketSnapshot] = {
     "equity-vol": MarketSnapshot(
         id="demo:equity-vol",
         equity_spots={"NVDA": 118.50, "SPY": 565.00},
         equity_vols={"NVDA": 0.46, "SPY": 0.22},
         rates={"USD": 0.04},
+        key_rates={"USD": dict(_PANEL_USD_KEY_RATES)},
         dividend_yields={"NVDA": 0.0, "SPY": 0.0},
         vol_surfaces={"SPY": _spy_demo_surface()},
     ),
@@ -323,12 +334,10 @@ _DEMO_MARKETS: dict[str, MarketSnapshot] = {
         rates={"USD": 0.04},
         key_rates={
             "USD": {
+                **_PANEL_USD_KEY_RATES,
                 "0.25Y": 0.0425,
                 "1.9Y": 0.043 * ((694.0 / 365.0) / 1.9),
-                "2Y": 0.043,
-                "5Y": 0.041,
                 "9.5Y": 0.041 * ((3468.0 / 365.0) / 9.5),
-                "10Y": 0.0415,
             }
         },
         projection_rates={"USD": 0.0425},
@@ -343,7 +352,7 @@ _DEMO_MARKETS: dict[str, MarketSnapshot] = {
         rates={"USD": 0.04, "EUR": 0.03},
         key_rates={
             "USD": {
-                "5Y": 0.041,
+                **_PANEL_USD_KEY_RATES,
                 "9.5Y": 0.041 * ((3468.0 / 365.0) / 9.5),
             }
         },

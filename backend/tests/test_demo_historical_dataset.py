@@ -112,6 +112,8 @@ def test_create_historical_dataset_accepts_csv_path(tmp_path: Path):
     _write_mini_csv(path)
     ds = create_historical_dataset(str(path))
     assert ds.factor_observations().n_observations == 3
+    assert ds.dataset_id == f"file:{path.resolve()}"
+    assert ds.source_path == str(path.resolve())
 
 
 def test_demo_dataset_feeds_historical_var_and_scenarios():

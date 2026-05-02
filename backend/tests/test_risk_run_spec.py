@@ -214,12 +214,9 @@ def test_submit_without_request_spec_records_factory_dataset():
     assert stored.calculation_config.observations == factory_spec.calculation_config.observations
     assert stored.calculation_config.seed == factory_spec.calculation_config.seed
 
-def test_submit_unparseable_as_of_does_not_fail_enqueue():
+def test_submit_unparseable_as_of_rejects_enqueue():
     repo = InMemoryRiskRunRepository()
     worker = RiskRunWorker(build_portfolio_service(), repo=repo, max_workers=1)
-    view = worker.submit(portfolio=_tiny_book(), execute=False, request={'as_of': 'later'})
+    with pytest.raises(ValueError, match="invalid risk run request"):
+        worker.submit(portfolio=_tiny_book(), execute=False, request={'as_of': 'later'})
     worker.shutdown(wait=False)
-    stored = repo.get(view.id)
-    assert stored is not None
-    assert stored.as_of is None
-    assert stored.historical_dataset_id is not None

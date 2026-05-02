@@ -1589,6 +1589,88 @@ class RiskRun(BaseModel):
         return self
 
 
+class RiskRunRequestBody(BaseModel):
+    """Shared typed calculation knobs for RiskRun ``request`` blobs (R0.8.4).
+
+    Unknown keys are rejected. Per-``run_type`` aliases below share this shape;
+    ``summary`` / ``var`` / ``dashboard`` use methodology; other supported
+    types accept the same envelope even when they ignore unused fields today.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    methodology: VaRMethodology | None = None
+    historical_dataset_id: str | None = Field(default=None, min_length=1)
+    historical_dataset_version: str | None = Field(default=None, min_length=1)
+    as_of: AsOf | None = None
+    calculation_config: RiskRunCalculationConfig | None = None
+
+    @field_serializer("as_of")
+    def _ser_as_of(self, value: date | AsOfLabel | None) -> str | None:
+        if value is None:
+            return None
+        return as_of_wire(value)
+
+
+class SummaryRiskRunRequest(RiskRunRequestBody):
+    """Typed request body for ``run_type=summary``."""
+
+
+class VarRiskRunRequest(RiskRunRequestBody):
+    """Typed request body for ``run_type=var``."""
+
+
+class DashboardRiskRunRequest(RiskRunRequestBody):
+    """Typed request body for ``run_type=dashboard``."""
+
+
+class GenericRiskRunRequest(RiskRunRequestBody):
+    """Typed envelope for supported run types that ignore most request knobs."""
+
+
+RISK_RUN_REQUEST_SCHEMAS: Mapping[str, type[RiskRunRequestBody]] = MappingProxyType(
+    {
+        "summary": SummaryRiskRunRequest,
+        "var": VarRiskRunRequest,
+        "dashboard": DashboardRiskRunRequest,
+        "stress": GenericRiskRunRequest,
+        "factors": GenericRiskRunRequest,
+        "limits": GenericRiskRunRequest,
+        "hierarchy": GenericRiskRunRequest,
+        "contributors": GenericRiskRunRequest,
+    }
+)
+
+
+def parse_risk_run_request(
+    run_type: str,
+    request: Mapping[str, Any] | RiskRunRequestBody | None = None,
+) -> RiskRunRequestBody:
+    """Validate a RiskRun request blob for ``run_type`` (extra='forbid').
+
+    Unsupported ``run_type`` values are left to the worker (400); when a schema
+    exists, free-form dicts are rejected.
+    """
+    if isinstance(request, RiskRunRequestBody):
+        typed = request
+        schema = RISK_RUN_REQUEST_SCHEMAS.get((run_type or "summary").strip())
+        if schema is not None and type(typed) is not schema and not isinstance(typed, schema):
+            typed = schema.model_validate(typed.model_dump(mode="python"))
+        return typed
+    schema = RISK_RUN_REQUEST_SCHEMAS.get((run_type or "summary").strip())
+    if schema is None:
+        # Unknown run_type: still forbid free-form via the shared body when the
+        # caller asked to parse; worker rejects the type separately.
+        schema = RiskRunRequestBody
+    raw: Mapping[str, Any] = {} if request is None else request
+    return schema.model_validate(dict(raw))
+
+
+def dump_risk_run_request(body: RiskRunRequestBody) -> dict[str, Any]:
+    """JSON-compatible request dict for persistence / worker execution."""
+    return body.model_dump(mode="json", exclude_none=True)
+
+
 class RiskRunCreateRequest(FiniteInputMixin):
     """POST /risk/runs body (M5.4). Mounted under ``/risk`` until M7.2 ``/api/v1``."""
 
@@ -1622,6 +1704,12 @@ class RiskRunCreateRequest(FiniteInputMixin):
     run_type: str = Field(default="summary", min_length=1)
     request: dict[str, Any] = Field(default_factory=dict)
     market_snapshot_id: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_typed_request(self) -> RiskRunCreateRequest:
+        typed = parse_risk_run_request(self.run_type, self.request)
+        self.request = dump_risk_run_request(typed)
+        return self
 
 
 class RiskRunResultView(BaseModel):
