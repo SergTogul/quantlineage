@@ -11,11 +11,6 @@ Conventions
 
 from __future__ import annotations
 
-import os
-import shutil
-import subprocess
-from pathlib import Path
-
 import numpy as np
 import pytest
 
@@ -44,32 +39,6 @@ from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
-
-def _build_native_lib(tmp_path: Path) -> Path:
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
-    root = Path(__file__).parents[1] / "native"
-    # Darwin: emit .dylib (matches test_native_kernel / ctypes loaders).
-    lib = tmp_path / ("libriskkernel.dylib" if os.uname().sysname == "Darwin" else "libriskkernel.so")
-    subprocess.run(
-        [
-            "g++",
-            "-std=c++20",
-            "-O3",
-            "-shared",
-            "-fPIC",
-            "-pthread",
-            "-I",
-            str(root / "include"),
-            str(root / "src" / "risk_kernel_capi.cpp"),
-            "-o",
-            str(lib),
-        ],
-        check=True,
-    )
-    return lib
-
-
 def _factor_series() -> FactorObservationSeries:
     eq = np.array([-0.12, -0.04, 0.0, 0.03, 0.08, -0.15, 0.02, 0.05], dtype=float)
     vol = np.array([0.25, 0.10, 0.0, -0.05, 0.15, 0.40, -0.02, 0.08], dtype=float)
@@ -82,7 +51,6 @@ def _factor_series() -> FactorObservationSeries:
         fx_returns=fx,
     )
 
-
 def _assert_pnl_close(actual: np.ndarray, expected: np.ndarray) -> None:
     assert actual.shape == expected.shape
     np.testing.assert_allclose(
@@ -92,23 +60,19 @@ def _assert_pnl_close(actual: np.ndarray, expected: np.ndarray) -> None:
         atol=KERNEL_PNL_ABS_TOL,
     )
 
-
 def test_scenario_kernel_backend_default_python(monkeypatch):
     monkeypatch.delenv("RISKFORGE_SCENARIO_KERNEL", raising=False)
     assert scenario_kernel_backend() == "python"
     assert get_scenario_kernel() is None
 
-
 def test_scenario_kernel_backend_native_alias(monkeypatch):
     monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "ctypes")
     assert scenario_kernel_backend() == "native"
-
 
 def test_scenario_kernel_backend_rejects_unknown(monkeypatch):
     monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "gpu")
     with pytest.raises(ValueError, match="python|native"):
         scenario_kernel_backend()
-
 
 def test_full_revaluation_rejected_by_approximate_pnl():
     z = np.zeros(4)
@@ -125,7 +89,6 @@ def test_full_revaluation_rejected_by_approximate_pnl():
             fx_ret=z,
             methodology=VaRMethodology.FULL_REVALUATION,
         )
-
 
 def test_numpy_matches_python_scenario_kernel_reference():
     """NumPy risk path vs pure-Python kernel ABI (same Δ-Γ math)."""
@@ -166,9 +129,8 @@ def test_numpy_matches_python_scenario_kernel_reference():
         )
         _assert_pnl_close(numpy_pnl, np.asarray(ref, dtype=float))
 
-
-def test_native_approximate_pnl_matches_numpy(tmp_path):
-    lib = _build_native_lib(tmp_path)
+def test_native_approximate_pnl_matches_numpy(native_scenario_lib):
+    lib = native_scenario_lib
     native = NativeScenarioKernel(lib)
     series = _factor_series()
     kwargs = dict(
@@ -189,10 +151,9 @@ def test_native_approximate_pnl_matches_numpy(tmp_path):
         )
         _assert_pnl_close(actual, ref)
 
-
-def test_historical_engine_native_var_matches_python(tmp_path, monkeypatch):
+def test_historical_engine_native_var_matches_python(native_scenario_lib, monkeypatch):
     """M6.7: HistoricalRiskEngine LINEAR/DELTA_GAMMA VaR parity under native kernel."""
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL_LIB", str(lib))
     dataset = ArrayHistoricalDataset(_factor_series())
     pricing = BuiltinPricingEngine()
@@ -213,9 +174,8 @@ def test_historical_engine_native_var_matches_python(tmp_path, monkeypatch):
                 py[key], rel=KERNEL_PNL_REL_TOL, abs=KERNEL_PNL_ABS_TOL
             ), key
 
-
-def test_env_native_backend_loads_lib(tmp_path, monkeypatch):
-    lib = _build_native_lib(tmp_path)
+def test_env_native_backend_loads_lib(native_scenario_lib, monkeypatch):
+    lib = native_scenario_lib
     monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "native")
     monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL_LIB", str(lib))
     kernel = get_scenario_kernel()
@@ -248,10 +208,9 @@ def test_env_native_backend_loads_lib(tmp_path, monkeypatch):
     )
     _assert_pnl_close(via_env, ref)
 
-
-def test_full_revaluation_path_unaffected_by_native_flag(tmp_path, monkeypatch):
+def test_full_revaluation_path_unaffected_by_native_flag(native_scenario_lib, monkeypatch):
     """FULL_REVALUATION must ignore RISKFORGE_SCENARIO_KERNEL (no kernel P&L)."""
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "native")
     monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL_LIB", str(lib))
     dataset = ArrayHistoricalDataset(_factor_series())
@@ -273,9 +232,8 @@ def test_full_revaluation_path_unaffected_by_native_flag(tmp_path, monkeypatch):
     pnl = full_revaluation_pnl_series(SAMPLE_PORTFOLIO, pricing, base, dataset)
     assert pnl.shape == (dataset.factor_observations().n_observations,)
 
-
-def test_empty_observations_native(tmp_path):
-    lib = _build_native_lib(tmp_path)
+def test_empty_observations_native(native_scenario_lib):
+    lib = native_scenario_lib
     z = np.zeros(0)
     out = approximate_pnl_series(
         delta=1.0,
@@ -292,10 +250,9 @@ def test_empty_observations_native(tmp_path):
     )
     assert out.shape == (0,)
 
-
-def test_native_historical_uses_pnl_from_arrays_not_object_pack(tmp_path):
+def test_native_historical_uses_pnl_from_arrays_not_object_pack(native_scenario_lib):
     """R0.17 leftover: native Historical VaR must not pack Exposure/Shock objects."""
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     native = NativeScenarioKernel(lib)
     captured: list[tuple[str, object, object]] = []
     orig_arrays = native.pnl_from_arrays
@@ -348,10 +305,9 @@ def test_native_historical_uses_pnl_from_arrays_not_object_pack(tmp_path):
     )
     _assert_pnl_close(actual, ref)
 
-
-def test_native_historical_mismatched_factor_lengths_fail_closed(tmp_path):
+def test_native_historical_mismatched_factor_lengths_fail_closed(native_scenario_lib):
     """R0.17 leftover: unequal factor lengths must not pack a truncated shock matrix."""
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     native = NativeScenarioKernel(lib)
     series = _factor_series()
     short_vol = series.vol_moves[:-1]
@@ -370,10 +326,9 @@ def test_native_historical_mismatched_factor_lengths_fail_closed(tmp_path):
             scenario_kernel=native,
         )
 
-
-def test_native_historical_non_1d_factor_fails_closed(tmp_path):
+def test_native_historical_non_1d_factor_fails_closed(native_scenario_lib):
     """R0.17 leftover: a column vector must not be silently treated as 1-D shocks."""
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     native = NativeScenarioKernel(lib)
     series = _factor_series()
     eq_col = series.equity_returns.reshape(-1, 1)
