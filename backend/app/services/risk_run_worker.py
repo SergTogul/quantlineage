@@ -26,10 +26,18 @@ import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any, Callable
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.api.errors import PUBLIC_RISK_RUN_FAILURE_MESSAGE
-from app.domain.models import Portfolio, RiskRun, RiskRunStatus, RiskRunView, VaRMethodology
+from app.domain.models import (
+    Portfolio,
+    RiskRun,
+    RiskRunStatus,
+    RiskRunView,
+    VaRMethodology,
+    dump_risk_run_request,
+    parse_risk_run_request,
+)
 from app.persistence.config import external_worker_enabled
 from app.persistence.memory_repos import InMemoryRiskRunRepository
 from app.persistence.repositories import RiskRunRepository
@@ -40,7 +48,7 @@ from app.persistence.sqlalchemy_repos import (
 )
 from app.risk.historical import HistoricalRiskEngine
 from app.services.portfolio_service import PortfolioService
-from app.services.risk_factories import resolve_run_spec
+from app.services.risk_factories import portfolio_service_for_spec, resolve_run_spec
 from app.services.risk_run_service import (
     InvalidRiskRunTransition,
     RiskRunNotFound,
@@ -269,13 +277,23 @@ class RiskRunWorker:
                 f"supported: {sorted(SUPPORTED_RUN_TYPES)}"
             )
         rid = run_id or str(uuid.uuid4())
-        req = dict(request or {})
+        try:
+            typed_request = parse_risk_run_request(run_type, request)
+        except ValidationError as exc:
+            raise ValueError(f"invalid risk run request: {exc}") from exc
+        req = dump_risk_run_request(typed_request)
         methodology = _parse_methodology(req)
         engine = getattr(self._portfolio_service, "risk", None)
-        spec = resolve_run_spec(
-            req,
-            risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None,
-        )
+        try:
+            spec = resolve_run_spec(
+                typed_request,
+                risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None,
+                run_type=run_type,
+            )
+        except ValueError:
+            raise
+        except ValidationError as exc:
+            raise ValueError(f"invalid risk run request: {exc}") from exc
 
         book = self._book_for_run(portfolio)
 
@@ -364,11 +382,19 @@ class RiskRunWorker:
                 )
                 return
             header = self._with_service(lambda svc: svc.get(run_id))
+            req = dict(header.request or {})
+            engine = getattr(self._portfolio_service, "risk", None)
+            spec = resolve_run_spec(
+                req,
+                risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None,
+                run_type=header.run_type,
+            )
+            run_service = portfolio_service_for_spec(self._portfolio_service, spec)
             payload = execute_run_type(
-                self._portfolio_service,
+                run_service,
                 run_type=header.run_type,
                 portfolio=portfolio,
-                request=dict(header.request or {}),
+                request=req,
             )
             self._with_service(
                 lambda svc: svc.complete(

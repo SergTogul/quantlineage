@@ -528,7 +528,7 @@ Then:
 
 ## RF-009 — Risk-run reproducibility differs between API and worker execution
 
-Status: **IN PROGRESS** (2026-09-04). R0.8.1–R0.8.2 APPROVE. R0.8.3 identity APPROVE — `create`/`update` are distinct; persist submit create-if-absents or attaches the stored book and does not upsert. Remaining: R0.8.4 typed requests (request dataset id still does not rebind the engine). Do not close.
+Status: **IN PROGRESS** (2026-09-08). R0.8.1–R0.8.4 APPROVE (`reviews/r0.8.4-typed-run-requests-independent-review.md`). Per-`run_type` schemas (`extra='forbid'`); `historical_dataset_id` rebinds via shared factories or 400 (never silently ignored); CSV identity is path-derived (`file:<abspath>`). Remaining: R0.8.5 Postgres lifecycle / same-spec interactive vs worker proof. Do not close.
 
 Priority: **P0**  
 Risk types: CORRECTNESS, REPRODUCIBILITY, OPERABILITY  

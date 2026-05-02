@@ -1,23 +1,29 @@
-"""Shared pricing + historical-dataset construction for API and worker (R0.8.2).
+"""Shared pricing + historical-dataset construction for API and worker (R0.8.2 / R0.8.4).
 
 Both FastAPI deps and ``python -m app.worker`` must call
 :func:`build_portfolio_service` so interactive and queued runs resolve the
 same historical dataset and calculation knobs.
 
-Does not close RF-009: portfolio persistence identity and typed run-request
-schemas remain R0.8.3 / R0.8.4.
+R0.8.4: typed request blobs drive dataset selection. A client-supplied
+``historical_dataset_id`` either rebinds the engine through these helpers or
+raises — it is never stored as a label while execution silently uses another
+dataset.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from typing import Any
 
-from pydantic import TypeAdapter, ValidationError
-
-from app.domain.models import AsOf, AsOfLabel, RiskRunCalculationConfig
+from app.domain.models import (
+    AsOfLabel,
+    RiskRunCalculationConfig,
+    RiskRunRequestBody,
+    dump_risk_run_request,
+    parse_risk_run_request,
+)
 from app.pricing.factory import create_pricing_engine
 from app.risk.factor_panel import create_synthetic_factor_panel
 from app.risk.historical import HistoricalRiskEngine
@@ -26,6 +32,7 @@ from app.risk.historical_data import (
     FileHistoricalDataset,
     SyntheticHistoricalDataset,
     create_historical_dataset,
+    file_csv_dataset_id,
 )
 from app.services.portfolio_service import PortfolioService
 
@@ -33,7 +40,16 @@ DEFAULT_HISTORICAL_DATASET_VERSION = "v1"
 DEFAULT_HISTORICAL_PANEL_SEED = 7
 SYNTHETIC_HISTORICAL_DATASET_ID = "synthetic-historical-factors"
 
-_AS_OF_ADAPTER: TypeAdapter[date | AsOfLabel] = TypeAdapter(AsOf)
+# Canonical id / short alias → create_historical_dataset source key.
+_DATASET_SOURCE_BY_ID: dict[str, str] = {
+    DEMO_HISTORICAL_DATASET_ID: "demo",
+    "demo": "demo",
+    "demo-historical": "demo",
+    SYNTHETIC_HISTORICAL_DATASET_ID: "synthetic",
+    "synthetic": "synthetic",
+    "rng": "synthetic",
+    "random": "synthetic",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,73 +62,235 @@ class ResolvedRiskRunSpec:
     calculation_config: RiskRunCalculationConfig | None = None
 
 
-def build_historical_risk_engine() -> HistoricalRiskEngine:
+def resolve_dataset_source(historical_dataset_id: str) -> str:
+    """Map a client dataset id to a ``create_historical_dataset`` source.
+
+    Raises ``ValueError`` when the id is not a known demo/synthetic alias and
+    is not an existing CSV path — callers must not silently ignore it.
+
+    Bare ``\"file\"`` is ambiguous (legacy collapsed CSV identity) and is
+    rejected. Canonical CSV ids use ``file:<abspath>``; plain existing ``.csv``
+    paths are also accepted and normalize to that form downstream.
+    """
+    raw = historical_dataset_id.strip()
+    if not raw:
+        raise ValueError("historical_dataset_id must be non-empty when set")
+    if raw.lower() == "file":
+        raise ValueError(
+            "ambiguous historical_dataset_id 'file'; "
+            "provide a concrete CSV path or file:<absolute-path>"
+        )
+    aliased = _DATASET_SOURCE_BY_ID.get(raw) or _DATASET_SOURCE_BY_ID.get(raw.lower())
+    if aliased is not None:
+        return aliased
+    path_raw = raw
+    if raw.startswith("file:"):
+        path_raw = raw[len("file:") :]
+        if not path_raw.strip():
+            raise ValueError(
+                "ambiguous historical_dataset_id 'file:'; "
+                "provide file:<absolute-path> to an existing factor CSV"
+            )
+    path = Path(path_raw).expanduser()
+    if path.suffix.lower() == ".csv" or path.is_file():
+        if not path.is_file():
+            raise ValueError(f"historical dataset CSV not found: {path}")
+        return str(path.resolve())
+    raise ValueError(
+        f"unsupported historical_dataset_id: {historical_dataset_id!r}; "
+        f"use {DEMO_HISTORICAL_DATASET_ID!r}, {SYNTHETIC_HISTORICAL_DATASET_ID!r}, "
+        "or a path to a factor CSV"
+    )
+
+
+def build_historical_risk_engine(
+    *,
+    historical_dataset_id: str | None = None,
+    seed: int | None = None,
+    observations: int | None = None,
+) -> HistoricalRiskEngine:
     """Wire production historical VaR to a per-factor panel (R0.5.3 / RF-005).
 
-    Keeps :func:`create_historical_dataset` for dataset identity / run-spec
-    compatibility. The labeled ``four_macro_demo`` dataset is still available
-    via ``HistoricalRiskEngine(dataset=..., factor_panel=None)``.
+    When ``historical_dataset_id`` is set, selects that dataset via
+    :func:`resolve_dataset_source` (rebind). Otherwise uses env / demo default.
     """
-    dataset = create_historical_dataset()
-    observations = len(dataset.factor_observations().equity_returns)
+    panel_seed = DEFAULT_HISTORICAL_PANEL_SEED if seed is None else seed
+    dataset_kwargs: dict[str, Any] = {"seed": panel_seed}
+    if observations is not None:
+        dataset_kwargs["observations"] = observations
+
+    if historical_dataset_id is not None:
+        source = resolve_dataset_source(historical_dataset_id)
+        dataset = create_historical_dataset(source, **dataset_kwargs)
+    else:
+        dataset = create_historical_dataset(**dataset_kwargs)
+
+    obs_count = (
+        observations
+        if observations is not None
+        else len(dataset.factor_observations().equity_returns)
+    )
     panel = create_synthetic_factor_panel(
-        seed=DEFAULT_HISTORICAL_PANEL_SEED,
-        observations=observations,
+        seed=panel_seed,
+        observations=obs_count,
     )
     return HistoricalRiskEngine(
         dataset=dataset,
-        observations=observations,
-        seed=DEFAULT_HISTORICAL_PANEL_SEED,
+        observations=obs_count,
+        seed=panel_seed,
         factor_panel=panel,
     )
 
 
-def build_portfolio_service() -> PortfolioService:
+def build_portfolio_service(
+    *,
+    historical_dataset_id: str | None = None,
+    seed: int | None = None,
+    observations: int | None = None,
+    market_data: Any | None = None,
+) -> PortfolioService:
     """Construct the process-wide pricing + historical risk stack.
 
     Used by FastAPI ``deps.portfolio_service`` and Compose ``app.worker``.
+    Optional kwargs rebuild the historical engine for a rebound run spec.
     """
-    return PortfolioService(create_pricing_engine(), build_historical_risk_engine())
+    engine = build_historical_risk_engine(
+        historical_dataset_id=historical_dataset_id,
+        seed=seed,
+        observations=observations,
+    )
+    if market_data is None:
+        return PortfolioService(create_pricing_engine(), engine)
+    return PortfolioService(create_pricing_engine(), engine, market_data=market_data)
 
 
 def dataset_identity(dataset: object) -> tuple[str, str]:
     """Stable id/version for a resolved historical dataset instance."""
+    if isinstance(dataset, FileHistoricalDataset):
+        raw_id = (dataset.dataset_id or "").strip()
+        if raw_id and raw_id != "file":
+            return raw_id, DEFAULT_HISTORICAL_DATASET_VERSION
+        if dataset.source_path:
+            return file_csv_dataset_id(dataset.source_path), DEFAULT_HISTORICAL_DATASET_VERSION
+        return DEMO_HISTORICAL_DATASET_ID, DEFAULT_HISTORICAL_DATASET_VERSION
     raw_id = getattr(dataset, "dataset_id", None)
     if isinstance(raw_id, str) and raw_id.strip():
         return raw_id.strip(), DEFAULT_HISTORICAL_DATASET_VERSION
-    if isinstance(dataset, FileHistoricalDataset):
-        return DEMO_HISTORICAL_DATASET_ID, DEFAULT_HISTORICAL_DATASET_VERSION
     if isinstance(dataset, SyntheticHistoricalDataset):
         return SYNTHETIC_HISTORICAL_DATASET_ID, DEFAULT_HISTORICAL_DATASET_VERSION
     return SYNTHETIC_HISTORICAL_DATASET_ID, DEFAULT_HISTORICAL_DATASET_VERSION
 
 
+def build_historical_risk_engine_for_spec(
+    spec: ResolvedRiskRunSpec,
+) -> HistoricalRiskEngine:
+    """Build an engine whose dataset identity matches ``spec`` (execute-time rebind)."""
+    cfg = spec.calculation_config
+    return build_historical_risk_engine(
+        historical_dataset_id=spec.historical_dataset_id,
+        seed=None if cfg is None else cfg.seed,
+        observations=None if cfg is None else cfg.observations,
+    )
+
+
+def portfolio_service_for_spec(
+    base: PortfolioService,
+    spec: ResolvedRiskRunSpec,
+) -> PortfolioService:
+    """Return ``base`` when its engine already matches ``spec``; otherwise rebound."""
+    engine = getattr(base, "risk", None)
+    if isinstance(engine, HistoricalRiskEngine):
+        current_id, current_version = dataset_identity(engine.dataset)
+        cfg = spec.calculation_config
+        seed_ok = cfg is None or cfg.seed is None or cfg.seed == engine.seed
+        obs_ok = (
+            cfg is None
+            or cfg.observations is None
+            or cfg.observations == engine.observations
+        )
+        if (
+            current_id == spec.historical_dataset_id
+            and current_version == spec.historical_dataset_version
+            and seed_ok
+            and obs_ok
+        ):
+            return base
+    rebound = build_historical_risk_engine_for_spec(spec)
+    return PortfolioService(
+        base.pricing,
+        rebound,
+        market_data=base.market_data,
+    )
+
+
 def resolve_run_spec(
-    request: dict[str, Any] | None = None,
+    request: dict[str, Any] | RiskRunRequestBody | None = None,
     *,
     risk_engine: HistoricalRiskEngine | None = None,
+    run_type: str = "summary",
 ) -> ResolvedRiskRunSpec:
-    """Merge request-blob spec fields with the factory-resolved dataset/config.
+    """Merge typed request-blob spec fields with the factory-resolved dataset/config.
 
-    Request values win when present and valid. Unparseable ``as_of`` is omitted
-    (the request dict is still an untyped envelope). Dataset identity always
-    comes from the shared factory when the request does not supply one.
+    When the request names a ``historical_dataset_id``, that dataset is resolved
+    (and must be supported). The returned identity is always the canonical id
+    of the selected dataset — never a free-form label that execution ignores.
     """
-    engine = risk_engine if risk_engine is not None else build_historical_risk_engine()
-    dataset_id, dataset_version = dataset_identity(engine.dataset)
+    if isinstance(request, RiskRunRequestBody):
+        typed = request
+    else:
+        typed = parse_risk_run_request(run_type, request)
+    req = dump_risk_run_request(typed)
+
+    requested_id = _nonempty_str(req.get("historical_dataset_id"))
+    requested_version = _nonempty_str(req.get("historical_dataset_version"))
+    cfg = typed.calculation_config
+
+    seed = None if cfg is None else cfg.seed
+    observations = None if cfg is None else cfg.observations
+
+    if requested_id is not None:
+        # Fail closed on unknown ids; rebind known aliases / CSV paths.
+        resolve_dataset_source(requested_id)
+        selected = build_historical_risk_engine(
+            historical_dataset_id=requested_id,
+            seed=seed,
+            observations=observations,
+        )
+    elif risk_engine is not None:
+        selected = risk_engine
+        if seed is not None or observations is not None:
+            current_id, _ = dataset_identity(risk_engine.dataset)
+            selected = build_historical_risk_engine(
+                historical_dataset_id=current_id,
+                seed=seed if seed is not None else risk_engine.seed,
+                observations=(
+                    observations if observations is not None else risk_engine.observations
+                ),
+            )
+    else:
+        selected = build_historical_risk_engine(
+            seed=seed,
+            observations=observations,
+        )
+
+    dataset_id, dataset_version = dataset_identity(selected.dataset)
+    if requested_version is not None and requested_version != dataset_version:
+        raise ValueError(
+            f"unsupported historical_dataset_version: {requested_version!r}; "
+            f"expected {dataset_version!r}"
+        )
+
     factory_config = RiskRunCalculationConfig(
-        observations=engine.observations,
-        seed=engine.seed,
+        observations=selected.observations,
+        seed=selected.seed,
+        confidence=None if cfg is None else cfg.confidence,
     )
-    req = request or {}
+
     return ResolvedRiskRunSpec(
-        historical_dataset_id=_nonempty_str(req.get("historical_dataset_id")) or dataset_id,
-        historical_dataset_version=(
-            _nonempty_str(req.get("historical_dataset_version")) or dataset_version
-        ),
-        as_of=_parse_as_of(req.get("as_of")),
-        calculation_config=_parse_calculation_config(req.get("calculation_config"))
-        or factory_config,
+        historical_dataset_id=dataset_id,
+        historical_dataset_version=dataset_version,
+        as_of=typed.as_of,
+        calculation_config=cfg or factory_config,
     )
 
 
@@ -121,25 +299,3 @@ def _nonempty_str(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-
-
-def _parse_as_of(value: Any) -> date | AsOfLabel | None:
-    if value is None or value == "":
-        return None
-    try:
-        return _AS_OF_ADAPTER.validate_python(value)
-    except (ValidationError, ValueError, TypeError):
-        return None
-
-
-def _parse_calculation_config(value: Any) -> RiskRunCalculationConfig | None:
-    if value is None or value == "":
-        return None
-    if isinstance(value, RiskRunCalculationConfig):
-        return value
-    if not isinstance(value, Mapping):
-        return None
-    try:
-        return RiskRunCalculationConfig.model_validate(value)
-    except ValidationError:
-        return None
