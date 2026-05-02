@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { money } from '../lib/risk.mjs'
+import BlockHelp from './BlockHelp'
 import {
   cellStyle, domainMaxAbs, divergingColor, sequentialColor, utilizationColor,
   hierarchyMetricCells, factorExposureMatrix, stressPnlCells, limitUtilizationCells,
@@ -66,7 +67,10 @@ export function HierarchyRiskHeatmap({ node }) {
     <div className="card wide">
       <div className="card-title-row">
         <div>
-          <h3>Hierarchy risk heatmap</h3>
+          <div className="block-title">
+            <h3>Hierarchy risk heatmap</h3>
+            <BlockHelp id="hierarchy-risk-heatmap" />
+          </div>
           <div className="muted">
             Color scale of API {metricLabel} by {level} — POST /api/v1/risk/hierarchy (display only)
           </div>
@@ -115,7 +119,10 @@ export function FactorExposureHeatmap({ items }) {
   if (!matrix.rows.length) {
     return (
       <div className="card wide">
-        <h3>Factor exposure heatmap</h3>
+        <div className="block-title">
+          <h3>Factor exposure heatmap</h3>
+          <BlockHelp id="factor-exposure-heatmap" />
+        </div>
         <div className="muted">No factor exposures from API</div>
       </div>
     )
@@ -125,7 +132,10 @@ export function FactorExposureHeatmap({ items }) {
     <div className="card wide">
       <div className="card-title-row">
         <div>
-          <h3>Factor exposure heatmap</h3>
+          <div className="block-title">
+            <h3>Factor exposure heatmap</h3>
+            <BlockHelp id="factor-exposure-heatmap" />
+          </div>
           <div className="muted">
             Factor × bucket grid from POST /api/v1/risk/factors — colors map API exposure (display only)
           </div>
@@ -177,7 +187,10 @@ export function StressPnlHeatmap({ items }) {
     <div className="card wide">
       <div className="card-title-row">
         <div>
-          <h3>Stress P&amp;L heatmap</h3>
+          <div className="block-title">
+            <h3>Stress P&amp;L heatmap</h3>
+            <BlockHelp id="stress-pnl-heatmap" />
+          </div>
           <div className="muted">
             Scenario P&amp;L from POST /api/v1/risk/stress — diverging color on API pnl (display only)
           </div>
@@ -213,7 +226,10 @@ export function LimitUtilizationHeatmap({ items }) {
     <div className="card wide">
       <div className="card-title-row">
         <div>
-          <h3>Limit utilization heatmap</h3>
+          <div className="block-title">
+            <h3>Limit utilization heatmap</h3>
+            <BlockHelp id="limit-utilization-heatmap" />
+          </div>
           <div className="muted">
             Utilization from POST /api/v1/risk/limits — color bands on API utilization_pct (display only)
           </div>
