@@ -1,4 +1,7 @@
 import os
+import shutil
+import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -43,3 +46,37 @@ def _reset_process_caches():
     yield
     reset_curve_construction_cache()
     reset_scenario_result_memo()
+
+
+@pytest.fixture(scope="session")
+def native_scenario_lib(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Build ``libriskkernel`` once per session (once per xdist worker).
+
+    Native ABI tests share this artifact. ``test_cpp_kernel_compiles_and_executes``
+    still compiles ``kernel_test`` from scratch as an explicit compile smoke.
+    """
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    root = Path(__file__).resolve().parents[1] / "native"
+    out_dir = tmp_path_factory.mktemp("native_scenario_lib")
+    lib_name = (
+        "libriskkernel.dylib" if os.uname().sysname == "Darwin" else "libriskkernel.so"
+    )
+    lib = out_dir / lib_name
+    subprocess.run(
+        [
+            "g++",
+            "-std=c++20",
+            "-O3",
+            "-shared",
+            "-fPIC",
+            "-pthread",
+            "-I",
+            str(root / "include"),
+            str(root / "src" / "risk_kernel_capi.cpp"),
+            "-o",
+            str(lib),
+        ],
+        check=True,
+    )
+    return lib

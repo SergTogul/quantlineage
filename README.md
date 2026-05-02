@@ -183,6 +183,8 @@ npm run dev
 ```bash
 cd backend
 PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin pytest -q
+# optional: parallel workers (pytest-xdist); native lib builds once per worker
+PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin pytest -q -n auto
 
 # static analysis (also CI job lint-static-analysis)
 pip install -r requirements-dev.txt # includes ruff + mypy
