@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { limitDrilldown } from '../api'
+import BlockHelp from './BlockHelp'
 import {
   breachedLimits, limitDrilldownSummary, limitStatus, limitStatusClass, limitStatusCounts,
   money, percent, threatClass, topContributors,
@@ -8,7 +9,10 @@ import {
 export function Contributors({ items }) {
   return (
     <div className="card">
-      <h3>Component VaR Contributors</h3>
+      <div className="block-title">
+        <h3>Component VaR Contributors</h3>
+        <BlockHelp id="component-var" />
+      </div>
       <div className="muted">Parametric component VaR by trade</div>
       <table>
         <tbody>
@@ -64,7 +68,10 @@ export function Limits({ items, portfolio }) {
 
   return (
     <div className="card wide">
-      <h3>Limits</h3>
+      <div className="block-title">
+        <h3>Limits</h3>
+        <BlockHelp id="limits" />
+      </div>
       <div className="muted">OK / WARNING / BREACH from LimitResult.status — drill via POST /risk/limits/drilldown</div>
       <div className="limit-status-strip" aria-label="Limit status summary">
         <span className="status ok">{counts.OK} OK</span>
@@ -173,7 +180,10 @@ export function Limits({ items, portfolio }) {
 export function Stress({ items }) {
   return (
     <div className="card wide">
-      <h3>Stress Tests</h3>
+      <div className="block-title">
+        <h3>Stress Tests</h3>
+        <BlockHelp id="stress-tests" />
+      </div>
       <table>
         <thead><tr><th>Scenario</th><th>P&amp;L</th></tr></thead>
         <tbody>
@@ -194,7 +204,10 @@ export function ThreatScenarios({ report }) {
     <div className="card wide">
       <div className="card-title-row">
         <div>
-          <h3>Threat Scenario Evaluation</h3>
+          <div className="block-title">
+            <h3>Threat Scenario Evaluation</h3>
+            <BlockHelp id="threat-scenarios" />
+          </div>
           <div className="muted">Ranked by portfolio loss after full revaluation</div>
         </div>
         <div className="scenario-badges">

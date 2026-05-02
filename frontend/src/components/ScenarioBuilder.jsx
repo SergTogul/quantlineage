@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   askRisk, compareHedge, evaluateCustomScenario, reverseStress, reverseStressMulti,
 } from '../api'
+import BlockHelp from './BlockHelp'
 import {
   REVERSE_MULTI_FACTORS, SCENARIO_PRESETS, defaultHedgeScenarios, defaultReverseMultiForm,
   defaultScenarioForm, formatFactorShock, hedgeComparisonSummary, money, percent,
@@ -56,7 +57,10 @@ export function ScenarioBuilder({ portfolio }) {
 
   return (
     <div className="card wide">
-      <h3>Scenario Builder</h3>
+      <div className="block-title">
+        <h3>Scenario Builder</h3>
+        <BlockHelp id="scenario-builder" />
+      </div>
       <div className="muted">
         Custom factor shocks → POST /api/v1/risk/stress/evaluate/custom (full reval on server)
       </div>
@@ -133,7 +137,10 @@ export function ReverseStress({ portfolio }) {
   const [result, setResult] = useState(null)
   return (
     <div className="card" data-testid="reverse-stress">
-      <h3>Reverse Stress</h3>
+      <div className="block-title">
+        <h3>Reverse Stress</h3>
+        <BlockHelp id="reverse-stress" />
+      </div>
       <div className="inline-form">
         <select value={factor} onChange={(e) => setFactor(e.target.value)}>
           <option>equity</option>
@@ -210,7 +217,10 @@ export function ReverseStressMulti({ portfolio }) {
 
   return (
     <div className="card wide" data-testid="reverse-stress-multi">
-      <h3>Multi-Factor Reverse Stress</h3>
+      <div className="block-title">
+        <h3>Multi-Factor Reverse Stress</h3>
+        <BlockHelp id="reverse-stress-multi" />
+      </div>
       <div className="muted">
         Constrained joint adverse moves → POST /api/v1/risk/stress/reverse/multi
         (server ray search + coordinate descent; not a certified global optimum)
@@ -331,7 +341,10 @@ export function RiskQuery({ portfolio }) {
   const [r, setR] = useState(null)
   return (
     <div className="card">
-      <h3>Risk Query</h3>
+      <div className="block-title">
+        <h3>Risk Query</h3>
+        <BlockHelp id="risk-query" />
+      </div>
       <div className="query">
         <input value={q} onChange={(e) => setQ(e.target.value)} />
         <button type="button" onClick={async () => setR(await askRisk(portfolio, q))}>Ask</button>
@@ -370,7 +383,10 @@ export function HedgeCompare({ portfolio }) {
 
   return (
     <div className="card wide">
-      <h3>Hedge Compare</h3>
+      <div className="block-title">
+        <h3>Hedge Compare</h3>
+        <BlockHelp id="hedge-compare" />
+      </div>
       <div className="muted">
         Before/after SPY flat hedge — VaR, ES, scenario P&amp;L, and factor deltas from API (no client risk math)
       </div>

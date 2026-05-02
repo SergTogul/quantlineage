@@ -3,6 +3,7 @@ import {
   changeAttribution, compareVarMethodologies, createRiskRun, esContributions, explainPnL,
   explainPnLDemo, getRiskRun,
 } from '../api'
+import BlockHelp from './BlockHelp'
 import {
   money, topFactors, varMethod, hierarchySummary, hierarchyNodeAtPath, hierarchyChildRows,
   hierarchyNodeMetrics, attributionSummary,
@@ -27,8 +28,54 @@ const ES_DIM_LABELS = {
   by_risk_factor: 'Risk factor',
 }
 
-export function RiskFactors({items}) { return <div className="card"><h3>Risk Factors</h3><table><thead><tr><th>Factor</th><th>Bucket</th><th>Exposure</th></tr></thead><tbody>{topFactors(items).map(x=><tr key={`${x.factor}-${x.bucket}`}><td>{x.factor}<div className="muted">{x.factor_type}</div></td><td>{x.bucket}</td><td>{money(x.exposure)}</td></tr>)}</tbody></table></div> }
-export function VaRAnalytics({report}) { const h=varMethod(report,'historical'),p=varMethod(report,'parametric'); return <div className="card"><h3>VaR / Expected Shortfall</h3><table><thead><tr><th>Method</th><th>99% VaR</th><th>ES</th></tr></thead><tbody>{[h,p].filter(Boolean).map(x=><tr key={x.method}><td>{x.method}</td><td>{money(x.var)}</td><td>{money(x.expected_shortfall)}</td></tr>)}</tbody></table><div className="muted foot">{report.contributions.length} component-risk contributions calculated</div></div> }
+export function RiskFactors({ items }) {
+  return (
+    <div className="card">
+      <div className="block-title">
+        <h3>Risk Factors</h3>
+        <BlockHelp id="risk-factors" />
+      </div>
+      <table>
+        <thead><tr><th>Factor</th><th>Bucket</th><th>Exposure</th></tr></thead>
+        <tbody>
+          {topFactors(items).map((x) => (
+            <tr key={`${x.factor}-${x.bucket}`}>
+              <td>{x.factor}<div className="muted">{x.factor_type}</div></td>
+              <td>{x.bucket}</td>
+              <td>{money(x.exposure)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+export function VaRAnalytics({ report }) {
+  const h = varMethod(report, 'historical')
+  const p = varMethod(report, 'parametric')
+  return (
+    <div className="card">
+      <div className="block-title">
+        <h3>VaR / Expected Shortfall</h3>
+        <BlockHelp id="var-es" />
+      </div>
+      <table>
+        <thead><tr><th>Method</th><th>99% VaR</th><th>ES</th></tr></thead>
+        <tbody>
+          {[h, p].filter(Boolean).map((x) => (
+            <tr key={x.method}>
+              <td>{x.method}</td>
+              <td>{money(x.var)}</td>
+              <td>{money(x.expected_shortfall)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="muted foot">{report.contributions.length} component-risk contributions calculated</div>
+    </div>
+  )
+}
 
 /**
  * M8.6: Firm→trade hierarchy drill-down. Metrics from selected API node only.
@@ -42,12 +89,23 @@ export function Hierarchy({ node }) {
   const summary = hierarchySummary(node)
 
   if (!node || !resolved) {
-    return <div className="card wide"><h3>Portfolio Hierarchy</h3><div className="muted">No hierarchy loaded</div></div>
+    return (
+      <div className="card wide">
+        <div className="block-title">
+          <h3>Portfolio Hierarchy</h3>
+          <BlockHelp id="portfolio-hierarchy" />
+        </div>
+        <div className="muted">No hierarchy loaded</div>
+      </div>
+    )
   }
 
   return (
     <div className="card wide">
-      <h3>Portfolio Hierarchy</h3>
+      <div className="block-title">
+        <h3>Portfolio Hierarchy</h3>
+        <BlockHelp id="portfolio-hierarchy" />
+      </div>
       <div className="muted">
         Drill Firm → Portfolio → Desk → Strategy → Book → Trade — node metrics from API
         {summary ? ` · book has ${summary.desks} desks / ${summary.trades} trades` : ''}
@@ -166,7 +224,10 @@ export function Attribution({ portfolio, initialReport = null }) {
 
   return (
     <div className="card wide">
-      <h3>P&amp;L Explain</h3>
+      <div className="block-title">
+        <h3>P&amp;L Explain</h3>
+        <BlockHelp id="pnl-explain" />
+      </div>
       <div className="muted">
         Market / trade-flow bridge from AttributionEngine — POST /api/v1/risk/attribution
         (demo endpoint optional for illustrative marks)
@@ -304,7 +365,10 @@ export function RiskRuns({ portfolio }) {
 
   return (
     <div className="card">
-      <h3>Risk Runs</h3>
+      <div className="block-title">
+        <h3>Risk Runs</h3>
+        <BlockHelp id="risk-runs" />
+      </div>
       <div className="muted">Async POST/GET /api/v1/risk/runs — poll until COMPLETED or FAILED</div>
       <div className="inline-form risk-run-form">
         <select
@@ -379,7 +443,10 @@ export function RiskChangeAttribution({ portfolio }) {
 
   return (
     <div className="card">
-      <h3>Risk Change Attribution</h3>
+      <div className="block-title">
+        <h3>Risk Change Attribution</h3>
+        <BlockHelp id="risk-change-attribution" />
+      </div>
       <div className="muted">
         VaR/ES waterfall after SPY×1.5 — POST /api/v1/risk/change-attribution (not P&amp;L Explain)
       </div>
@@ -471,7 +538,10 @@ export function ESContributions({ portfolio }) {
 
   return (
     <div className="card">
-      <h3>ES Contributions</h3>
+      <div className="block-title">
+        <h3>ES Contributions</h3>
+        <BlockHelp id="es-contributions" />
+      </div>
       <div className="muted">
         Tail-conditional ES by position / book / desk / strategy / factor — POST /api/v1/risk/es
       </div>
@@ -572,7 +642,10 @@ export function VaRCompare({ portfolio }) {
 
   return (
     <div className="card wide">
-      <h3>VaR Methodology Compare</h3>
+      <div className="block-title">
+        <h3>VaR Methodology Compare</h3>
+        <BlockHelp id="var-compare" />
+      </div>
       <div className="muted">
         LINEAR vs DELTA_GAMMA vs FULL_REVALUATION — POST /api/v1/risk/var/compare
       </div>
