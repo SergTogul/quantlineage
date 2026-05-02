@@ -101,6 +101,7 @@ class PortfolioService:
                 "seed": risk.seed,
                 "observations": risk.observations,
                 "dataset": risk.dataset,
+                "factor_panel": risk.factor_panel,
             }
         self.var_engine = VaRAnalytics(**hist_kwargs) if hist_kwargs else VaRAnalytics()
         self.limit_drilldown_engine = LimitDrilldownEngine(
@@ -227,6 +228,7 @@ class PortfolioService:
                 observations=self.risk.observations,
                 dataset=self.risk.dataset,
                 methodology=methodology,
+                factor_panel=self.risk.factor_panel,
             )
         else:
             engine = self.es_engine

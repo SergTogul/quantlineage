@@ -14,10 +14,16 @@ from app.domain.models import (
     VaRReport,
 )
 from app.interfaces.pricing import PricingEngine
-from app.risk.historical import approximate_pnl_series, require_explicit_market
+from app.risk.factor_panel import HistoricalFactorPanel
+from app.risk.historical import (
+    approximate_pnl_series,
+    approximate_position_pnls_from_panel,
+    require_explicit_market,
+    require_panel_covers_portfolio,
+)
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.marginal_var import parametric_component_var, parametric_marginal_var
-from app.risk.scenarios import iter_historical_shocked_snapshots
+from app.risk.scenarios import iter_historical_shocked_snapshots, iter_panel_shocked_snapshots
 
 
 class VaRAnalytics:
@@ -27,12 +33,14 @@ class VaRAnalytics:
         observations: int = 750,
         dataset: HistoricalMarketDataset | None = None,
         methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
+        factor_panel: HistoricalFactorPanel | None = None,
     ):
         self.seed, self.observations = seed, observations
         self.dataset: HistoricalMarketDataset = dataset or SyntheticHistoricalDataset(
             seed=seed, observations=observations
         )
         self.methodology = methodology
+        self.factor_panel = factor_panel
 
     def _factor_history(self):
         obs = self.dataset.factor_observations()
@@ -45,6 +53,16 @@ class VaRAnalytics:
         methodology: VaRMethodology,
         market: MarketSnapshot,
     ) -> dict[str, np.ndarray]:
+        if self.factor_panel is not None:
+            if methodology is VaRMethodology.FULL_REVALUATION:
+                return self._full_reval_position_pnls(portfolio, pricing, market)
+            return approximate_position_pnls_from_panel(
+                portfolio,
+                pricing,
+                market,
+                self.factor_panel,
+                methodology=methodology,
+            )
         if methodology is VaRMethodology.FULL_REVALUATION:
             return self._full_reval_position_pnls(portfolio, pricing, market)
         er, vp, rb, fx = self._factor_history()
@@ -73,7 +91,12 @@ class VaRAnalytics:
     ) -> dict[str, np.ndarray]:
         base = {p.id: pricing.value(p, market).market_value for p in portfolio.positions}
         collected: dict[str, list[float]] = {p.id: [] for p in portfolio.positions}
-        for snap in iter_historical_shocked_snapshots(market, self.dataset):
+        if self.factor_panel is not None:
+            require_panel_covers_portfolio(portfolio, self.factor_panel)
+            snaps = iter_panel_shocked_snapshots(market, self.factor_panel)
+        else:
+            snaps = iter_historical_shocked_snapshots(market, self.dataset)
+        for snap in snaps:
             for p in portfolio.positions:
                 collected[p.id].append(pricing.value(p, snap).market_value - base[p.id])
         return {pid: np.asarray(vals, dtype=float) for pid, vals in collected.items()}
@@ -89,7 +112,12 @@ class VaRAnalytics:
         meth = methodology if methodology is not None else self.methodology
         base_market = require_explicit_market(market)
         pos = self._position_pnls(portfolio, pricing, meth, base_market)
-        n = next(iter(pos.values())).shape[0] if pos else self.dataset.factor_observations().n_observations
+        if pos:
+            n = next(iter(pos.values())).shape[0]
+        elif self.factor_panel is not None:
+            n = self.factor_panel.n_observations
+        else:
+            n = self.dataset.factor_observations().n_observations
         total = sum(pos.values(), start=np.zeros(n))
         losses = -total
         var = float(max(0, np.quantile(losses, confidence)))
