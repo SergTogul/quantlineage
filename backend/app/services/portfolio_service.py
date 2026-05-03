@@ -20,7 +20,6 @@ from app.domain.models import (
     RiskSummary,
     ScenarioEvaluationReport,
     StressResult,
-    StressScenario,
     SwapPosition,
     VaRMethodology,
     VaRMethodologyComparison,
@@ -39,6 +38,7 @@ from app.risk.limit_drilldown import LimitDrilldownEngine
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.query import RiskQueryEngine
 from app.risk.risk_attribution import RiskChangeAttributionEngine
+from app.risk.scenario_attribution import ScenarioLike
 from app.risk.stress import (
     DEFAULT_SCENARIOS,
     THREAT_SCENARIOS,
@@ -150,13 +150,13 @@ class PortfolioService:
             r = {**r, "methodology": methodology.value}
         return RiskSummary(portfolio_id=portfolio.id, **r)
 
-    def stresses(self, portfolio: Portfolio, scenarios: list[StressScenario] | None = None) -> list[StressResult]:
+    def stresses(self, portfolio: Portfolio, scenarios: list[ScenarioLike] | None = None) -> list[StressResult]:
         market = self.market_snapshot(portfolio)
         return self.stress_engine.run(
             portfolio, self.pricing, scenarios or DEFAULT_SCENARIOS, market=market
         )
 
-    def threat_evaluation(self, portfolio: Portfolio, scenarios: list[StressScenario] | None = None) -> ScenarioEvaluationReport:
+    def threat_evaluation(self, portfolio: Portfolio, scenarios: list[ScenarioLike] | None = None) -> ScenarioEvaluationReport:
         market = self.market_snapshot(portfolio)
         return self.stress_engine.evaluate(
             portfolio, self.pricing, scenarios or THREAT_SCENARIOS, market=market
@@ -352,8 +352,8 @@ class PortfolioService:
         self,
         portfolio: Portfolio,
         *,
-        scenarios: list[StressScenario] | None = None,
-        threat_scenarios: list[StressScenario] | None = None,
+        scenarios: list[ScenarioLike] | None = None,
+        threat_scenarios: list[ScenarioLike] | None = None,
     ) -> dict:
         """One sequential pass of existing dashboard methods (R0.10.2).
 

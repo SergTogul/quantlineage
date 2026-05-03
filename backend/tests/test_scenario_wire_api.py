@@ -1,8 +1,8 @@
-"""M3.8 formal Scenario HTTP wire — adapters + API contracts.
+"""M3.8 / R0.4.2-B formal Scenario HTTP wire — adapters + API contracts.
 
-Numerical equivalence: formal wire → ``scenario_to_stress`` → StressEngine
-must match legacy ``StressScenario`` custom endpoints for the same shocks.
-No PricingEngine / VaR math changes.
+Formal wire → domain ``Scenario`` → StressEngine (native apply). Parity:
+formal custom stress P&L must match legacy ``StressScenario`` custom endpoints
+for the same shocks. ``wire_to_stress`` remains an adapter for tests/migration.
 """
 
 from __future__ import annotations
@@ -17,22 +17,29 @@ from app.api.scenario_wire import (
     stress_to_wire,
     wire_to_scenario,
     wire_to_stress,
+    wires_to_scenarios,
 )
 from app.domain.models import MarketSnapshot, StressScenario
 from app.main import app
 from app.market.snapshot import shock_snapshot
+from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import EquitySpot, EquityVol, RateZero
 from app.risk.scenario_model import (
     FactorShock,
     Scenario,
     ScenarioCategory,
     ScenarioThreshold,
-    apply_scenario,
     scenario_from_stress,
+    scenario_to_stress,
 )
-from app.sample import SAMPLE_PORTFOLIO
+from app.risk.scenario_engine import apply_scenario
+from app.risk.stress import StressEngine
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 
 client = TestClient(app)
+PRICING = BuiltinPricingEngine()
+ENGINE = StressEngine()
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 
 def _base() -> MarketSnapshot:
@@ -208,3 +215,85 @@ def test_legacy_custom_stress_unchanged():
     response = client.post("/api/v1/risk/stress/evaluate/custom", json=payload)
     assert response.status_code == 200
     assert response.json()["evaluations"][0]["scenario"] == "Custom"
+
+
+def test_wires_to_scenarios_preserves_formal_type():
+    wire = ScenarioWire(
+        id="native",
+        name="Native formal",
+        category=ScenarioCategory.FACTOR,
+        shocks=[
+            FactorShockWire(factor_type="equity", key="SPY", amount=-0.10, bucket="SPY"),
+        ],
+        max_loss_pct=0.05,
+    )
+    scenarios = wires_to_scenarios([wire])
+    assert len(scenarios) == 1
+    assert isinstance(scenarios[0], Scenario)
+    assert scenarios[0].id == "native"
+
+
+def test_stress_engine_runs_formal_scenario_without_scenario_to_stress(monkeypatch):
+    """R0.4.2-B: StressEngine.run accepts formal Scenario; no collapse adapter."""
+    formal = Scenario(
+        id="formal-run",
+        name="Formal run",
+        category=ScenarioCategory.FACTOR,
+        shocks=(FactorShock(EquitySpot("SPY"), -0.10),),
+        threshold=ScenarioThreshold(max_loss_pct=0.05),
+    )
+    legacy = scenario_to_stress(formal)
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("scenario_to_stress must not be called on StressEngine.run path")
+
+    monkeypatch.setattr("app.risk.scenario_model.scenario_to_stress", boom)
+    monkeypatch.setattr("app.risk.scenario_attribution.scenario_to_stress", boom, raising=False)
+
+    formal_results = ENGINE.run(
+        SAMPLE_PORTFOLIO, PRICING, [formal], market=SAMPLE_MARKET
+    )
+    legacy_results = ENGINE.run(
+        SAMPLE_PORTFOLIO, PRICING, [legacy], market=SAMPLE_MARKET
+    )
+    assert formal_results[0].scenario == "Formal run"
+    assert formal_results[0].pnl == pytest.approx(legacy_results[0].pnl, rel=0, abs=1e-9)
+    assert formal_results[0].by_position.keys() == legacy_results[0].by_position.keys()
+    for pid in formal_results[0].by_position:
+        assert formal_results[0].by_position[pid] == pytest.approx(
+            legacy_results[0].by_position[pid], rel=0, abs=1e-9
+        )
+
+
+def test_stress_engine_evaluate_formal_matches_legacy_content_path():
+    """Formal evaluate vs collapsed StressScenario: identical P&L / threat fields."""
+    formal = Scenario(
+        id="formal-eval",
+        name="Formal eval",
+        category=ScenarioCategory.HYPOTHETICAL,
+        description="native formal evaluate",
+        shocks=(
+            FactorShock(EquitySpot("SPY"), -0.15),
+            FactorShock(EquityVol(underlying="SPY"), 0.25),
+        ),
+        threshold=ScenarioThreshold(max_loss_pct=0.02),
+    )
+    legacy = scenario_to_stress(formal)
+    formal_report = ENGINE.evaluate(
+        SAMPLE_PORTFOLIO, PRICING, [formal], market=SAMPLE_MARKET
+    )
+    legacy_report = ENGINE.evaluate(
+        SAMPLE_PORTFOLIO, PRICING, [legacy], market=SAMPLE_MARKET
+    )
+    fe = formal_report.evaluations[0]
+    le = legacy_report.evaluations[0]
+    assert fe.scenario == "Formal eval"
+    assert fe.pnl == pytest.approx(le.pnl, rel=0, abs=1e-9)
+    assert fe.loss == pytest.approx(le.loss, rel=0, abs=1e-9)
+    assert fe.loss_pct_nav == pytest.approx(le.loss_pct_nav, rel=0, abs=1e-12)
+    assert fe.threat_level == le.threat_level
+    assert fe.breached == le.breached
+    assert fe.kind == le.kind
+    shocked_formal = apply_scenario(SAMPLE_MARKET, formal)
+    shocked_legacy = apply_scenario(SAMPLE_MARKET, legacy)
+    assert shocked_formal.content_hash() == shocked_legacy.content_hash()

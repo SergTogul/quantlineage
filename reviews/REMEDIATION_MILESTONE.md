@@ -385,7 +385,9 @@ Replace nested raw dictionaries where practical with typed domain models for:
 
 ## R0.4.2 One canonical Scenario model
 
-R0.4.2-A COMPLETE (2026-09-09): scenario expand/collapse converts StressScenario bp fields only via `shock_units`; stress↔formal parity golden pins exact marks/`content_hash`. StressScenario wire adapters retained. Remaining R0.4.2: broader formal-only HTTP converge (not blocking one-pass).
+R0.4.2-A COMPLETE (2026-09-09): scenario expand/collapse converts StressScenario bp fields only via `shock_units`; stress↔formal parity golden pins exact marks/`content_hash`. StressScenario wire adapters retained.
+
+R0.4.2-B COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-b-formal-scenario-engine-independent-review.md`). Engine-facing `StressEngine` / PortfolioService / attribution apply accept formal `Scenario | StressScenario` (`ScenarioLike`); formal HTTP `/risk/stress/formal/*` lifts wire → `Scenario` → engine apply (no `scenario_to_stress` on that path). Legacy `/risk/stress/*` StressScenario wire retained. Remaining for full R0.4.2 converge (not this slice): make formal HTTP the default client path, retire dual list endpoints (`/scenarios` vs `/scenarios/formal`), and any remaining what-if / compare callers that still prefer StressScenario-only wire — do not close RF-004.
 
 Converge:
 
@@ -410,6 +412,12 @@ R0.4.2-A COMPLETE (2026-09-09): engine-facing scenario expand/collapse
 (`scenario_model` / `scenarios`) converts StressScenario bp fields through
 `shock_units` (`bps_to_decimal_rate` / `decimal_rate_to_bps`); stress↔formal
 parity golden pins identical `content_hash` / marks. StressScenario wire retained.
+
+R0.4.2-B COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-b-formal-scenario-engine-independent-review.md`). `StressEngine.run` /
+`evaluate` / `ScenarioComparisonEngine.compare` and PortfolioService stress
+entry points take `ScenarioLike`; formal custom/evaluate HTTP uses
+`wires_to_scenarios` → native apply; attribution factor isolation applies
+formal `Scenario` without collapse. Evidence: `reviews/r0.4.2-b-formal-scenario-engine-report.md`.
 
 ## R0.4.3 Explicit shock units
 
