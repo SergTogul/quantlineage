@@ -1,26 +1,37 @@
-"""R0.7.3: hierarchy consumes TradeCalculationArtifact for additive metrics.
+"""R0.7.3 / R0.7.5: hierarchy consumes TradeCalculationArtifact for additive metrics.
 
 When a complete artifact map is supplied, parent additive fields equal the
 sum of trade artifacts and pricing is not invoked. Incomplete maps fail
 closed (no silent mix of reprice + artifacts).
 
-VaR / ES / limits are omitted on the artifact path (not invented from
-vectors; node VaR from historical P&L is later). The default no-artifact
-path still full-reprices (RF-008 stays open).
+When ``artifacts`` is omitted, ``HierarchyEngine`` builds the trade-grain
+map once (``pricing.value`` per position) then aggregates — it must not
+reprice once per hierarchy node (R0.7.5 / RF-008 leftover).
 
 Conventions:
 - Additive: parent == sum(children) within abs 1e-9 for MV, Greeks, stress P&L
 - Sign: same as Valuation / HierarchyNode (currency PV and Greeks)
 """
 from __future__ import annotations
+
 import math
+
 import pytest
-from app.domain.models import EquityPosition, HierarchyLevel, HierarchyNode, HierarchyRef, MarketSnapshot, Portfolio
+from tests.market_fixtures import equity_spots_market
+
+from app.domain.models import (
+    EquityPosition,
+    HierarchyLevel,
+    HierarchyNode,
+    HierarchyRef,
+    MarketSnapshot,
+    Portfolio,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.hierarchy import HierarchyEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.trade_artifacts import TradeCalculationArtifact
-from tests.market_fixtures import equity_spots_market
+
 _ADDITIVE_NODE = ('market_value', 'delta', 'gamma', 'vega', 'dv01', 'fx_delta')
 
 class _ForbiddenPricing:
@@ -40,10 +51,42 @@ class _CountingPricing(BuiltinPricingEngine):
     def __init__(self) -> None:
         super().__init__()
         self.value_calls = 0
+        self.value_portfolio_calls = 0
+        self.shocked_value_calls = 0
 
     def value(self, position, market):
         self.value_calls += 1
         return super().value(position, market)
+
+    def value_portfolio(self, portfolio, market=None):
+        self.value_portfolio_calls += 1
+        return super().value_portfolio(portfolio, market)
+
+    def shocked_value(self, position, scenario, market=None):
+        self.shocked_value_calls += 1
+        return super().shocked_value(position, scenario, market)
+
+class _FirstPassThenForbidden(BuiltinPricingEngine):
+    """Allows exactly ``budget`` ``value`` calls, then forbids further pricing."""
+
+    def __init__(self, budget: int) -> None:
+        super().__init__()
+        self.budget = budget
+        self.value_calls = 0
+
+    def value(self, position, market):
+        self.value_calls += 1
+        if self.value_calls > self.budget:
+            raise AssertionError(
+                f'pricing.value called {self.value_calls} times; budget was {self.budget}'
+            )
+        return super().value(position, market)
+
+    def value_portfolio(self, portfolio, market=None):
+        raise AssertionError('pricing.value_portfolio must not be used after trade artifacts')
+
+    def shocked_value(self, position, scenario, market=None):
+        raise AssertionError('pricing.shocked_value must not be used on default artifact path')
 
 def _artifact(trade_id: str, *, pv: float, delta: float, gamma: float=0.0, vega: float=0.0, dv01: float=0.0, fx_delta: float=0.0, stress_pnl: dict[str, float] | None=None) -> TradeCalculationArtifact:
     return TradeCalculationArtifact.from_parts(trade_id, pv=pv, delta=delta, gamma=gamma, vega=vega, dv01=dv01, fx_delta=fx_delta, stress_pnl=stress_pnl)
@@ -61,16 +104,19 @@ def _complete_artifacts() -> dict[str, TradeCalculationArtifact]:
 def _engine() -> HierarchyEngine:
     return HierarchyEngine(HistoricalRiskEngine(seed=1, observations=20))
 
+def _count_nodes(node: HierarchyNode) -> int:
+    return 1 + sum(_count_nodes(child) for child in node.children)
+
 def _assert_additive_reconciles(node: HierarchyNode, tol: float=1e-09) -> None:
     if not node.children:
         return
     for attr in _ADDITIVE_NODE:
         parent = getattr(node, attr)
-        child_sum = sum((getattr(c, attr) for c in node.children))
+        child_sum = sum(getattr(c, attr) for c in node.children)
         assert math.isclose(parent, child_sum, abs_tol=tol), f'{node.level}:{node.name} {attr} {parent} != children {child_sum}'
     parent_stress = {s.scenario: s.pnl for s in node.stress}
     for scenario, parent_pnl in parent_stress.items():
-        child_sum = sum((next((s.pnl for s in c.stress if s.scenario == scenario)) for c in node.children))
+        child_sum = sum(next(s.pnl for s in c.stress if s.scenario == scenario) for c in node.children)
         assert math.isclose(parent_pnl, child_sum, abs_tol=tol), f'{node.level}:{node.name} stress[{scenario}] {parent_pnl} != {child_sum}'
     for child in node.children:
         _assert_additive_reconciles(child, tol)
@@ -122,9 +168,44 @@ def test_risk_at_sums_artifacts_without_pricing():
     parent_stress = {s.scenario: s.pnl for s in node.stress}
     assert parent_stress['eq_crash'] == -15.0
 
-def test_omitted_artifacts_still_reprices():
+def test_omitted_artifacts_values_each_trade_once_not_once_per_node():
+    """R0.7.5: default build prices once per trade, then aggregates."""
     pf = _two_trade_book()
     pricing = _CountingPricing()
     root = _engine().build(pf, pricing, market=_two_trade_market())
-    assert pricing.value_calls > 0
+    n_nodes = _count_nodes(root)
+    n_positions = len(pf.positions)
+    assert n_nodes == 7
+    assert n_positions == 2
+    assert pricing.value_calls == n_positions
+    assert pricing.value_calls < n_nodes
+    assert pricing.value_portfolio_calls == 0
+    assert pricing.shocked_value_calls == 0
     assert root.market_value != 0.0
+    assert root.limits == []
+    assert root.stress == []
+
+def test_omitted_artifacts_forbid_pricing_after_first_pass():
+    """After the trade-grain pass, aggregation must not call pricing again."""
+    pf = _two_trade_book()
+    pricing = _FirstPassThenForbidden(budget=len(pf.positions))
+    root = _engine().build(pf, pricing, market=_two_trade_market())
+    assert pricing.value_calls == len(pf.positions)
+    assert math.isclose(root.market_value, 100.0 * 100 + 80.0 * 50, abs_tol=1e-09)
+
+def test_risk_at_omitted_artifacts_values_subset_once():
+    pf = _two_trade_book()
+    pricing = _CountingPricing()
+    ref = HierarchyRef(
+        level=HierarchyLevel.BOOK,
+        firm='Acme Capital',
+        portfolio_id='two-trade',
+        desk='Equity Desk',
+        strategy='Momentum',
+        book='Cash',
+    )
+    node = _engine().risk_at(pf, pricing, ref, market=_two_trade_market())
+    assert pricing.value_calls == 2
+    assert pricing.shocked_value_calls == 0
+    assert node.limits == []
+    assert math.isclose(node.market_value, 14000.0, abs_tol=1e-09)

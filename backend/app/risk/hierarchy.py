@@ -5,17 +5,21 @@ Tree: Firm → Portfolio → Desk → Strategy → Book → Trade.
 Additive metrics (parent == sum children within abs 1e-9):
   market_value, delta, gamma, vega, dv01, fx_delta, stress scenario P&L.
 
-Node-level metrics (computed on the position subset, not summed):
-  var_95, var_99, expected_shortfall_99, limits.
+Node-level metrics (from summed trade historical P&L, not summed VaR):
+  var_95, var_99, expected_shortfall_99. Limits stay omitted on the
+  artifact aggregation path.
 
-When ``artifacts`` is supplied to ``build`` / ``risk_at``, additive fields are
-summed from ``TradeCalculationArtifact`` and pricing is not invoked. Node
-VaR / ES come from the summed ``historical_pnl`` vector (same loss = -P&L
-quantile convention as ``HistoricalRiskEngine.calculate`` / ``test_var_es_golden.py``).
-Limits stay omitted. An incomplete map fails closed. Mixed present/absent
-historical vectors fail closed via ``TradeCalculationArtifact.add``. All-omitted
-vectors keep VaR / ES at zero. Omitting ``artifacts`` keeps the historical
-full-reprice path.
+When ``artifacts`` is supplied to ``build`` / ``risk_at``, additive fields
+are summed from ``TradeCalculationArtifact`` and pricing is not invoked.
+When ``artifacts`` is omitted, trade artifacts are built **once**
+(``pricing.value`` + ``historical_pnl_for_valuation`` per position) and the
+same aggregation path is used (R0.7.5 / RF-008 leftover). Node VaR / ES
+come from the summed ``historical_pnl`` vector (same loss = -P&L quantile
+convention as ``HistoricalRiskEngine.calculate`` / ``test_var_es_golden.py``).
+An incomplete explicit map fails closed. Mixed present/absent historical
+vectors fail closed via ``TradeCalculationArtifact.add``. All-omitted
+vectors keep VaR / ES at zero. Stress on the default producer path is
+empty (same as ``PortfolioService.hierarchy``).
 
 Position-level ``desk`` / ``strategy`` override portfolio defaults when set.
 Placement helpers live in ``hierarchy_placement`` (re-exported here for API stability).
@@ -47,7 +51,11 @@ from app.risk.hierarchy_placement import (
     resolve_desk,
     resolve_strategy,
 )
-from app.risk.historical import HistoricalRiskEngine, require_explicit_market
+from app.risk.historical import (
+    HistoricalRiskEngine,
+    historical_pnl_for_valuation,
+    require_explicit_market,
+)
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.risk.trade_artifacts import TradeCalculationArtifact
@@ -139,6 +147,13 @@ def _scenario_ids(
                 seen.add(scenario)
                 ordered.append(scenario)
     return tuple(ordered)
+
+
+def _artifact_trade_id(position_id: str) -> str:
+    """Stable non-empty artifact trade_id (empty position ids stay map keys)."""
+    if isinstance(position_id, str) and position_id.strip():
+        return position_id
+    return "__empty__"
 
 
 def _var_es_from_historical_pnl(
@@ -241,6 +256,28 @@ class HierarchyEngine:
             market=market,
         )
 
+    def _trade_artifacts(
+        self,
+        portfolio: Portfolio,
+        pricing: PricingEngine,
+        market: MarketSnapshot,
+    ) -> dict[str, TradeCalculationArtifact]:
+        """Value each trade once and attach historical P&L (no per-node reprice).
+
+        Same convention as ``PortfolioService.hierarchy``: PV / Greeks from
+        ``pricing.value``; historical vector via ``historical_pnl_for_valuation``;
+        stress maps left empty (stress would re-call ``value`` / shock paths).
+        """
+        artifacts: dict[str, TradeCalculationArtifact] = {}
+        for position in portfolio.positions:
+            valuation = pricing.value(position, market)
+            artifacts[position.id] = TradeCalculationArtifact.from_valuation(
+                valuation,
+                trade_id=_artifact_trade_id(position.id),
+                historical_pnl=historical_pnl_for_valuation(self.risk, valuation),
+            )
+        return artifacts
+
     def _node(
         self,
         name: str,
@@ -336,9 +373,11 @@ class HierarchyEngine:
         root_market = require_explicit_market(market)
         artifact_map = _normalize_artifacts(artifacts)
         sub = portfolio_at(portfolio, ref)
-        scenario_ids = (
-            _scenario_ids(sub.positions, artifact_map) if artifact_map is not None else ()
-        )
+        if artifact_map is None:
+            artifact_map = self._trade_artifacts(sub, pricing, root_market)
+        else:
+            _require_complete_artifacts(sub.positions, artifact_map)
+        scenario_ids = _scenario_ids(sub.positions, artifact_map)
         return self._node(
             sub.name,
             ref.level.value,
@@ -361,13 +400,11 @@ class HierarchyEngine:
         """Full Firm → … → Trade tree with NAV/Greeks/VaR/ES/stress/limits per node."""
         root_market = require_explicit_market(market)
         artifact_map = _normalize_artifacts(artifacts)
-        if artifact_map is not None:
+        if artifact_map is None:
+            artifact_map = self._trade_artifacts(portfolio, pricing, root_market)
+        else:
             _require_complete_artifacts(portfolio.positions, artifact_map)
-        scenario_ids = (
-            _scenario_ids(portfolio.positions, artifact_map)
-            if artifact_map is not None
-            else ()
-        )
+        scenario_ids = _scenario_ids(portfolio.positions, artifact_map)
         # desk -> strategy -> book -> [positions]
         tree: dict[str, dict[str, dict[str, list]]] = defaultdict(
             lambda: defaultdict(lambda: defaultdict(list))

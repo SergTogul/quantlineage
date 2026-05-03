@@ -238,6 +238,47 @@ def approximate_pnl_series(
     return linear + 0.5 * gamma * equity_ret * equity_ret
 
 
+def historical_pnl_for_valuation(
+    risk: RiskEngine,
+    valuation: Valuation,
+) -> tuple[float, ...] | None:
+    """One historical P&L series from already-valued Greeks (no reprice).
+
+    Shared by ``PortfolioService`` and ``HierarchyEngine`` default artifact
+    production. Uses the engine dataset + methodology and
+    ``approximate_pnl_series`` (LINEAR / DELTA_GAMMA). One series per trade,
+    shared factor observations so lengths match.
+
+    FULL_REVALUATION and an opt-in ``factor_panel`` are omitted (``None``):
+    those paths would call ``value`` again. Non-``HistoricalRiskEngine``
+    risk engines also return ``None``.
+    """
+    if not isinstance(risk, HistoricalRiskEngine):
+        return None
+    if risk.methodology is VaRMethodology.FULL_REVALUATION:
+        return None
+    if risk.factor_panel is not None:
+        return None
+    observations = risk.dataset.factor_observations()
+    series = approximate_pnl_series(
+        delta=valuation.delta,
+        gamma=valuation.gamma,
+        vega=valuation.vega,
+        dv01=valuation.dv01,
+        fx_delta=valuation.fx_delta,
+        equity_ret=observations.equity_returns,
+        vol_pct=observations.vol_moves,
+        rates_bps=observations.rate_moves_bps,
+        fx_ret=observations.fx_returns,
+        methodology=risk.methodology,
+        scenario_kernel=risk.scenario_kernel,
+        scenario_backend=risk.scenario_backend,
+    )
+    if series.size == 0:
+        return None
+    return tuple(float(point) for point in series)
+
+
 def _rate_tenor(maturity_years: float) -> str:
     return f"{round(float(maturity_years))}Y"
 
