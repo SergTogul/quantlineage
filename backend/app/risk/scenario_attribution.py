@@ -31,7 +31,6 @@ from app.risk.scenario_model import (
     FactorShock,
     Scenario,
     scenario_from_stress,
-    scenario_to_stress,
 )
 from app.sample import DemoAggregateMarketDataProvider
 
@@ -89,22 +88,17 @@ def _to_formal(scenario: ScenarioLike, base: MarketSnapshot) -> Scenario:
     return scenario_from_stress(scenario, base)
 
 
-def _to_stress(scenario: ScenarioLike, base: MarketSnapshot) -> StressScenario:
-    if isinstance(scenario, StressScenario):
-        return scenario
-    return scenario_to_stress(scenario)
-
-
 def _portfolio_pnl_by_position(
     portfolio: Portfolio,
     pricing: PricingEngine,
-    stress: StressScenario,
+    scenario: ScenarioLike,
     market: MarketSnapshot,
     base_by_position: dict[str, float],
 ) -> dict[str, float]:
     # One shocked snapshot per scenario (or isolated-factor sub-scenario), then
     # revalue every position — do not rebuild via shocked_value per trade.
-    shocked = apply_scenario(market, stress)
+    # Formal Scenario applies directly (no scenario_to_stress collapse).
+    shocked = apply_scenario(market, scenario)
     return {
         p.id: pricing.value(p, shocked).market_value - base_by_position[p.id]
         for p in portfolio.positions
@@ -161,8 +155,7 @@ def _factor_isolated_pnl(
             threshold=formal.threshold,
             metadata={"isolated_factor": key},
         )
-        iso_stress = scenario_to_stress(iso)
-        by_pos = _portfolio_pnl_by_position(portfolio, pricing, iso_stress, market, base_by_position)
+        by_pos = _portfolio_pnl_by_position(portfolio, pricing, iso, market, base_by_position)
         factor_pnl[key] = sum(by_pos.values())
         labels[key] = _factor_label(shocks)
 
@@ -198,7 +191,6 @@ class ScenarioAttributionEngine:
         """
         base_market = require_explicit_market(market)
         formal = _to_formal(scenario, base_market)
-        stress = _to_stress(scenario, base_market)
         scenario_id = formal.id
 
         if not portfolio.positions:
@@ -218,7 +210,7 @@ class ScenarioAttributionEngine:
             p.id: pricing.value(p, base_market).market_value for p in portfolio.positions
         }
         trade_pnl = by_trade_pnl if by_trade_pnl is not None else _portfolio_pnl_by_position(
-            portfolio, pricing, stress, base_market, base_by_position
+            portfolio, pricing, formal, base_market, base_by_position
         )
         # Ensure every position appears (zero if missing from caller map).
         trade_pnl = {p.id: float(trade_pnl.get(p.id, 0.0)) for p in portfolio.positions}

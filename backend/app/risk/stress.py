@@ -12,6 +12,8 @@ every position on that shared shocked snapshot (``PricingEngine.value``).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from app.domain.models import (
     FactorExposureChange,
     HedgeComparisonReport,
@@ -38,6 +40,7 @@ from app.risk.reverse_stress import ReverseStressEngine
 from app.risk.reverse_stress_multi import MultiFactorReverseStressEngine
 from app.risk.scenario_attribution import ScenarioAttributionEngine, ScenarioLike
 from app.risk.scenario_engine import ScenarioEngine, apply_scenario
+from app.risk.scenario_model import Scenario, category_to_kind
 from app.sample import DemoAggregateMarketDataProvider
 
 __all__ = [
@@ -134,6 +137,27 @@ def _threat_level(loss_pct_nav: float) -> str:
     return "LOW"
 
 
+def _evaluation_fields(
+    scenario: ScenarioLike, index: int
+) -> tuple[str, str, ScenarioKind, str, float | None]:
+    """Normalize formal Scenario / legacy StressScenario fields for StressEvaluation."""
+    if isinstance(scenario, Scenario):
+        return (
+            scenario.id or f"scenario_{index + 1}",
+            scenario.name,
+            category_to_kind(scenario.category),
+            scenario.description,
+            scenario.threshold.max_loss_pct,
+        )
+    return (
+        scenario.id or f"scenario_{index + 1}",
+        scenario.name,
+        scenario.kind,
+        scenario.description,
+        scenario.max_loss_pct,
+    )
+
+
 class StressEngine:
     def __init__(self):
         self.market_data = DemoAggregateMarketDataProvider()
@@ -143,9 +167,14 @@ class StressEngine:
         self,
         portfolio: Portfolio,
         pricing_engine: PricingEngine,
-        scenarios: list[StressScenario],
+        scenarios: Sequence[ScenarioLike],
         market: MarketSnapshot | None = None,
     ) -> list[StressResult]:
+        """Full-reval stress P&L. Accepts formal ``Scenario`` or legacy ``StressScenario``.
+
+        Formal scenarios apply via ``apply_scenario`` / ScenarioEngine — callers need
+        not collapse through ``scenario_to_stress`` first.
+        """
         market = require_explicit_market(market)
         base = {p.id: pricing_engine.value(p, market).market_value for p in portfolio.positions}
         output = []
@@ -184,9 +213,10 @@ class StressEngine:
         self,
         portfolio: Portfolio,
         pricing_engine: PricingEngine,
-        scenarios: list[StressScenario],
+        scenarios: Sequence[ScenarioLike],
         market: MarketSnapshot | None = None,
     ) -> ScenarioEvaluationReport:
+        """Threat evaluation. Accepts formal ``Scenario`` or legacy ``StressScenario``."""
         market = require_explicit_market(market)
         base_by_position = {p.id: pricing_engine.value(p, market).market_value for p in portfolio.positions}
         base_mv = sum(base_by_position.values())
@@ -216,7 +246,9 @@ class StressEngine:
                 ],
                 key=lambda x: x.pnl,
             )[:5]
-            threshold = scenario.max_loss_pct
+            scenario_id, name, kind, description, threshold = _evaluation_fields(
+                scenario, index
+            )
             breakdown = self.contributions(
                 portfolio,
                 pricing_engine,
@@ -226,10 +258,10 @@ class StressEngine:
             )
             evaluations.append(
                 StressEvaluation(
-                    scenario_id=scenario.id or f"scenario_{index + 1}",
-                    scenario=scenario.name,
-                    kind=scenario.kind,
-                    description=scenario.description,
+                    scenario_id=scenario_id,
+                    scenario=name,
+                    kind=kind,
+                    description=description,
                     base_market_value=base_mv,
                     stressed_market_value=stressed_mv,
                     pnl=pnl,
@@ -322,7 +354,7 @@ class ScenarioComparisonEngine:
         base_portfolio: Portfolio,
         hedged_portfolio: Portfolio,
         pricing_engine: PricingEngine,
-        scenarios: list[StressScenario],
+        scenarios: Sequence[ScenarioLike],
         *,
         methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
         market: MarketSnapshot | None = None,

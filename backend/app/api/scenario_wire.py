@@ -1,9 +1,10 @@
-"""Formal ``Scenario`` HTTP wire DTOs and adapters (M3.8).
+"""Formal ``Scenario`` HTTP wire DTOs and adapters (M3.8 / R0.4.2-B).
 
 Legacy ``StressScenario`` remains the wire shape for existing stress endpoints
-(ADR 004). These models expose the formal typed-shock scenario on versioned
-``/api/v1`` routes without changing VaR/stress math — adapters project onto
-``StressScenario`` for ``StressEngine`` / existing services.
+(ADR 004). Formal ``/risk/stress/formal/*`` routes lift wire → domain
+``Scenario`` and pass it to ``StressEngine`` without collapsing through
+``scenario_to_stress``. ``wire_to_stress`` remains for adapters / tests that
+still need the legacy StressScenario projection.
 """
 
 from __future__ import annotations
@@ -122,7 +123,10 @@ def scenario_to_wire(scenario: Scenario) -> ScenarioWire:
 
 
 def wire_to_stress(wire: ScenarioWire) -> StressScenario:
-    """Project formal wire onto legacy ``StressScenario`` for StressEngine paths."""
+    """Project formal wire onto legacy ``StressScenario`` (adapter / tests only).
+
+    Engine-facing formal HTTP paths use :func:`wire_to_scenario` instead.
+    """
     return scenario_to_stress(wire_to_scenario(wire))
 
 
@@ -131,7 +135,13 @@ def stress_to_wire(stress: StressScenario, base: MarketSnapshot) -> ScenarioWire
     return scenario_to_wire(scenario_from_stress(stress, base))
 
 
+def wires_to_scenarios(scenarios: list[ScenarioWire]) -> list[Scenario]:
+    """Lift formal wire list → domain ``Scenario`` for StressEngine."""
+    return [wire_to_scenario(s) for s in scenarios]
+
+
 def wires_to_stress(scenarios: list[ScenarioWire]) -> list[StressScenario]:
+    """Legacy adapter: formal wire → StressScenario (parity / migration helpers)."""
     return [wire_to_stress(s) for s in scenarios]
 
 
@@ -143,5 +153,6 @@ __all__ = [
     "stress_to_wire",
     "wire_to_scenario",
     "wire_to_stress",
+    "wires_to_scenarios",
     "wires_to_stress",
 ]

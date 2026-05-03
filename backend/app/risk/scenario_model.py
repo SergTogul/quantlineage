@@ -17,8 +17,8 @@ convert only at the adapter boundary via ``bps_to_decimal_rate`` /
 Legacy ``StressScenario`` (flat scalar/dict fields) remains the wire/API shape
 for existing stress endpoints. M3.8 adds formal ``ScenarioWire`` under
 ``/api/v1/risk/stress/formal/*`` and ``GET .../scenarios/formal`` (see
-``app.api.scenario_wire``). Use the adapters in this module to convert
-without rewriting ``StressEngine`` / what-if / VaR paths.
+``app.api.scenario_wire``). R0.4.2-B: ``StressEngine`` accepts formal
+``Scenario`` directly via ``apply_scenario``; adapters remain for legacy wire.
 """
 
 from __future__ import annotations
