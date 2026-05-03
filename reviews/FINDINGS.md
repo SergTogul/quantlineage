@@ -528,7 +528,7 @@ Then:
 
 ## RF-009 — Risk-run reproducibility differs between API and worker execution
 
-Status: **IN PROGRESS** (2026-09-08). R0.8.1–R0.8.4 APPROVE (`reviews/r0.8.4-typed-run-requests-independent-review.md`). Per-`run_type` schemas (`extra='forbid'`); `historical_dataset_id` rebinds via shared factories or 400 (never silently ignored); CSV identity is path-derived (`file:<abspath>`). Remaining: R0.8.5 Postgres lifecycle / same-spec interactive vs worker proof. Do not close.
+Status: **CLOSED** (2026-09-08). R0.8.1–R0.8.5 APPROVE (`reviews/r0.8.5-postgres-same-spec-independent-review.md`). Per-`run_type` schemas (`extra='forbid'`); `historical_dataset_id` rebinds via shared factories or 400 (never silently ignored); CSV identity is path-derived (`file:<abspath>`). Same RiskRun spec yields exact interactive vs worker payloads for `summary`/`var` (synthetic, SQLite); execute prefers persisted first-class columns over a tampered request blob. Optional Postgres lifecycle skips without DSN (nightly-safe). Residual Minor: `methodology` column does not override a conflicting request blob (dataset/`as_of`/config do).
 
 Priority: **P0**  
 Risk types: CORRECTNESS, REPRODUCIBILITY, OPERABILITY  

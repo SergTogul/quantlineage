@@ -190,3 +190,40 @@ def test_resolve_run_spec_rejects_bare_file_against_demo_engine(
             {"historical_dataset_id": "file"},
             risk_engine=service.risk,
         )
+
+
+def test_resolve_execute_spec_prefers_persisted_columns(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """R0.8.5: emptied request blob must not drift from stored dataset columns."""
+    from datetime import date
+
+    from app.domain.models import RiskRun, RiskRunCalculationConfig, RiskRunStatus
+    from app.services.risk_factories import resolve_execute_spec
+
+    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    service = build_portfolio_service()
+    run = RiskRun(
+        id="exec-cols",
+        portfolio_id="p",
+        status=RiskRunStatus.QUEUED,
+        run_type="summary",
+        request={"methodology": "DELTA_GAMMA"},
+        historical_dataset_id=SYNTHETIC_HISTORICAL_DATASET_ID,
+        historical_dataset_version="v1",
+        as_of=date(2026, 9, 2),
+        calculation_config=RiskRunCalculationConfig(observations=250, seed=7),
+    )
+    blob_only = resolve_run_spec(
+        dict(run.request),
+        risk_engine=service.risk,
+        run_type=run.run_type,
+    )
+    assert blob_only.historical_dataset_id == DEMO_HISTORICAL_DATASET_ID
+    spec = resolve_execute_spec(run, risk_engine=service.risk)
+    assert spec.historical_dataset_id == SYNTHETIC_HISTORICAL_DATASET_ID
+    assert spec.historical_dataset_version == "v1"
+    assert spec.as_of == date(2026, 9, 2)
+    assert spec.calculation_config is not None
+    assert spec.calculation_config.observations == 250
+    assert spec.calculation_config.seed == 7
