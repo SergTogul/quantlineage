@@ -1,8 +1,11 @@
-"""M3.8 / R0.4.2-B formal Scenario HTTP wire — adapters + API contracts.
+"""M3.8 / R0.4.2-C formal Scenario HTTP wire — adapters + API contracts.
 
 Formal wire → domain ``Scenario`` → StressEngine (native apply). Parity:
 formal custom stress P&L must match legacy ``StressScenario`` custom endpoints
 for the same shocks. ``wire_to_stress`` remains an adapter for tests/migration.
+
+R0.4.2-C: ``GET /risk/stress/scenarios`` returns formal wire by default;
+``/scenarios/formal`` is an identical alias.
 """
 
 from __future__ import annotations
@@ -192,17 +195,30 @@ def test_formal_evaluate_custom_api_contract():
     assert body["evaluations"][0]["scenario"] == "Formal threat"
 
 
-def test_get_scenarios_formal_returns_wire_shape():
-    legacy = client.get("/api/v1/risk/stress/scenarios")
-    formal = client.get("/api/v1/risk/stress/scenarios/formal")
-    assert legacy.status_code == 200
-    assert formal.status_code == 200
-    assert len(formal.json()) == len(legacy.json())
-    row = formal.json()[0]
+def test_get_scenarios_default_is_formal_wire():
+    """R0.4.2-C: GET /scenarios returns formal ScenarioWire, not StressScenario dicts."""
+    response = client.get("/api/v1/risk/stress/scenarios")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) >= 5
+    row = body[0]
     assert "category" in row
     assert "shocks" in row
     assert isinstance(row["shocks"], list)
     assert "id" in row and "name" in row
+    # Legacy StressScenario scalar fields must not be the list wire.
+    assert "equity_shock" not in row
+    assert "rates_shift_bps" not in row
+    assert "vol_shock" not in row
+
+
+def test_get_scenarios_formal_alias_matches_default():
+    """R0.4.2-C: /scenarios/formal is an identical JSON alias of the default list."""
+    default = client.get("/api/v1/risk/stress/scenarios")
+    formal = client.get("/api/v1/risk/stress/scenarios/formal")
+    assert default.status_code == 200
+    assert formal.status_code == 200
+    assert formal.json() == default.json()
 
 
 def test_legacy_custom_stress_unchanged():

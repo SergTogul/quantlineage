@@ -1,7 +1,9 @@
 """Stress / reverse-stress / threat routes (M7.1). Under /risk until M7.2.
 
-M3.8: formal ``Scenario`` wire under ``/risk/stress/formal/*`` and
-``GET /risk/stress/scenarios/formal`` (legacy ``StressScenario`` endpoints unchanged).
+R0.4.2-C: ``GET /risk/stress/scenarios`` returns formal ``ScenarioWire`` (breaking
+vs legacy StressScenario dicts). ``GET .../scenarios/formal`` is an identical
+alias. Formal POST twins remain under ``/risk/stress/formal/*``; legacy
+StressScenario POST bodies retained for existing clients.
 """
 
 from __future__ import annotations
@@ -52,6 +54,14 @@ from app.services.portfolio_service import PortfolioService
 router = APIRouter(prefix="/risk", tags=["stress"])
 
 
+def _formal_scenario_wires(
+    scenarios: list[StressScenario],
+    base: MarketSnapshot,
+) -> list[ScenarioWire]:
+    """Project DI StressScenario definitions onto the canonical formal list wire."""
+    return [stress_to_wire(s, base) for s in scenarios]
+
+
 @router.post(
     "/stress",
     response_model=list[StressResult],
@@ -71,25 +81,41 @@ def risk_stress(
     return service.stresses(portfolio, scenarios)
 
 
-@router.get("/stress/scenarios")
+@router.get(
+    "/stress/scenarios",
+    response_model=list[ScenarioWire],
+    summary="List scenario definitions (formal Scenario wire)",
+    description=(
+        "R0.4.2-C **breaking change**: returns formal ``ScenarioWire`` "
+        "(``category``, ``shocks[]``) instead of legacy ``StressScenario`` "
+        "dicts (``equity_shock``, ``rates_shift_bps``, …). "
+        "Same payload as ``GET /risk/stress/scenarios/formal``."
+    ),
+)
 def risk_stress_scenarios(
     scenarios: list[StressScenario] = Depends(get_default_stress_scenarios),
-):
-    """List scenario definitions from DI repo; THREAT_SCENARIOS if repo empty (M5.9)."""
-    return scenarios
+    base: MarketSnapshot = Depends(get_default_market_snapshot),
+) -> list[ScenarioWire]:
+    """List DI scenario definitions as formal wire; THREAT_SCENARIOS if repo empty."""
+    return _formal_scenario_wires(scenarios, base)
 
 
 @router.get(
     "/stress/scenarios/formal",
     response_model=list[ScenarioWire],
-    summary="List scenarios as formal Scenario wire (M3.8)",
+    summary="Alias: list scenarios as formal Scenario wire",
+    description=(
+        "Identical JSON to ``GET /risk/stress/scenarios`` (R0.4.2-C). "
+        "Kept so clients that already call ``/formal`` keep working."
+    ),
+    deprecated=False,
 )
 def risk_stress_scenarios_formal(
     scenarios: list[StressScenario] = Depends(get_default_stress_scenarios),
     base: MarketSnapshot = Depends(get_default_market_snapshot),
 ) -> list[ScenarioWire]:
-    """Same DI defaults as ``GET /stress/scenarios``, projected to formal wire."""
-    return [stress_to_wire(s, base) for s in scenarios]
+    """Alias of ``GET /stress/scenarios`` — same formal wire payload."""
+    return _formal_scenario_wires(scenarios, base)
 
 
 @router.post("/stress/custom")

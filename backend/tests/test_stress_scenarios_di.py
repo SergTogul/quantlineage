@@ -28,6 +28,9 @@ def test_get_stress_scenarios_from_memory_repo(clear_db_url):
         body = resp.json()
         assert len(body) == len(expected_ids)
         assert {row["id"] for row in body} == expected_ids
+        # R0.4.2-C: list wire is formal ScenarioWire.
+        assert "shocks" in body[0] and "category" in body[0]
+        assert "equity_shock" not in body[0]
         # Seeded set is DEFAULT + THREAT (larger than legacy in-code threat list alone).
         assert len(body) > len(THREAT_SCENARIOS)
 

@@ -389,6 +389,8 @@ R0.4.2-A COMPLETE (2026-09-09): scenario expand/collapse converts StressScenario
 
 R0.4.2-B COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-b-formal-scenario-engine-independent-review.md`). Engine-facing `StressEngine` / PortfolioService / attribution apply accept formal `Scenario | StressScenario` (`ScenarioLike`); formal HTTP `/risk/stress/formal/*` lifts wire → `Scenario` → engine apply (no `scenario_to_stress` on that path). Legacy `/risk/stress/*` StressScenario wire retained. Remaining for full R0.4.2 converge (not this slice): make formal HTTP the default client path, retire dual list endpoints (`/scenarios` vs `/scenarios/formal`), and any remaining what-if / compare callers that still prefer StressScenario-only wire — do not close RF-004.
 
+R0.4.2-C COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-c-formal-default-wire-independent-review.md`). `GET /risk/stress/scenarios` returns formal `ScenarioWire` (breaking vs legacy StressScenario dicts); `GET .../scenarios/formal` kept as identical JSON alias. No `/scenarios/legacy` path. Residual dual StressScenario POST bodies on custom/evaluate/compare (frontend `scenarioPayload`). RF-004 / RF-011 stay IN PROGRESS.
+
 Converge:
 
 - legacy stress scenarios;
@@ -418,6 +420,11 @@ R0.4.2-B COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-
 entry points take `ScenarioLike`; formal custom/evaluate HTTP uses
 `wires_to_scenarios` → native apply; attribution factor isolation applies
 formal `Scenario` without collapse. Evidence: `reviews/r0.4.2-b-formal-scenario-engine-report.md`.
+
+R0.4.2-C COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-c-formal-default-wire-independent-review.md`). Formal ScenarioWire is the
+default `GET /risk/stress/scenarios` list; `/scenarios/formal` is an identical
+alias. Residual: StressScenario POST bodies on custom/evaluate/compare.
+Evidence: `reviews/r0.4.2-c-formal-default-wire-report.md`.
 
 ## R0.4.3 Explicit shock units
 
