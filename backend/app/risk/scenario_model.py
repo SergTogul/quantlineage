@@ -15,8 +15,9 @@ convert only at the adapter boundary via ``bps_to_decimal_rate`` /
 ``decimal_rate_to_bps`` — expand/collapse must not inline bp↔decimal scales.
 
 Legacy ``StressScenario`` (flat scalar/dict fields) remains the wire/API shape
-for existing stress endpoints. M3.8 adds formal ``ScenarioWire`` under
-``/api/v1/risk/stress/formal/*`` and ``GET .../scenarios/formal`` (see
+for existing stress POST endpoints. R0.4.2-C: ``GET .../scenarios`` returns
+formal ``ScenarioWire`` (``/scenarios/formal`` is an identical alias); formal
+POST twins stay under ``/api/v1/risk/stress/formal/*`` (see
 ``app.api.scenario_wire``). R0.4.2-B: ``StressEngine`` accepts formal
 ``Scenario`` directly via ``apply_scenario``; adapters remain for legacy wire.
 """

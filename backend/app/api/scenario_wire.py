@@ -1,10 +1,12 @@
-"""Formal ``Scenario`` HTTP wire DTOs and adapters (M3.8 / R0.4.2-B).
+"""Formal ``Scenario`` HTTP wire DTOs and adapters (M3.8 / R0.4.2-C).
 
-Legacy ``StressScenario`` remains the wire shape for existing stress endpoints
-(ADR 004). Formal ``/risk/stress/formal/*`` routes lift wire → domain
-``Scenario`` and pass it to ``StressEngine`` without collapsing through
-``scenario_to_stress``. ``wire_to_stress`` remains for adapters / tests that
-still need the legacy StressScenario projection.
+Canonical list wire is ``ScenarioWire`` on ``GET /risk/stress/scenarios``
+(and the ``/scenarios/formal`` alias). Formal POST twins under
+``/risk/stress/formal/*`` lift wire → domain ``Scenario`` for ``StressEngine``
+without ``scenario_to_stress``. Legacy ``StressScenario`` POST bodies remain
+on ``/stress/custom``, ``/evaluate/custom``, ``/compare`` for existing clients.
+``wire_to_stress`` remains for adapters / tests that still need the legacy
+StressScenario projection.
 """
 
 from __future__ import annotations

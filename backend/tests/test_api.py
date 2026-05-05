@@ -29,7 +29,9 @@ def test_threat_scenario_evaluation_api():
     scenarios = client.get("/risk/stress/scenarios")
     report = client.post("/risk/stress/evaluate", json=portfolio)
     assert scenarios.status_code == 200
-    assert len(scenarios.json()) >= 5
+    body = scenarios.json()
+    assert len(body) >= 5
+    assert "shocks" in body[0] and "category" in body[0]
     assert report.status_code == 200
     payload = report.json()
     assert payload["portfolio_id"] == portfolio["id"]
