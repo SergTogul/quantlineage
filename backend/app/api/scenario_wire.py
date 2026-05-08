@@ -1,12 +1,12 @@
-"""Formal ``Scenario`` HTTP wire DTOs and adapters (M3.8 / R0.4.2-C).
+"""Formal ``Scenario`` HTTP wire DTOs and adapters (M3.8 / R0.4.2-D).
 
 Canonical list wire is ``ScenarioWire`` on ``GET /risk/stress/scenarios``
-(and the ``/scenarios/formal`` alias). Formal POST twins under
-``/risk/stress/formal/*`` lift wire → domain ``Scenario`` for ``StressEngine``
-without ``scenario_to_stress``. Legacy ``StressScenario`` POST bodies remain
-on ``/stress/custom``, ``/evaluate/custom``, ``/compare`` for existing clients.
-``wire_to_stress`` remains for adapters / tests that still need the legacy
-StressScenario projection.
+(and the ``/scenarios/formal`` alias). Primary custom / evaluate / compare POST
+paths are under ``/risk/stress/formal/*`` and lift wire → domain ``Scenario``
+for ``StressEngine`` without ``scenario_to_stress``. Legacy ``StressScenario``
+POST bodies on ``/stress/custom``, ``/evaluate/custom``, ``/compare`` remain
+as **deprecated** back-compat only. ``wire_to_stress`` remains for adapters /
+tests that still need the legacy StressScenario projection.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from app.domain.models import (
     MarketSnapshot,
     Portfolio,
     StressScenario,
+    VaRMethodology,
 )
 from app.risk.factor_types import FactorType, parse_risk_factor
 from app.risk.scenario_model import (
@@ -71,6 +72,15 @@ class FormalCustomStressRequest(FiniteInputMixin):
 
     portfolio: Portfolio
     scenarios: list[ScenarioWire]
+
+
+class FormalScenarioComparisonRequest(FiniteInputMixin):
+    """Hedge comparison using formal Scenario wire payloads (R0.4.2-D)."""
+
+    portfolio: Portfolio
+    hedged_portfolio: Portfolio
+    scenarios: list[ScenarioWire]
+    methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA
 
 
 def wire_to_scenario(wire: ScenarioWire) -> Scenario:
@@ -150,6 +160,7 @@ def wires_to_stress(scenarios: list[ScenarioWire]) -> list[StressScenario]:
 __all__ = [
     "FactorShockWire",
     "FormalCustomStressRequest",
+    "FormalScenarioComparisonRequest",
     "ScenarioWire",
     "scenario_to_wire",
     "stress_to_wire",

@@ -96,7 +96,10 @@ export function getPortfolio() {
 }
 
 export function evaluateCustomScenario(portfolio, scenario) {
-  return json(`${API_V1}/risk/stress/evaluate/custom`,{method:'POST',body:JSON.stringify({portfolio,scenarios:[scenario]})})
+  return json(`${API_V1}/risk/stress/formal/evaluate/custom`, {
+    method: 'POST',
+    body: JSON.stringify({ portfolio, scenarios: [scenario] }),
+  })
 }
 export function reverseStress(portfolio, factor, target_loss_pct) {
   return json(`${API_V1}/risk/stress/reverse`,{method:'POST',body:JSON.stringify({portfolio,factor,target_loss_pct})})
@@ -118,9 +121,10 @@ export function reverseStressMulti(portfolio, target_loss_pct, options = {}) {
 /**
  * Before/after hedge comparison → HedgeComparisonReport (object, not list).
  * Use hedgeComparisonSummary() from risk.mjs to normalize for display.
+ * R0.4.2-D: formal ScenarioWire via /risk/stress/formal/compare.
  */
 export function compareHedge(portfolio, hedged_portfolio, scenarios, methodology = 'DELTA_GAMMA') {
-  return json(`${API_V1}/risk/stress/compare`, {
+  return json(`${API_V1}/risk/stress/formal/compare`, {
     method: 'POST',
     body: JSON.stringify({ portfolio, hedged_portfolio, scenarios, methodology }),
   })

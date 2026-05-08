@@ -535,6 +535,37 @@ HEDGE_COMPARE_BODY_EXAMPLES: dict[str, dict[str, Any]] = {
     ),
 }
 
+EXAMPLE_FORMAL_HEDGE_COMPARE_REQUEST: dict[str, Any] = {
+    "portfolio": EXAMPLE_PORTFOLIO,
+    "hedged_portfolio": EXAMPLE_HEDGED_PORTFOLIO,
+    "scenarios": [
+        {
+            "id": "Crash",
+            "name": "Crash",
+            "category": "factor",
+            "shocks": [
+                {
+                    "factor_type": "equity",
+                    "key": "SPY",
+                    "amount": -0.20,
+                    "bucket": "SPY",
+                }
+            ],
+            "max_loss_pct": None,
+            "severity": None,
+            "metadata": {},
+        }
+    ],
+    "methodology": "DELTA_GAMMA",
+}
+
+FORMAL_HEDGE_COMPARE_BODY_EXAMPLES: dict[str, dict[str, Any]] = {
+    "flatten_equity_formal": _ex(
+        "Compare base vs reduced equity hedge (formal Scenario wire)",
+        EXAMPLE_FORMAL_HEDGE_COMPARE_REQUEST,
+    ),
+}
+
 RESP_STRESS = {
     200: success_response(
         "Stress P&L by scenario",
@@ -767,6 +798,7 @@ CRITICAL_OPENAPI_PATHS: tuple[tuple[str, str], ...] = (
     ("post", "/risk/stress/reverse"),
     ("post", "/risk/stress/reverse/multi"),
     ("post", "/risk/stress/compare"),
+    ("post", "/risk/stress/formal/compare"),
     ("post", "/risk/change-attribution"),
     ("post", "/risk/limits/drilldown"),
     ("post", "/risk/runs"),
@@ -784,6 +816,7 @@ TYPED_RESPONSE_SCHEMAS: tuple[tuple[str, str, str, str | None], ...] = (
     ("post", "/risk/stress/reverse", "ReverseStressResult", None),
     ("post", "/risk/stress/reverse/multi", "MultiFactorReverseStressResult", None),
     ("post", "/risk/stress/compare", "HedgeComparisonReport", None),
+    ("post", "/risk/stress/formal/compare", "HedgeComparisonReport", None),
     ("post", "/risk/change-attribution", "RiskChangeAttributionReport", None),
     ("post", "/risk/limits/drilldown", "LimitDrilldownReport", None),
     ("post", "/risk/runs", "RiskRunView", None),

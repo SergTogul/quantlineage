@@ -179,9 +179,26 @@ export function spyFlatHedgePortfolio(portfolio) {
   return { ...portfolio, positions }
 }
 
-/** Default stress scenarios for hedge-compare UI (API request payload only). */
-export function defaultHedgeScenarios() {
-  return [{ name: 'Crash', equity_shock: -0.2 }]
+/** Default stress scenarios for hedge-compare UI (formal ScenarioWire only). */
+export function defaultHedgeScenarios(portfolio) {
+  const { equities } = stressFactorKeysFromPortfolio(portfolio)
+  const shocks = []
+  for (const sym of equities) {
+    shocks.push({
+      factor_type: 'equity',
+      key: sym,
+      amount: -0.2,
+      bucket: sym,
+    })
+  }
+  return [
+    {
+      id: 'Crash',
+      name: 'Crash',
+      category: 'factor',
+      shocks,
+    },
+  ]
 }
 
 /** Thin display parse for MultiFactorReverseStressResult (API fields only). */
@@ -319,8 +336,125 @@ export function limitDrilldownSummary(report) {
   }
 }
 
-export function scenarioPayload(form){
-  return {id:'ui_custom',name:form.name||'Custom Scenario',kind:'custom',equity_shock:Number(form.equity)/100,vol_shock:Number(form.vol)/100,rates_shift_bps:Number(form.rates),fx_shock:Number(form.fx)/100,max_loss_pct:Number(form.limit)/100}
+/**
+ * Demo / fallback factor keys matching canned global-macro market expansion
+ * (NVDA/SPY equity+vol, EURUSD FX+vol, USD/EUR parallel rates).
+ * Used when portfolio is absent so ScenarioWire still expands like legacy scalars.
+ */
+export const DEMO_STRESS_FACTOR_KEYS = Object.freeze({
+  equities: Object.freeze(['NVDA', 'SPY']),
+  fxPairs: Object.freeze(['EURUSD']),
+  rateCcys: Object.freeze(['EUR', 'USD']),
+})
+
+const EQUITY_POS_TYPES = new Set(['equity', 'european_option', 'equity_future'])
+const FX_POS_TYPES = new Set(['fx_forward', 'fx_option'])
+const RATE_POS_TYPES = new Set(['bond', 'swap'])
+
+/**
+ * Derive stress expansion keys from portfolio positions (display/request only).
+ * FX pairs also contribute inferred currency codes for parallel rate shocks.
+ */
+export function stressFactorKeysFromPortfolio(portfolio) {
+  const equities = new Set()
+  const fxPairs = new Set()
+  const rateCcys = new Set()
+  for (const pos of portfolio?.positions || []) {
+    const type = pos?.type
+    if (EQUITY_POS_TYPES.has(type) && pos.symbol) equities.add(pos.symbol)
+    if (FX_POS_TYPES.has(type) && pos.pair) {
+      fxPairs.add(pos.pair)
+      if (typeof pos.pair === 'string' && pos.pair.length === 6) {
+        rateCcys.add(pos.pair.slice(0, 3))
+        rateCcys.add(pos.pair.slice(3, 6))
+      }
+    }
+    if (RATE_POS_TYPES.has(type) && pos.currency) rateCcys.add(pos.currency)
+  }
+  if (!equities.size && !fxPairs.size && !rateCcys.size) {
+    return {
+      equities: [...DEMO_STRESS_FACTOR_KEYS.equities],
+      fxPairs: [...DEMO_STRESS_FACTOR_KEYS.fxPairs],
+      rateCcys: [...DEMO_STRESS_FACTOR_KEYS.rateCcys],
+    }
+  }
+  return {
+    equities: [...equities].sort(),
+    fxPairs: [...fxPairs].sort(),
+    rateCcys: [...rateCcys].sort(),
+  }
+}
+
+/**
+ * Display % / bp → formal ScenarioWire (MarketSnapshot.bump units).
+ * Equity/FX/vol: fraction; rates: absolute decimal (100 bp → 0.01).
+ * Expands family shocks onto portfolio (or demo) factor keys for legacy parity.
+ */
+export function scenarioPayload(form, portfolio) {
+  const equityFrac = Number(form.equity) / 100
+  const volFrac = Number(form.vol) / 100
+  const ratesBps = Number(form.rates)
+  const ratesAmt = ratesBps / 10_000
+  const fxFrac = Number(form.fx) / 100
+  const { equities, fxPairs, rateCcys } = stressFactorKeysFromPortfolio(portfolio)
+  const shocks = []
+  for (const sym of equities) {
+    if (equityFrac) {
+      shocks.push({
+        factor_type: 'equity',
+        key: sym,
+        amount: equityFrac,
+        bucket: sym,
+      })
+    }
+    if (volFrac) {
+      shocks.push({
+        factor_type: 'vol',
+        key: `${sym}:VOL`,
+        amount: volFrac,
+        bucket: sym,
+        expiry: 'GENERIC',
+        moneyness: 'ATM',
+      })
+    }
+  }
+  for (const pair of fxPairs) {
+    if (fxFrac) {
+      shocks.push({
+        factor_type: 'fx',
+        key: pair,
+        amount: fxFrac,
+        bucket: pair,
+      })
+    }
+    if (volFrac) {
+      shocks.push({
+        factor_type: 'vol',
+        key: `${pair}:VOL`,
+        amount: volFrac,
+        bucket: pair,
+        expiry: 'GENERIC',
+        moneyness: 'ATM',
+      })
+    }
+  }
+  for (const ccy of rateCcys) {
+    if (ratesBps) {
+      shocks.push({
+        factor_type: 'rate',
+        key: `${ccy}:RATE`,
+        amount: ratesAmt,
+        bucket: 'ALL',
+      })
+    }
+  }
+  return {
+    id: 'ui_custom',
+    name: form.name || 'Custom Scenario',
+    category: 'custom',
+    shocks,
+    max_loss_pct: Number(form.limit) / 100,
+  }
 }
 
 /** Default Scenario Builder form (display units: % / bp). */

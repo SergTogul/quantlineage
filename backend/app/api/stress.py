@@ -1,9 +1,10 @@
 """Stress / reverse-stress / threat routes (M7.1). Under /risk until M7.2.
 
-R0.4.2-C: ``GET /risk/stress/scenarios`` returns formal ``ScenarioWire`` (breaking
-vs legacy StressScenario dicts). ``GET .../scenarios/formal`` is an identical
-alias. Formal POST twins remain under ``/risk/stress/formal/*``; legacy
-StressScenario POST bodies retained for existing clients.
+R0.4.2-D: Primary UI/custom POST path is formal ``ScenarioWire`` under
+``/risk/stress/formal/*`` (custom, evaluate/custom, compare). Legacy
+``StressScenario`` POST bodies on ``/stress/custom``, ``/evaluate/custom``,
+``/compare`` are **deprecated** back-compat only. List wire remains formal
+(``GET /scenarios``; ``/scenarios/formal`` identical alias).
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from app.api.deps import (
 )
 from app.api.openapi_examples import (
     FORMAL_CUSTOM_STRESS_BODY_EXAMPLES,
+    FORMAL_HEDGE_COMPARE_BODY_EXAMPLES,
     HEDGE_COMPARE_BODY_EXAMPLES,
     RESP_HEDGE_COMPARE,
     RESP_REVERSE,
@@ -32,6 +34,7 @@ from app.api.openapi_examples import (
 )
 from app.api.scenario_wire import (
     FormalCustomStressRequest,
+    FormalScenarioComparisonRequest,
     ScenarioWire,
     stress_to_wire,
     wires_to_scenarios,
@@ -118,7 +121,15 @@ def risk_stress_scenarios_formal(
     return _formal_scenario_wires(scenarios, base)
 
 
-@router.post("/stress/custom")
+@router.post(
+    "/stress/custom",
+    deprecated=True,
+    summary="Custom stress P&L (legacy StressScenario — deprecated)",
+    description=(
+        "Deprecated R0.4.2-D: prefer ``POST /risk/stress/formal/custom`` with "
+        "``ScenarioWire``. Retained for back-compat only."
+    ),
+)
 def risk_stress_custom(
     request: CustomStressRequest,
     service: PortfolioService = Depends(get_portfolio_service),
@@ -156,7 +167,15 @@ def risk_stress_evaluate(
     return service.threat_evaluation(portfolio, scenarios)
 
 
-@router.post("/stress/evaluate/custom")
+@router.post(
+    "/stress/evaluate/custom",
+    deprecated=True,
+    summary="Threat evaluation (legacy StressScenario — deprecated)",
+    description=(
+        "Deprecated R0.4.2-D: prefer ``POST /risk/stress/formal/evaluate/custom`` "
+        "with ``ScenarioWire``. Retained for back-compat only."
+    ),
+)
 def risk_stress_evaluate_custom(
     request: CustomStressRequest,
     service: PortfolioService = Depends(get_portfolio_service),
@@ -232,7 +251,12 @@ def risk_stress_reverse_multi(
 @router.post(
     "/stress/compare",
     response_model=HedgeComparisonReport,
-    summary="Hedge comparison (VaR/ES + scenario P&L)",
+    deprecated=True,
+    summary="Hedge comparison (legacy StressScenario — deprecated)",
+    description=(
+        "Deprecated R0.4.2-D: prefer ``POST /risk/stress/formal/compare`` with "
+        "``ScenarioWire``. Retained for back-compat only."
+    ),
     responses=RESP_HEDGE_COMPARE,
 )
 def risk_stress_compare(
@@ -247,5 +271,28 @@ def risk_stress_compare(
         request.portfolio,
         request.hedged_portfolio,
         request.scenarios,
+        methodology=request.methodology,
+    )
+
+
+@router.post(
+    "/stress/formal/compare",
+    response_model=HedgeComparisonReport,
+    summary="Hedge comparison (formal Scenario wire)",
+    responses=RESP_HEDGE_COMPARE,
+)
+def risk_stress_formal_compare(
+    request: Annotated[
+        FormalScenarioComparisonRequest,
+        Body(openapi_examples=FORMAL_HEDGE_COMPARE_BODY_EXAMPLES),
+    ],
+    service: PortfolioService = Depends(get_portfolio_service),
+) -> HedgeComparisonReport:
+    """Accept formal Scenario wire; compare via ScenarioComparisonEngine."""
+    reject_inline_heavy(route="POST /risk/stress/formal/compare")
+    return service.compare_scenarios(
+        request.portfolio,
+        request.hedged_portfolio,
+        wires_to_scenarios(request.scenarios),
         methodology=request.methodology,
     )
