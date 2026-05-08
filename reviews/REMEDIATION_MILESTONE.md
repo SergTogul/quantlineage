@@ -391,6 +391,8 @@ R0.4.2-B COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-
 
 R0.4.2-C COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-c-formal-default-wire-independent-review.md`). `GET /risk/stress/scenarios` returns formal `ScenarioWire` (breaking vs legacy StressScenario dicts); `GET .../scenarios/formal` kept as identical JSON alias. No `/scenarios/legacy` path. Residual dual StressScenario POST bodies on custom/evaluate/compare (frontend `scenarioPayload`). RF-004 / RF-011 stay IN PROGRESS.
 
+R0.4.2-D COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-d-formal-post-wire-independent-review.md`). Primary UI POST path uses formal ScenarioWire (`/formal/evaluate/custom`, `/formal/custom`, `/formal/compare`); frontend `scenarioPayload` / `compareHedge` no longer call legacy StressScenario POSTs. Legacy custom/evaluate/compare routes retained as **deprecated** back-compat. **RF-004 CLOSED**; RF-011 stays IN PROGRESS (typed nesting + deprecated dual POST residual). Review Important deferred: parity tests use `stress_to_wire` expansion, not frontend builders.
+
 Converge:
 
 - legacy stress scenarios;
@@ -425,6 +427,12 @@ R0.4.2-C COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-
 default `GET /risk/stress/scenarios` list; `/scenarios/formal` is an identical
 alias. Residual: StressScenario POST bodies on custom/evaluate/compare.
 Evidence: `reviews/r0.4.2-c-formal-default-wire-report.md`.
+
+R0.4.2-D COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-d-formal-post-wire-independent-review.md`). Formal ScenarioWire is the primary
+UI stress POST path (`scenarioPayload` → `/formal/evaluate/custom`; hedge →
+`/formal/compare`; thin formal compare route added). Legacy StressScenario POST
+routes deprecated but retained. **RF-004 CLOSED**; RF-011 remains IN PROGRESS.
+Evidence: `reviews/r0.4.2-d-formal-post-wire-report.md`.
 
 ## R0.4.3 Explicit shock units
 
