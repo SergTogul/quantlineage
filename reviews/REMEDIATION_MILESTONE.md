@@ -655,7 +655,14 @@ Do not return massive nested by-position payloads on every hierarchy node unless
 
 ## R0.7.5 Default build uses trade artifacts — COMPLETE (2026-09-08)
 
-Independent review **APPROVE** (`reviews/r0.7.5-default-hierarchy-artifacts-independent-review.md`). When `artifacts` is omitted, `HierarchyEngine.build` / `risk_at` build a complete trade-grain `TradeCalculationArtifact` map **once** (`pricing.value` + shared `historical_pnl_for_valuation` per position) and then use the existing artifact aggregation path. Explicit `artifacts=` maps are unchanged. Node VaR/ES remain VaR/ES of the summed historical vector. Stress maps stay empty and limits stay `[]` on the default producer path (same as `PortfolioService.hierarchy`). Probe: 2 `value` / 0 portfolio / 0 shocked for 7 nodes. RF-008 stays **IN PROGRESS** for empty stress/limits on that path and R0.7.4 lazy drilldown.
+Independent review **APPROVE** (`reviews/r0.7.5-default-hierarchy-artifacts-independent-review.md`). When `artifacts` is omitted, `HierarchyEngine.build` / `risk_at` build a complete trade-grain `TradeCalculationArtifact` map **once** (`pricing.value` + shared `historical_pnl_for_valuation` per position) and then use the existing artifact aggregation path. Explicit `artifacts=` maps are unchanged. Node VaR/ES remain VaR/ES of the summed historical vector. Stress filled in R0.7.6; limits stay `[]` (P1 residual with R0.7.4).
+
+## R0.7.6 Hierarchy artifact path fills stress — COMPLETE (2026-09-09)
+
+Independent review **APPROVE** (`reviews/r0.7.6-hierarchy-artifact-stress-independent-review.md`). **RF-008 CLOSED.**
+
+Default producer (`HierarchyEngine._trade_artifacts`; `PortfolioService.hierarchy` delegates to `build`) attaches per-trade `stress_pnl` for `self.stress_scenarios` / `DEFAULT_SCENARIOS`: each scenario applied **once** via `apply_scenario`, then every position valued on the shocked snapshot. Nodes expose filled `stress` with parent == sum(children). Artifact-path `StressResult.scenario` uses scenario **id** (legacy `StressEngine.run` uses **name** — P&L matches). Limits stay `[]` — **P1 residual** with R0.7.4 lazy drilldown. Report: `reviews/r0.7.6-hierarchy-artifact-stress-report.md`.
+
 
 ### Exit criteria
 

@@ -484,7 +484,7 @@ Do not set a fake universal SLA until benchmark environments are controlled.
 
 ## RF-008 — Hierarchy recomputes full risk independently at every node
 
-Status: **IN PROGRESS** (2026-09-08). R0.7.1–R0.7.3 and **R0.7.5 APPROVE** (`reviews/r0.7.5-default-hierarchy-artifacts-independent-review.md`): default and live hierarchy value each position once and aggregate; node VaR/ES from the summed historical vector. Remaining: default producer stress/limits still empty; R0.7.4 lazy drilldown. Do not close.
+Status: **CLOSED** (2026-09-09). Independent review **APPROVE** (`reviews/r0.7.6-hierarchy-artifact-stress-independent-review.md`). R0.7.1–R0.7.3, R0.7.5, R0.7.6: default and live hierarchy value each position once, fill `DEFAULT_SCENARIOS` stress via scenario-once/price-many, aggregate PV/Greeks/stress/historical vectors; node VaR/ES = VaR/ES of the summed historical vector. Acceptance evidence met (additive reconcile, VaR(sum), stable IDs, no independent full risk per trade). **P1 residuals (not blocking close):** node `limits == []` (concentration/key-rate still need artifact-aware LimitEngine); R0.7.4 lazy drilldown payload trimming.
 
 Priority: **P0**  
 Risk types: PERFORMANCE, ARCHITECTURE, OPERABILITY  

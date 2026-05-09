@@ -33,7 +33,7 @@ from app.risk.attribution import AttributionEngine
 from app.risk.es import ESContributionAnalytics
 from app.risk.factors import RiskFactorEngine
 from app.risk.hierarchy import HierarchyEngine
-from app.risk.historical import HistoricalRiskEngine, historical_pnl_for_valuation
+from app.risk.historical import HistoricalRiskEngine
 from app.risk.limit_drilldown import LimitDrilldownEngine
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.query import RiskQueryEngine
@@ -47,7 +47,6 @@ from app.risk.stress import (
     ScenarioComparisonEngine,
     StressEngine,
 )
-from app.risk.trade_artifacts import TradeCalculationArtifact
 from app.risk.var import VaRAnalytics
 from app.sample import DemoPortfolioMarketDataProvider
 
@@ -290,31 +289,16 @@ class PortfolioService:
         )
 
     def hierarchy(self, portfolio):
-        """Build the firm tree from one valuation per trade (R0.7.3 leftover).
+        """Build the firm tree from one trade-artifact producer pass (R0.7.6).
 
-        PV and additive Greeks come from ``self.pricing.value`` once per
-        position. Historical P&L is attached once per trade from those
-        Greeks via ``historical_pnl_for_valuation`` (same dataset as
-        ``self.risk``). ``HierarchyEngine`` sums the vectors and computes
-        node VaR / ES. Stress P&L is left empty: ``self.stresses`` would
-        snapshot again and ``StressEngine.run`` would re-call ``value``
-        plus ``shocked_value`` per scenario (once-per-trade, not
-        once-per-node, but not value-once).
-
-        Callers may also omit ``artifacts`` on ``HierarchyEngine.build``;
-        that path now builds the same trade-grain map once (R0.7.5).
+        Delegates to ``HierarchyEngine.build`` without a pre-built map so the
+        engine default path values each position once, attaches historical
+        P&L, fills default-scenario stress (scenario-once / price-many), and
+        aggregates. Limits stay omitted on that path.
         """
         market = self.market_snapshot(portfolio)
-        artifacts = {}
-        for position in portfolio.positions:
-            valuation = self.pricing.value(position, market)
-            artifacts[position.id] = TradeCalculationArtifact.from_valuation(
-                valuation,
-                trade_id=position.id,
-                historical_pnl=historical_pnl_for_valuation(self.risk, valuation),
-            )
         return self.hierarchy_engine.build(
-            portfolio, self.pricing, market=market, artifacts=artifacts
+            portfolio, self.pricing, market=market
         )
     def attribution(self, request): return self.attribution_engine.explain(request,self.pricing)
     def risk_change_attribution(

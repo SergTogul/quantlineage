@@ -7,19 +7,26 @@ Additive metrics (parent == sum children within abs 1e-9):
 
 Node-level metrics (from summed trade historical P&L, not summed VaR):
   var_95, var_99, expected_shortfall_99. Limits stay omitted on the
-  artifact aggregation path.
+  artifact aggregation path (concentration / key-rate still need per-node
+  pricing or an artifact-aware LimitEngine — R0.7.6 residual).
 
 When ``artifacts`` is supplied to ``build`` / ``risk_at``, additive fields
 are summed from ``TradeCalculationArtifact`` and pricing is not invoked.
-When ``artifacts`` is omitted, trade artifacts are built **once**
-(``pricing.value`` + ``historical_pnl_for_valuation`` per position) and the
-same aggregation path is used (R0.7.5 / RF-008 leftover). Node VaR / ES
-come from the summed ``historical_pnl`` vector (same loss = -P&L quantile
-convention as ``HistoricalRiskEngine.calculate`` / ``test_var_es_golden.py``).
+When ``artifacts`` is omitted, trade artifacts are built **once**:
+base ``pricing.value`` per position, shared ``historical_pnl_for_valuation``,
+and default-scenario stress P&L via scenario-once / price-many (R0.7.5 /
+R0.7.6 / RF-008 leftover). Node VaR / ES come from the summed
+``historical_pnl`` vector (same loss = -P&L quantile convention as
+``HistoricalRiskEngine.calculate`` / ``test_var_es_golden.py``).
 An incomplete explicit map fails closed. Mixed present/absent historical
 vectors fail closed via ``TradeCalculationArtifact.add``. All-omitted
-vectors keep VaR / ES at zero. Stress on the default producer path is
-empty (same as ``PortfolioService.hierarchy``).
+vectors keep VaR / ES at zero.
+
+Default-producer stress keys use scenario ``id`` (fallback ``name``), so
+``StressResult.scenario`` on the artifact path is the scenario id. The
+legacy reprice ``StressEngine.run`` labels rows with ``scenario.name`` —
+intentional label difference; P&L math matches when the same scenarios
+are applied.
 
 Position-level ``desk`` / ``strategy`` override portfolio defaults when set.
 Placement helpers live in ``hierarchy_placement`` (re-exported here for API stability).
@@ -57,6 +64,7 @@ from app.risk.historical import (
     require_explicit_market,
 )
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
+from app.risk.scenario_engine import apply_scenario
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.risk.trade_artifacts import TradeCalculationArtifact
 
@@ -154,6 +162,17 @@ def _artifact_trade_id(position_id: str) -> str:
     if isinstance(position_id, str) and position_id.strip():
         return position_id
     return "__empty__"
+
+
+def _scenario_artifact_key(scenario: StressScenario) -> str:
+    """Stable stress_pnl key: prefer scenario id, else non-empty name."""
+    sid = getattr(scenario, "id", None)
+    if isinstance(sid, str) and sid.strip():
+        return sid
+    name = getattr(scenario, "name", None)
+    if isinstance(name, str) and name.strip():
+        return name
+    raise ValueError("stress scenario must have a non-empty id or name")
 
 
 def _var_es_from_historical_pnl(
@@ -262,19 +281,39 @@ class HierarchyEngine:
         pricing: PricingEngine,
         market: MarketSnapshot,
     ) -> dict[str, TradeCalculationArtifact]:
-        """Value each trade once and attach historical P&L (no per-node reprice).
+        """Value each trade once; attach historical + default stress P&L.
 
-        Same convention as ``PortfolioService.hierarchy``: PV / Greeks from
-        ``pricing.value``; historical vector via ``historical_pnl_for_valuation``;
-        stress maps left empty (stress would re-call ``value`` / shock paths).
+        Base PV / Greeks: one ``pricing.value`` per position on ``market``.
+        Historical vector: ``historical_pnl_for_valuation`` (no extra value).
+        Stress: each entry in ``self.stress_scenarios`` (default
+        ``DEFAULT_SCENARIOS``) is applied once via ``apply_scenario``, then
+        every position is valued on that shocked snapshot (RF-006 / R0.4.5
+        scenario-once, price-many). No per-node full stress run.
         """
+        valuations = {
+            position.id: pricing.value(position, market)
+            for position in portfolio.positions
+        }
+        stress_by_trade: dict[str, dict[str, float]] = {
+            position_id: {} for position_id in valuations
+        }
+        if valuations:
+            for scenario in self.stress_scenarios:
+                key = _scenario_artifact_key(scenario)
+                shocked = apply_scenario(market, scenario)
+                for position in portfolio.positions:
+                    shocked_mv = pricing.value(position, shocked).market_value
+                    stress_by_trade[position.id][key] = (
+                        shocked_mv - valuations[position.id].market_value
+                    )
         artifacts: dict[str, TradeCalculationArtifact] = {}
         for position in portfolio.positions:
-            valuation = pricing.value(position, market)
+            valuation = valuations[position.id]
             artifacts[position.id] = TradeCalculationArtifact.from_valuation(
                 valuation,
                 trade_id=_artifact_trade_id(position.id),
                 historical_pnl=historical_pnl_for_valuation(self.risk, valuation),
+                stress_pnl=stress_by_trade[position.id],
             )
         return artifacts
 
