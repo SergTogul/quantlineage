@@ -23,7 +23,7 @@ function httpError(res, body) {
 }
 
 /** HEAVY inline refuse: HTTP 400 with details.use pointing at /risk/runs. */
-function isHeavyInlineRefuse(err) {
+export function isHeavyInlineRefuse(err) {
   return (
     err?.status === 400 &&
     err?.body &&
@@ -52,20 +52,23 @@ async function pollRiskRunUntilTerminal(runId) {
   return run
 }
 
-function dashboardPayloadFromRun(run) {
+function payloadFromRiskRun(run, resultType) {
   const results = Array.isArray(run?.results) ? run.results : []
-  const typed = results.find((r) => r?.result_type === 'dashboard')
+  const typed = results.find((r) => r?.result_type === resultType)
   const entry = typed ?? (results.length === 1 ? results[0] : null)
   const payload = entry?.payload
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('Dashboard risk run completed without a usable payload')
+  if (payload == null || (typeof payload !== 'object' && !Array.isArray(payload))) {
+    throw new Error(`Risk run completed without a usable ${resultType} payload`)
   }
   return payload
 }
 
-async function loadDashboardViaRiskRun() {
-  const portfolio = await getPortfolio()
-  const created = await createRiskRun(portfolio, { run_type: 'dashboard' })
+/**
+ * Create + poll a RiskRun until COMPLETED/FAILED; return the typed result payload.
+ */
+export async function runViaRiskRun(portfolio, { run_type, request = {} } = {}) {
+  if (!run_type) throw new Error('runViaRiskRun requires run_type')
+  const created = await createRiskRun(portfolio, { run_type, request })
   const runId = created?.id
   if (!runId) throw new Error('Risk run create response missing id')
   const run = isRiskRunTerminal(created)
@@ -74,7 +77,25 @@ async function loadDashboardViaRiskRun() {
   if (riskRunStatus(run) === 'FAILED') {
     throw new Error(run.error_message || `Risk run ${runId} FAILED`)
   }
-  return dashboardPayloadFromRun(run)
+  return payloadFromRiskRun(run, run_type)
+}
+
+/**
+ * Prefer a sync HEAVY POST; on refuse (`details.use=/risk/runs`), fall back to RiskRun.
+ * Gate-off: sync path only. INTERACTIVE callers should not use this helper.
+ */
+async function postHeavyOrRiskRun(syncUrl, syncInit, { portfolio, run_type, request }) {
+  try {
+    return await json(syncUrl, syncInit)
+  } catch (err) {
+    if (!isHeavyInlineRefuse(err)) throw err
+    return runViaRiskRun(portfolio, { run_type, request })
+  }
+}
+
+async function loadDashboardViaRiskRun() {
+  const portfolio = await getPortfolio()
+  return runViaRiskRun(portfolio, { run_type: 'dashboard' })
 }
 
 /**
@@ -96,27 +117,53 @@ export function getPortfolio() {
 }
 
 export function evaluateCustomScenario(portfolio, scenario) {
-  return json(`${API_V1}/risk/stress/formal/evaluate/custom`, {
-    method: 'POST',
-    body: JSON.stringify({ portfolio, scenarios: [scenario] }),
-  })
+  const body = { portfolio, scenarios: [scenario] }
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/stress/formal/evaluate/custom`,
+    { method: 'POST', body: JSON.stringify(body) },
+    {
+      portfolio,
+      run_type: 'stress_evaluate',
+      request: { scenarios: [scenario] },
+    },
+  )
 }
 export function reverseStress(portfolio, factor, target_loss_pct) {
-  return json(`${API_V1}/risk/stress/reverse`,{method:'POST',body:JSON.stringify({portfolio,factor,target_loss_pct})})
+  const body = { portfolio, factor, target_loss_pct }
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/stress/reverse`,
+    { method: 'POST', body: JSON.stringify(body) },
+    {
+      portfolio,
+      run_type: 'reverse_stress',
+      request: { factor, target_loss_pct },
+    },
+  )
 }
 /** Multi-factor reverse stress → MultiFactorReverseStressResult. */
 export function reverseStressMulti(portfolio, target_loss_pct, options = {}) {
-  return json(`${API_V1}/risk/stress/reverse/multi`, {
-    method: 'POST',
-    body: JSON.stringify({
-      portfolio,
-      target_loss_pct,
-      factors: options.factors,
-      weights: options.weights,
-      max_shock: options.max_shock,
-      max_shocks: options.max_shocks,
-    }),
-  })
+  const request = {
+    target_loss_pct,
+    factors: options.factors,
+    weights: options.weights,
+    max_shock: options.max_shock,
+    max_shocks: options.max_shocks,
+  }
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/stress/reverse/multi`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        portfolio,
+        target_loss_pct,
+        factors: options.factors,
+        weights: options.weights,
+        max_shock: options.max_shock,
+        max_shocks: options.max_shocks,
+      }),
+    },
+    { portfolio, run_type: 'reverse_stress_multi', request },
+  )
 }
 /**
  * Before/after hedge comparison → HedgeComparisonReport (object, not list).
@@ -124,17 +171,29 @@ export function reverseStressMulti(portfolio, target_loss_pct, options = {}) {
  * R0.4.2-D: formal ScenarioWire via /risk/stress/formal/compare.
  */
 export function compareHedge(portfolio, hedged_portfolio, scenarios, methodology = 'DELTA_GAMMA') {
-  return json(`${API_V1}/risk/stress/formal/compare`, {
-    method: 'POST',
-    body: JSON.stringify({ portfolio, hedged_portfolio, scenarios, methodology }),
-  })
+  const body = { portfolio, hedged_portfolio, scenarios, methodology }
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/stress/formal/compare`,
+    { method: 'POST', body: JSON.stringify(body) },
+    {
+      portfolio,
+      run_type: 'stress_compare',
+      request: { hedged_portfolio, scenarios, methodology },
+    },
+  )
 }
 export function askRisk(portfolio, question) {
-  return json(`${API_V1}/risk/query`,{method:'POST',body:JSON.stringify({portfolio,question})})
+  const body = { portfolio, question }
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/query`,
+    { method: 'POST', body: JSON.stringify(body) },
+    { portfolio, run_type: 'query', request: { question } },
+  )
 }
 /**
  * Limit breach drill-down → LimitDrilldownReport.
  * Use limitDrilldownSummary() from risk.mjs to normalize for display.
+ * INTERACTIVE — not converted to RiskRun fallback.
  */
 export function limitDrilldown(portfolio, options = {}) {
   return json(`${API_V1}/risk/limits/drilldown`, {
@@ -155,18 +214,31 @@ export function limitDrilldown(portfolio, options = {}) {
  * Body: AttributionRequest (previous/current portfolio ± markets, optional dt_years).
  */
 export function explainPnL(request) {
-  return json(`${API_V1}/risk/attribution`, {
-    method: 'POST',
-    body: JSON.stringify(request),
-  })
+  const portfolio = request?.previous_portfolio ?? request?.current_portfolio
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/attribution`,
+    { method: 'POST', body: JSON.stringify(request) },
+    {
+      portfolio,
+      run_type: 'attribution',
+      request: {
+        previous_portfolio: request.previous_portfolio,
+        current_portfolio: request.current_portfolio,
+        previous_market: request.previous_market,
+        current_market: request.current_market,
+        dt_years: request.dt_years,
+      },
+    },
+  )
 }
 
 /** Illustrative market-move demo → AttributionReport via POST /risk/attribution/demo. */
 export function explainPnLDemo(portfolio) {
-  return json(`${API_V1}/risk/attribution/demo`, {
-    method: 'POST',
-    body: JSON.stringify(portfolio),
-  })
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/attribution/demo`,
+    { method: 'POST', body: JSON.stringify(portfolio) },
+    { portfolio, run_type: 'attribution_demo', request: {} },
+  )
 }
 
 /**
@@ -196,10 +268,23 @@ export function getRiskRun(runId) {
  * Body: RiskChangeAttributionRequest (previous/current portfolio ± markets).
  */
 export function changeAttribution(request) {
-  return json(`${API_V1}/risk/change-attribution`, {
-    method: 'POST',
-    body: JSON.stringify(request),
-  })
+  const portfolio = request?.previous_portfolio ?? request?.current_portfolio
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/change-attribution`,
+    { method: 'POST', body: JSON.stringify(request) },
+    {
+      portfolio,
+      run_type: 'change_attribution',
+      request: {
+        previous_portfolio: request.previous_portfolio,
+        current_portfolio: request.current_portfolio,
+        previous_market: request.previous_market,
+        current_market: request.current_market,
+        metric: request.metric,
+        methodology: request.methodology,
+      },
+    },
+  )
 }
 
 /**
@@ -208,10 +293,15 @@ export function changeAttribution(request) {
  */
 export function esContributions(portfolio, methodology = 'DELTA_GAMMA') {
   const q = new URLSearchParams({ methodology })
-  return json(`${API_V1}/risk/es?${q}`, {
-    method: 'POST',
-    body: JSON.stringify(portfolio),
-  })
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/es?${q}`,
+    { method: 'POST', body: JSON.stringify(portfolio) },
+    {
+      portfolio,
+      run_type: 'es',
+      request: { methodology },
+    },
+  )
 }
 
 /**
@@ -223,8 +313,13 @@ export function compareVarMethodologies(portfolio, observations) {
     observations != null && observations !== ''
       ? `?observations=${encodeURIComponent(observations)}`
       : ''
-  return json(`${API_V1}/risk/var/compare${q}`, {
-    method: 'POST',
-    body: JSON.stringify(portfolio),
-  })
+  const request =
+    observations != null && observations !== ''
+      ? { observations: Number(observations) }
+      : {}
+  return postHeavyOrRiskRun(
+    `${API_V1}/risk/var/compare${q}`,
+    { method: 'POST', body: JSON.stringify(portfolio) },
+    { portfolio, run_type: 'var_compare', request },
+  )
 }

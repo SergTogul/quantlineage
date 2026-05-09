@@ -806,7 +806,7 @@ Prefer one completed risk-run artifact or a coherent batch service.
 
 ## R0.10.3 Queue/backpressure — COMPLETE (refuse-gate, 2026-09-04)
 
-When `RISKFORGE_EXTERNAL_WORKER=1` or `RISKFORGE_HEAVY_INLINE=0`, FULL_REVALUATION summary, dashboard, leftover `risk.py` HEAVY routes, and HEAVY stress / attribution / limits refuse request-thread compute (HTTP 400 `Invalid request`, `details.use=/risk/runs`). `run_type=dashboard` on `POST /risk/runs` returns the coherent batch payload (lists stay arrays). Compose `loadDashboard()` falls back to that RiskRun path on refuse. Other interactive HEAVY UI POSTs still sync. RF-015 stays open.
+When `RISKFORGE_EXTERNAL_WORKER=1` or `RISKFORGE_HEAVY_INLINE=0`, FULL_REVALUATION summary, dashboard, leftover `risk.py` HEAVY routes, and HEAVY stress / attribution / limits refuse request-thread compute (HTTP 400 `Invalid request`, `details.use=/risk/runs`). `run_type=dashboard` on `POST /risk/runs` returns the coherent batch payload (lists stay arrays). Compose `loadDashboard()` falls back to that RiskRun path on refuse. Remaining HEAVY UI POSTs addressed in R0.10.4.
 
 Bound:
 
@@ -818,6 +818,12 @@ Bound:
 ### Exit criteria
 
 Large risk cannot monopolize ordinary HTTP request execution indefinitely.
+
+## R0.10.4 Remaining HEAVY UI → RiskRun fallback — COMPLETE (2026-09-09)
+
+Independent review **APPROVE** (`reviews/r0.10.4-heavy-ui-riskrun-fallback-independent-review.md`). Frontend `api.js` shared helper (`postHeavyOrRiskRun` / `runViaRiskRun`) mirrors `loadDashboard`: sync HEAVY POST first; on refuse (`details.use=/risk/runs`) create+poll typed RiskRun. New Backend `run_type`s (R0.8.4 schemas): `stress_evaluate`, `reverse_stress`, `reverse_stress_multi`, `stress_compare`, `query`, `attribution`, `attribution_demo`, `change_attribution`, `es`, `var_compare`. INTERACTIVE routes unchanged. **RF-015 CLOSED**.
+
+Report: `reviews/r0.10.4-heavy-ui-riskrun-fallback-report.md`.
 
 ---
 

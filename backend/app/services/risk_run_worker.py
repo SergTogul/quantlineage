@@ -29,8 +29,11 @@ from typing import Any, Callable
 from pydantic import BaseModel, ValidationError
 
 from app.api.errors import PUBLIC_RISK_RUN_FAILURE_MESSAGE
+from app.api.scenario_wire import ScenarioWire, wires_to_scenarios
 from app.domain.models import (
+    AttributionRequest,
     Portfolio,
+    RiskChangeAttributionRequest,
     RiskRun,
     RiskRunStatus,
     RiskRunView,
@@ -73,6 +76,16 @@ SUPPORTED_RUN_TYPES = frozenset(
         "hierarchy",
         "contributors",
         "dashboard",
+        "stress_evaluate",
+        "reverse_stress",
+        "reverse_stress_multi",
+        "stress_compare",
+        "query",
+        "attribution",
+        "attribution_demo",
+        "change_attribution",
+        "es",
+        "var_compare",
     }
 )
 
@@ -120,6 +133,11 @@ def _parse_methodology(request: dict[str, Any]) -> VaRMethodology | None:
     return VaRMethodology(str(raw).strip().upper())
 
 
+def _scenarios_from_request(request: dict[str, Any]) -> list[Any]:
+    raw = request.get("scenarios") or []
+    return wires_to_scenarios([ScenarioWire.model_validate(item) for item in raw])
+
+
 def execute_run_type(
     portfolio_service: PortfolioService,
     *,
@@ -154,6 +172,95 @@ def execute_run_type(
         return _serialize_result(portfolio_service.contributors(portfolio))
     if run_type == "dashboard":
         return _serialize_dashboard_result(portfolio_service.dashboard(portfolio))
+    if run_type == "stress_evaluate":
+        scenarios = _scenarios_from_request(request)
+        return _serialize_result(
+            portfolio_service.threat_evaluation(
+                portfolio, scenarios if scenarios else None
+            )
+        )
+    if run_type == "reverse_stress":
+        target = request.get("target_loss_pct")
+        if target is None:
+            raise ValueError("reverse_stress requires target_loss_pct")
+        factor = request.get("factor") or "equity"
+        max_shock = request.get("max_shock", 0.80)
+        return _serialize_result(
+            portfolio_service.reverse_stress(
+                portfolio, float(target), factor, float(max_shock)
+            )
+        )
+    if run_type == "reverse_stress_multi":
+        target = request.get("target_loss_pct")
+        if target is None:
+            raise ValueError("reverse_stress_multi requires target_loss_pct")
+        return _serialize_result(
+            portfolio_service.reverse_stress_multi(
+                portfolio,
+                float(target),
+                factors=request.get("factors"),
+                weights=request.get("weights"),
+                max_shock=float(request.get("max_shock", 0.80)),
+                max_shocks=request.get("max_shocks"),
+            )
+        )
+    if run_type == "stress_compare":
+        hedged = request.get("hedged_portfolio")
+        if hedged is None:
+            raise ValueError("stress_compare requires hedged_portfolio")
+        hedged_book = (
+            hedged if isinstance(hedged, Portfolio) else Portfolio.model_validate(hedged)
+        )
+        scenarios = _scenarios_from_request(request)
+        if not scenarios:
+            raise ValueError("stress_compare requires scenarios")
+        return _serialize_result(
+            portfolio_service.compare_scenarios(
+                portfolio, hedged_book, scenarios, methodology=methodology
+            )
+        )
+    if run_type == "query":
+        question = request.get("question")
+        if not question:
+            raise ValueError("query requires question")
+        return _serialize_result(portfolio_service.query(portfolio, str(question)))
+    if run_type == "attribution":
+        attr_req = AttributionRequest.model_validate(
+            {
+                "previous_portfolio": request.get("previous_portfolio") or portfolio,
+                "current_portfolio": request.get("current_portfolio") or portfolio,
+                "previous_market": request.get("previous_market"),
+                "current_market": request.get("current_market"),
+                "dt_years": request.get("dt_years", 0.0),
+            }
+        )
+        return _serialize_result(portfolio_service.attribution(attr_req))
+    if run_type == "attribution_demo":
+        return _serialize_result(portfolio_service.demo_attribution(portfolio))
+    if run_type == "change_attribution":
+        change_req = RiskChangeAttributionRequest.model_validate(
+            {
+                "previous_portfolio": request.get("previous_portfolio") or portfolio,
+                "current_portfolio": request.get("current_portfolio") or portfolio,
+                "previous_market": request.get("previous_market"),
+                "current_market": request.get("current_market"),
+                "metric": request.get("metric") or "var_99",
+                "methodology": methodology,
+            }
+        )
+        return _serialize_result(portfolio_service.risk_change_attribution(change_req))
+    if run_type == "es":
+        return _serialize_result(
+            portfolio_service.es_contributions(portfolio, methodology=methodology)
+        )
+    if run_type == "var_compare":
+        observations = request.get("observations")
+        return _serialize_result(
+            portfolio_service.compare_var_methodologies(
+                portfolio,
+                observations=int(observations) if observations is not None else None,
+            )
+        )
     raise ValueError(f"unsupported run_type {run_type!r}")
 
 
