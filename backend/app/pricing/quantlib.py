@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from datetime import date, timedelta
 from threading import RLock
 from types import SimpleNamespace
+from typing import Any
 
 from app.domain.instrument_terms import (
     BondTerms,
@@ -225,6 +226,105 @@ def _pricing_view(
     return SimpleNamespace(**attrs)
 
 
+def _terms_key(position: Position) -> tuple[str, str]:
+    return type(position).__name__, position.model_dump_json()
+
+
+def _ql_date_key(value: date) -> str:
+    return value.isoformat()
+
+
+def _has_matching_vol_surface(
+    market: MarketSnapshot | None, name: str, asset_class: str, spot: float
+) -> bool:
+    raw = (market.vol_surfaces.get(name) if market is not None else None) or None
+    return bool(
+        raw is not None
+        and spot > 0.0
+        and str(raw.get("asset_class", "")).lower() == asset_class
+    )
+
+
+class _ReusableScalarOption:
+    """Cached QuantLib scalar-vol option with relinkable market quotes."""
+
+    def __init__(
+        self,
+        owner: "QuantLibPricingEngine",
+        *,
+        option_type: str,
+        strike: float,
+        maturity_years: float,
+        foreign_or_dividend_rate: float,
+        domestic_or_risk_free_rate: float,
+        spot: float,
+        volatility: float,
+    ) -> None:
+        today = owner._ql_date(owner.evaluation_date)
+        self.spot_quote = ql.SimpleQuote(spot)
+        self.foreign_or_dividend_quote = ql.SimpleQuote(foreign_or_dividend_rate)
+        self.domestic_or_risk_free_quote = ql.SimpleQuote(domestic_or_risk_free_rate)
+        self.vol_quote = ql.SimpleQuote(volatility)
+        spot_handle = ql.QuoteHandle(self.spot_quote)
+        foreign_or_dividend = ql.YieldTermStructureHandle(
+            ql.FlatForward(
+                today,
+                ql.QuoteHandle(self.foreign_or_dividend_quote),
+                ql.Actual365Fixed(),
+                ql.Continuous,
+            )
+        )
+        domestic_or_risk_free = ql.YieldTermStructureHandle(
+            ql.FlatForward(
+                today,
+                ql.QuoteHandle(self.domestic_or_risk_free_quote),
+                ql.Actual365Fixed(),
+                ql.Continuous,
+            )
+        )
+        vol = ql.BlackVolTermStructureHandle(
+            ql.BlackConstantVol(
+                today,
+                ql.NullCalendar(),
+                ql.QuoteHandle(self.vol_quote),
+                ql.Actual365Fixed(),
+            )
+        )
+        process = ql.BlackScholesMertonProcess(
+            spot_handle, foreign_or_dividend, domestic_or_risk_free, vol
+        )
+        payoff = ql.PlainVanillaPayoff(
+            ql.Option.Call if option_type == "call" else ql.Option.Put,
+            strike,
+        )
+        self.instrument = ql.VanillaOption(
+            payoff,
+            ql.EuropeanExercise(owner._maturity_date(maturity_years)),
+        )
+        self.instrument.setPricingEngine(ql.AnalyticEuropeanEngine(process))
+
+    def update(
+        self,
+        *,
+        spot: float,
+        foreign_or_dividend_rate: float,
+        domestic_or_risk_free_rate: float,
+        volatility: float,
+    ) -> None:
+        self.spot_quote.setValue(spot)
+        self.foreign_or_dividend_quote.setValue(foreign_or_dividend_rate)
+        self.domestic_or_risk_free_quote.setValue(domestic_or_risk_free_rate)
+        self.vol_quote.setValue(volatility)
+
+    def price(self) -> tuple[float, float, float, float]:
+        return (
+            self.instrument.NPV(),
+            self.instrument.delta(),
+            self.instrument.gamma(),
+            self.instrument.vega(),
+        )
+
+
 class QuantLibPricingEngine(PricingEngine):
     """QuantLib-backed valuation adapter.
 
@@ -251,6 +351,8 @@ class QuantLibPricingEngine(PricingEngine):
         self.evaluation_date = evaluation_date or date.today()
         # Bind the process lock; do not allocate a per-instance RLock.
         self._lock = _QL_PROCESS_LOCK
+        self._terms_cache: dict[tuple[str, str], InstrumentTerms] = {}
+        self._structure_cache: dict[tuple[Any, ...], object] = {}
 
     @contextmanager
     def _session(self, evaluation_date: date | None = None):
@@ -287,10 +389,20 @@ class QuantLibPricingEngine(PricingEngine):
         days = max(1, round(years * 365.0))
         return self._ql_date(self.evaluation_date + timedelta(days=days))
 
+    def _terms_for_position(self, position: Position) -> InstrumentTerms:
+        if not hasattr(position, "model_dump_json"):
+            return terms_from_position(position)
+        key = _terms_key(position)
+        terms = self._terms_cache.get(key)
+        if terms is None:
+            terms = terms_from_position(position)
+            self._terms_cache[key] = terms
+        return terms
+
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
         market = require_explicit_market(market)
         try:
-            terms = terms_from_position(position)
+            terms = self._terms_for_position(position)
         except TypeError:
             raise TypeError(
                 f"unsupported instrument for QuantLib production pricing: "
@@ -339,6 +451,40 @@ class QuantLibPricingEngine(PricingEngine):
         return ql.YieldTermStructureHandle(
             ql.FlatForward(today, rate, ql.Actual365Fixed(), ql.Continuous)
         )
+
+    def _cached_scalar_option(
+        self,
+        *,
+        cache_key: tuple[Any, ...],
+        option_type: str,
+        strike: float,
+        maturity_years: float,
+        foreign_or_dividend_rate: float,
+        domestic_or_risk_free_rate: float,
+        spot: float,
+        volatility: float,
+    ) -> _ReusableScalarOption:
+        cached = self._structure_cache.get(cache_key)
+        if cached is None:
+            cached = _ReusableScalarOption(
+                self,
+                option_type=option_type,
+                strike=strike,
+                maturity_years=maturity_years,
+                foreign_or_dividend_rate=foreign_or_dividend_rate,
+                domestic_or_risk_free_rate=domestic_or_risk_free_rate,
+                spot=spot,
+                volatility=volatility,
+            )
+            self._structure_cache[cache_key] = cached
+        assert isinstance(cached, _ReusableScalarOption)
+        cached.update(
+            spot=spot,
+            foreign_or_dividend_rate=foreign_or_dividend_rate,
+            domestic_or_risk_free_rate=domestic_or_risk_free_rate,
+            volatility=volatility,
+        )
+        return cached
 
     def _curve_handle(self, market: MarketSnapshot | None, currency: str, flat_rate: float):
         """Build a QL handle from snapshot curves/key_rates, else flat continuous."""
@@ -416,6 +562,35 @@ class QuantLibPricingEngine(PricingEngine):
         return ql.BlackVolTermStructureHandle(ql_surface)
 
     def _option(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
+        if not _has_matching_vol_surface(market, p.symbol, "equity", p.spot):
+            option = self._cached_scalar_option(
+                cache_key=(
+                    "equity_option",
+                    _ql_date_key(self.evaluation_date),
+                    p.symbol,
+                    p.currency,
+                    p.strike,
+                    p.maturity_years,
+                    p.option_type,
+                ),
+                option_type=p.option_type,
+                strike=p.strike,
+                maturity_years=p.maturity_years,
+                foreign_or_dividend_rate=p.dividend_yield,
+                domestic_or_risk_free_rate=p.risk_free_rate,
+                spot=p.spot,
+                volatility=p.volatility,
+            )
+            unit_price, unit_delta, unit_gamma, unit_vega = option.price()
+            return Valuation(
+                position_id=p.id,
+                market_value=p.quantity * unit_price,
+                delta=p.quantity * unit_delta * p.spot,
+                gamma=p.quantity * unit_gamma * p.spot * p.spot,
+                # QuantLib vega is dPV / d(vol=1.00), so convert to a 1-vol-point exposure.
+                vega=p.quantity * unit_vega * 0.01,
+            )
+
         spot = ql.QuoteHandle(ql.SimpleQuote(p.spot))
         risk_free = self._flat_curve(p.risk_free_rate)
         dividend = self._flat_curve(p.dividend_yield)
@@ -482,11 +657,19 @@ class QuantLibPricingEngine(PricingEngine):
             if fixing_date <= eval_dt:
                 index.addFixing(fixing_date, rate, True)
 
-    def _swap_npv(self, p: SimpleNamespace, market_rate: float, curve_handle=None) -> float:
+    def _swap_schedules(self, p: SimpleNamespace):
+        key = (
+            "swap_schedules",
+            _ql_date_key(self.evaluation_date),
+            p.currency,
+            p.maturity_years,
+        )
+        cached = self._structure_cache.get(key)
+        if cached is not None:
+            return cached
         start = self._ql_date(self.evaluation_date)
         maturity = self._maturity_date(p.maturity_years)
         calendar = ql.NullCalendar()
-
         fixed_schedule = ql.Schedule(
             start,
             maturity,
@@ -507,6 +690,12 @@ class QuantLibPricingEngine(PricingEngine):
             ql.DateGeneration.Forward,
             False,
         )
+        cached = (fixed_schedule, float_schedule)
+        self._structure_cache[key] = cached
+        return cached
+
+    def _swap_npv(self, p: SimpleNamespace, market_rate: float, curve_handle=None) -> float:
+        fixed_schedule, float_schedule = self._swap_schedules(p)
         curve = curve_handle if curve_handle is not None else self._flat_curve(market_rate)
         index = ql.USDLibor(ql.Period(6, ql.Months), curve)
         self._seed_ibor_fixings(index, float_schedule, market_rate)
@@ -566,6 +755,34 @@ class QuantLibPricingEngine(PricingEngine):
     def _fx_option(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
         # Garman–Kohlhagen ≡ Black–Scholes–Merton with foreign rate as dividend yield.
         # Exercise date from _maturity_date (T < ~1/365 clamps to 1 calendar day).
+        if not _has_matching_vol_surface(market, p.pair, "fx", p.spot):
+            option = self._cached_scalar_option(
+                cache_key=(
+                    "fx_option",
+                    _ql_date_key(self.evaluation_date),
+                    p.pair,
+                    p.strike,
+                    p.maturity_years,
+                    p.option_type,
+                ),
+                option_type=p.option_type,
+                strike=p.strike,
+                maturity_years=p.maturity_years,
+                foreign_or_dividend_rate=p.foreign_rate,
+                domestic_or_risk_free_rate=p.domestic_rate,
+                spot=p.spot,
+                volatility=p.volatility,
+            )
+            unit_price, unit_delta, unit_gamma, unit_vega = option.price()
+            return Valuation(
+                position_id=p.id,
+                market_value=p.notional_base * unit_price,
+                # Cash FX delta / gamma / 1-vol-point vega match Builtin conventions.
+                fx_delta=p.notional_base * unit_delta * p.spot,
+                gamma=p.notional_base * unit_gamma * p.spot * p.spot,
+                vega=p.notional_base * unit_vega * 0.01,
+            )
+
         spot = ql.QuoteHandle(ql.SimpleQuote(p.spot))
         domestic = self._flat_curve(p.domestic_rate)
         foreign = self._flat_curve(p.foreign_rate)

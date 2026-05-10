@@ -579,7 +579,9 @@ Capture:
 
 `iter_shocked_snapshots` / `iter_historical_shocked_snapshots` yield one snapshot; list helpers wrap them. Full-reval loops consume the iterator. RF-007 stays open (still N×S pricing).
 
-## R0.6.3 Reuse QuantLib structures where safe
+## R0.6.3 Reuse QuantLib structures where safe — COMPLETE pending review (2026-09-09)
+
+`QuantLibPricingEngine` now caches contract terms, swap schedules, and scalar equity/FX option QuantLib structures keyed by contract inputs and evaluation date. Scalar option paths reuse `VanillaOption` / payoff / exercise / process structures while updating `SimpleQuote` handles for spot, rates, dividends/foreign rates, and vol on every snapshot. Attached vol surfaces and snapshot curve/key-rate structures are still rebuilt/relinked from the current `MarketSnapshot` so shocked market state cannot go stale. Evidence: `backend/tests/test_quantlib_reuse.py`; focused brief suite `179 passed`; report `reviews/r0.6.3-quantlib-reuse-report.md`. RF-007 remains open for R0.6.4-R0.6.6 / close gate.
 
 Evaluate:
 
