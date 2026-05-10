@@ -592,7 +592,9 @@ Evaluate:
 
 Do not cache stale market state.
 
-## R0.6.4 Remove anti-cache behavior
+## R0.6.4 Remove anti-cache behavior — COMPLETE pending review (2026-09-09)
+
+Unique-shock / FULL_REVALUATION loops enter `bypass_valuation_lru` so `CachedPricingEngine` does not hash, look up, or store per unique shocked snapshot. Base-snapshot valuations still use the LRU. `shocked_value` bypasses the LRU because the shocked market is unique by construction. Numerical identity vs inner/cold path at abs `1e-12`. Curve-construction cache stays enabled (equity/FX/vol bumps can hit when rate marks are unchanged). Evidence: `backend/tests/test_pricing_anti_cache.py`; brief focused suite `53 passed`; report `reviews/r0.6.4-anti-cache-report.md`. RF-007 remains open for R0.6.5–R0.6.6 / close gate.
 
 If the valuation LRU is slower for unique shocked markets, disable it for that execution class or redesign the caching level.
 

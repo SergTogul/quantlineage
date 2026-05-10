@@ -29,6 +29,7 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
+from app.pricing.cache import bypass_valuation_lru
 from app.risk.factor_panel import HistoricalFactorPanel, panel_factor_identity
 from app.risk.factor_types import (
     EquitySpot,
@@ -431,9 +432,10 @@ def full_revaluation_pnl_from_panel(
     require_panel_covers_portfolio(portfolio, panel)
     base_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, base_market))
     pnls: list[float] = []
-    for snap in iter_panel_shocked_snapshots(base_market, panel):
-        shocked_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, snap))
-        pnls.append(shocked_mv - base_mv)
+    with bypass_valuation_lru():
+        for snap in iter_panel_shocked_snapshots(base_market, panel):
+            shocked_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, snap))
+            pnls.append(shocked_mv - base_mv)
     return np.asarray(pnls, dtype=float)
 
 
@@ -453,9 +455,10 @@ def full_revaluation_pnl_series(
     """
     base_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, base_market))
     pnls: list[float] = []
-    for snap in iter_historical_shocked_snapshots(base_market, dataset):
-        shocked_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, snap))
-        pnls.append(shocked_mv - base_mv)
+    with bypass_valuation_lru():
+        for snap in iter_historical_shocked_snapshots(base_market, dataset):
+            shocked_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, snap))
+            pnls.append(shocked_mv - base_mv)
     return np.asarray(pnls, dtype=float)
 
 
