@@ -28,17 +28,17 @@ from app.domain.models import (
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
+from app.pricing.cache import bypass_valuation_lru
 from app.risk.factor_panel import HistoricalFactorPanel
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
 from app.risk.historical import (
+    _panel_linear_contribution,
     require_explicit_market,
     require_panel_covers_portfolio,
     required_factors_for_position,
-    _panel_linear_contribution,
 )
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
-from app.risk.shock_units import relative_vol_move_to_vol_points
 from app.risk.scenarios import (
     AggregateFactorChange,
     FactorChange,
@@ -49,6 +49,7 @@ from app.risk.scenarios import (
     iter_aggregate_changes,
     market_scenario_from_change,
 )
+from app.risk.shock_units import relative_vol_move_to_vol_points
 from app.risk.var import VaRAnalytics
 
 # Aggregate risk-factor families used for ES factor attribution.
@@ -189,21 +190,22 @@ def _aggregate_factor_pnl_full_reval(
     factor_pnl = {k: np.zeros(n, dtype=float) for k in _FACTOR_KEYS}
     base_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, base_market))
 
-    for i, change in enumerate(changes):
-        isolated = {
-            "equity": AggregateFactorChange(change.index, change.equity_return, 0.0, 0.0, 0.0),
-            "vol": AggregateFactorChange(change.index, 0.0, change.vol_move, 0.0, 0.0),
-            "rate": AggregateFactorChange(change.index, 0.0, 0.0, change.rate_move_bps, 0.0),
-            "fx": AggregateFactorChange(change.index, 0.0, 0.0, 0.0, change.fx_return),
-        }
-        for key, iso in isolated.items():
-            if not expand_aggregate_change(iso, base_market):
-                factor_pnl[key][i] = 0.0
-                continue
-            scenario = market_scenario_from_change(iso, base_market, id_prefix=f"es_{key}")
-            snap = apply_market_scenario(base_market, scenario)
-            shocked_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, snap))
-            factor_pnl[key][i] = shocked_mv - base_mv
+    with bypass_valuation_lru():
+        for i, change in enumerate(changes):
+            isolated = {
+                "equity": AggregateFactorChange(change.index, change.equity_return, 0.0, 0.0, 0.0),
+                "vol": AggregateFactorChange(change.index, 0.0, change.vol_move, 0.0, 0.0),
+                "rate": AggregateFactorChange(change.index, 0.0, 0.0, change.rate_move_bps, 0.0),
+                "fx": AggregateFactorChange(change.index, 0.0, 0.0, 0.0, change.fx_return),
+            }
+            for key, iso in isolated.items():
+                if not expand_aggregate_change(iso, base_market):
+                    factor_pnl[key][i] = 0.0
+                    continue
+                scenario = market_scenario_from_change(iso, base_market, id_prefix=f"es_{key}")
+                snap = apply_market_scenario(base_market, scenario)
+                shocked_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, snap))
+                factor_pnl[key][i] = shocked_mv - base_mv
 
     residual = total_pnl - sum(factor_pnl[k] for k in _FACTOR_KEYS)
     factor_pnl["interaction"] = residual
@@ -227,29 +229,30 @@ def _aggregate_factor_pnl_full_reval_from_panel(
     factor_pnl = {k: np.zeros(n, dtype=float) for k in _FACTOR_KEYS}
     base_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, base_market))
 
-    for i, observation in enumerate(panel.observations):
-        # Ensure the observation can resolve every required factor before isolating.
-        for factor in (
-            f for p in portfolio.positions for f in required_factors_for_position(p)
-        ):
-            observation.change(factor)
-        all_shocks = factor_changes_from_panel_observation(observation)
-        by_family: dict[str, list[FactorChange]] = {k: [] for k in _FACTOR_KEYS}
-        for shock in all_shocks:
-            by_family[_factor_family(shock.factor)].append(shock)
-        for key in _FACTOR_KEYS:
-            shocks = tuple(by_family[key])
-            if not shocks:
-                factor_pnl[key][i] = 0.0
-                continue
-            scenario = MarketScenario(
-                id=f"es_panel_{key}_{i}",
-                name=f"Panel {key} isolation {i}",
-                shocks=shocks,
-            )
-            snap = apply_market_scenario(base_market, scenario)
-            shocked_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, snap))
-            factor_pnl[key][i] = shocked_mv - base_mv
+    with bypass_valuation_lru():
+        for i, observation in enumerate(panel.observations):
+            # Ensure the observation can resolve every required factor before isolating.
+            for factor in (
+                f for p in portfolio.positions for f in required_factors_for_position(p)
+            ):
+                observation.change(factor)
+            all_shocks = factor_changes_from_panel_observation(observation)
+            by_family: dict[str, list[FactorChange]] = {k: [] for k in _FACTOR_KEYS}
+            for shock in all_shocks:
+                by_family[_factor_family(shock.factor)].append(shock)
+            for key in _FACTOR_KEYS:
+                shocks = tuple(by_family[key])
+                if not shocks:
+                    factor_pnl[key][i] = 0.0
+                    continue
+                scenario = MarketScenario(
+                    id=f"es_panel_{key}_{i}",
+                    name=f"Panel {key} isolation {i}",
+                    shocks=shocks,
+                )
+                snap = apply_market_scenario(base_market, scenario)
+                shocked_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, snap))
+                factor_pnl[key][i] = shocked_mv - base_mv
 
     residual = total_pnl - sum(factor_pnl[k] for k in _FACTOR_KEYS)
     factor_pnl["interaction"] = residual

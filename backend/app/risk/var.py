@@ -14,6 +14,7 @@ from app.domain.models import (
     VaRReport,
 )
 from app.interfaces.pricing import PricingEngine
+from app.pricing.cache import bypass_valuation_lru
 from app.risk.factor_panel import HistoricalFactorPanel
 from app.risk.historical import (
     approximate_pnl_series,
@@ -96,9 +97,10 @@ class VaRAnalytics:
             snaps = iter_panel_shocked_snapshots(market, self.factor_panel)
         else:
             snaps = iter_historical_shocked_snapshots(market, self.dataset)
-        for snap in snaps:
-            for p in portfolio.positions:
-                collected[p.id].append(pricing.value(p, snap).market_value - base[p.id])
+        with bypass_valuation_lru():
+            for snap in snaps:
+                for p in portfolio.positions:
+                    collected[p.id].append(pricing.value(p, snap).market_value - base[p.id])
         return {pid: np.asarray(vals, dtype=float) for pid, vals in collected.items()}
 
     def report(

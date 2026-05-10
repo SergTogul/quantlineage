@@ -23,7 +23,9 @@ def create_pricing_engine() -> PricingEngine:
 
     When ``RISKFORGE_PRICING_CACHE`` is enabled (default), the adapter is wrapped
     in :class:`~app.pricing.cache.CachedPricingEngine` so repeated valuations of
-    the same trade + market + pricing configuration hit an LRU cache.
+    the same trade + market + pricing configuration hit an LRU cache. Unique-shock
+    / FULL_REVALUATION loops enter :func:`~app.pricing.cache.bypass_valuation_lru`
+    so that LRU is not consulted on snapshots that cannot hit.
     """
     name = os.getenv("RISKFORGE_PRICING_ENGINE", "quantlib").strip().lower()
     if name == "quantlib":
