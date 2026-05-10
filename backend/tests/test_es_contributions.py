@@ -6,7 +6,8 @@ Conventions:
 - Linearity of conditional expectation ⇒ position/book/desk/strategy
   contributions sum to portfolio ES (within float tolerance)
 - Risk-factor contributions under LINEAR / DELTA_GAMMA use additive Greek
-  P&L terms; under FULL_REVALUATION use factor-isolated reval + residual
+  P&L terms; under FULL_REVALUATION reuse that split vs joint full-reval P&L
+  plus an interaction residual
 - Tolerances: abs 1e-6 (currency) or rel 1e-8 for reconciliation
 """
 from __future__ import annotations
