@@ -598,15 +598,17 @@ Unique-shock / FULL_REVALUATION loops enter `bypass_valuation_lru` so `CachedPri
 
 If the valuation LRU is slower for unique shocked markets, disable it for that execution class or redesign the caching level.
 
-## R0.6.5 Process-level scenario parallelism
+## R0.6.5 Process-level scenario parallelism — COMPLETE pending review (2026-09-09)
 
 Partition independent scenario blocks across worker processes when profiling shows value.
+
+Option B: HEAVY full-reval already runs out-of-request-thread via RiskRun (`RF-015` CLOSED). Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP enqueues; Compose `worker` (`python -m app.worker`) is the OS-process QuantLib partition. `POST /risk/summary?methodology=FULL_REVALUATION` and `POST /risk/var` refuse inline when the gate is on (`details.use=/risk/runs`). No unused `ProcessPoolExecutor` / multiprocessing chunking: R0.6.1 identity bench (`pnl_checksum` `6602fa69…`, `wall_ms` recorded only) does not justify in-process scenario-block multiprocessing. In-process QuantLib stays serialized by `_QL_PROCESS_LOCK`. Evidence: `backend/tests/test_r065_process_partition.py`; focused brief suite; report `reviews/r0.6.5-process-parallelism-report.md`. RF-007 remains open for the close gate / N=100/1k.
 
 ## R0.6.6 Contribution reuse — COMPLETE pending review (2026-09-09)
 
 Avoid whole-book full revaluation once per factor family when the same trade/scenario P&Ls can be reused or decomposed coherently.
 
-Full-reval ES factor contributions and scenario-attribution factor buckets reuse the already-computed joint trade/scenario P&L and attribute families from one base Δ-Γ Greek valuation. They do not apply family-isolated scenarios or reprice the book per family × observation. `interaction` = joint full-reval − sum(families). Bound: family path is O(N) base `value` calls, not O(N×S×F) extra books; scenario `apply_scenario` stays one full scenario (not × factor keys). Cash-equity family P&L matches LINEAR at abs `1e-12`; reconcile abs `1e-6` / rel `1e-8`. Evidence: `backend/tests/test_contribution_reuse.py`; focused suite including ES/VaR/attribution/anti-cache; report `reviews/r0.6.6-contribution-reuse-report.md`. RF-007 remains open for R0.6.5 / close gate.
+Full-reval ES factor contributions and scenario-attribution factor buckets reuse the already-computed joint trade/scenario P&L and attribute families from one base Δ-Γ Greek valuation. They do not apply family-isolated scenarios or reprice the book per family × observation. `interaction` = joint full-reval − sum(families). Bound: family path is O(N) base `value` calls, not O(N×S×F) extra books; scenario `apply_scenario` stays one full scenario (not × factor keys). Cash-equity family P&L matches LINEAR at abs `1e-12`; reconcile abs `1e-6` / rel `1e-8`. Evidence: `backend/tests/test_contribution_reuse.py`; focused suite including ES/VaR/attribution/anti-cache; report `reviews/r0.6.6-contribution-reuse-report.md`. RF-007 remains open for the close gate / N=100/1k.
 
 ### Exit criteria
 
