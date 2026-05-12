@@ -62,8 +62,26 @@ Evidence already in code:
 ## R0.3.5 process-partition design (bounded)
 
 R0.3.5 pins the concurrency architecture. It does **not** introduce a
-scenario-block `ProcessPoolExecutor` or a job platform (that remains R0.6.5
-after profiling).
+scenario-block `ProcessPoolExecutor` or a job platform.
+
+## R0.6.5 — RiskRun / Compose worker is the process partition
+
+R0.6.5 (option B) does **not** add unused scenario-block multiprocessing.
+R0.6.1 records identity only (`pnl_checksum` `6602fa69…`, `wall_ms` not
+SLA-gated) and does not show a cheap, numerically identical chunked
+`ProcessPoolExecutor` for `full_revaluation_pnl_series`. HEAVY
+`FULL_REVALUATION` already runs out of the request thread:
+
+- Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP enqueues
+  `QUEUED` rows (`RF-015` CLOSED).
+- Compose `worker` / `python -m app.worker` is a distinct OS process with
+  its own QuantLib globals.
+- `POST /risk/summary?methodology=FULL_REVALUATION` and `POST /risk/var`
+  refuse inline when the gate is on (`details.use=/risk/runs`).
+- Extra worker replicas remain the supported scale-out (`SKIP LOCKED`).
+
+Do not invent a FULL_REVALUATION wall-time SLA. Do not price QuantLib on
+an in-process thread pool.
 
 | Path | What happens | Parallelism |
 |---|---|---|
@@ -94,6 +112,7 @@ process — not more threads in that loop.
 | Thread-parallel FULL_REVAL without lock | Unsafe; would change numerical/process behavior under load. |
 | Move QuantLib into the native scenario `.so` | Violates “pricing library prices; RiskForge aggregates”; couples ABI to QL. |
 | ProcessPoolExecutor for every risk run now | Heavier ops change; still documents single-process poll + future claim/lease. Prefer documenting the target architecture over premature rewrite. |
+| Chunked `ProcessPoolExecutor` inside `full_revaluation_pnl_series` (R0.6.5 option A) | Not justified: pickling/reconstructing QuantLib per chunk is not cheap; R0.6.1 is identity-not-SLA; Compose worker already is the process partition. |
 
 ## Consequences
 
@@ -114,5 +133,6 @@ process — not more threads in that loop.
 - `backend/app/services/risk_run_worker.py` (job thread pool + external process worker)
 - `backend/app/worker.py` (Compose worker process entrypoint)
 - `backend/tests/test_quantlib_process_parallelism.py` (R0.3.5 pins)
+- `backend/tests/test_r065_process_partition.py` (R0.6.5 HEAVY / RiskRun proof)
 - `backend/native/README.md` (kernel parallelism; FULL_REVAL out of scope)
 - ROADMAP
