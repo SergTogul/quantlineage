@@ -468,7 +468,7 @@ Structural factor×scenario evidence (monkeypatch counters, not wall-clock):
 multi-factor apply `model_copy` == 1 / freeze ∈ [1,2] for K≥5; `run` /
 `evaluate` apply count == S for P×S; contribution sum↔P&L + interaction residual
 cited from existing `test_scenario_attribution.py`. RF-006 **CLOSED**.
-Report: `reviews/r0.4.6-rf006-acceptance-report.md`. N×S full-reval cost remains RF-007.
+Report: `reviews/r0.4.6-rf006-acceptance-report.md`. N×S full-reval cost is RF-007 (**CLOSED**; P1 benches).
 
 ### Exit criteria
 
@@ -553,12 +553,12 @@ Two equities and two rate tenors can move independently in one historical observ
 Related findings:
 
 - RF-006
-- RF-007
+- RF-007 (**CLOSED** 2026-09-09; P1 benches)
 - RF-015
 
 ## R0.6.1 Baseline benchmark first — COMPLETE (2026-09-04)
 
-`benchmarks/run_full_reval_bench.py` + `backend/tests/test_full_reval_bench.py`. N=10×S=100 identity vs `full_revaluation_var_es`; `pnl_checksum` `6602fa69…`; `wall_ms` recorded only. Not in nightly/PR-FULL. N=100/1k, reuse, and N×S remain later. RF-007 stays open.
+`benchmarks/run_full_reval_bench.py` + `backend/tests/test_full_reval_bench.py`. Identity is **1 trade × 120 obs** builtin vs `full_revaluation_pnl_series` (not N=10×S=100). `pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`; `wall_ms` recorded only. Not in nightly/PR-FULL. N=100/1k wall/RSS/scenarios-sec/builtin-vs-QuantLib/warm-vs-cold remain **P1** after RF-007 CLOSE.
 
 Record current performance for:
 
@@ -577,11 +577,13 @@ Capture:
 
 ## R0.6.2 Stream/chunk shocked scenarios — COMPLETE (2026-09-04)
 
-`iter_shocked_snapshots` / `iter_historical_shocked_snapshots` yield one snapshot; list helpers wrap them. Full-reval loops consume the iterator. RF-007 stays open (still N×S pricing).
+`iter_shocked_snapshots` / `iter_historical_shocked_snapshots` yield one snapshot; list helpers wrap them. Full-reval loops consume the iterator. Joint N×S `value` remains the cost of full reval (explainable after CLOSE).
 
-## R0.6.3 Reuse QuantLib structures where safe — COMPLETE pending review (2026-09-09)
+## R0.6.3 Reuse QuantLib structures where safe — COMPLETE (2026-09-09)
 
-`QuantLibPricingEngine` now caches contract terms, swap schedules, and scalar equity/FX option QuantLib structures keyed by contract inputs and evaluation date. Scalar option paths reuse `VanillaOption` / payoff / exercise / process structures while updating `SimpleQuote` handles for spot, rates, dividends/foreign rates, and vol on every snapshot. Attached vol surfaces and snapshot curve/key-rate structures are still rebuilt/relinked from the current `MarketSnapshot` so shocked market state cannot go stale. Evidence: `backend/tests/test_quantlib_reuse.py`; focused brief suite `179 passed`; report `reviews/r0.6.3-quantlib-reuse-report.md`. RF-007 remains open for R0.6.4-R0.6.6 / close gate.
+Independent review **APPROVE** (`reviews/sdd-briefs/task-1-r0.6.3-review.md`).
+
+`QuantLibPricingEngine` now caches contract terms, swap schedules, and scalar equity/FX option QuantLib structures keyed by contract inputs and evaluation date. Scalar option paths reuse `VanillaOption` / payoff / exercise / process structures while updating `SimpleQuote` handles for spot, rates, dividends/foreign rates, and vol on every snapshot. Attached vol surfaces and snapshot curve/key-rate structures are still rebuilt/relinked from the current `MarketSnapshot` so shocked market state cannot go stale. Evidence: `backend/tests/test_quantlib_reuse.py`; focused brief suite `179 passed`; report `reviews/r0.6.3-quantlib-reuse-report.md`.
 
 Evaluate:
 
@@ -592,27 +594,41 @@ Evaluate:
 
 Do not cache stale market state.
 
-## R0.6.4 Remove anti-cache behavior — COMPLETE pending review (2026-09-09)
+## R0.6.4 Remove anti-cache behavior — COMPLETE (2026-09-09)
 
-Unique-shock / FULL_REVALUATION loops enter `bypass_valuation_lru` so `CachedPricingEngine` does not hash, look up, or store per unique shocked snapshot. Base-snapshot valuations still use the LRU. `shocked_value` bypasses the LRU because the shocked market is unique by construction. Numerical identity vs inner/cold path at abs `1e-12`. Curve-construction cache stays enabled (equity/FX/vol bumps can hit when rate marks are unchanged). Evidence: `backend/tests/test_pricing_anti_cache.py`; brief focused suite `53 passed`; report `reviews/r0.6.4-anti-cache-report.md`. RF-007 remains open for R0.6.5–R0.6.6 / close gate.
+Independent review **APPROVE** (`reviews/sdd-briefs/task-2-r0.6.4-review.md`).
+
+Unique-shock / FULL_REVALUATION loops enter `bypass_valuation_lru` so `CachedPricingEngine` does not hash, look up, or store per unique shocked snapshot. Base-snapshot valuations still use the LRU. `shocked_value` bypasses the LRU because the shocked market is unique by construction. Numerical identity vs inner/cold path at abs `1e-12`. Curve-construction cache stays enabled (equity/FX/vol bumps can hit when rate marks are unchanged). Evidence: `backend/tests/test_pricing_anti_cache.py`; brief focused suite `53 passed`; report `reviews/r0.6.4-anti-cache-report.md`.
 
 If the valuation LRU is slower for unique shocked markets, disable it for that execution class or redesign the caching level.
 
-## R0.6.5 Process-level scenario parallelism — COMPLETE pending review (2026-09-09)
+## R0.6.5 Process-level scenario parallelism — COMPLETE (2026-09-09)
+
+Independent review **APPROVE** (`reviews/sdd-briefs/task-4-r0.6.5-review.md`). Choice **B**.
 
 Partition independent scenario blocks across worker processes when profiling shows value.
 
-Option B: HEAVY full-reval already runs out-of-request-thread via RiskRun (`RF-015` CLOSED). Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP enqueues; Compose `worker` (`python -m app.worker`) is the OS-process QuantLib partition. `POST /risk/summary?methodology=FULL_REVALUATION` and `POST /risk/var` refuse inline when the gate is on (`details.use=/risk/runs`). No unused `ProcessPoolExecutor` / multiprocessing chunking: R0.6.1 identity bench (`pnl_checksum` `6602fa69…`, `wall_ms` recorded only) does not justify in-process scenario-block multiprocessing. In-process QuantLib stays serialized by `_QL_PROCESS_LOCK`. Evidence: `backend/tests/test_r065_process_partition.py`; focused brief suite; report `reviews/r0.6.5-process-parallelism-report.md`. RF-007 remains open for the close gate / N=100/1k.
+Option B: HEAVY full-reval already runs out-of-request-thread via RiskRun (`RF-015` CLOSED). Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP enqueues; Compose `worker` (`python -m app.worker`) is the OS-process QuantLib partition. `POST /risk/summary?methodology=FULL_REVALUATION` and `POST /risk/var` refuse inline when the gate is on (`details.use=/risk/runs`). No unused `ProcessPoolExecutor` / multiprocessing chunking: R0.6.1 identity bench (`pnl_checksum` `6602fa69…`, `wall_ms` recorded only) does not justify in-process scenario-block multiprocessing. In-process QuantLib stays serialized by `_QL_PROCESS_LOCK`. Evidence: `backend/tests/test_r065_process_partition.py`; focused brief suite; report `reviews/r0.6.5-process-parallelism-report.md`. Intra-run scenario-block multiprocessing remains a **P1** residual (not an SLA).
 
-## R0.6.6 Contribution reuse — COMPLETE pending review (2026-09-09)
+## R0.6.6 Contribution reuse — COMPLETE (2026-09-09)
+
+Independent review **APPROVE** (`reviews/sdd-briefs/task-3-r0.6.6-review.md`).
 
 Avoid whole-book full revaluation once per factor family when the same trade/scenario P&Ls can be reused or decomposed coherently.
 
-Full-reval ES factor contributions and scenario-attribution factor buckets reuse the already-computed joint trade/scenario P&L and attribute families from one base Δ-Γ Greek valuation. They do not apply family-isolated scenarios or reprice the book per family × observation. `interaction` = joint full-reval − sum(families). Bound: family path is O(N) base `value` calls, not O(N×S×F) extra books; scenario `apply_scenario` stays one full scenario (not × factor keys). Cash-equity family P&L matches LINEAR at abs `1e-12`; reconcile abs `1e-6` / rel `1e-8`. Evidence: `backend/tests/test_contribution_reuse.py`; focused suite including ES/VaR/attribution/anti-cache; report `reviews/r0.6.6-contribution-reuse-report.md`. RF-007 remains open for the close gate / N=100/1k.
+Full-reval ES factor contributions and scenario-attribution factor buckets reuse the already-computed joint trade/scenario P&L and attribute families from one base Δ-Γ Greek valuation. They do not apply family-isolated scenarios or reprice the book per family × observation. `interaction` = joint full-reval − sum(families). Bound: family path is O(N) base `value` calls, not O(N×S×F) extra books; scenario `apply_scenario` stays one full scenario (not × factor keys). Cash-equity family P&L matches LINEAR at abs `1e-12`; reconcile abs `1e-6` / rel `1e-8`. Evidence: `backend/tests/test_contribution_reuse.py`; focused suite including ES/VaR/attribution/anti-cache; report `reviews/r0.6.6-contribution-reuse-report.md`.
+
+## R0.6 close gate — COMPLETE (2026-09-09)
+
+QA close gate **CLOSE** with P1 residuals (`reviews/r0.6-rf007-close-gate-report.md`). **RF-007 CLOSED.**
+
+Required direction: 6 MET, 1 PARTIAL (option B job process, not intra-run chunks). Goldens/identity **69 passed**. Joint scaling is O(N×S) `value` + O(N) Greeks, bounded as a HEAVY RiskRun job. Interactive default remains DELTA_GAMMA. No SLA.
 
 ### Exit criteria
 
 Full revaluation is still allowed to be expensive, but its scaling is explainable, benchmarked, bounded, and appropriate for a risk-run job.
+
+**Met** for close: explainable O(N×S) joint pricing; bounded as RiskRun / Compose `worker`; appropriate (LINEAR / DELTA_GAMMA stay the interactive default). **P1 residual:** benchmarked beyond 1×120 builtin identity + `wall_ms` (N=100/1k, RSS, scenarios/sec, builtin vs QuantLib, warm vs cold). Do not invent a host SLA from recorded `wall_ms`.
 
 ---
 
