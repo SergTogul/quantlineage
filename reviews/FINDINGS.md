@@ -390,7 +390,7 @@ Keep the current four-column dataset as an explicitly documented projection/demo
 Priority: **P0**  
 Risk types: PERFORMANCE, ARCHITECTURE, CORRECTNESS  
 Confidence: HIGH  
-Status: **CLOSED** (2026-09-09). R0.4.4 — one-pass `MarketSnapshot.apply` (stage all shocks, single `model_copy` / nested freeze). R0.4.5 — StressEngine / attribution scenario-once-price-many. R0.4.6 acceptance residual — structural proofs: multi-factor apply `model_copy` == 1 and freeze ∈ [1,2] for K≥5 (not O(K)); `StressEngine.run` / `evaluate` `apply_scenario` count == S for P×S (not P×S); contribution sum↔portfolio P&L + interaction residual already pinned in `test_scenario_attribution.py`. Evidence: `tests/test_market_snapshot.py::test_apply_freezes_once_not_per_factor`, `tests/test_stress.py` once-per-scenario + P×S counters, `tests/test_scenario_attribution.py` reconcile helpers / `test_single_factor_interaction_near_zero` / `test_risk_factor_contributions_reconcile_with_interaction`. Report: `reviews/r0.4.6-rf006-acceptance-report.md`. Wall-clock N×S pricing is the remaining cost of full reval (RF-007 **CLOSED**; P1 benches).
+Status: **CLOSED** (2026-09-09). R0.4.4 — one-pass `MarketSnapshot.apply` (stage all shocks, single `model_copy` / nested freeze). R0.4.5 — StressEngine / attribution scenario-once-price-many. R0.4.6 acceptance residual — structural proofs: multi-factor apply `model_copy` == 1 and freeze ∈ [1,2] for K≥5 (not O(K)); `StressEngine.run` / `evaluate` `apply_scenario` count == S for P×S (not P×S); contribution sum↔portfolio P&L + interaction residual already pinned in `test_scenario_attribution.py`. Evidence: `tests/test_market_snapshot.py::test_apply_freezes_once_not_per_factor`, `tests/test_stress.py` once-per-scenario + P×S counters, `tests/test_scenario_attribution.py` reconcile helpers / `test_single_factor_interaction_near_zero` / `test_risk_factor_contributions_reconcile_with_interaction`. Report: `reviews/r0.4.6-rf006-acceptance-report.md`. Wall-clock N×S pricing remains RF-007.
 
 Source findings:
 
@@ -433,7 +433,7 @@ Create the shocked snapshot once per scenario, not once per trade.
 
 ## RF-007 — Full revaluation and contribution paths reconstruct N×S QuantLib work
 
-Status: **CLOSED** (2026-09-09). QA close gate (`reviews/r0.6-rf007-close-gate-report.md`). R0.6.1–R0.6.6 APPROVE (`reviews/sdd-briefs/task-1-r0.6.3-review.md`, `task-2-r0.6.4-review.md`, `task-3-r0.6.6-review.md`, `task-4-r0.6.5-review.md`): stream shocked snapshots; one-pass scenario market (RF-006); QuantLib scalar-option reuse via live `SimpleQuote` handles; unique-shock valuation LRU bypass; factor contributions reuse joint P&L + O(N) Δ-Γ (not O(N×S×F) extra books); HEAVY `FULL_REVALUATION` is a RiskRun / Compose `worker` OS-process job (option B; no in-process QuantLib threads). Interactive default remains `DELTA_GAMMA`. Joint full-reval scaling is O(N×S) `value` calls, bounded out of the request thread. Goldens and R0.6.1 `pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f` unchanged. **P1 residuals (not blocking close):** N=100/1k wall/RSS/scenarios-sec/builtin-vs-QuantLib/warm-vs-cold matrix not recorded (R0.6.1 is 1 trade × 120 obs builtin identity + `wall_ms` only; not an SLA); intra-run scenario-block multiprocessing (option A) not implemented — scale-out is worker job replicas.
+Status: **IN PROGRESS** (2026-09-09). R0.6.1–R0.6.6 APPROVE (architecture in place: `reviews/sdd-briefs/task-1-r0.6.3-review.md`, `task-2-r0.6.4-review.md`, `task-3-r0.6.6-review.md`, `task-4-r0.6.5-review.md`): stream shocked snapshots; one-pass scenario market (RF-006); QuantLib scalar-option reuse via live `SimpleQuote` handles; unique-shock valuation LRU bypass; factor contributions reuse joint P&L + O(N) Δ-Γ (not O(N×S×F) extra books); HEAVY `FULL_REVALUATION` is a RiskRun / Compose `worker` OS-process job (option B; no in-process QuantLib threads). Interactive default remains `DELTA_GAMMA`. Close-gate **KEEP OPEN** (`reviews/r0.6-rf007-close-gate-report.md`). Residual: acceptance benches UNMET/PARTIAL — peak RSS, scenarios/sec, builtin vs QuantLib **UNMET**; N trades × S scenarios, wall time, and warm vs cold only **PARTIAL** at 1×120 builtin identity + `wall_ms` (`pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`). Record N=100/1k (and S=50/750/1k where practical) wall, peak RSS, scenarios/sec, builtin vs QuantLib, warm vs cold; identity checksum stays; no SLA. Option A intra-run scenario-block multiprocessing remains PARTIAL (may stay P1 after benches). Do not close.
 
 Priority: **P0**  
 Risk types: PERFORMANCE, OPERABILITY, ARCHITECTURE  
@@ -480,7 +480,7 @@ Benchmark and record:
 
 Do not set a fake universal SLA until benchmark environments are controlled.
 
-Close-gate (2026-09-09): required direction met (process-partition bullet **PARTIAL**: option B job process, not intra-run chunks). Numerical identity **met**. Bench matrix beyond 1×120 builtin `wall_ms` is the P1 residual above. No SLA.
+Close-gate (2026-09-09): required direction 6 MET, 1 PARTIAL (option B job process, not intra-run chunks). Numerical identity **met**. Acceptance benches required for close remain UNMET/PARTIAL (RSS / scenarios/sec / builtin vs QuantLib UNMET; N×S / wall / warm-cold PARTIAL at 1×120 builtin). No SLA. **KEEP OPEN.**
 
 ---
 
