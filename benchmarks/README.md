@@ -146,12 +146,19 @@ Benchmark scripts stay separate from product unit tests; equivalence stays in
 `backend/tests/test_native_kernel.py` and Historical VaR parity in
 `backend/tests/test_historical_scenario_kernel.py`.
 
-## FULL_REVALUATION baseline (R0.6.1)
+## FULL_REVALUATION baseline (R0.6.1 / R0.6.7)
 
 `run_full_reval_bench.py` records a **checksum/impl identity** on the nightly
 120-obs unit-equity sample (shocked PV − base PV). `wall_ms` is printed for
 operators and is **not** a host SLA. Do not invoke `check_m6_sla.py`. Do not
 treat a positive throughput reading as a floor.
+
+R0.6.7 adds a nested `acceptance` object at PR-safe **N=10 × S=50** (above
+1×120): `peak_rss_kib`, `scenarios_per_sec`, `wall_ms_cold` / `wall_ms_warm`,
+and builtin vs QuantLib at the same N×S. QuantLib is skip-or-run (fail-closed
+when `RISKFORGE_REQUIRE_QUANTLIB=1`). Pytest asserts those values are finite
+numbers, not floors. Operators may pass `--acceptance-n` / `--acceptance-s`;
+do not use N=1000 in PR CI.
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python benchmarks/run_full_reval_bench.py --json
