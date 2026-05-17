@@ -24,6 +24,7 @@ NIGHTLY_JOB_IDS = (
     "full-reval-sample",
     "quantlib-e2e",
     "hierarchy-benchmark",
+    "full-reval-n100",
 )
 
 
@@ -78,6 +79,7 @@ def test_pr_full_needs_does_not_include_nightly():
     assert not leaked_ids, f"PR-FULL needs: must not include nightly job ids; found {leaked_ids}"
     assert "quantlib-e2e" not in needed
     assert "hierarchy-benchmark" not in needed
+    assert "full-reval-n100" not in needed
     assert not re.search(r"(?im)^      - \S*nightly", block), (
         "PR-FULL needs: list must not name a nightly job id"
     )
@@ -234,3 +236,32 @@ def test_hierarchy_bench_script_is_identity_not_sla():
     assert "2a51c37798de149329b37c58729c13302de6f902bcc26e3316542dab12537d1d" in text
     assert "EXPECTED_N_NODES" in text
     assert "EXPECTED_MARKET_VALUE" in text
+
+
+def test_nightly_runs_full_reval_n100():
+    text = _text(NIGHTLY_YML)
+    block = _job_block(text, "full-reval-n100")
+    assert "tests/test_nightly_full_reval_n100.py" in block
+    assert "RISKFORGE_NIGHTLY" in block
+    assert "continue-on-error" not in block
+    assert "echo-only" not in block.lower()
+    assert "check_m6_sla.py" not in block
+    assert not re.search(r"wall_ms\s*[><]=?\s*\d", block)
+    assert not re.search(r"peak_rss_kib\s*[><]=?\s*\d", block)
+    assert not re.search(r"throughput\s*>\s*0", block)
+    assert "SLA-sized" not in block
+
+
+def test_nightly_full_reval_n100_is_identity_not_sla():
+    path = REPO_ROOT / "backend" / "tests" / "test_nightly_full_reval_n100.py"
+    assert path.is_file(), "expected backend/tests/test_nightly_full_reval_n100.py"
+    text = path.read_text(encoding="utf-8")
+    assert "RISKFORGE_NIGHTLY" in text
+    assert "skipif" in text
+    assert "n_positions" in text
+    assert "100" in text
+    assert "50" in text
+    assert not re.search(r"(?m)^\s*(import |from ).*check_m6_sla", text)
+    assert not re.search(r"check_m6_sla\.py\s", text)
+    assert not re.search(r"throughput\s*>\s*0", text)
+    assert not re.search(r"wall_ms\s*[><]=?\s*\d", text)
