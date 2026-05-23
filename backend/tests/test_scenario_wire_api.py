@@ -27,6 +27,7 @@ from app.main import app
 from app.market.snapshot import shock_snapshot
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import EquitySpot, EquityVol, RateZero
+from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import (
     FactorShock,
     Scenario,
@@ -35,7 +36,6 @@ from app.risk.scenario_model import (
     scenario_from_stress,
     scenario_to_stress,
 )
-from app.risk.scenario_engine import apply_scenario
 from app.risk.stress import StressEngine
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 

@@ -15,19 +15,19 @@ from app.domain.models import (
     InterestRateFuturePosition,
     SwapPosition,
 )
+from app.market.demo_snapshot import MissingMarketDataError
 from app.persistence.session import session_scope
 from app.persistence.sqlalchemy_repos import SqlAlchemyPortfolioRepository
 from app.pricing.builtin import BuiltinPricingEngine
-from app.market.demo_snapshot import MissingMarketDataError
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.sample import (
+    _DEMO_AGGREGATE_MARKETS,
     CROSS_ASSET_PORTFOLIO,
     DEMO_PORTFOLIOS,
     DEMO_PORTFOLIOS_BY_ID,
     EQUITY_VOL_PORTFOLIO,
     RATES_MACRO_PORTFOLIO,
     SAMPLE_PORTFOLIO,
-    _DEMO_AGGREGATE_MARKETS,
     demo_aggregate_market_snapshot,
     demo_market_snapshot,
     demo_portfolio_summaries,

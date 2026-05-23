@@ -17,7 +17,8 @@ from __future__ import annotations
 import time
 from uuid import uuid4
 
-import pytest
+from tests.market_fixtures import FixedMarketProvider, equity_spot_market
+from tests.test_postgres_two_worker import require_live_postgres
 
 from app.domain.models import EquityPosition, Portfolio, RiskRunStatus
 from app.persistence.session import (
@@ -38,15 +39,13 @@ from app.services.risk_factories import (
     resolve_run_spec,
 )
 from app.services.risk_run_worker import RiskRunWorker, execute_run_type
-from tests.market_fixtures import FixedMarketProvider, equity_spot_market
-from tests.test_postgres_two_worker import require_live_postgres
 
 
 def _factory():
     engine = create_engine_from_url(require_live_postgres(), echo=False)
     # Ensure schema exists for local docker without requiring alembic migrate.
-    from app.persistence.base import Base
     from app.persistence import models as _models  # noqa: F401
+    from app.persistence.base import Base
 
     Base.metadata.create_all(engine)
     return create_session_factory(engine=engine)

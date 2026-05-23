@@ -9,15 +9,19 @@ Conventions:
 - Tolerances: abs 1e-9 for zero-shock; relative separation for options book
 """
 from __future__ import annotations
+
 import numpy as np
+
 from app.domain.models import EuropeanOptionPosition, MarketSnapshot, Portfolio, VaRMethodology
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.var import VaRAnalytics
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 from app.services.portfolio_service import PortfolioService
+
 
 def _zero_series(n: int=20) -> FactorObservationSeries:
     z = np.zeros(n)
@@ -90,12 +94,12 @@ def test_var_report_exposes_methodology_and_reconciles_contributions():
     report = VaRAnalytics(dataset=dataset).report(_option_book(), pricing, confidence=0.9, methodology=VaRMethodology.FULL_REVALUATION, market=_option_market())
     assert report.methodology == VaRMethodology.FULL_REVALUATION
     assert {m.method for m in report.methods} == {'historical', 'parametric'}
-    hist = next((m for m in report.methods if m.method == 'historical'))
+    hist = next(m for m in report.methods if m.method == 'historical')
     assert hist.var >= 0.0
     assert hist.expected_shortfall >= hist.var
-    pvar = next((m for m in report.methods if m.method == 'parametric')).var
+    pvar = next(m for m in report.methods if m.method == 'parametric').var
     if pvar > 0:
-        assert abs(sum((c.contribution_pct for c in report.contributions)) - 100.0) < 1e-06
+        assert abs(sum(c.contribution_pct for c in report.contributions) - 100.0) < 1e-06
 
 def test_service_and_api_default_methodology():
     svc = PortfolioService(BuiltinPricingEngine(), HistoricalRiskEngine(seed=2, observations=40))

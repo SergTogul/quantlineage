@@ -1,13 +1,25 @@
 """M7.5: API errors use ``{code, message, details}`` on legacy and /api/v1 paths."""
 from __future__ import annotations
+
 from typing import Any
+
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from app.api.errors import ErrorBody, body_from_http_exception, body_from_validation_error, body_internal_error, code_for_status, error_payload, register_exception_handlers
+
+from app.api.errors import (
+    ErrorBody,
+    body_from_http_exception,
+    body_from_validation_error,
+    body_internal_error,
+    code_for_status,
+    error_payload,
+    register_exception_handlers,
+)
 from app.domain.models import EquityPosition, Portfolio
+
 
 def _assert_error_shape(body: dict[str, Any]) -> None:
     assert set(body.keys()) == {'code', 'message', 'details'}

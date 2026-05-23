@@ -8,17 +8,27 @@ not altered.
 Tolerances: exact snapshot hashes; P&L atol 1e-12 (same as R0.1.4 goldens).
 """
 from __future__ import annotations
+
 import inspect
 import re
 from collections.abc import Iterator
+
 import numpy as np
 import pytest
+
 from app.domain.models import EquityPosition, MarketSnapshot, Portfolio, VaRMethodology
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine, full_revaluation_pnl_series
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
-from app.risk.scenarios import historical_market_scenarios, historical_shocked_snapshots, iter_historical_shocked_snapshots, iter_shocked_snapshots, shocked_snapshots
+from app.risk.scenarios import (
+    historical_market_scenarios,
+    historical_shocked_snapshots,
+    iter_historical_shocked_snapshots,
+    iter_shocked_snapshots,
+    shocked_snapshots,
+)
 from app.risk.var import VaRAnalytics
+
 
 def _base_snapshot() -> MarketSnapshot:
     return MarketSnapshot(id='base', equity_spots={'SPY': 100.0, 'NVDA': 200.0}, equity_vols={'SPY': 0.2}, fx_spots={'EURUSD': 1.1}, fx_vols={'EURUSD': 0.12}, rates={'USD': 0.04, 'EUR': 0.03})

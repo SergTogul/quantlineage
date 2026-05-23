@@ -33,14 +33,12 @@ from __future__ import annotations
 
 import ctypes
 import math
-import os
 import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
-
 import numpy as np
+import pytest
 
 from app.compute.kernel import (
     KERNEL_ABI_ABS_TOL,
@@ -57,6 +55,7 @@ from app.compute.kernel import (
     PythonScenarioKernel,
     Shock,
 )
+
 
 def _approx(actual, expected):
     return actual == pytest.approx(
@@ -440,7 +439,7 @@ def test_native_tiny_workload_matches_python_with_many_threads(native_scenario_l
     native = NativeScenarioKernel(native_scenario_lib)
     exposures = [Exposure(1000, 200, 30, -10, 500)]
     shocks = [Shock(-0.01 + 0.0001 * k, 2.0, 5.0, -0.002) for k in range(64)]
-    assert 1 * 64 < KERNEL_PARALLEL_MIN_WORK
+    assert KERNEL_PARALLEL_MIN_WORK > 1 * 64
     expected = PythonScenarioKernel().pnl(exposures, shocks)
     assert _approx(native.pnl(exposures, shocks), expected)
     e = np.array([[1000.0, 200.0, 30.0, -10.0, 500.0]], dtype=np.float64)

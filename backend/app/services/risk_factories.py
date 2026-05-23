@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from app.domain.models import (
+    AsOfLabel,
     RiskRun,
     RiskRunCalculationConfig,
     RiskRunRequestBody,

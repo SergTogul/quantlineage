@@ -1,13 +1,17 @@
 """R0.2 Phase B — QuantLib value() prices from InstrumentTerms + snapshot only."""
 from __future__ import annotations
+
 from datetime import date
+
 import pytest
 from pydantic import ValidationError
 from tests.quantlib_gate import import_quantlib
+
 ql = import_quantlib()
 from app.domain.instrument_terms import EquityTerms, terms_from_position
 from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot
 from app.pricing.quantlib import QuantLibPricingEngine
+
 
 @pytest.fixture
 def engine():

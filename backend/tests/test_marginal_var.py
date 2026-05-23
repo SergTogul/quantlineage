@@ -14,15 +14,25 @@ Conventions:
 - Tolerances: analytical equality abs 1e-9; FD vs analytical rel 5e-2 / abs 1e-4
 """
 from __future__ import annotations
+
 import math
+
 import numpy as np
-from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot, Portfolio, VaRMethodology
+from tests.market_fixtures import equity_spots_market
+
+from app.domain.models import (
+    EquityPosition,
+    EuropeanOptionPosition,
+    MarketSnapshot,
+    Portfolio,
+    VaRMethodology,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.marginal_var import finite_difference_marginal_var, parametric_marginal_vars
 from app.risk.var import VaRAnalytics
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
-from tests.market_fixtures import equity_spots_market
+
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 def _mixed_series(n: int=100) -> FactorObservationSeries:
@@ -39,14 +49,14 @@ def test_marginal_var_equals_component_at_unit_weights_delta_gamma():
     pricing = BuiltinPricingEngine()
     book = _book()
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(book, pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA, market=_mvar_market())
-    assert all((hasattr(c, 'marginal_var') for c in report.contributions))
+    assert all(hasattr(c, 'marginal_var') for c in report.contributions)
     for c in report.contributions:
         assert math.isclose(c.marginal_var, c.component_var, rel_tol=1e-09, abs_tol=1e-09)
 
 def test_marginal_var_equals_component_under_full_revaluation():
     pricing = BuiltinPricingEngine()
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(SAMPLE_PORTFOLIO, pricing, confidence=0.95, methodology=VaRMethodology.FULL_REVALUATION, market=SAMPLE_MARKET)
-    pvar = next((m.var for m in report.methods if m.method == 'parametric'))
+    pvar = next(m.var for m in report.methods if m.method == 'parametric')
     assert pvar > 0
     for c in report.contributions:
         assert math.isclose(c.marginal_var, c.component_var, rel_tol=1e-09, abs_tol=1e-09)
@@ -69,4 +79,4 @@ def test_zero_risk_portfolio_has_zero_marginal_var():
     series = FactorObservationSeries(equity_returns=z.copy(), vol_moves=z.copy(), rate_moves_bps=z.copy(), fx_returns=z.copy())
     book = _book()
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(series)).report(book, BuiltinPricingEngine(), methodology=VaRMethodology.DELTA_GAMMA, market=_mvar_market())
-    assert all((c.marginal_var == 0.0 for c in report.contributions))
+    assert all(c.marginal_var == 0.0 for c in report.contributions)

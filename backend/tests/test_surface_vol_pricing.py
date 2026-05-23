@@ -8,12 +8,20 @@ Conventions
   pricing always reads the grid payload when attached.
 """
 from __future__ import annotations
+
 import pytest
+
 from app.domain.models import EuropeanOptionPosition, FXOptionPosition, MarketSnapshot
-from app.market.vol_surfaces import VolSurface, attach_vol_surface, build_equity_vol_surface, build_fx_vol_surface
+from app.market.vol_surfaces import (
+    VolSurface,
+    attach_vol_surface,
+    build_equity_vol_surface,
+    build_fx_vol_surface,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.surface_vol import option_vol_from_snapshot
 from app.risk.factor_types import EquityVol, FXVol
+
 try:
     from app.pricing.quantlib import QuantLibPricingEngine
     _ql_engine = QuantLibPricingEngine()

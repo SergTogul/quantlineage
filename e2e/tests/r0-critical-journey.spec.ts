@@ -8,7 +8,7 @@ import { expect, test } from '@playwright/test'
  *
  * Asserts UI → API → rendered results only. Does not invent or pin dollar VaR/ES.
  * Request units (display % / bp → API decimal / bp) are captured where they matter.
- * Hedge change is `base_var_99 !== hedged_var_99` from POST /risk/stress/compare JSON.
+ * Hedge change is `base_var_99 !== hedged_var_99` from POST /risk/stress/formal/compare JSON.
  */
 
 const MAIN = { name: 'Main' }
@@ -120,10 +120,12 @@ test.describe('R0.12.3 critical journey', () => {
     await hedge.getByLabel('hedge methodology').selectOption('DELTA_GAMMA')
 
     const hedgeRequest = page.waitForRequest((req) =>
-      isPostPath(req.url(), req.method(), '/api/v1/risk/stress/compare'),
+      isPostPath(req.url(), req.method(), '/api/v1/risk/stress/formal/compare'),
     )
     const hedgeResponse = page.waitForResponse(
-      (res) => isPostPath(res.url(), res.request().method(), '/api/v1/risk/stress/compare') && res.ok(),
+      (res) =>
+        isPostPath(res.url(), res.request().method(), '/api/v1/risk/stress/formal/compare') &&
+        res.ok(),
     )
     await hedge.getByRole('button', { name: 'Compare hedge' }).click()
     const hedgePost = await hedgeRequest

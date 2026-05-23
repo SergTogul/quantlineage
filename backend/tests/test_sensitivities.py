@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 
 import pytest
+from tests.market_fixtures import equity_spot_market, fx_market, usd_rate_market
 
 from app.domain.models import (
     BondPosition,
@@ -25,7 +26,6 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, RateZero
 from app.risk.sensitivities import FUTURE_MEASURES, SensitivityEngine
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
-from tests.market_fixtures import equity_spot_market, fx_market, usd_rate_market
 
 pricing = BuiltinPricingEngine()
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)

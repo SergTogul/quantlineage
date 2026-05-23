@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from tests.quantlib_gate import import_quantlib
 
 from app.domain.models import (
     EquityFuturePosition,
@@ -12,14 +13,12 @@ from app.domain.models import (
     WhatIfRequest,
 )
 from app.market.demo_snapshot import (
-    ConflictingSampleMarkError,
     MissingMarketDataError,
 )
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
-from tests.quantlib_gate import import_quantlib
 
 
 def _eq_m(spot, *, symbol="ABC", rate=0.04, vol=None, div=0.0):

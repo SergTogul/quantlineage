@@ -1,11 +1,21 @@
 """R0.11.2 / SEC-006: reject non-finite financial scalars at the domain/API boundary."""
 from __future__ import annotations
+
 import json
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from app.domain.models import EquityPosition, EuropeanOptionPosition, FXForwardPosition, MarketSnapshot, Portfolio
+
+from app.domain.models import (
+    EquityPosition,
+    EuropeanOptionPosition,
+    FXForwardPosition,
+    MarketSnapshot,
+    Portfolio,
+)
 from app.sample import DEMO_PORTFOLIOS, SAMPLE_PORTFOLIO
+
 
 def _equity(*, quantity: float=10.0, price: float=100.0) -> EquityPosition:
     return EquityPosition(type='equity', id='eq-1', symbol='AAPL', quantity=quantity, price=price)

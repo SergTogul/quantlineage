@@ -1,10 +1,13 @@
 """R0.2 Phase B — Builtin value() prices from InstrumentTerms + snapshot only."""
 from __future__ import annotations
+
 import pytest
 from pydantic import ValidationError
+
 from app.domain.instrument_terms import EquityTerms, terms_from_position
 from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot
 from app.pricing.builtin import BuiltinPricingEngine
+
 
 @pytest.fixture
 def engine():

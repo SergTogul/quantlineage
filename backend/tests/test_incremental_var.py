@@ -7,15 +7,18 @@ Conventions:
 - Tolerance: abs 1e-9 vs independent before/after calculate()
 """
 from __future__ import annotations
+
 import math
+
 import pytest
+from tests.market_fixtures import equity_spot_market
+
 from app.domain.models import EquityPosition, Portfolio, VaRMethodology
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.incremental_var import apply_what_if_changes, incremental_var
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
-from tests.market_fixtures import equity_spot_market
-from tests.market_fixtures import equity_spot_market
+
 _TOL = 1e-09
 _SEED = 7
 _OBS = 80
@@ -34,16 +37,16 @@ def test_apply_add_does_not_mutate_base_portfolio():
     assert len(base.positions) == n_before
     assert [p.id for p in base.positions] == ids_before
     assert len(after.positions) == n_before + 1
-    assert any((p.id == 'eq-hypo' for p in after.positions))
+    assert any(p.id == 'eq-hypo' for p in after.positions)
 
 def test_apply_remove_and_modify():
     base = SAMPLE_PORTFOLIO
     removed = apply_what_if_changes(base, [{'operation': 'remove', 'position_id': 'eq-spy'}])
-    assert all((p.id != 'eq-spy' for p in removed.positions))
+    assert all(p.id != 'eq-spy' for p in removed.positions)
     assert len(removed.positions) == len(base.positions) - 1
     modified_pos = _new_equity('eq-spy', quantity=50.0)
     modified = apply_what_if_changes(base, [{'operation': 'modify', 'position_id': 'eq-spy', 'position': modified_pos}])
-    spy = next((p for p in modified.positions if p.id == 'eq-spy'))
+    spy = next(p for p in modified.positions if p.id == 'eq-spy')
     assert spy.quantity == 50.0
     assert len(modified.positions) == len(base.positions)
 

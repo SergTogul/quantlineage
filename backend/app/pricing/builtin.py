@@ -30,12 +30,12 @@ from app.pricing.curve_rates import (
     required_continuous_zero,
     required_ir_future_quote,
 )
-from app.risk.historical import require_explicit_market
 from app.pricing.surface_vol import (
     required_equity_option_vol,
     required_fx_option_vol,
     required_ir_option_vol,
 )
+from app.risk.historical import require_explicit_market
 
 _N = NormalDist()
 def _cdf(x: float) -> float: return _N.cdf(x)

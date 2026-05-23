@@ -1,19 +1,42 @@
 """M5.6: optional FastAPI persistence DI via RISKFORGE_DATABASE_URL."""
 from __future__ import annotations
+
 import time
+
 import pytest
 from fastapi import Depends
 from fastapi.testclient import TestClient
-from app.api.deps import get_default_market_snapshot, get_limit_definition_repository, get_market_snapshot_repository, get_scenario_definition_repository
+from tests.market_fixtures import FixedMarketProvider, equity_spot_market
+
+from app.api.deps import (
+    get_default_market_snapshot,
+    get_limit_definition_repository,
+    get_market_snapshot_repository,
+    get_scenario_definition_repository,
+)
 from app.domain.models import EquityPosition, Portfolio, RiskRunStatus
 from app.persistence.config import get_configured_database_url
-from app.persistence.repositories import LimitDefinitionRepository, MarketSnapshotRepository, ScenarioDefinitionRepository
+from app.persistence.repositories import (
+    LimitDefinitionRepository,
+    MarketSnapshotRepository,
+    ScenarioDefinitionRepository,
+)
 from app.persistence.session import session_scope
-from app.persistence.sqlalchemy_repos import SqlAlchemyLimitDefinitionRepository, SqlAlchemyMarketSnapshotRepository, SqlAlchemyPortfolioRepository, SqlAlchemyRiskRunRepository, SqlAlchemyScenarioDefinitionRepository
-from app.persistence.wiring import DEFAULT_MARKET_SNAPSHOT_ID, default_limit_id, default_seed_scenarios
+from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyLimitDefinitionRepository,
+    SqlAlchemyMarketSnapshotRepository,
+    SqlAlchemyPortfolioRepository,
+    SqlAlchemyRiskRunRepository,
+    SqlAlchemyScenarioDefinitionRepository,
+)
+from app.persistence.wiring import (
+    DEFAULT_MARKET_SNAPSHOT_ID,
+    default_limit_id,
+    default_seed_scenarios,
+)
 from app.risk.limits import DEFAULT_LIMITS
 from app.sample import SAMPLE_PORTFOLIO
-from tests.market_fixtures import FixedMarketProvider, equity_spot_market
+
 
 @pytest.fixture
 def clear_db_url(monkeypatch):
@@ -83,7 +106,7 @@ def test_default_risk_runs_use_memory_without_database_url(clear_db_url, tiny_po
     from app.api import deps
     from app.main import app
     previous = deps.portfolio_service.market_data
-    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market("AAPL", 190.0))
+    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market("SPY", 190.0))
     try:
         with TestClient(app) as client:
             created = client.post('/risk/runs', json={'portfolio': tiny_portfolio.model_dump(mode='json'), 'run_type': 'summary'})
@@ -98,7 +121,7 @@ def test_default_risk_runs_use_memory_without_database_url(clear_db_url, tiny_po
 
 @pytest.fixture
 def tiny_portfolio() -> Portfolio:
-    return Portfolio(id='di-async-book', name='DI Async Book', positions=[EquityPosition(type='equity', id='eq-di-1', symbol='AAPL', quantity=10)])
+    return Portfolio(id='di-async-book', name='DI Async Book', positions=[EquityPosition(type='equity', id='eq-di-1', symbol='SPY', quantity=10)])
 
 def _wait_terminal(client: TestClient, run_id: str, *, timeout_s: float=30.0) -> dict:
     deadline = time.time() + timeout_s
@@ -120,7 +143,7 @@ def test_database_url_wires_sqlalchemy_portfolio_and_risk_runs(monkeypatch, tmp_
     from app.api import deps
     from app.main import app
     previous = deps.portfolio_service.market_data
-    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market("AAPL", 190.0))
+    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market("SPY", 190.0))
     try:
         with TestClient(app) as client:
             assert client.app.state.persistence_enabled is True

@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import pytest
 from pydantic import ValidationError
+
 from app.domain.models import BondPosition, Portfolio, SwapPosition
 from app.market.demo_snapshot import DemoSampleMarksSnapshotAdapter, SampleMarksRemovedError
 from app.market.snapshot import PositionMarketDataProvider
@@ -8,6 +10,7 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.sample import RATES_MACRO_PORTFOLIO, SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
+
 
 def _usd_rate_book(*, reverse: bool=False) -> Portfolio:
     """Economics-only USD bond+swap book (marks no longer embeddable on Position)."""
@@ -114,7 +117,7 @@ def test_portfolio_service_threads_one_resolved_snapshot_to_dashboard_paths() ->
     service.demo_attribution(SAMPLE_PORTFOLIO)
     assert len(calls) == after_limits + 2
     assert calls[-1] == SAMPLE_PORTFOLIO.id
-    assert all((portfolio_id == SAMPLE_PORTFOLIO.id for portfolio_id in calls))
+    assert all(portfolio_id == SAMPLE_PORTFOLIO.id for portfolio_id in calls)
 
 def _flat_spy_hedge(*, portfolio_id: str | None=None) -> Portfolio:
     hedge = SAMPLE_PORTFOLIO.model_copy(deep=True)
@@ -150,8 +153,8 @@ def test_compare_stress_and_var_legs_use_same_base_snapshot(monkeypatch) -> None
     assert stress_markets and var_markets
     shared = stress_markets[0]
     assert shared is not None
-    assert all((market is shared for market in stress_markets))
-    assert all((market is shared for market in var_markets))
+    assert all(market is shared for market in stress_markets)
+    assert all(market is shared for market in var_markets)
     assert shared.id == demo_market_snapshot(SAMPLE_PORTFOLIO).id
 
 def test_compare_does_not_call_adapter_on_sample(monkeypatch) -> None:
