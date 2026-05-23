@@ -117,7 +117,8 @@ class _FourMacroDemoLabels:
 class HistoricalMarketDataset(Protocol):
     """Source of historical factor observations for risk engines."""
 
-    projection: HistoricalDatasetProjection
+    @property
+    def projection(self) -> HistoricalDatasetProjection: ...
 
     def factor_observations(self) -> FactorObservationSeries:
         """Return aligned factor move series (deterministic for a given source)."""

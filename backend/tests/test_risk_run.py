@@ -1,13 +1,29 @@
 """M5.2 RiskRun domain DTO validation and persistence mapping."""
 from __future__ import annotations
+
 from datetime import UTC, datetime, timedelta
+
 import pytest
 from pydantic import ValidationError
-from app.domain.models import EquityPosition, MarketSnapshot, Portfolio, RiskResultRef, RiskRun, RiskRunStatus, VaRMethodology
+
+from app.domain.models import (
+    EquityPosition,
+    MarketSnapshot,
+    Portfolio,
+    RiskResultRef,
+    RiskRun,
+    RiskRunStatus,
+    VaRMethodology,
+)
 from app.persistence.risk_run_mapping import apply_risk_run_to_row, risk_run_to_row, row_to_risk_run
 from app.persistence.session import session_scope
-from app.persistence.sqlalchemy_repos import SqlAlchemyMarketSnapshotRepository, SqlAlchemyPortfolioRepository, SqlAlchemyRiskRunRepository
+from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyMarketSnapshotRepository,
+    SqlAlchemyPortfolioRepository,
+    SqlAlchemyRiskRunRepository,
+)
 from app.persistence.testing import make_sqlite_session_factory
+
 UTC = UTC
 
 def _ts(hour: int=12, minute: int=0) -> datetime:

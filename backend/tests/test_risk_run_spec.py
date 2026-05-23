@@ -3,19 +3,40 @@
 Does not close RF-009 (server-owned identity and typed request schemas remain).
 """
 from __future__ import annotations
+
 from datetime import UTC, date, datetime
+
 import pytest
 from pydantic import ValidationError
-from app.domain.models import EquityPosition, MarketSnapshot, Portfolio, RiskRun, RiskRunCalculationConfig, RiskRunStatus, RiskRunView, VaRMethodology
+
+from app.domain.models import (
+    EquityPosition,
+    MarketSnapshot,
+    Portfolio,
+    RiskRun,
+    RiskRunCalculationConfig,
+    RiskRunStatus,
+    RiskRunView,
+    VaRMethodology,
+)
 from app.persistence.memory_repos import InMemoryRiskRunRepository
 from app.persistence.models import RiskRunRow
 from app.persistence.risk_run_mapping import risk_run_to_row, row_to_risk_run
 from app.persistence.session import session_scope
-from app.persistence.sqlalchemy_repos import SqlAlchemyMarketSnapshotRepository, SqlAlchemyPortfolioRepository, SqlAlchemyRiskRunRepository
+from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyMarketSnapshotRepository,
+    SqlAlchemyPortfolioRepository,
+    SqlAlchemyRiskRunRepository,
+)
 from app.persistence.testing import make_sqlite_session_factory
-from app.services.risk_factories import DEFAULT_HISTORICAL_DATASET_VERSION, build_portfolio_service, resolve_run_spec
+from app.services.risk_factories import (
+    DEFAULT_HISTORICAL_DATASET_VERSION,
+    build_portfolio_service,
+    resolve_run_spec,
+)
 from app.services.risk_run_service import RiskRunService
 from app.services.risk_run_worker import RiskRunWorker
+
 
 def _ts() -> datetime:
     return datetime(2026, 9, 3, 12, 0, tzinfo=UTC)
@@ -207,7 +228,7 @@ def test_submit_without_request_spec_records_factory_dataset():
     stored = repo.get(view.id)
     assert stored is not None
     populated = [stored.historical_dataset_id, stored.historical_dataset_version, stored.as_of, stored.calculation_config]
-    assert any((value is not None for value in populated))
+    assert any(value is not None for value in populated)
     assert stored.historical_dataset_id == factory_spec.historical_dataset_id
     assert stored.calculation_config is not None
     assert factory_spec.calculation_config is not None

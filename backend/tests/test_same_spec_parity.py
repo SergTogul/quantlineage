@@ -12,6 +12,7 @@ import time
 from typing import Any
 
 import pytest
+from tests.market_fixtures import FixedMarketProvider, equity_spot_market
 
 from app.domain.models import EquityPosition, Portfolio, RiskRunStatus
 from app.persistence.models import RiskRunRow
@@ -28,7 +29,6 @@ from app.services.risk_factories import (
     resolve_run_spec,
 )
 from app.services.risk_run_worker import RiskRunWorker, execute_run_type
-from tests.market_fixtures import FixedMarketProvider, equity_spot_market
 
 
 def _book(portfolio_id: str = "parity-book") -> Portfolio:

@@ -18,13 +18,22 @@ Conventions:
 - Tolerance: exact on controlled vectors (abs 1e-12)
 """
 from __future__ import annotations
+
 import numpy as np
 import pytest
-from app.domain.models import EquityPosition, HierarchyLevel, HierarchyRef, MarketSnapshot, Portfolio
+from tests.market_fixtures import equity_spots_market
+
+from app.domain.models import (
+    EquityPosition,
+    HierarchyLevel,
+    HierarchyRef,
+    MarketSnapshot,
+    Portfolio,
+)
 from app.risk.hierarchy import HierarchyEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.trade_artifacts import TradeCalculationArtifact
-from tests.market_fixtures import equity_spots_market
+
 ABS_TOL = 1e-12
 
 class _ForbiddenPricing:

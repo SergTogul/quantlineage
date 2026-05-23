@@ -1,15 +1,23 @@
 """RF-014 / R0.11.4: failed risk HTTP and risk-run errors must not leak internals."""
 from __future__ import annotations
+
 import time
 from typing import Any
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from app.api.deps import get_portfolio_service
-from app.api.errors import PUBLIC_BAD_REQUEST_MESSAGE, PUBLIC_RISK_RUN_FAILURE_MESSAGE, register_exception_handlers
+from app.api.errors import (
+    PUBLIC_BAD_REQUEST_MESSAGE,
+    PUBLIC_RISK_RUN_FAILURE_MESSAGE,
+    register_exception_handlers,
+)
 from app.domain.models import EquityPosition, Portfolio, RiskRunStatus
 from app.main import app
 from app.persistence.memory_repos import InMemoryRiskRunRepository
 from app.services.risk_run_worker import RiskRunWorker
+
 _LEAK = 'QuantLib::Error: file /secret/ql/errors.cpp:42 cannot price XYZ'
 
 def _assert_error_shape(body: dict[str, Any]) -> None:

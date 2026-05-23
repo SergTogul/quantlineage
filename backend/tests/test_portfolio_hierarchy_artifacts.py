@@ -20,6 +20,7 @@ import math
 
 import numpy as np
 import pytest
+from tests.market_fixtures import FixedMarketProvider, equity_spots_market
 
 from app.domain.models import EquityPosition, HierarchyNode, MarketSnapshot, Portfolio
 from app.pricing.builtin import BuiltinPricingEngine
@@ -27,7 +28,6 @@ from app.risk.historical import HistoricalRiskEngine, approximate_pnl_series
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.risk.trade_artifacts import TradeCalculationArtifact
 from app.services.portfolio_service import PortfolioService
-from tests.market_fixtures import FixedMarketProvider, equity_spots_market
 
 _ADDITIVE_NODE = ("market_value", "delta", "gamma", "vega", "dv01", "fx_delta")
 _N_DEFAULT_SCENARIOS = len(DEFAULT_SCENARIOS)

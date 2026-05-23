@@ -1,12 +1,27 @@
 """M5.3 risk-run lifecycle: valid transitions, illegal rejects, duration."""
 from __future__ import annotations
+
 from datetime import UTC, datetime, timedelta
+
 import pytest
+
 from app.domain.models import EquityPosition, Portfolio, RiskRun, RiskRunStatus
 from app.persistence.session import session_scope
-from app.persistence.sqlalchemy_repos import SqlAlchemyPortfolioRepository, SqlAlchemyRiskRunRepository
+from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyPortfolioRepository,
+    SqlAlchemyRiskRunRepository,
+)
 from app.persistence.testing import make_sqlite_session_factory
-from app.services.risk_run_service import ALLOWED_TRANSITIONS, InvalidRiskRunTransition, RiskRunNotFound, RiskRunService, assert_transition_allowed, can_transition, elapsed_seconds
+from app.services.risk_run_service import (
+    ALLOWED_TRANSITIONS,
+    InvalidRiskRunTransition,
+    RiskRunNotFound,
+    RiskRunService,
+    assert_transition_allowed,
+    can_transition,
+    elapsed_seconds,
+)
+
 
 @pytest.fixture
 def session_factory():

@@ -9,12 +9,20 @@ Conventions
   leave off-pillar bumps ~flat (true isolation vs parallel).
 """
 from __future__ import annotations
+
 import math
+
 import pytest
+
 from app.domain.models import BondPosition, InterestRateFuturePosition, MarketSnapshot, SwapPosition
-from app.market.curves import CurveBootstrapInstrument, attach_bootstrapped_curve, attach_standard_usd_curves
+from app.market.curves import (
+    CurveBootstrapInstrument,
+    attach_bootstrapped_curve,
+    attach_standard_usd_curves,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import RateZero
+
 builtin = BuiltinPricingEngine()
 
 def _bond_10y() -> BondPosition:

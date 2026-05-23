@@ -1,11 +1,18 @@
 """M4.4 risk-change attribution invariants and driver tests."""
 from __future__ import annotations
-from app.domain.models import EquityPosition, Portfolio, RiskChangeAttributionRequest, VaRMethodology
+
+from app.domain.models import (
+    EquityPosition,
+    Portfolio,
+    RiskChangeAttributionRequest,
+    VaRMethodology,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.risk_attribution import RiskChangeAttributionEngine
 from app.sample import SAMPLE_PORTFOLIO, DemoPortfolioMarketDataProvider, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
+
 _ABS_TOL = 1e-06
 _REL_TOL = 1e-08
 
@@ -29,7 +36,7 @@ def test_drivers_reconcile_to_total_change():
     previous = demo_market_snapshot(SAMPLE_PORTFOLIO)
     current = previous.model_copy(update={'id': 'shocked', 'equity_spots': {k: v * 0.92 for k, v in previous.equity_spots.items()}, 'equity_vols': {k: v * 1.15 for k, v in previous.equity_vols.items()}, 'rates': {k: v + 0.0025 for k, v in previous.rates.items()}, 'fx_spots': {k: v * 0.98 for k, v in previous.fx_spots.items()}})
     report = _engine().explain(RiskChangeAttributionRequest(previous_portfolio=SAMPLE_PORTFOLIO, current_portfolio=SAMPLE_PORTFOLIO, previous_market=previous, current_market=current), pricing)
-    explained = sum((i.delta_risk for i in report.items))
+    explained = sum(i.delta_risk for i in report.items)
     assert abs(explained - report.total_change) <= max(_ABS_TOL, _REL_TOL * abs(report.total_change))
     assert abs(report.residual) < _ABS_TOL
     drivers = {i.driver for i in report.items}
@@ -82,6 +89,7 @@ def test_service_risk_change_attribution():
 def test_change_attribution_api():
     """POST /risk/change-attribution wires RiskChangeAttributionRequest → service."""
     from fastapi.testclient import TestClient
+
     from app.main import app
     with TestClient(app) as client:
         portfolio = client.get('/portfolio').json()

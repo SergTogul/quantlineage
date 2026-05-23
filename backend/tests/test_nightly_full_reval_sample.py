@@ -5,14 +5,18 @@ Uses the same shocked-PV − base-PV identity as ``test_full_reval_golden.py``.
 Does not change pricing engines.
 """
 from __future__ import annotations
+
 import os
+
 import numpy as np
 import pytest
+
 from app.domain.models import EquityPosition, MarketSnapshot, Portfolio
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import full_revaluation_pnl_series
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.scenarios import historical_shocked_snapshots
+
 N_OBS = 120
 pytestmark = pytest.mark.skipif(os.environ.get('RISKFORGE_NIGHTLY') != '1', reason='nightly-only larger FULL_REVALUATION sample (set RISKFORGE_NIGHTLY=1)')
 

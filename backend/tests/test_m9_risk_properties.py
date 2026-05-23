@@ -17,18 +17,29 @@ Tolerances: abs 1e-9 currency for exact aggregations; abs 1e-6 / rel 1e-8 for
 component VaR (same as test_component_var.py).
 """
 from __future__ import annotations
+
 import math
+
 import numpy as np
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
-from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot, Portfolio, StressScenario, VaRMethodology
+from tests.market_fixtures import equity_spots_market
+
+from app.domain.models import (
+    EquityPosition,
+    EuropeanOptionPosition,
+    MarketSnapshot,
+    Portfolio,
+    StressScenario,
+    VaRMethodology,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.stress import StressEngine
 from app.risk.var import VaRAnalytics
-from tests.market_fixtures import equity_spots_market
+
 pricing = BuiltinPricingEngine()
 stress = StressEngine()
 _PROP = settings(max_examples=40, deadline=None, suppress_health_check=[HealthCheck.too_slow])
@@ -51,7 +62,7 @@ def _mixed_series(n: int=80, seed: int=11) -> FactorObservationSeries:
     return FactorObservationSeries(equity_returns=rng.normal(-0.001, 0.02, n), vol_moves=rng.normal(0.0, 0.06, n), rate_moves_bps=rng.normal(0.0, 4.0, n), fx_returns=rng.normal(0.0, 0.008, n))
 
 def _parametric_var(report) -> float:
-    return next((m.var for m in report.methods if m.method == 'parametric'))
+    return next(m.var for m in report.methods if m.method == 'parametric')
 
 @given(n=st.integers(min_value=1, max_value=4), data=st.data(), seed=st.integers(1, 50))
 @_PROP
@@ -69,7 +80,7 @@ def test_risk_market_value_equals_sum_of_position_mvs(n, data):
     """M9.3: HistoricalRiskEngine market_value == Σ position valuations."""
     book, market = _equity_book_and_market(n, data)
     r = HistoricalRiskEngine(seed=3, observations=40).calculate(book, pricing, market=market)
-    expected = sum((v.market_value for v in pricing.value_portfolio(book, market)))
+    expected = sum(v.market_value for v in pricing.value_portfolio(book, market))
     assert r['market_value'] == pytest.approx(expected, abs=1e-09)
 
 @given(qty_eq=_qty, price=_price, qty_opt=st.floats(min_value=-200.0, max_value=200.0, allow_nan=False, allow_infinity=False).filter(lambda q: abs(q) >= 5.0), strike_mult=st.floats(min_value=0.85, max_value=1.15, allow_nan=False, allow_infinity=False), vol=st.floats(min_value=0.15, max_value=0.45, allow_nan=False, allow_infinity=False))
@@ -80,10 +91,10 @@ def test_component_var_reconciles_random_equity_option_book(qty_eq, price, qty_o
     market = equity_spots_market({'SPY': price}, vols={'SPY': vol})
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series())).report(book, pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA, market=market)
     pvar = _parametric_var(report)
-    total = sum((c.component_var for c in report.contributions))
+    total = sum(c.component_var for c in report.contributions)
     assert math.isclose(total, pvar, rel_tol=1e-08, abs_tol=1e-06)
     if pvar > 1e-09:
-        assert math.isclose(sum((c.contribution_pct for c in report.contributions)), 100.0, abs_tol=1e-06)
+        assert math.isclose(sum(c.contribution_pct for c in report.contributions), 100.0, abs_tol=1e-06)
 
 @given(n=st.integers(min_value=1, max_value=4), data=st.data(), equity_shock=_eq_shock)
 @_PROP

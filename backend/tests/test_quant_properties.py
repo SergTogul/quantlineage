@@ -17,6 +17,7 @@ import math
 import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
+from tests.market_fixtures import equity_spot_market, usd_rate_market
 
 from app.domain.models import (
     BondPosition,
@@ -30,7 +31,6 @@ from app.domain.models import (
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.stress import StressEngine
-from tests.market_fixtures import equity_spot_market, usd_rate_market
 
 engine = BuiltinPricingEngine()
 

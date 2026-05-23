@@ -1,20 +1,27 @@
 """M5.4 async risk-run APIs: POST/GET /risk/runs (+ /api/v1/risk/runs alias)."""
 from __future__ import annotations
+
 import time
+
 import pytest
 from fastapi.testclient import TestClient
+from tests.market_fixtures import FixedMarketProvider, equity_spot_market
+
 from app.domain.models import EquityPosition, Portfolio, RiskRunStatus
 from app.main import app
 from app.persistence.memory_repos import InMemoryRiskRunRepository
 from app.persistence.session import session_scope
-from app.persistence.sqlalchemy_repos import SqlAlchemyPortfolioRepository, SqlAlchemyRiskRunRepository
+from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyPortfolioRepository,
+    SqlAlchemyRiskRunRepository,
+)
 from app.persistence.testing import make_sqlite_session_factory
 from app.pricing.factory import create_pricing_engine
 from app.risk.historical import HistoricalRiskEngine
 from app.services.portfolio_service import PortfolioService
-from tests.market_fixtures import FixedMarketProvider, equity_spot_market
 from app.services.risk_run_service import RiskRunService
 from app.services.risk_run_worker import SUPPORTED_RUN_TYPES, RiskRunWorker, execute_run_type
+
 
 @pytest.fixture
 def client():

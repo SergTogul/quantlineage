@@ -1,4 +1,5 @@
 import pytest
+from tests.market_fixtures import equity_spot_market, usd_rate_market
 
 from app.domain.models import (
     BondPosition,
@@ -9,7 +10,6 @@ from app.domain.models import (
     SwapPosition,
 )
 from app.pricing.builtin import BuiltinPricingEngine
-from tests.market_fixtures import equity_spot_market, usd_rate_market
 
 p = BuiltinPricingEngine()
 

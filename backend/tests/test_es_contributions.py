@@ -11,14 +11,24 @@ Conventions:
 - Tolerances: abs 1e-6 (currency) or rel 1e-8 for reconciliation
 """
 from __future__ import annotations
+
 import math
+
 import numpy as np
-from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot, Portfolio, VaRMethodology
+from tests.market_fixtures import equity_spots_market
+
+from app.domain.models import (
+    EquityPosition,
+    EuropeanOptionPosition,
+    MarketSnapshot,
+    Portfolio,
+    VaRMethodology,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.es import ESContributionAnalytics
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
-from tests.market_fixtures import equity_spots_market
+
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 def _es_market():
@@ -32,10 +42,10 @@ def _two_book_portfolio() -> Portfolio:
     return Portfolio(id='es-books', name='ES Books', desk='Macro Desk', strategy='Directional', positions=[EquityPosition(type='equity', id='eq-a', symbol='SPY', quantity=1000, book='Equity Cash'), EuropeanOptionPosition(type='european_option', id='opt-a', symbol='SPY', quantity=200, strike=100.0, maturity_years=0.5, option_type='call', book='Equity Derivatives'), EquityPosition(type='equity', id='eq-b', symbol='NVDA', quantity=500, book='Equity Cash')])
 
 def _assert_reconciles(contributions, portfolio_es: float, *, abs_tol: float=1e-06) -> None:
-    total = sum((c.component_es for c in contributions))
+    total = sum(c.component_es for c in contributions)
     assert math.isclose(total, portfolio_es, rel_tol=1e-08, abs_tol=abs_tol), f'contribution sum {total} vs portfolio ES {portfolio_es}'
     if portfolio_es > abs_tol:
-        assert math.isclose(sum((c.contribution_pct for c in contributions)), 100.0, abs_tol=1e-06)
+        assert math.isclose(sum(c.contribution_pct for c in contributions), 100.0, abs_tol=1e-06)
 
 def test_es_contributions_importable():
     assert ESContributionAnalytics is not None
@@ -62,8 +72,8 @@ def test_book_desk_strategy_es_contributions_reconcile():
     _assert_reconciles(report.by_strategy, report.portfolio_es)
     assert report.by_desk[0].key == 'Macro Desk'
     assert report.by_strategy[0].key == 'Directional'
-    cash_pos = sum((c.component_es for c in report.by_position if c.key in {'eq-a', 'eq-b'}))
-    cash_book = next((c.component_es for c in report.by_book if c.key == 'Equity Cash'))
+    cash_pos = sum(c.component_es for c in report.by_position if c.key in {'eq-a', 'eq-b'})
+    cash_book = next(c.component_es for c in report.by_book if c.key == 'Equity Cash')
     assert math.isclose(cash_pos, cash_book, abs_tol=1e-09)
 
 def test_risk_factor_es_contributions_reconcile_delta_gamma():
@@ -103,15 +113,15 @@ def test_tail_empty_when_flat_pnl_uses_var_as_es():
     report = ESContributionAnalytics(dataset=ArrayHistoricalDataset(series)).report(SAMPLE_PORTFOLIO, pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA, market=SAMPLE_MARKET)
     assert report.portfolio_var == 0.0
     assert report.portfolio_es == 0.0
-    assert all((c.component_es == 0.0 for c in report.by_position))
+    assert all(c.component_es == 0.0 for c in report.by_position)
 
 def test_var_report_includes_position_es_contributions():
     pricing = BuiltinPricingEngine()
     dataset = ArrayHistoricalDataset(_mixed_series())
     from app.risk.var import VaRAnalytics
     report = VaRAnalytics(dataset=dataset).report(SAMPLE_PORTFOLIO, pricing, confidence=0.95, methodology=VaRMethodology.DELTA_GAMMA, market=SAMPLE_MARKET)
-    hist = next((m for m in report.methods if m.method == 'historical'))
-    es_sum = sum((c.component_es or 0.0 for c in report.contributions))
+    hist = next(m for m in report.methods if m.method == 'historical')
+    es_sum = sum(c.component_es or 0.0 for c in report.contributions)
     assert math.isclose(es_sum, hist.expected_shortfall, rel_tol=1e-08, abs_tol=1e-06)
 
 def test_service_exposes_es_contributions():
@@ -124,6 +134,7 @@ def test_service_exposes_es_contributions():
 
 def test_es_api_endpoint_default_methodology():
     from fastapi.testclient import TestClient
+
     from app.main import app
     client = TestClient(app)
     portfolio = client.get('/portfolio').json()
@@ -133,10 +144,11 @@ def test_es_api_endpoint_default_methodology():
     assert payload['methodology'] == 'DELTA_GAMMA'
     assert payload['portfolio_es'] >= 0.0
     assert payload['by_position']
-    assert math.isclose(sum((c['component_es'] for c in payload['by_position'])), payload['portfolio_es'], rel_tol=1e-08, abs_tol=1e-06)
+    assert math.isclose(sum(c['component_es'] for c in payload['by_position']), payload['portfolio_es'], rel_tol=1e-08, abs_tol=1e-06)
 
 def test_es_api_methodology_query_param():
     from fastapi.testclient import TestClient
+
     from app.main import app
     client = TestClient(app)
     portfolio = client.get('/portfolio').json()

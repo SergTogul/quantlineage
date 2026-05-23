@@ -7,14 +7,21 @@ unreachable (the GHA skip-green hole). ``CI`` plus an unset DSN still skips so
 PR ``backend-pytest`` is not broken. Does not change PR ``postgres-persistence-smoke``.
 """
 from __future__ import annotations
+
 import os
 import threading
 from uuid import uuid4
+
 import pytest
+
 from app.domain.models import EquityPosition, Portfolio, RiskRun, RiskRunStatus
 from app.persistence.config import get_configured_database_url
 from app.persistence.session import create_engine_from_url, create_session_factory, session_scope
-from app.persistence.sqlalchemy_repos import SqlAlchemyPortfolioRepository, SqlAlchemyRiskRunRepository
+from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyPortfolioRepository,
+    SqlAlchemyRiskRunRepository,
+)
+
 
 def _env_flag(name: str) -> bool:
     return os.environ.get(name, '').strip().lower() in {'1', 'true', 'yes', 'on'}

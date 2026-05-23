@@ -9,24 +9,43 @@ Conventions (currency units; positive = gain):
 - Tolerances: abs 1e-6 (exact paths); Taylor residual abs 1% of |market move| or 1.0
 """
 from __future__ import annotations
+
 import math
-from app.domain.models import AttributionRequest, EquityPosition, EuropeanOptionPosition, MarketSnapshot, Portfolio
+
+from app.domain.models import (
+    AttributionRequest,
+    EquityPosition,
+    EuropeanOptionPosition,
+    MarketSnapshot,
+    Portfolio,
+)
 from app.pricing.builtin import BuiltinPricingEngine
-from app.risk.attribution import DRIVER_CLOSED, DRIVER_DELTA, DRIVER_FX, DRIVER_GAMMA, DRIVER_NEW, DRIVER_RATES, DRIVER_THETA, DRIVER_VEGA, AttributionEngine
+from app.risk.attribution import (
+    DRIVER_CLOSED,
+    DRIVER_DELTA,
+    DRIVER_FX,
+    DRIVER_GAMMA,
+    DRIVER_NEW,
+    DRIVER_RATES,
+    DRIVER_THETA,
+    DRIVER_VEGA,
+    AttributionEngine,
+)
 from app.risk.historical import HistoricalRiskEngine
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
+
 pricing = BuiltinPricingEngine()
 engine = AttributionEngine()
 
 def _pv(portfolio: Portfolio, market: MarketSnapshot) -> float:
-    return sum((v.market_value for v in pricing.value_portfolio(portfolio, market)))
+    return sum(v.market_value for v in pricing.value_portfolio(portfolio, market))
 
 def _by_driver(report) -> dict[str, float]:
     return {i.driver: i.pnl for i in report.items}
 
 def _assert_reconciles(report, *, abs_tol: float=1e-06) -> None:
-    explained = sum((i.pnl for i in report.items))
+    explained = sum(i.pnl for i in report.items)
     assert math.isclose(explained, report.explained_change, abs_tol=abs_tol, rel_tol=1e-08)
     assert math.isclose(report.explained_change + report.residual, report.total_change, abs_tol=abs_tol, rel_tol=1e-08)
     assert math.isclose(report.total_change, report.current_market_value - report.base_market_value, abs_tol=abs_tol, rel_tol=1e-08)
