@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 /**
  * R0.12.3 — Critical E2E journey against the live local API (builtin pricing).
  *
- * load demo portfolio → inspect dashboard VaR/ES → run a named custom scenario
+ * load demo portfolio (POST /risk/dashboard) → inspect dashboard VaR/ES → run a named custom scenario
  * → inspect contributors → SPY-flat hedge compare → verify changed risk from compare JSON.
  *
  * Asserts UI → API → rendered results only. Does not invent or pin dollar VaR/ES.
@@ -29,11 +29,11 @@ test.describe('R0.12.3 critical journey', () => {
   }) => {
     test.setTimeout(120_000)
 
-    const dashboardVar = page.waitForResponse(
-      (res) => isPostPath(res.url(), res.request().method(), '/api/v1/risk/var') && res.ok(),
+    const dashboardBatch = page.waitForResponse(
+      (res) => isPostPath(res.url(), res.request().method(), '/api/v1/risk/dashboard') && res.ok(),
     )
     await page.goto('/')
-    await dashboardVar
+    await dashboardBatch
     await expect(page.getByText('Loading portfolio risk')).toHaveCount(0)
     await expect(page.getByText('API error')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Global Macro Demo' })).toBeVisible()
@@ -61,10 +61,12 @@ test.describe('R0.12.3 critical journey', () => {
     await expect(builder.locator('.scenario-payload-preview')).toContainText('rates 100 bp')
 
     const scenarioRequest = page.waitForRequest((req) =>
-      isPostPath(req.url(), req.method(), '/api/v1/risk/stress/evaluate/custom'),
+      isPostPath(req.url(), req.method(), '/api/v1/risk/stress/formal/evaluate/custom'),
     )
     const scenarioResponse = page.waitForResponse(
-      (res) => isPostPath(res.url(), res.request().method(), '/api/v1/risk/stress/evaluate/custom') && res.ok(),
+      (res) =>
+        isPostPath(res.url(), res.request().method(), '/api/v1/risk/stress/formal/evaluate/custom') &&
+        res.ok(),
     )
     await builder.getByRole('button', { name: 'Run scenario' }).click()
     const scenarioPost = await scenarioRequest
@@ -72,10 +74,11 @@ test.describe('R0.12.3 critical journey', () => {
     const scenarioBody = scenarioPost.postDataJSON()
     const custom = scenarioBody.scenarios[0]
     expect(custom.name).toBe('R0 Critical Journey')
-    expect(custom.equity_shock).toBeCloseTo(-0.2, 10)
-    expect(custom.vol_shock).toBeCloseTo(0.5, 10)
-    expect(custom.rates_shift_bps).toBe(100)
-    expect(custom.fx_shock).toBeCloseTo(-0.05, 10)
+    const shocks = custom.shocks || []
+    expect(shocks.some((s) => s.factor_type === 'equity' && Math.abs(s.amount - -0.2) < 1e-10)).toBe(true)
+    expect(shocks.some((s) => s.factor_type === 'vol' && Math.abs(s.amount - 0.5) < 1e-10)).toBe(true)
+    expect(shocks.some((s) => s.factor_type === 'rate' && Math.abs(s.amount - 0.01) < 1e-10)).toBe(true)
+    expect(shocks.some((s) => s.factor_type === 'fx' && Math.abs(s.amount + 0.05) < 1e-10)).toBe(true)
     expect(custom.max_loss_pct).toBeCloseTo(0.1, 10)
 
     const scenarioResult = builder.locator('.scenario-result')
@@ -131,7 +134,10 @@ test.describe('R0.12.3 critical journey', () => {
     const hedgePost = await hedgeRequest
     const hedgeRes = await hedgeResponse
     const hedgeBody = hedgePost.postDataJSON()
-    expect(hedgeBody.scenarios[0].equity_shock).toBeCloseTo(-0.2, 10)
+    const hedgeShocks = hedgeBody.scenarios[0]?.shocks || []
+    expect(hedgeShocks.some((s) => s.factor_type === 'equity' && Math.abs(s.amount - -0.2) < 1e-10)).toBe(
+      true,
+    )
     const spyEquity = (hedgeBody.hedged_portfolio?.positions || []).find(
       (p) => p.symbol === 'SPY' && p.type === 'equity',
     )
