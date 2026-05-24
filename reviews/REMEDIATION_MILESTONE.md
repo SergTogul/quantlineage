@@ -711,7 +711,7 @@ Hierarchy time is driven primarily by one base calculation + aggregation, not nu
 Related findings:
 
 - RF-009 (**CLOSED**)
-- RF-013 (**CLOSED** pending independent review; `reviews/r0.8.6-rf013-close-gate-report.md`)
+- RF-013 (**IN PROGRESS**; HTTP overwrite pin landed in R0.8.6; finding not CLOSED — `reviews/r0.8.6-rf013-close-gate-report.md`)
 - RF-010
 
 ## R0.8.1 Deterministic RiskRun specification — COMPLETE (2026-09-04)
@@ -771,18 +771,18 @@ The same RiskRun spec yields the same result whether executed interactively or b
 
 Report: `reviews/r0.8.5-postgres-same-spec-report.md`.
 
-## R0.8.6 Canonical identity HTTP pin — COMPLETE pending independent review (2026-09-09)
+## R0.8.6 Canonical identity HTTP pin — COMPLETE; RF-013 stays IN PROGRESS (2026-09-09)
 
-Close gate (`reviews/r0.8.6-rf013-close-gate-report.md`). **RF-013 CLOSED** (not final until Task 9 independent review APPROVE).
+HTTP overwrite pin landed (`reviews/r0.8.6-rf013-close-gate-report.md`). **RF-013 remains IN PROGRESS** — independent review KEEP OPEN; do not CLOSE.
 
 Acceptance:
 
-- HTTP `POST /api/v1/risk/runs` and `/risk/runs` with `portfolio.id=global-macro` cannot overwrite the seeded Cross-Asset book (`GET /portfolio` + SQL). Catalog `GET /portfolios/global-macro` remains the in-code SAMPLE contract. Evidence: `backend/tests/test_portfolio_identity.py`.
-- Persisted RiskRun reproduced from IDs — **cite R0.8.5** `tests/test_same_spec_parity.py` (RF-009 CLOSED).
-- PostgreSQL pytest/integration — **cite R0.8.5** `tests/test_postgres_risk_run_lifecycle.py` (identity-on-execute included). Not duplicated.
-- Large derived payloads not unconstrained JSON — **cite R0.8.4** typed per-`run_type` schemas (`extra='forbid'`).
+- HTTP `POST /api/v1/risk/runs` and `/risk/runs` with `portfolio.id=global-macro` cannot overwrite the seeded Cross-Asset book (`GET /portfolio` + SQL). Catalog `GET /portfolios/global-macro` remains the in-code SAMPLE contract. Evidence: `backend/tests/test_portfolio_identity.py`. **MET**.
+- Persisted RiskRun reproduced from IDs — **cite R0.8.5** `tests/test_same_spec_parity.py` (RF-009 CLOSED). **MET**.
+- PostgreSQL pytest/integration — **cite R0.8.5** `tests/test_postgres_risk_run_lifecycle.py` (identity-on-execute included). Not duplicated. **MET**.
+- Large derived payloads not unconstrained JSON — **UNMET**. PERF-016 is `risk_results.payload` unconstrained JSON (`backend/app/persistence/models.py`). R0.8.4 typed per-`run_type` request bodies are not this cell.
 
-Residuals (not blocking the four acceptance cells): no `portfolio_version` / server-issued ids; leftover `save` upsert for seed; object ACLs are RF-014.
+Residuals (keep finding IN PROGRESS): no `portfolio_version` / server-issued ids; live calculate still POSTs a full book; leftover `save` upsert for seed callers; object ACLs = RF-014.
 
 ---
 
@@ -791,7 +791,7 @@ Residuals (not blocking the four acceptance cells): no `portfolio_version` / ser
 Related findings:
 
 - RF-010
-- RF-013 (identity **CLOSED** in R0.8.6; remaining domain/API split is RF-010)
+- RF-013 (identity **IN PROGRESS** after R0.8.6 HTTP pin; remaining domain/API split is RF-010)
 
 ## R0.9.1 Split transport schemas
 
