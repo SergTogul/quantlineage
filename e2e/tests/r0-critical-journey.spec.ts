@@ -56,9 +56,9 @@ test.describe('R0.12.3 critical journey', () => {
     await builder.locator('label', { hasText: 'Equity %' }).locator('input').fill('-20')
     await builder.locator('label', { hasText: 'Rates bp' }).locator('input').fill('100')
 
-    // Display % / bp → API decimal / bp (preview is request-unit, not a risk number).
+    // Display % / bp → API decimal (preview is request-unit, not a risk number).
     await expect(builder.locator('.scenario-payload-preview')).toContainText('API shocks: equity -0.2')
-    await expect(builder.locator('.scenario-payload-preview')).toContainText('rates 100 bp')
+    await expect(builder.locator('.scenario-payload-preview')).toContainText('rates 0.01 (decimal)')
 
     const scenarioRequest = page.waitForRequest((req) =>
       isPostPath(req.url(), req.method(), '/api/v1/risk/stress/formal/evaluate/custom'),
