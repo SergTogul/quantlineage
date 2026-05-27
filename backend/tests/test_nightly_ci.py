@@ -265,3 +265,93 @@ def test_nightly_full_reval_n100_is_identity_not_sla():
     assert not re.search(r"check_m6_sla\.py\s", text)
     assert not re.search(r"throughput\s*>\s*0", text)
     assert not re.search(r"wall_ms\s*[><]=?\s*\d", text)
+
+
+def _job_ids(text: str) -> tuple[str, ...]:
+    match = re.search(r"(?ms)^jobs:\n(.*)\Z", text)
+    assert match, "workflow must have a jobs: block"
+    return tuple(re.findall(r"(?m)^  ([A-Za-z0-9_-]+):", match.group(1)))
+
+
+def _invokes_check_m6_sla(block: str) -> bool:
+    return bool(
+        re.search(
+            r"(?m)^\s+(run:|.+\|\s*$|.*\b(?:python|python3)\b).*\bcheck_m6_sla\.py\b",
+            block,
+        )
+        or re.search(r"(?m)^\s+.*\bbenchmarks/check_m6_sla\.py\b", block)
+    )
+
+
+def test_ubuntu_latest_jobs_do_not_run_check_m6_sla():
+    """Host-specific SLA-K1/K2 floors flake on ubuntu-latest. Do not invent them."""
+    for path in (CI_YML, NIGHTLY_YML):
+        text = _text(path)
+        for job_id in _job_ids(text):
+            block = _job_block(text, job_id)
+            if not re.search(r"(?m)^\s+runs-on:\s*ubuntu-latest\s*$", block):
+                continue
+            assert not _invokes_check_m6_sla(block), (
+                f"{path.name} job {job_id!r} runs on ubuntu-latest and must not "
+                "invoke benchmarks/check_m6_sla.py"
+            )
+
+
+def test_labeled_sla_job_is_absent_honest_residual():
+    """No self-hosted runner is registered; do not fake a labeled SLA job.
+
+    If a later owner adds a labeled job, it must run check_m6_sla.py, must not
+    use ubuntu-latest, must not set continue-on-error, and must stay out of
+    PR-FULL needs:. Until then nightly.yml must document PARTIAL.
+    """
+    text = _text(NIGHTLY_YML)
+    sla_jobs = [
+        job_id
+        for job_id in _job_ids(text)
+        if _invokes_check_m6_sla(_job_block(text, job_id))
+    ]
+    assert not sla_jobs, (
+        f"labeled SLA jobs found {sla_jobs}; pin runs-on / continue-on-error "
+        "separately rather than inventing ubuntu-latest floors"
+    )
+    assert "RF-016 residual: labeled-runner SLA-K1/K2 is PARTIAL" in text
+    assert "actions/runners total_count=0" in text
+    assert "continue-on-error" not in text
+
+
+def test_sla_k_harness_exists_with_documented_floors():
+    path = REPO_ROOT / "benchmarks" / "check_m6_sla.py"
+    assert path.is_file(), "expected benchmarks/check_m6_sla.py"
+    text = path.read_text(encoding="utf-8")
+    assert "MIN_SERIAL_SPEEDUP_VS_PYTHON = 50.0" in text
+    assert "MIN_PARALLEL_VS_SERIAL = 1.3" in text
+    assert 'WORKLOAD = "10k_x_1k"' in text
+    assert "SLA-K1" in text
+    assert "SLA-K2" in text
+
+
+def test_sla_k_docs_exist_and_do_not_claim_ubuntu_ci_floors():
+    perf = REPO_ROOT / "docs" / "performance.md"
+    results = REPO_ROOT / "benchmarks" / "RESULTS.md"
+    assert perf.is_file(), "expected docs/performance.md"
+    assert results.is_file(), "expected benchmarks/RESULTS.md"
+    perf_text = perf.read_text(encoding="utf-8")
+    results_text = results.read_text(encoding="utf-8")
+    assert "SLA-K1" in perf_text and "SLA-K2" in perf_text
+    assert "SLA-K1" in results_text and "SLA-K2" in results_text
+    assert "check_m6_sla.py" in perf_text
+    assert "not a CI hard gate on arbitrary runner hardware" in perf_text
+    assert "RF-016 residual: labeled-runner SLA-K1/K2 is PARTIAL" in perf_text
+    assert "actions/runners total_count=0" in perf_text
+
+
+def test_pr_full_needs_does_not_include_sla_k():
+    block = _job_block(_text(CI_YML), "pr-full")
+    needed = _needs_ids(block)
+    leaked = [
+        job_id
+        for job_id in needed
+        if "sla" in job_id.lower() or "m6" in job_id.lower()
+    ]
+    assert not leaked, f"PR-FULL needs: must not include SLA jobs; found {leaked}"
+    assert "check_m6_sla.py" not in _text(CI_YML)
