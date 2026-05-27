@@ -835,7 +835,7 @@ A dashboard load does not execute redundant full valuations of the same book and
 Priority: **P1**  
 Risk types: TEST_GAP, CI, OPERABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Remaining: labeled-runner SLA-K1/K2. Not CLOSED.)
+Status: **IN PROGRESS** (2026-09-09). R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Labeled-runner SLA-K1/K2 is **PARTIAL**: harness (`benchmarks/check_m6_sla.py`) + `docs/performance.md` + `benchmarks/RESULTS.md` exist; this repo has no self-hosted runner (`actions/runners total_count=0`, 2026-09-09); CI does not enforce host floors on `ubuntu-latest`. Not CLOSED.
 
 Source findings:
 
@@ -872,6 +872,8 @@ Deterministic core unit/golden/property tests.
 - larger full-revaluation samples;
 - benchmark/SLA on labeled runner;
 - optional QuantLib E2E/demo range check.
+
+NIGHTLY scoring (R0.12.6): Postgres two-worker **MET**; larger full-reval samples **MET** (sample + N=100 identity, not host SLA); QuantLib E2E **MET** (nightly only). Labeled-runner SLA-K1/K2 (`check_m6_sla.py`) **PARTIAL** — harness and reference-host evidence exist; no labeled runner is registered; do not invent `ubuntu-latest` floors. Demo-artifact range check (QA-024) remains a leftover, not this slice.
 
 ### Acceptance evidence
 

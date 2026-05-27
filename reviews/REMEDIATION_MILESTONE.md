@@ -999,6 +999,10 @@ Capture/assert request units where percent/bp conversion matters.
 - hierarchy benchmark — COMPLETE (nightly identity, `reviews/r0.12-hierarchy-bench-independent-review.md`);
 - optional QuantLib E2E — COMPLETE (`reviews/r0.12-ql-e2e-independent-review.md`; nightly job only).
 
+## R0.12.6 Labeled-runner SLA-K1/K2 (honest residual)
+
+RF-016 leftover. No self-hosted runner is registered (`actions/runners total_count=0`, 2026-09-09). Do **not** run `benchmarks/check_m6_sla.py` on `ubuntu-latest`. Harness + `docs/performance.md` + `benchmarks/RESULTS.md` exist; CI does not enforce host floors. Score **PARTIAL**. Do not CLOSE RF-016. Evidence: `reviews/r0.12.6-rf016-sla-k-report.md`.
+
 ## R0.12.5 Native ABI safety
 
 Add explicit ABI/version/error/length validation before expanding native use.
