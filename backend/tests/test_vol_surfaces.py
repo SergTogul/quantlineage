@@ -114,7 +114,7 @@ def test_to_dict_plain_and_attach_to_snapshot():
     base = MarketSnapshot(equity_vols={"SPY": 0.18}, rates={"USD": 0.04})
     snap = attach_vol_surface(base, surf)
     assert "SPY" in snap.vol_surfaces
-    assert snap.vol.surfaces["SPY"]["atm_vol"] == pytest.approx(0.18)
+    assert snap.vol.surfaces["SPY"].atm_vol() == pytest.approx(0.18)
     # Scalar ATM mark kept in sync for pricing compatibility.
     assert snap.equity_vols["SPY"] == pytest.approx(0.18)
 
