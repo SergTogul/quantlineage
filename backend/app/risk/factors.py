@@ -17,6 +17,7 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.market.snapshot import MarketDataProvider
+from app.pricing.instrument_capabilities import get_capability
 from app.risk.factor_types import (
     EquitySpot,
     EquityVol,
@@ -43,6 +44,7 @@ class RiskFactorEngine:
         market = market or self.market_data.snapshot(portfolio)
         agg: dict[RiskFactor, float] = defaultdict(float)
         for p in portfolio.positions:
+            get_capability(getattr(p, "type", None))
             v = pricing.value(p, market)
             if isinstance(p, (EquityPosition, EquityFuturePosition, EuropeanOptionPosition)):
                 agg[EquitySpot(p.symbol)] += v.delta

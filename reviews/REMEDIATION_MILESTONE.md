@@ -542,6 +542,10 @@ Ensure factor contributions are calculated against the factor-complete scenario 
 
 Do not allow an omitted factor to disappear into `interaction` without a reconciliation signal.
 
+## R0.5.6 Wire capability registry into remaining dispatch — COMPLETE (slice, 2026-09-09)
+
+`get_capability` is consulted by QuantLib/Builtin `value()`, snapshot overlay (unknown families raise; empty-marks `return {}` removed), `trade_cache_key`, and `RiskFactorEngine.calculate_typed`. QuantLib still does not call Builtin. Goldens unchanged. **RF-012 stays IN PROGRESS:** parallel `isinstance` ladders remain; adding a family is not yet one registration plus tests. Report: `reviews/r0.5.6-rf012-capability-wire-report.md`.
+
 ### Exit criteria
 
 Two equities and two rate tenors can move independently in one historical observation.
