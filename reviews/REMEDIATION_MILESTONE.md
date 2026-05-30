@@ -376,6 +376,16 @@ MappingProxy-frozen; `curves.py` bp→decimal shifts go through
 `bps_to_decimal_rate`. Flat dict storage on MarketSnapshot retained.
 RF-004 / RF-011 stay IN PROGRESS.
 
+R0.4.1-B COMPLETE (2026-09-09): typed curve/surface nesting on canonical views.
+`VolMarket.surfaces` reconstructs `VolSurface` via `vol_surface_from_dict`;
+`RateMarket.curves` reconstructs named `YieldCurve` (`from_zero_dict` or
+equivalent nodes). Invalid present surface/curve payloads fail closed
+(`ValueError`/`KeyError`/`TypeError`); empty `vol_surfaces`/`curves` stay
+empty mappings. `FxMarket` and `MarketSnapshot.fx_spots` reject non-6-letter
+ISO pair keys via `_require_fx_pair`; empty `fx_spots` remains valid. Flat
+dict storage retained (no nested Pydantic rewrite). RF-011 stays IN PROGRESS
+(dual domain StressScenario/Scenario collapse remains).
+
 Replace nested raw dictionaries where practical with typed domain models for:
 
 - yield curves;

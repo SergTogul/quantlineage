@@ -591,24 +591,37 @@ class MarketSnapshot(FiniteInputMixin):
 
         return EquityMarket(spots=self.equity_spots, dividend_yields=self.dividend_yields)
 
+    @field_validator("fx_spots")
+    @classmethod
+    def _validate_fx_spot_keys(cls, value: Mapping) -> Mapping:
+        """Reject non-6-letter ISO FX pair keys. Empty ``fx_spots`` stays valid."""
+        for pair in value:
+            _require_fx_pair(str(pair))
+        return value
+
     @property
     def rates_market(self):
         """Canonical typed rates sub-market view (``app.market.markets.RateMarket``)."""
-        from app.market.markets import RateMarket
+        from app.market.markets import RateMarket, typed_yield_curves
 
         return RateMarket(
             discount=self.rates,
             projection=self.projection_rates,
             spreads=self.rate_spreads,
             key_rates=self.key_rates,
+            curves=typed_yield_curves(self.curves),
         )
 
     @property
     def vol(self):
         """Canonical typed vol sub-market view (``app.market.markets.VolMarket``)."""
-        from app.market.markets import VolMarket
+        from app.market.markets import VolMarket, typed_vol_surfaces
 
-        return VolMarket(equity=self.equity_vols, fx=self.fx_vols, surfaces=self.vol_surfaces)
+        return VolMarket(
+            equity=self.equity_vols,
+            fx=self.fx_vols,
+            surfaces=typed_vol_surfaces(self.vol_surfaces),
+        )
 
     @property
     def fx(self):
