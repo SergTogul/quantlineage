@@ -38,6 +38,7 @@ from app.domain.models import (
     calendar_as_of,
 )
 from app.interfaces.pricing import PricingEngine
+from app.pricing.instrument_capabilities import get_capability
 
 # Family schema ids keep v1 cache identity. Equity-family InstrumentTerms add
 # settlement ``currency`` that Positions never hashed; drop it at hash time.
@@ -130,6 +131,7 @@ class PricingConfiguration:
 def trade_cache_key(position: Position) -> str:
     """Versioned economics hash from ``terms_from_position``; marks excluded."""
     terms = terms_from_position(position)
+    get_capability(terms.type)
     schema = _TRADE_CACHE_SCHEMAS.get(terms.type)
     if schema is None:
         raise TypeError(

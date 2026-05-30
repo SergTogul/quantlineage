@@ -30,6 +30,7 @@ from app.pricing.curve_rates import (
     required_continuous_zero,
     required_ir_future_quote,
 )
+from app.pricing.instrument_capabilities import get_capability
 from app.pricing.surface_vol import (
     required_equity_option_vol,
     required_fx_option_vol,
@@ -77,6 +78,7 @@ def _required_fx_spot(market: MarketSnapshot, pair: str) -> float:
 
 def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -> dict:
     """Resolve live marks from the explicit snapshot using terms keys only."""
+    get_capability(getattr(terms, "type", None))
     if isinstance(terms, EquityTerms):
         return {"price": _required_equity_spot(market, terms.symbol)}
     if isinstance(terms, EquityFutureTerms):
@@ -189,7 +191,9 @@ def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -
             "domestic_rate": _required_settlement_rate(market, terms.pair[-3:]),
             "foreign_rate": _required_settlement_rate(market, terms.pair[:3]),
         }
-    return {}
+    raise TypeError(
+        f"unknown instrument family: {getattr(terms, 'type', type(terms).__name__)!r}"
+    )
 
 
 def _pricing_view(
@@ -228,6 +232,7 @@ class BuiltinPricingEngine(PricingEngine):
             terms = terms_from_position(position)
         except TypeError:
             raise TypeError(f"Unsupported position: {type(position)!r}") from None
+        get_capability(terms.type)
 
         # Snapshot is the sole mark authority; working view never reads Position marks.
         working = _pricing_view(position, terms, market)
