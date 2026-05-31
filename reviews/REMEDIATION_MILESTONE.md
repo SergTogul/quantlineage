@@ -386,6 +386,15 @@ ISO pair keys via `_require_fx_pair`; empty `fx_spots` remains valid. Flat
 dict storage retained (no nested Pydantic rewrite). RF-011 stays IN PROGRESS
 (dual domain StressScenario/Scenario collapse remains).
 
+R0.4.1-C COMPLETE (2026-09-09): explicit equity-currency / rate selection.
+`EquityPosition` / `EquityFuturePosition` / `EuropeanOptionPosition` carry
+`currency` (default `"USD"` so demo books stay valid). Production valuation
+looks up `market.rates[terms.currency]`; EUR option/future with `rates={}` or
+USD-only rates fail closed. Snapshot constructor default `{"USD": 0.04}` when
+`rates` is omitted is unchanged. RF-011 stays **IN PROGRESS** (libraries /
+persistence still store `StressScenario`; historical / reverse remain dual).
+Evidence: `reviews/r0.4.1-c-explicit-currency-rate-report.md`.
+
 Replace nested raw dictionaries where practical with typed domain models for:
 
 - yield curves;
@@ -403,7 +412,7 @@ R0.4.2-C COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-
 
 R0.4.2-D COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-d-formal-post-wire-independent-review.md`). Primary UI POST path uses formal ScenarioWire (`/formal/evaluate/custom`, `/formal/custom`, `/formal/compare`); frontend `scenarioPayload` / `compareHedge` no longer call legacy StressScenario POSTs. Legacy custom/evaluate/compare routes retained as **deprecated** back-compat. **RF-004 CLOSED**; RF-011 stays IN PROGRESS (typed nesting + deprecated dual POST residual). Review Important deferred: parity tests use `stress_to_wire` expansion, not frontend builders.
 
-R0.4.2-E COMPLETE pending review (2026-09-09): Engine-facing `StressEngine.run` / `evaluate` / `contributions` / compare convert `StressScenario` once at the HTTP or engine boundary (`to_canonical_scenario`); internals apply typed `Scenario` only. Deprecated StressScenario POST routes retained as adapters (`stresses_to_scenarios`). RF-011 stays **IN PROGRESS** (implicit USD rate default; library/persistence still StressScenario). Evidence: `reviews/r0.4.2-e-scenario-only-engine-report.md`.
+R0.4.2-E COMPLETE pending review (2026-09-09): Engine-facing `StressEngine.run` / `evaluate` / `contributions` / compare convert `StressScenario` once at the HTTP or engine boundary (`to_canonical_scenario`); internals apply typed `Scenario` only. Deprecated StressScenario POST routes retained as adapters (`stresses_to_scenarios`). RF-011 stays **IN PROGRESS** (library/persistence still StressScenario; historical/reverse dual). Evidence: `reviews/r0.4.2-e-scenario-only-engine-report.md`.
 
 Converge:
 
@@ -448,7 +457,8 @@ Evidence: `reviews/r0.4.2-d-formal-post-wire-report.md`.
 
 R0.4.2-E COMPLETE pending review (2026-09-09): Engine-facing stress / attribution /
 threat take canonical `Scenario`; legacy HTTP `StressScenario` is adapter-only.
-RF-011 stays IN PROGRESS (implicit USD equity-currency/rate default). Evidence:
+RF-011 stays IN PROGRESS (libraries/persistence still StressScenario;
+historical/reverse dual). Evidence:
 `reviews/r0.4.2-e-scenario-only-engine-report.md`.
 
 ## R0.4.3 Explicit shock units
