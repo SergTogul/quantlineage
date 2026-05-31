@@ -40,7 +40,7 @@ from app.risk.reverse_stress import ReverseStressEngine
 from app.risk.reverse_stress_multi import MultiFactorReverseStressEngine
 from app.risk.scenario_attribution import ScenarioAttributionEngine, ScenarioLike
 from app.risk.scenario_engine import ScenarioEngine, apply_scenario
-from app.risk.scenario_model import Scenario, category_to_kind
+from app.risk.scenario_model import Scenario, category_to_kind, to_canonical_scenario, to_canonical_scenarios
 from app.sample import DemoAggregateMarketDataProvider
 
 __all__ = [
@@ -138,23 +138,15 @@ def _threat_level(loss_pct_nav: float) -> str:
 
 
 def _evaluation_fields(
-    scenario: ScenarioLike, index: int
+    scenario: Scenario, index: int
 ) -> tuple[str, str, ScenarioKind, str, float | None]:
-    """Normalize formal Scenario / legacy StressScenario fields for StressEvaluation."""
-    if isinstance(scenario, Scenario):
-        return (
-            scenario.id or f"scenario_{index + 1}",
-            scenario.name,
-            category_to_kind(scenario.category),
-            scenario.description,
-            scenario.threshold.max_loss_pct,
-        )
+    """Read canonical ``Scenario`` fields for ``StressEvaluation``."""
     return (
         scenario.id or f"scenario_{index + 1}",
         scenario.name,
-        scenario.kind,
+        category_to_kind(scenario.category),
         scenario.description,
-        scenario.max_loss_pct,
+        scenario.threshold.max_loss_pct,
     )
 
 
@@ -170,12 +162,15 @@ class StressEngine:
         scenarios: Sequence[ScenarioLike],
         market: MarketSnapshot | None = None,
     ) -> list[StressResult]:
-        """Full-reval stress P&L. Accepts formal ``Scenario`` or legacy ``StressScenario``.
+        """Full-reval stress P&L on canonical ``Scenario``.
 
-        Formal scenarios apply via ``apply_scenario`` / ScenarioEngine — callers need
-        not collapse through ``scenario_to_stress`` first.
+        Legacy ``StressScenario`` is adapted once at this boundary via
+        ``to_canonical_scenarios`` (HTTP should convert first). Apply uses
+        typed ``Scenario`` only — callers need not collapse through
+        ``scenario_to_stress``.
         """
         market = require_explicit_market(market)
+        scenarios = to_canonical_scenarios(scenarios, market)
         base = {p.id: pricing_engine.value(p, market).market_value for p in portfolio.positions}
         output = []
         for scenario in scenarios:
@@ -201,11 +196,13 @@ class StressEngine:
         by_trade_pnl: dict[str, float] | None = None,
     ) -> ScenarioContributionBreakdown:
         """Hierarchy + risk-factor stress P&L decomposition for one scenario (M3.4)."""
+        market = require_explicit_market(market)
+        scenario = to_canonical_scenario(scenario, market)
         return self.attribution.decompose(
             portfolio,
             pricing_engine,
             scenario,
-            market=require_explicit_market(market),
+            market=market,
             by_trade_pnl=by_trade_pnl,
         )
 
@@ -216,8 +213,13 @@ class StressEngine:
         scenarios: Sequence[ScenarioLike],
         market: MarketSnapshot | None = None,
     ) -> ScenarioEvaluationReport:
-        """Threat evaluation. Accepts formal ``Scenario`` or legacy ``StressScenario``."""
+        """Threat evaluation on canonical ``Scenario``.
+
+        Legacy ``StressScenario`` is adapted once at this boundary; internals
+        do not branch on the wire type.
+        """
         market = require_explicit_market(market)
+        scenarios = to_canonical_scenarios(scenarios, market)
         base_by_position = {p.id: pricing_engine.value(p, market).market_value for p in portfolio.positions}
         base_mv = sum(base_by_position.values())
         nav_denominator = abs(base_mv) or 1.0
@@ -360,6 +362,7 @@ class ScenarioComparisonEngine:
         market: MarketSnapshot | None = None,
     ) -> HedgeComparisonReport:
         market = require_explicit_market(market)
+        scenarios = to_canonical_scenarios(scenarios, market)
         base_stress = self.engine.run(
             base_portfolio, pricing_engine, scenarios, market=market
         )
