@@ -41,16 +41,18 @@ from app.api.scenario_wire import (
     stresses_to_scenarios,
     wires_to_scenarios,
 )
-from app.domain.models import (
+from app.api.schemas import (
     CustomStressRequest,
+    MultiFactorReverseStressRequest,
+    ReverseStressRequest,
+    ScenarioComparisonRequest,
+)
+from app.domain.models import (
     HedgeComparisonReport,
     MarketSnapshot,
-    MultiFactorReverseStressRequest,
     MultiFactorReverseStressResult,
     Portfolio,
-    ReverseStressRequest,
     ReverseStressResult,
-    ScenarioComparisonRequest,
     StressResult,
     StressScenario,
 )

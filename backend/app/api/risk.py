@@ -17,10 +17,10 @@ from app.api.openapi_examples import (
     RESP_WHAT_IF,
     WHAT_IF_BODY_EXAMPLES,
 )
+from app.api.schemas import RiskQueryRequest
 from app.domain.models import (
     ESContributionReport,
     Portfolio,
-    RiskQueryRequest,
     VaRMethodology,
     VaRReport,
     WhatIfReport,

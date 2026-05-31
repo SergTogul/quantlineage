@@ -1,3 +1,4 @@
+from app.api.schemas import LimitDrilldownRequest
 from app.domain.models import (
     BondPosition,
     Contributor,
@@ -10,7 +11,6 @@ from app.domain.models import (
     HierarchyRef,
     InterestRateFuturePosition,
     LimitDrilldownReport,
-    LimitDrilldownRequest,
     LimitMetric,
     Portfolio,
     Position,

@@ -576,6 +576,7 @@ Interactive and worker calculations with the same run specification produce the 
 Priority: **P1**  
 Risk types: ARCHITECTURE, MAINTAINABILITY  
 Confidence: HIGH
+Status: **IN PROGRESS** (2026-09-09). R0.9.1 COMPLETE — obvious HTTP `*Request` / `*Response` / RiskRun wire bodies moved to `app.api.schemas` (`transport.py`). Domain package does not import FastAPI or `app.api`. Dual-use engine/service inputs (`AttributionRequest`, `RiskChangeAttributionRequest`, `WhatIfRequest`) remain in domain. **Do not CLOSE:** `RiskEngine.calculate` is still an untyped dictionary (R0.9.2); `PortfolioService` remains a process-wide orchestrator / no lifespan composition (R0.9.3). Evidence: `reviews/r0.9.1-split-transport-schemas-report.md`.
 
 Source findings:
 
