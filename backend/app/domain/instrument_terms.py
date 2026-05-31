@@ -28,7 +28,7 @@ from app.domain.models import (
     SwaptionPosition,
 )
 
-# Equity cash/derivative Positions have no currency field; settlement is USD.
+# Default when an equity Position omits currency (USD demo books stay valid).
 _EQUITY_SETTLEMENT_CURRENCY = "USD"
 
 
@@ -167,7 +167,12 @@ InstrumentTermsAdapter = TypeAdapter(
 
 
 def _equity_currency(position: EquityPosition | EquityFuturePosition | EuropeanOptionPosition) -> str:
-    return getattr(position, "currency", None) or _EQUITY_SETTLEMENT_CURRENCY
+    currency = str(position.currency).strip()
+    if not currency:
+        raise ValueError(
+            f"{type(position).__name__} {position.id!r} requires an explicit currency"
+        )
+    return currency
 
 
 def terms_from_position(position: Position) -> InstrumentTerms:

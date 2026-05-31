@@ -52,7 +52,9 @@ def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
 
 def _equity_settlement_currency(position) -> str:
     currency = getattr(position, "currency", None)
-    return str(currency) if currency else "USD"
+    if not currency:
+        raise ValueError("equity settlement currency is required on terms")
+    return str(currency)
 
 
 def _required_settlement_rate(market: MarketSnapshot, currency: str) -> float:
