@@ -5,7 +5,8 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
-from app.domain.models import Portfolio, RiskQueryResponse
+from app.api.schemas import RiskQueryResponse
+from app.domain.models import Portfolio
 
 
 class RiskToolName(str, Enum):

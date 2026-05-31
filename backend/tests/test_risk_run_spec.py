@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime
 import pytest
 from pydantic import ValidationError
 
+from app.api.schemas import RiskRunView
 from app.domain.models import (
     EquityPosition,
     MarketSnapshot,
@@ -16,7 +17,6 @@ from app.domain.models import (
     RiskRun,
     RiskRunCalculationConfig,
     RiskRunStatus,
-    RiskRunView,
     VaRMethodology,
 )
 from app.persistence.memory_repos import InMemoryRiskRunRepository
