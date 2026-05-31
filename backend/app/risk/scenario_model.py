@@ -14,12 +14,13 @@ units (see ``FactorShock`` and ``app.risk.shock_units``). Legacy
 convert only at the adapter boundary via ``bps_to_decimal_rate`` /
 ``decimal_rate_to_bps`` — expand/collapse must not inline bp↔decimal scales.
 
-Legacy ``StressScenario`` (flat scalar/dict fields) remains the wire/API shape
-for existing stress POST endpoints. R0.4.2-C: ``GET .../scenarios`` returns
+Legacy ``StressScenario`` (flat scalar/dict fields) remains the HTTP/wire
+adapter for deprecated POST endpoints. R0.4.2-C: ``GET .../scenarios`` returns
 formal ``ScenarioWire`` (``/scenarios/formal`` is an identical alias); formal
 POST twins stay under ``/api/v1/risk/stress/formal/*`` (see
-``app.api.scenario_wire``). R0.4.2-B: ``StressEngine`` accepts formal
-``Scenario`` directly via ``apply_scenario``; adapters remain for legacy wire.
+``app.api.scenario_wire``). R0.4.2-E: engine-facing stress / attribution /
+threat convert ``StressScenario`` once at the HTTP or engine boundary via
+``to_canonical_scenario``; internals apply typed ``Scenario`` only.
 """
 
 from __future__ import annotations
@@ -235,6 +236,28 @@ def _expand_stress_to_shocks(stress: StressScenario, base: MarketSnapshot) -> tu
     return tuple(shocks)
 
 
+def to_canonical_scenario(scenario: Scenario | StressScenario, base: MarketSnapshot) -> Scenario:
+    """Adapt engine/HTTP input to canonical ``Scenario``.
+
+    Formal ``Scenario`` is returned unchanged. Legacy ``StressScenario`` is
+    expanded via :func:`scenario_from_stress` (rate bp→decimal only through
+    ``shock_units``). Other types raise ``TypeError``.
+    """
+    if isinstance(scenario, Scenario):
+        return scenario
+    if isinstance(scenario, StressScenario):
+        return scenario_from_stress(scenario, base)
+    raise TypeError(f"unsupported engine scenario type: {type(scenario)!r}")
+
+
+def to_canonical_scenarios(
+    scenarios: Sequence[Scenario | StressScenario],
+    base: MarketSnapshot,
+) -> list[Scenario]:
+    """Adapt a sequence of engine/HTTP inputs to canonical ``Scenario``."""
+    return [to_canonical_scenario(s, base) for s in scenarios]
+
+
 def scenario_from_stress(
     stress: StressScenario,
     base: MarketSnapshot,
@@ -371,4 +394,6 @@ __all__ = [
     "scenario_to_market_scenario",
     "scenario_to_stress",
     "threshold_breached",
+    "to_canonical_scenario",
+    "to_canonical_scenarios",
 ]

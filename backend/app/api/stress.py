@@ -1,9 +1,10 @@
 """Stress / reverse-stress / threat routes (M7.1). Under /risk until M7.2.
 
-R0.4.2-D: Primary UI/custom POST path is formal ``ScenarioWire`` under
+R0.4.2-D/E: Primary UI/custom POST path is formal ``ScenarioWire`` under
 ``/risk/stress/formal/*`` (custom, evaluate/custom, compare). Legacy
 ``StressScenario`` POST bodies on ``/stress/custom``, ``/evaluate/custom``,
-``/compare`` are **deprecated** back-compat only. List wire remains formal
+``/compare`` are **deprecated** back-compat only and are adapted to canonical
+``Scenario`` at this HTTP layer. List wire remains formal
 (``GET /scenarios``; ``/scenarios/formal`` identical alias).
 """
 
@@ -37,6 +38,7 @@ from app.api.scenario_wire import (
     FormalScenarioComparisonRequest,
     ScenarioWire,
     stress_to_wire,
+    stresses_to_scenarios,
     wires_to_scenarios,
 )
 from app.domain.models import (
@@ -65,6 +67,15 @@ def _formal_scenario_wires(
     return [stress_to_wire(s, base) for s in scenarios]
 
 
+def _canonical_from_legacy(
+    portfolio: Portfolio,
+    scenarios: list[StressScenario],
+    service: PortfolioService,
+):
+    """Adapt deprecated/DI StressScenario lists to engine-facing Scenario."""
+    return stresses_to_scenarios(scenarios, service.market_snapshot(portfolio))
+
+
 @router.post(
     "/stress",
     response_model=list[StressResult],
@@ -81,7 +92,7 @@ def risk_stress(
 ) -> list[StressResult]:
     """Baseline stress P&L over DI DEFAULT scenarios (M5.9 follow-up)."""
     reject_inline_heavy(route="POST /risk/stress")
-    return service.stresses(portfolio, scenarios)
+    return service.stresses(portfolio, _canonical_from_legacy(portfolio, scenarios, service))
 
 
 @router.get(
@@ -135,7 +146,10 @@ def risk_stress_custom(
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     reject_inline_heavy(route="POST /risk/stress/custom")
-    return service.stresses(request.portfolio, request.scenarios)
+    return service.stresses(
+        request.portfolio,
+        _canonical_from_legacy(request.portfolio, request.scenarios, service),
+    )
 
 
 @router.post(
@@ -164,7 +178,9 @@ def risk_stress_evaluate(
 ):
     """Threat evaluation over DI-backed scenario defaults (M5.9)."""
     reject_inline_heavy(route="POST /risk/stress/evaluate")
-    return service.threat_evaluation(portfolio, scenarios)
+    return service.threat_evaluation(
+        portfolio, _canonical_from_legacy(portfolio, scenarios, service)
+    )
 
 
 @router.post(
@@ -181,7 +197,10 @@ def risk_stress_evaluate_custom(
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     reject_inline_heavy(route="POST /risk/stress/evaluate/custom")
-    return service.threat_evaluation(request.portfolio, request.scenarios)
+    return service.threat_evaluation(
+        request.portfolio,
+        _canonical_from_legacy(request.portfolio, request.scenarios, service),
+    )
 
 
 @router.post(
@@ -270,7 +289,7 @@ def risk_stress_compare(
     return service.compare_scenarios(
         request.portfolio,
         request.hedged_portfolio,
-        request.scenarios,
+        _canonical_from_legacy(request.portfolio, request.scenarios, service),
         methodology=request.methodology,
     )
 

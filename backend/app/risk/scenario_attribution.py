@@ -8,8 +8,9 @@ reuse the joint trade/scenario P&L (one shocked snapshot) and the additive
 Greek split from the same base valuations, plus an ``interaction`` residual so
 the factor dimension reconciles to portfolio stress P&L.
 
-Inputs: formal ``Scenario`` (preferred) or legacy ``StressScenario``. Pricing
-goes through ``PricingEngine`` / shocked snapshots — no instrument formulas here.
+Inputs: canonical ``Scenario`` after a one-shot ``to_canonical_scenario``
+adapt at the engine/HTTP boundary. Pricing goes through ``PricingEngine`` /
+shocked snapshots — no instrument formulas here.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import (
     FactorShock,
     Scenario,
-    scenario_from_stress,
+    to_canonical_scenario,
 )
 from app.risk.shock_units import decimal_rate_to_bps
 from app.sample import DemoAggregateMarketDataProvider
@@ -92,20 +93,18 @@ def _trade_label(position) -> str:
 
 
 def _to_formal(scenario: ScenarioLike, base: MarketSnapshot) -> Scenario:
-    if isinstance(scenario, Scenario):
-        return scenario
-    return scenario_from_stress(scenario, base)
+    return to_canonical_scenario(scenario, base)
 
 
 def _portfolio_pnl_by_position(
     portfolio: Portfolio,
     pricing: PricingEngine,
-    scenario: ScenarioLike,
+    scenario: Scenario,
     market: MarketSnapshot,
     base_by_position: dict[str, float],
 ) -> dict[str, float]:
     # One shocked snapshot per scenario, then revalue every position — do not
-    # rebuild via shocked_value per trade. Formal Scenario applies directly
+    # rebuild via shocked_value per trade. Canonical Scenario applies directly
     # (no scenario_to_stress collapse).
     shocked = apply_scenario(market, scenario)
     return {
