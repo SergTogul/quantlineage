@@ -733,7 +733,7 @@ Keep an explicit inline/debug calculation endpoint only for tests/demo tooling.
 Priority: **P1**  
 Risk types: SECURITY, AVAILABILITY, OPERABILITY  
 Confidence: HIGH  
-Status: **CLOSED** (2026-09-09). QA local-demo close gate (`reviews/r0.11.7-rf014-close-gate-report.md`). Controller must not treat CLOSED as final until Task 15 independent review **APPROVE**. R0.11.1–R0.11.6 APPROVE. Local-demo required direction is **MET** (loopback Compose, finite numbers, positions/scenarios/body caps, error sanitization; local demo stays unauthenticated). Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** are **accepted residuals** (not MET). Not production IAM.
+Status: **CLOSED** (2026-09-09). QA local-demo close gate (`reviews/r0.11.7-rf014-close-gate-report.md`); independent review **APPROVE** (`reviews/sdd-briefs/task-15-rf014-close-gate-review.md`). R0.11.1–R0.11.6 APPROVE. Local-demo required direction is **MET** (loopback Compose, finite numbers, positions/scenarios/body caps, error sanitization; local demo stays unauthenticated). Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** are **accepted residuals** (not MET). Not production IAM.
 
 Source findings:
 
