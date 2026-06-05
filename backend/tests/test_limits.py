@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.domain.models import MarketSnapshot, RiskLimit
+from app.domain.models import MarketSnapshot, RiskLimit, RiskSummary
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.limits import (
@@ -53,7 +53,7 @@ def test_evaluate_statuses_and_fields():
         RiskLimit(metric="dv01", limit=1e-12, warning_threshold_pct=50.0, label="tiny"),
         RiskLimit(
             metric="vega",
-            limit=abs(risk["vega"]) / 0.85 if risk["vega"] else 1.0,
+            limit=abs(risk.vega) / 0.85 if risk.vega else 1.0,
             warning_threshold_pct=80.0,
             label="warn-band",
         ),
@@ -84,7 +84,17 @@ def test_service_limits_include_new_metrics_and_status():
 
 def test_configurable_warning_threshold():
     pricing = BuiltinPricingEngine()
-    risk = {"var_99": 90.0, "dv01": 0.0, "vega": 0.0, "fx_delta": 0.0, "expected_shortfall_99": 0.0}
+    risk = RiskSummary(
+        portfolio_id="warn",
+        market_value=0.0,
+        delta=0.0,
+        gamma=0.0,
+        vega=0.0,
+        dv01=0.0,
+        var_95=0.0,
+        var_99=90.0,
+        expected_shortfall_99=0.0,
+    )
     tight = RiskLimit(metric="var_99", limit=100.0, warning_threshold_pct=95.0)
     loose = RiskLimit(metric="var_99", limit=100.0, warning_threshold_pct=50.0)
     engine = LimitEngine()
@@ -101,8 +111,9 @@ def test_zero_portfolio_zero_risk_limits_ok():
     risk = HistoricalRiskEngine(seed=1, observations=20).calculate(
         empty, pricing, market=MarketSnapshot(id="empty")
     )
-    enriched = {**risk, "stress_loss": 0.0, "key_rate_dv01": 0.0}
-    rows = LimitEngine().evaluate(empty, pricing, enriched, DEFAULT_LIMITS)
+    rows = LimitEngine().evaluate(
+        empty, pricing, risk, DEFAULT_LIMITS, extra={"stress_loss": 0.0, "key_rate_dv01": 0.0}
+    )
     assert all(r.value == 0.0 or r.metric == "single_position_pct" for r in rows)
     # Empty book: concentration uses gross=1 fallback → 0%; all should be OK.
     assert all(r.status == "OK" for r in rows)

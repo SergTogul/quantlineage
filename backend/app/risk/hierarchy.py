@@ -46,6 +46,7 @@ from app.domain.models import (
     LimitResult,
     MarketSnapshot,
     Portfolio,
+    RiskSummary,
     StressResult,
     StressScenario,
 )
@@ -242,7 +243,7 @@ class HierarchyEngine:
 
     def _metrics(
         self, portfolio: Portfolio, pricing: PricingEngine, market: MarketSnapshot
-    ) -> dict:
+    ) -> RiskSummary:
         if isinstance(self.risk, HistoricalRiskEngine):
             return self.risk.calculate(portfolio, pricing, market=market)
         return self.risk.calculate(portfolio, pricing)
@@ -258,21 +259,22 @@ class HierarchyEngine:
         self,
         portfolio: Portfolio,
         pricing: PricingEngine,
-        risk: dict,
+        risk: RiskSummary,
         market: MarketSnapshot,
         stress: Sequence[StressResult] | None = None,
     ) -> list[LimitResult]:
-        enriched = dict(risk)
-        if stress is not None and "stress_loss" not in enriched:
-            enriched["stress_loss"] = max(
+        extra: dict[str, float] = {}
+        if stress is not None:
+            extra["stress_loss"] = max(
                 0.0, max((-float(s.pnl) for s in stress), default=0.0)
             )
         return self.limit_engine.evaluate(
             portfolio,
             pricing,
-            enriched,
+            risk,
             DEFAULT_LIMITS,
             market=market,
+            extra=extra or None,
         )
 
     def _trade_artifacts(
@@ -349,15 +351,15 @@ class HierarchyEngine:
             name=name,
             level=level,  # type: ignore[arg-type]
             path=path,
-            market_value=float(r["market_value"]),
-            delta=float(r.get("delta", 0.0)),
-            gamma=float(r.get("gamma", 0.0)),
-            vega=float(r.get("vega", 0.0)),
-            dv01=float(r.get("dv01", 0.0)),
-            fx_delta=float(r.get("fx_delta", 0.0)),
-            var_95=float(r.get("var_95", 0.0)),
-            var_99=float(r["var_99"]),
-            expected_shortfall_99=float(r.get("expected_shortfall_99", 0.0)),
+            market_value=float(r.market_value),
+            delta=float(r.delta),
+            gamma=float(r.gamma),
+            vega=float(r.vega),
+            dv01=float(r.dv01),
+            fx_delta=float(r.fx_delta),
+            var_95=float(r.var_95),
+            var_99=float(r.var_99),
+            expected_shortfall_99=float(r.expected_shortfall_99),
             stress=stress,
             limits=self._limits(portfolio, pricing, r, market, stress),
             children=list(children or []),

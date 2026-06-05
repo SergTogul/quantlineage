@@ -47,7 +47,7 @@ def test_var_methodology_enum_values():
 def test_default_methodology_is_delta_gamma():
     engine = HistoricalRiskEngine(seed=1, observations=50)
     r = engine.calculate(SAMPLE_PORTFOLIO, BuiltinPricingEngine(), market=SAMPLE_MARKET)
-    assert r['methodology'] == 'DELTA_GAMMA'
+    assert r.methodology == 'DELTA_GAMMA'
     report = VaRAnalytics(seed=1, observations=50).report(SAMPLE_PORTFOLIO, BuiltinPricingEngine(), market=SAMPLE_MARKET)
     assert report.methodology == VaRMethodology.DELTA_GAMMA
 
@@ -58,10 +58,10 @@ def test_zero_shocks_yield_near_zero_var_all_methodologies():
     book = _option_book()
     for meth in VaRMethodology:
         r = engine.calculate(book, pricing, methodology=meth, market=_option_market())
-        assert r['var_95'] == 0.0
-        assert r['var_99'] == 0.0
-        assert r['expected_shortfall_99'] == 0.0
-        assert abs(r['market_value']) > 0.0
+        assert r.var_95 == 0.0
+        assert r.var_99 == 0.0
+        assert r.expected_shortfall_99 == 0.0
+        assert abs(r.market_value) > 0.0
 
 def test_full_reval_differs_from_linear_on_options_book():
     pricing = BuiltinPricingEngine()
@@ -72,10 +72,10 @@ def test_full_reval_differs_from_linear_on_options_book():
     linear = engine.calculate(book, pricing, methodology=VaRMethodology.LINEAR, market=market)
     full = engine.calculate(book, pricing, methodology=VaRMethodology.FULL_REVALUATION, market=market)
     dg = engine.calculate(book, pricing, methodology=VaRMethodology.DELTA_GAMMA, market=market)
-    assert abs(full['var_99'] - linear['var_99']) > 1.0
-    assert abs(full['var_99'] - dg['var_99']) > 1e-06
-    assert linear['methodology'] == 'LINEAR'
-    assert full['methodology'] == 'FULL_REVALUATION'
+    assert abs(full.var_99 - linear.var_99) > 1.0
+    assert abs(full.var_99 - dg.var_99) > 1e-06
+    assert linear.methodology == 'LINEAR'
+    assert full.methodology == 'FULL_REVALUATION'
 
 def test_linear_omits_gamma_vs_delta_gamma():
     pricing = BuiltinPricingEngine()
@@ -86,7 +86,7 @@ def test_linear_omits_gamma_vs_delta_gamma():
     linear = engine.calculate(book, pricing, methodology=VaRMethodology.LINEAR, market=market)
     dg = engine.calculate(book, pricing, methodology=VaRMethodology.DELTA_GAMMA, market=market)
     assert book.positions
-    assert abs(linear['var_99'] - dg['var_99']) > 1e-06
+    assert abs(linear.var_99 - dg.var_99) > 1e-06
 
 def test_var_report_exposes_methodology_and_reconciles_contributions():
     pricing = BuiltinPricingEngine()
@@ -114,6 +114,6 @@ def test_delta_gamma_default_matches_legacy_seeded_numbers():
     """Regression: default path remains the pre-M2.3 Δ-Γ approximation."""
     pricing = BuiltinPricingEngine()
     r = HistoricalRiskEngine(seed=1, observations=750).calculate(SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET)
-    assert r['methodology'] == 'DELTA_GAMMA'
-    assert r['var_99'] >= r['var_95'] >= 0.0
-    assert r['expected_shortfall_99'] >= r['var_99']
+    assert r.methodology == 'DELTA_GAMMA'
+    assert r.var_99 >= r.var_95 >= 0.0
+    assert r.expected_shortfall_99 >= r.var_99

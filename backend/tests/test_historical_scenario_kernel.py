@@ -170,8 +170,8 @@ def test_historical_engine_native_var_matches_python(native_scenario_lib, monkey
             SAMPLE_PORTFOLIO, pricing, methodology=meth, market=SAMPLE_MARKET
         )
         for key in ("var_95", "var_99", "expected_shortfall_99", "market_value", "delta", "gamma"):
-            assert nat[key] == pytest.approx(
-                py[key], rel=KERNEL_PNL_REL_TOL, abs=KERNEL_PNL_ABS_TOL
+            assert getattr(nat, key) == pytest.approx(
+                getattr(py, key), rel=KERNEL_PNL_REL_TOL, abs=KERNEL_PNL_ABS_TOL
             ), key
 
 def test_env_native_backend_loads_lib(native_scenario_lib, monkeypatch):
@@ -223,8 +223,8 @@ def test_full_revaluation_path_unaffected_by_native_flag(native_scenario_lib, mo
         methodology=VaRMethodology.FULL_REVALUATION,
         market=SAMPLE_MARKET,
     )
-    assert out["methodology"] == "FULL_REVALUATION"
-    assert out["var_95"] >= 0.0
+    assert out.methodology == "FULL_REVALUATION"
+    assert out.var_95 >= 0.0
     # Smoke: full_revaluation helper still documents/runs independently of kernel.
     from app.sample import demo_market_snapshot
 

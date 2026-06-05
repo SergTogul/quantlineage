@@ -52,7 +52,7 @@ def compare_methodologies(
     results: list[VaRMethodologyMetrics] = []
     for meth in meths:
         t0 = time.perf_counter()
-        raw = engine.calculate(
+        result = engine.calculate(
             portfolio,
             pricing_engine,
             methodology=meth,
@@ -62,9 +62,9 @@ def compare_methodologies(
         results.append(
             VaRMethodologyMetrics(
                 methodology=meth,
-                var_95=float(raw["var_95"]),
-                var_99=float(raw["var_99"]),
-                expected_shortfall_99=float(raw["expected_shortfall_99"]),
+                var_95=float(result.var_95),
+                var_99=float(result.var_99),
+                expected_shortfall_99=float(result.expected_shortfall_99),
                 runtime_ms=float(elapsed_ms),
             )
         )

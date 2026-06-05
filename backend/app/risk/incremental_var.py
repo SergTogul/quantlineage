@@ -105,25 +105,6 @@ def apply_what_if_changes(
     return portfolio.model_copy(update={"positions": positions})
 
 
-def _summary_from_dict(portfolio_id: str, raw: Mapping[str, Any], methodology: VaRMethodology) -> RiskSummary:
-    meth = raw.get("methodology", methodology)
-    if isinstance(meth, str):
-        meth = VaRMethodology(meth)
-    return RiskSummary(
-        portfolio_id=portfolio_id,
-        market_value=float(raw["market_value"]),
-        delta=float(raw["delta"]),
-        gamma=float(raw["gamma"]),
-        vega=float(raw["vega"]),
-        dv01=float(raw["dv01"]),
-        fx_delta=float(raw.get("fx_delta", 0.0)),
-        var_95=float(raw["var_95"]),
-        var_99=float(raw["var_99"]),
-        expected_shortfall_99=float(raw["expected_shortfall_99"]),
-        methodology=meth,
-    )
-
-
 def _calculate(
     portfolio: Portfolio,
     pricing: PricingEngine,
@@ -132,13 +113,13 @@ def _calculate(
     market: MarketSnapshot | None = None,
 ) -> RiskSummary:
     if isinstance(risk_engine, HistoricalRiskEngine):
-        raw = risk_engine.calculate(
+        return risk_engine.calculate(
             portfolio, pricing, methodology=methodology, market=market
         )
-    else:
-        raw = risk_engine.calculate(portfolio, pricing)
-        raw = {**raw, "methodology": methodology.value}
-    return _summary_from_dict(portfolio.id, raw, methodology)
+    result = risk_engine.calculate(portfolio, pricing)
+    if result.methodology == methodology:
+        return result
+    return result.model_copy(update={"methodology": methodology})
 
 
 def _incremental(before: RiskSummary, after: RiskSummary) -> WhatIfIncrementalRisk:
