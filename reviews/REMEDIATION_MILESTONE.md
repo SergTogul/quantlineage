@@ -853,9 +853,22 @@ container; no FastAPI in `app.risk` / `app.domain`.
 
 Report: `reviews/r0.9.2-typed-risk-results-report.md`.
 
-## R0.9.3 Explicit application composition
+## R0.9.3 Explicit application composition — COMPLETE (2026-09-09); RF-010 CLOSED
 
-Replace process-global orchestration objects with application/lifespan composition.
+`PortfolioService` is constructed in FastAPI lifespan via the existing
+`build_portfolio_service()` factory and stored on `app.state.portfolio_service`.
+`get_portfolio_service(request)` reads that attribute (same pattern as
+`get_risk_run_worker`). `RiskRunWorker` is built with the same instance.
+`app.main.service` is a thin module `__getattr__` alias to the lifespan
+instance (factory fallback when lifespan has not run). No DI container /
+service locator framework. Risk numbers unchanged.
+
+**RF-010 CLOSED** — four acceptance cells MET (domain without FastAPI; schemas
+split; typed results; explicit composition). Named residual: dual-use
+`AttributionRequest` / `RiskChangeAttributionRequest` / `WhatIfRequest` stay
+in domain. Independent review pending.
+
+Report: `reviews/r0.9.3-application-composition-report.md`.
 
 ## R0.9.4 Keep refactor bounded
 
@@ -865,6 +878,9 @@ Do not introduce:
 - DI containers;
 - unnecessary repository interfaces;
 - one-file-per-class churn.
+
+R0.9.1–R0.9.3 followed this bound (no DI container; no one-file-per-class split
+of `PortfolioService`).
 
 ### Exit criteria
 

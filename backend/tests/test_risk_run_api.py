@@ -25,15 +25,15 @@ from app.services.risk_run_worker import SUPPORTED_RUN_TYPES, RiskRunWorker, exe
 
 @pytest.fixture
 def client():
-    from app.api import deps
-    previous = deps.portfolio_service.market_data
-    # Production panel covers NVDA/SPY (not AAPL); keep fixtures panel-compatible.
-    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market("NVDA", 190.0))
-    try:
-        with TestClient(app) as c:
+    with TestClient(app) as c:
+        svc = c.app.state.portfolio_service
+        previous = svc.market_data
+        # Production panel covers NVDA/SPY (not AAPL); keep fixtures panel-compatible.
+        svc.market_data = FixedMarketProvider(equity_spot_market("NVDA", 190.0))
+        try:
             yield c
-    finally:
-        deps.portfolio_service.market_data = previous
+        finally:
+            svc.market_data = previous
 
 @pytest.fixture
 def tiny_portfolio() -> Portfolio:
@@ -243,7 +243,6 @@ def test_typed_request_rejects_ambiguous_file_dataset_id(client, tiny_portfolio,
 def test_typed_request_rebinds_csv_path_dataset(client, tiny_portfolio, tmp_path, monkeypatch):
     """Process CSV A + request CSV B must COMPLETE on B's identity, never A's."""
     monkeypatch.delenv('RISKFORGE_HISTORICAL_DATASET', raising=False)
-    from app.api import deps
     from app.risk.historical_data import file_csv_dataset_id
     from app.services.risk_factories import build_portfolio_service
 
@@ -257,9 +256,11 @@ def test_typed_request_rebinds_csv_path_dataset(client, tiny_portfolio, tmp_path
             encoding='utf-8',
         )
 
-    previous = deps.portfolio_service
-    deps.portfolio_service = build_portfolio_service(historical_dataset_id=str(path_a))
-    deps.portfolio_service.market_data = previous.market_data
+    previous = client.app.state.portfolio_service
+    replacement = build_portfolio_service(historical_dataset_id=str(path_a))
+    replacement.market_data = previous.market_data
+    client.app.state.portfolio_service = replacement
+    client.app.state.risk_run_worker._portfolio_service = replacement
     try:
         created = client.post(
             '/risk/runs',
@@ -282,7 +283,8 @@ def test_typed_request_rebinds_csv_path_dataset(client, tiny_portfolio, tmp_path
         assert done['historical_dataset_id'] == expected_b
         assert done['results'][0]['result_type'] == 'summary'
     finally:
-        deps.portfolio_service = previous
+        client.app.state.portfolio_service = previous
+        client.app.state.risk_run_worker._portfolio_service = previous
 
 
 def test_worker_fails_run_on_execution_error(tiny_portfolio):

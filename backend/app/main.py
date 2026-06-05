@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.attribution import router as attribution_router
 from app.api.auth import SharedTokenMiddleware, require_shared_auth_configured
-from app.api.deps import portfolio_service
+from app.api.deps import fallback_portfolio_service
 from app.api.errors import register_exception_handlers
 from app.api.health import router as health_router
 from app.api.legacy_deprecation import LegacyDeprecationMiddleware
@@ -19,14 +19,8 @@ from app.api.risk_runs import router as risk_runs_router
 from app.api.stress import router as stress_router
 from app.api.workload import WorkloadBodyLimitMiddleware, enforce_workload_limits
 from app.persistence.wiring import build_persistence_wiring
+from app.services.risk_factories import build_portfolio_service
 from app.services.risk_run_worker import RiskRunWorker
-
-# Default in-memory worker; lifespan may replace with SQLAlchemy-backed worker
-# when RISKFORGE_DATABASE_URL is set (M5.6).
-risk_run_worker = RiskRunWorker(portfolio_service)
-
-# Backward-compatible alias for tests/tools that import ``app.main.service``.
-service = portfolio_service
 
 API_V1_PREFIX = "/api/v1"
 
@@ -53,6 +47,10 @@ async def lifespan(app: FastAPI):
 
     Shared / non-loopback profiles fail closed here unless ``RISKFORGE_API_TOKEN``
     is set (R0.11.5). Local loopback / default Compose stays unauthenticated.
+
+    ``PortfolioService`` is constructed here via ``build_portfolio_service()``
+    and stored on ``app.state`` so HTTP Depends and ``RiskRunWorker`` share
+    one instance (R0.9.3).
     """
     require_shared_auth_configured()
     wiring = build_persistence_wiring()
@@ -64,10 +62,12 @@ async def lifespan(app: FastAPI):
     app.state.scenario_definition_repo = wiring.scenario_definition_repo
     app.state.limit_definition_repo = wiring.limit_definition_repo
 
+    service = build_portfolio_service()
+    app.state.portfolio_service = service
     if wiring.enabled and wiring.session_factory is not None:
-        worker = RiskRunWorker(portfolio_service, session_factory=wiring.session_factory)
+        worker = RiskRunWorker(service, session_factory=wiring.session_factory)
     else:
-        worker = risk_run_worker
+        worker = RiskRunWorker(service)
         worker.ensure_running()
 
     app.state.risk_run_worker = worker
@@ -106,3 +106,18 @@ for _router in _DOMAIN_ROUTERS:
 # risk_runs router paths are /runs, /runs/{id} — mount once under /risk and /api/v1/risk.
 app.include_router(risk_runs_router, prefix="/risk")
 app.include_router(risk_runs_router, prefix=f"{API_V1_PREFIX}/risk")
+
+
+def __getattr__(name: str):
+    """``app.main.service`` is a thin alias to the lifespan instance.
+
+    Before lifespan (legacy TestClient without context manager), this returns
+    the same factory fallback ``get_portfolio_service`` uses so tests/tools do
+    not observe a second live service.
+    """
+    if name != "service":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    svc = getattr(app.state, "portfolio_service", None)
+    if svc is not None:
+        return svc
+    return fallback_portfolio_service()
