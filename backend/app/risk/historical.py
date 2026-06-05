@@ -23,6 +23,7 @@ from app.domain.models import (
     MarketSnapshot,
     Portfolio,
     Position,
+    RiskSummary,
     SwapPosition,
     Valuation,
     VaRMethodology,
@@ -511,7 +512,7 @@ class HistoricalRiskEngine(RiskEngine):
         pricing_engine: PricingEngine,
         methodology: VaRMethodology | None = None,
         market: MarketSnapshot | None = None,
-    ) -> dict:
+    ) -> RiskSummary:
         meth = methodology if methodology is not None else self.methodology
         # Production path: caller must supply the snapshot. Demo inference is
         # reserved for named demo helpers / tests, not this engine.
@@ -556,15 +557,18 @@ class HistoricalRiskEngine(RiskEngine):
         var99 = float(max(0.0, np.quantile(losses, 0.99)))
         tail = losses[losses >= var99]
         es99 = float(max(0.0, tail.mean() if len(tail) else var99))
-        return {
-            "market_value": float(mv),
-            "delta": float(delta),
-            "gamma": float(gamma),
-            "vega": float(vega),
-            "dv01": float(dv01),
-            "fx_delta": float(fx_delta),
-            "var_95": var95,
-            "var_99": var99,
-            "expected_shortfall_99": es99,
-            "methodology": meth.value if isinstance(meth, VaRMethodology) else str(meth),
-        }
+        if not isinstance(meth, VaRMethodology):
+            meth = VaRMethodology(str(meth))
+        return RiskSummary(
+            portfolio_id=portfolio.id,
+            market_value=float(mv),
+            delta=float(delta),
+            gamma=float(gamma),
+            vega=float(vega),
+            dv01=float(dv01),
+            fx_delta=float(fx_delta),
+            var_95=var95,
+            var_99=var99,
+            expected_shortfall_99=es99,
+            methodology=meth,
+        )

@@ -8,12 +8,15 @@ status. Warning bands are per-limit via ``RiskLimit.warning_threshold_pct``
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from app.domain.models import (
     LimitResult,
     LimitStatus,
     MarketSnapshot,
     Portfolio,
     RiskLimit,
+    RiskSummary,
 )
 from app.interfaces.pricing import PricingEngine
 
@@ -107,14 +110,26 @@ def _concentration_pct(
     return max(values, default=0.0) / gross * 100.0
 
 
+def _risk_abs(
+    risk: RiskSummary,
+    name: str,
+    extra: Mapping[str, float] | None = None,
+    default: float = 0.0,
+) -> float:
+    if extra is not None and name in extra:
+        return abs(float(extra[name]))
+    return abs(float(getattr(risk, name, default)))
+
+
 def _key_rate_dv01_abs(
     portfolio: Portfolio,
     pricing_engine: PricingEngine,
-    risk: dict[str, float],
+    risk: RiskSummary,
     market: MarketSnapshot | None = None,
+    extra: Mapping[str, float] | None = None,
 ) -> float:
-    if "key_rate_dv01" in risk:
-        return abs(float(risk["key_rate_dv01"]))
+    if extra is not None and "key_rate_dv01" in extra:
+        return abs(float(extra["key_rate_dv01"]))
     # Lazy: avoid importing sensitivities at module load for light callers.
     from app.risk.sensitivities import SensitivityEngine
 
@@ -123,18 +138,18 @@ def _key_rate_dv01_abs(
     )
     if not measures:
         # Fall back to parallel DV01 when no key-rate pillars are available.
-        return abs(float(risk.get("dv01", 0.0)))
+        return abs(float(risk.dv01))
     return max(abs(m.value) for m in measures)
 
 
 def _stress_loss_abs(
     portfolio: Portfolio,
     pricing_engine: PricingEngine,
-    risk: dict[str, float],
     market: MarketSnapshot | None = None,
+    extra: Mapping[str, float] | None = None,
 ) -> float:
-    if "stress_loss" in risk:
-        return abs(float(risk["stress_loss"]))
+    if extra is not None and "stress_loss" in extra:
+        return abs(float(extra["stress_loss"]))
     from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 
     results = StressEngine().run(
@@ -151,9 +166,10 @@ class LimitEngine:
         self,
         portfolio: Portfolio,
         pricing_engine: PricingEngine,
-        risk: dict[str, float],
+        risk: RiskSummary,
         needed: set[str] | None = None,
         market: MarketSnapshot | None = None,
+        extra: Mapping[str, float] | None = None,
     ) -> dict[str, float]:
         """Absolute metric values used for utilization / breach checks."""
         want = needed or {
@@ -169,28 +185,28 @@ class LimitEngine:
         }
         out: dict[str, float] = {}
         if "var_99" in want:
-            out["var_99"] = abs(float(risk.get("var_99", 0.0)))
+            out["var_99"] = _risk_abs(risk, "var_99", extra)
         if "var_95" in want:
-            out["var_95"] = abs(float(risk.get("var_95", 0.0)))
+            out["var_95"] = _risk_abs(risk, "var_95", extra)
         if "expected_shortfall_99" in want:
-            out["expected_shortfall_99"] = abs(float(risk.get("expected_shortfall_99", 0.0)))
+            out["expected_shortfall_99"] = _risk_abs(risk, "expected_shortfall_99", extra)
         if "dv01" in want:
-            out["dv01"] = abs(float(risk.get("dv01", 0.0)))
+            out["dv01"] = _risk_abs(risk, "dv01", extra)
         if "vega" in want:
-            out["vega"] = abs(float(risk.get("vega", 0.0)))
+            out["vega"] = _risk_abs(risk, "vega", extra)
         if "fx_delta" in want:
-            out["fx_delta"] = abs(float(risk.get("fx_delta", 0.0)))
+            out["fx_delta"] = _risk_abs(risk, "fx_delta", extra)
         if "single_position_pct" in want:
             out["single_position_pct"] = _concentration_pct(
                 portfolio, pricing_engine, market
             )
         if "key_rate_dv01" in want:
             out["key_rate_dv01"] = _key_rate_dv01_abs(
-                portfolio, pricing_engine, risk, market
+                portfolio, pricing_engine, risk, market, extra
             )
         if "stress_loss" in want:
             out["stress_loss"] = _stress_loss_abs(
-                portfolio, pricing_engine, risk, market
+                portfolio, pricing_engine, market, extra
             )
         return out
 
@@ -198,13 +214,14 @@ class LimitEngine:
         self,
         portfolio: Portfolio,
         pricing_engine: PricingEngine,
-        risk: dict[str, float],
+        risk: RiskSummary,
         limits: list[RiskLimit],
         market: MarketSnapshot | None = None,
+        extra: Mapping[str, float] | None = None,
     ) -> list[LimitResult]:
         needed = {item.metric for item in limits}
         metrics = self.resolve_metrics(
-            portfolio, pricing_engine, risk, needed, market=market
+            portfolio, pricing_engine, risk, needed, market=market, extra=extra
         )
         results: list[LimitResult] = []
         for item in limits:

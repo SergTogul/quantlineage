@@ -73,4 +73,4 @@ def test_what_if_remove_matches_apply_helper():
     after_pf = apply_what_if_changes(SAMPLE_PORTFOLIO, [{'operation': 'remove', 'position_id': 'opt-spy-put'}])
     market = svc.market_snapshot(SAMPLE_PORTFOLIO)
     direct = svc.risk.calculate(after_pf, svc.pricing, methodology=VaRMethodology.DELTA_GAMMA, market=market)
-    assert math.isclose(report.after.var_99, direct['var_99'], abs_tol=_TOL)
+    assert math.isclose(report.after.var_99, direct.var_99, abs_tol=_TOL)

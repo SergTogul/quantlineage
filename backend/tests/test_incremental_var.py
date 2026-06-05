@@ -65,11 +65,11 @@ def test_incremental_var_equals_after_minus_before():
     before = engine.calculate(SAMPLE_PORTFOLIO, pricing, methodology=VaRMethodology.DELTA_GAMMA, market=market)
     after_pf = apply_what_if_changes(SAMPLE_PORTFOLIO, [{'operation': 'add', 'position': trade}])
     after = engine.calculate(after_pf, pricing, methodology=VaRMethodology.DELTA_GAMMA, market=market)
-    assert math.isclose(result.before.var_99, before['var_99'], abs_tol=_TOL)
-    assert math.isclose(result.after.var_99, after['var_99'], abs_tol=_TOL)
-    assert math.isclose(result.incremental.var_99, after['var_99'] - before['var_99'], abs_tol=_TOL)
-    assert math.isclose(result.incremental.var_95, after['var_95'] - before['var_95'], abs_tol=_TOL)
-    assert math.isclose(result.incremental.expected_shortfall_99, after['expected_shortfall_99'] - before['expected_shortfall_99'], abs_tol=_TOL)
+    assert math.isclose(result.before.var_99, before.var_99, abs_tol=_TOL)
+    assert math.isclose(result.after.var_99, after.var_99, abs_tol=_TOL)
+    assert math.isclose(result.incremental.var_99, after.var_99 - before.var_99, abs_tol=_TOL)
+    assert math.isclose(result.incremental.var_95, after.var_95 - before.var_95, abs_tol=_TOL)
+    assert math.isclose(result.incremental.expected_shortfall_99, after.expected_shortfall_99 - before.expected_shortfall_99, abs_tol=_TOL)
 
 def test_removing_all_risk_positions_reduces_var():
     """Removing a long equity sleeve should not increase VaR (typically lowers it)."""
@@ -97,4 +97,4 @@ def test_zero_portfolio_add_trade_incremental_equals_standalone_var():
     result = incremental_var(empty, pricing, changes=[{'operation': 'add', 'position': trade}], risk_engine=engine, market=market)
     standalone = engine.calculate(after, pricing, market=market)
     assert result.before.var_99 == 0.0
-    assert math.isclose(result.incremental.var_99, standalone['var_99'], abs_tol=_TOL)
+    assert math.isclose(result.incremental.var_99, standalone.var_99, abs_tol=_TOL)

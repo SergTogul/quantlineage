@@ -45,11 +45,11 @@ def test_compare_metrics_match_direct_engine_calculate():
         direct = engine.calculate(
             SAMPLE_PORTFOLIO, pricing, methodology=row.methodology, market=SAMPLE_MARKET
         )
-        assert math.isclose(row.var_95, direct["var_95"], rel_tol=0.0, abs_tol=_TOL)
-        assert math.isclose(row.var_99, direct["var_99"], rel_tol=0.0, abs_tol=_TOL)
+        assert math.isclose(row.var_95, direct.var_95, rel_tol=0.0, abs_tol=_TOL)
+        assert math.isclose(row.var_99, direct.var_99, rel_tol=0.0, abs_tol=_TOL)
         assert math.isclose(
             row.expected_shortfall_99,
-            direct["expected_shortfall_99"],
+            direct.expected_shortfall_99,
             rel_tol=0.0,
             abs_tol=_TOL,
         )
@@ -95,7 +95,7 @@ def test_linear_equals_delta_gamma_when_gamma_zero():
     greeks = engine.calculate(
         equity_only, pricing, methodology=VaRMethodology.LINEAR, market=market
     )
-    assert abs(greeks["gamma"]) < 1e-12
+    assert abs(greeks.gamma) < 1e-12
     report = compare_methodologies(
         equity_only,
         pricing,

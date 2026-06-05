@@ -153,9 +153,9 @@ def test_node_ids_do_not_change_var_es_or_additive_reconciliation():
             _reconcile(child)
     _reconcile(root)
     expected = risk.calculate(pf, pricing, market=market)
-    assert math.isclose(root.var_95, expected['var_95'], abs_tol=1e-09)
-    assert math.isclose(root.var_99, expected['var_99'], abs_tol=1e-09)
-    assert math.isclose(root.expected_shortfall_99, expected['expected_shortfall_99'], abs_tol=1e-09)
+    assert math.isclose(root.var_95, expected.var_95, abs_tol=1e-09)
+    assert math.isclose(root.var_99, expected.var_99, abs_tol=1e-09)
+    assert math.isclose(root.expected_shortfall_99, expected.expected_shortfall_99, abs_tol=1e-09)
     assert math.isclose(root.market_value, 3500.0, abs_tol=1e-09)
 
 def _assert_unique_nonempty_ids(root: HierarchyNode) -> list[str]:

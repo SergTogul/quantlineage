@@ -52,7 +52,7 @@ def dataset_from_pnl(pnl: np.ndarray) -> ArrayHistoricalDataset:
     )
 
 
-def historical_result(pnl: np.ndarray) -> dict:
+def historical_result(pnl: np.ndarray):
     return HistoricalRiskEngine(
         dataset=dataset_from_pnl(pnl),
         methodology=VaRMethodology.LINEAR,
@@ -102,9 +102,9 @@ def test_exact_hand_computed_var_es_goldens(
     analytics95 = historical_method(pnl, 0.95)
     analytics99 = historical_method(pnl, 0.99)
 
-    assert result["var_95"] == pytest.approx(var95, rel=0, abs=ABS_TOL), case
-    assert result["var_99"] == pytest.approx(var99, rel=0, abs=ABS_TOL), case
-    assert result["expected_shortfall_99"] == pytest.approx(es99, rel=0, abs=ABS_TOL), case
+    assert result.var_95 == pytest.approx(var95, rel=0, abs=ABS_TOL), case
+    assert result.var_99 == pytest.approx(var99, rel=0, abs=ABS_TOL), case
+    assert result.expected_shortfall_99 == pytest.approx(es99, rel=0, abs=ABS_TOL), case
     assert analytics95.var == pytest.approx(var95, rel=0, abs=ABS_TOL), case
     assert analytics95.expected_shortfall == pytest.approx(es95, rel=0, abs=ABS_TOL), case
     assert analytics99.var == pytest.approx(var99, rel=0, abs=ABS_TOL), case
@@ -112,9 +112,9 @@ def test_exact_hand_computed_var_es_goldens(
 
     # R0 requires explicit engine-to-analytics parity for cases A-D.
     if case in {"A", "B", "C", "D"}:
-        assert result["var_95"] == pytest.approx(analytics95.var, rel=0, abs=ABS_TOL)
-        assert result["var_99"] == pytest.approx(analytics99.var, rel=0, abs=ABS_TOL)
-        assert result["expected_shortfall_99"] == pytest.approx(
+        assert result.var_95 == pytest.approx(analytics95.var, rel=0, abs=ABS_TOL)
+        assert result.var_99 == pytest.approx(analytics99.var, rel=0, abs=ABS_TOL)
+        assert result.expected_shortfall_99 == pytest.approx(
             analytics99.expected_shortfall,
             rel=0,
             abs=ABS_TOL,
@@ -170,6 +170,6 @@ def test_historical_engine_es99_includes_var_threshold() -> None:
     """
     pnl = -np.arange(0.0, 101.0)
     result = historical_result(pnl)
-    assert result["var_99"] == pytest.approx(99.0, rel=0, abs=ABS_TOL)
-    assert result["expected_shortfall_99"] == pytest.approx(99.5, rel=0, abs=ABS_TOL)
-    assert result["expected_shortfall_99"] != pytest.approx(100.0, rel=0, abs=ABS_TOL)
+    assert result.var_99 == pytest.approx(99.0, rel=0, abs=ABS_TOL)
+    assert result.expected_shortfall_99 == pytest.approx(99.5, rel=0, abs=ABS_TOL)
+    assert result.expected_shortfall_99 != pytest.approx(100.0, rel=0, abs=ABS_TOL)

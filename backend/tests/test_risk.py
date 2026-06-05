@@ -20,8 +20,8 @@ def test_var_ordering_and_es():
     r = HistoricalRiskEngine().calculate(
         SAMPLE_PORTFOLIO, BuiltinPricingEngine(), market=SAMPLE_MARKET
     )
-    assert r["var_99"] >= r["var_95"] >= 0
-    assert r["expected_shortfall_99"] >= r["var_99"]
+    assert r.var_99 >= r.var_95 >= 0
+    assert r.expected_shortfall_99 >= r.var_99
 
 
 def test_stress_returns_position_breakdown():

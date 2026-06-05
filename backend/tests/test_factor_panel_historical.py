@@ -139,7 +139,7 @@ def test_bare_historical_engine_has_no_panel_and_broadcasts():
     vals = PRICING.value_portfolio(book, market)
     broadcast_pnl = (vals[0].delta + vals[1].delta) * -0.1
     assert broadcast_pnl < 0.0
-    assert result['var_95'] == pytest.approx(-broadcast_pnl, abs=1e-12)
+    assert result.var_95 == pytest.approx(-broadcast_pnl, abs=1e-12)
 
 def test_engine_with_factor_panel_uses_per_name_moves():
     book, market = _equity_book()
@@ -149,5 +149,5 @@ def test_engine_with_factor_panel_uses_per_name_moves():
     vals = PRICING.value_portfolio(book, market)
     panel_pnl = vals[0].delta * 0.1 + vals[1].delta * -0.2
     broadcast_pnl = (vals[0].delta + vals[1].delta) * 0.1
-    assert result['var_95'] == pytest.approx(max(0.0, -panel_pnl), abs=1e-12)
-    assert result['var_95'] != pytest.approx(max(0.0, -broadcast_pnl))
+    assert result.var_95 == pytest.approx(max(0.0, -panel_pnl), abs=1e-12)
+    assert result.var_95 != pytest.approx(max(0.0, -broadcast_pnl))

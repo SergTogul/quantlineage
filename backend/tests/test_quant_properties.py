@@ -310,7 +310,7 @@ def test_empty_portfolio_has_zero_aggregate_risk():
         "var_99",
         "expected_shortfall_99",
     ):
-        assert r[key] == 0.0
+        assert getattr(r, key) == 0.0
 
 
 # FD-stable domain: near-ATM, not-too-short T, not-too-low vol.
