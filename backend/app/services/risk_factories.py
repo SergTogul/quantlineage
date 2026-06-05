@@ -155,7 +155,7 @@ def build_portfolio_service(
 ) -> PortfolioService:
     """Construct the process-wide pricing + historical risk stack.
 
-    Used by FastAPI ``deps.portfolio_service`` and Compose ``app.worker``.
+    Used by FastAPI lifespan (``app.state.portfolio_service``) and Compose ``app.worker``.
     Optional kwargs rebuild the historical engine for a rebound run spec.
     """
     engine = build_historical_risk_engine(
