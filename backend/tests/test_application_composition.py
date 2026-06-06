@@ -27,6 +27,11 @@ DI_CONTAINER_MODULES = frozenset(
         "that_depends",
     }
 )
+# Renamed caches such as ``_legacy_portfolio_service = build_portfolio_service()``.
+FORBIDDEN_SERVICE_CACHE_MARKERS = (
+    "_legacy_portfolio_service",
+    "fallback_portfolio_service",
+)
 
 
 @pytest.fixture
@@ -34,24 +39,50 @@ def clear_db_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("RISKFORGE_DATABASE_URL", raising=False)
 
 
+def _call_name(func: ast.expr) -> str | None:
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
+
+
 def _top_level_assign_calls(path: Path) -> list[tuple[str, str]]:
-    """Return (target_name, called_func) for module-level ``x = func(...)``."""
+    """Return (target_name, called_func) for module-level ``x = func(...)``.
+
+    Includes annotated assignments so ``_cache: T = build_portfolio_service()``
+    cannot sneak past a pin that only walks ``ast.Assign``.
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"))
     found: list[tuple[str, str]] = []
     for node in tree.body:
-        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Call):
+        value: ast.expr | None = None
+        names: list[str] = []
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            value = node.value
+            names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.target, ast.Name)
+        ):
+            value = node.value
+            names = [node.target.id]
+        if value is None:
             continue
-        func = node.value.func
-        if isinstance(func, ast.Name):
-            called = func.id
-        elif isinstance(func, ast.Attribute):
-            called = func.attr
-        else:
+        called = _call_name(value.func)
+        if called is None:
             continue
-        for target in node.targets:
-            if isinstance(target, ast.Name):
-                found.append((target.id, called))
+        found.extend((name, called) for name in names)
     return found
+
+
+def _calls_named(path: Path, func_name: str) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and _call_name(node.func) == func_name:
+            return True
+    return False
 
 
 def _imported_modules(path: Path) -> set[str]:
@@ -66,19 +97,34 @@ def _imported_modules(path: Path) -> set[str]:
 
 
 def test_deps_does_not_assign_module_global_portfolio_service() -> None:
-    """HTTP composition must not be ``portfolio_service = build_portfolio_service()``."""
+    """HTTP composition must not call ``build_portfolio_service`` in deps at all.
+
+    Any name counts (``portfolio_service``, ``_legacy_portfolio_service``, …).
+    """
+    for path in (DEPS_PATH, MAIN_PATH):
+        source = path.read_text(encoding="utf-8")
+        for marker in FORBIDDEN_SERVICE_CACHE_MARKERS:
+            assert marker not in source, (
+                f"module-global service cache still present in {path.name}: {marker}"
+            )
     assigned = _top_level_assign_calls(DEPS_PATH)
     offenders = [
         f"{name} = {called}()"
         for name, called in assigned
-        if name == "portfolio_service" and called == "build_portfolio_service"
+        if called == "build_portfolio_service"
     ]
     assert not offenders, f"module-global service singleton still present: {offenders}"
+    assert not _calls_named(DEPS_PATH, "build_portfolio_service"), (
+        "deps.py must not call build_portfolio_service (lifespan in main.py owns that)"
+    )
 
 
 def test_get_portfolio_service_takes_request_like_worker() -> None:
     params = inspect.signature(get_portfolio_service).parameters
     assert "request" in params, "get_portfolio_service must read app.state from Request"
+    source = inspect.getsource(get_portfolio_service)
+    assert "HTTP_503_SERVICE_UNAVAILABLE" in source
+    assert "fallback" not in source.lower()
 
 
 def test_lifespan_sets_portfolio_service_on_app_state(clear_db_url: None) -> None:
@@ -134,8 +180,9 @@ def test_composition_modules_do_not_import_di_container() -> None:
         assert not hit, f"{path.name} imports DI container: {sorted(hit)}"
 
 
-def test_http_portfolio_service_fallback_without_lifespan(clear_db_url: None) -> None:
-    """Legacy TestClient without lifespan: no 503; honest factory fallback."""
+def test_http_portfolio_service_without_lifespan_is_503(clear_db_url: None) -> None:
+    """TestClient without lifespan must fail closed (503), not a module-global cache."""
+    from app import main
     from app.main import app
 
     for attr in (
@@ -150,16 +197,14 @@ def test_http_portfolio_service_fallback_without_lifespan(clear_db_url: None) ->
         if hasattr(app.state, attr):
             delattr(app.state, attr)
 
-    from app import main
-    from app.api.deps import fallback_portfolio_service
+    assert getattr(app.state, "portfolio_service", None) is None
+    with pytest.raises(AttributeError, match="lifespan"):
+        _ = main.service
 
     client = TestClient(app)
     assert getattr(client.app.state, "portfolio_service", None) is None
-    assert main.service is fallback_portfolio_service()
-
     resp = client.post(
         "/risk/summary",
         json=SAMPLE_PORTFOLIO.model_dump(mode="json"),
     )
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["portfolio_id"] == SAMPLE_PORTFOLIO.id
+    assert resp.status_code == 503, resp.text
