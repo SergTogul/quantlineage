@@ -100,27 +100,27 @@ def test_engine_deterministic():
 
 
 def test_compare_api():
-    client = TestClient(app)
-    portfolio = client.get("/portfolio").json()
-    hedge = client.get("/portfolio").json()
-    for p in hedge["positions"]:
-        if p.get("symbol") == "SPY" and p.get("type") == "equity":
-            p["quantity"] = 0
-            break
-    body = {
-        "portfolio": portfolio,
-        "hedged_portfolio": hedge,
-        "scenarios": [{"name": "Crash", "equity_shock": -0.2}],
-        "methodology": "DELTA_GAMMA",
-    }
-    r = client.post("/risk/stress/compare", json=body)
-    assert r.status_code == 200, r.text
-    data = r.json()
-    assert "hedge_cost" in data
-    assert "base_var_99" in data
-    assert "hedged_var_99" in data
-    assert "base_expected_shortfall_99" in data
-    assert "scenarios" in data
-    assert data["scenarios"][0]["scenario"] == "Crash"
-    assert "loss_improvement" in data["scenarios"][0]
-    assert "factor_exposure_changes" in data
+    with TestClient(app) as client:
+        portfolio = client.get("/portfolio").json()
+        hedge = client.get("/portfolio").json()
+        for p in hedge["positions"]:
+            if p.get("symbol") == "SPY" and p.get("type") == "equity":
+                p["quantity"] = 0
+                break
+        body = {
+            "portfolio": portfolio,
+            "hedged_portfolio": hedge,
+            "scenarios": [{"name": "Crash", "equity_shock": -0.2}],
+            "methodology": "DELTA_GAMMA",
+        }
+        r = client.post("/risk/stress/compare", json=body)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert "hedge_cost" in data
+        assert "base_var_99" in data
+        assert "hedged_var_99" in data
+        assert "base_expected_shortfall_99" in data
+        assert "scenarios" in data
+        assert data["scenarios"][0]["scenario"] == "Crash"
+        assert "loss_improvement" in data["scenarios"][0]
+        assert "factor_exposure_changes" in data

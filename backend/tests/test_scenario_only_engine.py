@@ -33,7 +33,6 @@ from app.services.portfolio_service import PortfolioService
 PRICING = BuiltinPricingEngine()
 ENGINE = StressEngine()
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
-client = TestClient(app)
 
 
 def _legacy_equity_down() -> StressScenario:
@@ -192,25 +191,26 @@ def test_deprecated_custom_http_adapts_legacy_before_service(monkeypatch):
         return original(self, portfolio, scenarios)
 
     monkeypatch.setattr(PortfolioService, "stresses", tracking_stresses)
-    portfolio = client.get("/api/v1/portfolio").json()
-    response = client.post(
-        "/api/v1/risk/stress/custom",
-        json={
-            "portfolio": portfolio,
-            "scenarios": [
-                {
-                    "name": "Custom",
-                    "id": "custom-legacy",
-                    "equity_shocks": {"SPY": -0.10},
-                    "max_loss_pct": 0.05,
-                }
-            ],
-        },
-    )
-    assert response.status_code == 200
-    assert seen
-    assert all(isinstance(s, Scenario) for s in seen)
-    assert all(not isinstance(s, StressScenario) for s in seen)
+    with TestClient(app) as client:
+        portfolio = client.get("/api/v1/portfolio").json()
+        response = client.post(
+            "/api/v1/risk/stress/custom",
+            json={
+                "portfolio": portfolio,
+                "scenarios": [
+                    {
+                        "name": "Custom",
+                        "id": "custom-legacy",
+                        "equity_shocks": {"SPY": -0.10},
+                        "max_loss_pct": 0.05,
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 200
+        assert seen
+        assert all(isinstance(s, Scenario) for s in seen)
+        assert all(not isinstance(s, StressScenario) for s in seen)
 
 
 def test_deprecated_evaluate_custom_http_adapts_legacy_before_service(monkeypatch):
@@ -223,22 +223,23 @@ def test_deprecated_evaluate_custom_http_adapts_legacy_before_service(monkeypatc
         return original(self, portfolio, scenarios)
 
     monkeypatch.setattr(PortfolioService, "threat_evaluation", tracking_eval)
-    portfolio = client.get("/api/v1/portfolio").json()
-    response = client.post(
-        "/api/v1/risk/stress/evaluate/custom",
-        json={
-            "portfolio": portfolio,
-            "scenarios": [
-                {
-                    "name": "Custom threat",
-                    "id": "custom-threat",
-                    "equity_shocks": {"SPY": -0.10},
-                    "max_loss_pct": 0.05,
-                }
-            ],
-        },
-    )
-    assert response.status_code == 200
-    assert seen
-    assert all(isinstance(s, Scenario) for s in seen)
-    assert all(not isinstance(s, StressScenario) for s in seen)
+    with TestClient(app) as client:
+        portfolio = client.get("/api/v1/portfolio").json()
+        response = client.post(
+            "/api/v1/risk/stress/evaluate/custom",
+            json={
+                "portfolio": portfolio,
+                "scenarios": [
+                    {
+                        "name": "Custom threat",
+                        "id": "custom-threat",
+                        "equity_shocks": {"SPY": -0.10},
+                        "max_loss_pct": 0.05,
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 200
+        assert seen
+        assert all(isinstance(s, Scenario) for s in seen)
+        assert all(not isinstance(s, StressScenario) for s in seen)

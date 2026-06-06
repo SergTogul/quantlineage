@@ -136,22 +136,22 @@ def test_es_api_endpoint_default_methodology():
     from fastapi.testclient import TestClient
 
     from app.main import app
-    client = TestClient(app)
-    portfolio = client.get('/portfolio').json()
-    response = client.post('/risk/es', json=portfolio)
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload['methodology'] == 'DELTA_GAMMA'
-    assert payload['portfolio_es'] >= 0.0
-    assert payload['by_position']
-    assert math.isclose(sum(c['component_es'] for c in payload['by_position']), payload['portfolio_es'], rel_tol=1e-08, abs_tol=1e-06)
+    with TestClient(app) as client:
+        portfolio = client.get('/portfolio').json()
+        response = client.post('/risk/es', json=portfolio)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload['methodology'] == 'DELTA_GAMMA'
+        assert payload['portfolio_es'] >= 0.0
+        assert payload['by_position']
+        assert math.isclose(sum(c['component_es'] for c in payload['by_position']), payload['portfolio_es'], rel_tol=1e-08, abs_tol=1e-06)
 
 def test_es_api_methodology_query_param():
     from fastapi.testclient import TestClient
 
     from app.main import app
-    client = TestClient(app)
-    portfolio = client.get('/portfolio').json()
-    response = client.post('/risk/es?methodology=LINEAR', json=portfolio)
-    assert response.status_code == 200
-    assert response.json()['methodology'] == 'LINEAR'
+    with TestClient(app) as client:
+        portfolio = client.get('/portfolio').json()
+        response = client.post('/risk/es?methodology=LINEAR', json=portfolio)
+        assert response.status_code == 200
+        assert response.json()['methodology'] == 'LINEAR'

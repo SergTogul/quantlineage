@@ -213,25 +213,25 @@ def test_metric_absent_from_limits_raises():
 
 
 def test_api_limits_drilldown():
-    client = TestClient(app)
-    portfolio = client.get("/portfolio").json()
-    payload = {
-        "portfolio": portfolio,
-        "breaches_only": False,
-        "top_n": 2,
-        "metric": "var_99",
-    }
-    response = client.post("/risk/limits/drilldown", json=payload)
-    assert response.status_code == 200
-    body = response.json()
-    assert body["portfolio_id"] == portfolio["id"]
-    assert body["hierarchy_level"] == "portfolio"
-    assert len(body["items"]) == 1
-    item = body["items"][0]
-    assert item["metric"] == "var_99"
-    assert "hierarchy_node" in item
-    assert "utilization_pct" in item
-    assert len(item["contributors"]) <= 2
+    with TestClient(app) as client:
+        portfolio = client.get("/portfolio").json()
+        payload = {
+            "portfolio": portfolio,
+            "breaches_only": False,
+            "top_n": 2,
+            "metric": "var_99",
+        }
+        response = client.post("/risk/limits/drilldown", json=payload)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["portfolio_id"] == portfolio["id"]
+        assert body["hierarchy_level"] == "portfolio"
+        assert len(body["items"]) == 1
+        item = body["items"][0]
+        assert item["metric"] == "var_99"
+        assert "hierarchy_node" in item
+        assert "utilization_pct" in item
+        assert len(item["contributors"]) <= 2
 
 
 def test_api_request_model_roundtrip():
