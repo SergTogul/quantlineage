@@ -185,7 +185,7 @@ def test_http_portfolio_service_without_lifespan_is_503(clear_db_url: None) -> N
     from app import main
     from app.main import app
 
-    for attr in (
+    state_attrs = (
         "portfolio_service",
         "risk_run_worker",
         "scenario_definition_repo",
@@ -193,18 +193,28 @@ def test_http_portfolio_service_without_lifespan_is_503(clear_db_url: None) -> N
         "limit_definition_repo",
         "session_factory",
         "persistence_enabled",
-    ):
-        if hasattr(app.state, attr):
-            delattr(app.state, attr)
-
-    assert getattr(app.state, "portfolio_service", None) is None
-    with pytest.raises(AttributeError, match="lifespan"):
-        _ = main.service
-
-    client = TestClient(app)
-    assert getattr(client.app.state, "portfolio_service", None) is None
-    resp = client.post(
-        "/risk/summary",
-        json=SAMPLE_PORTFOLIO.model_dump(mode="json"),
     )
-    assert resp.status_code == 503, resp.text
+    saved = {
+        attr: getattr(app.state, attr)
+        for attr in state_attrs
+        if hasattr(app.state, attr)
+    }
+    try:
+        for attr in state_attrs:
+            if hasattr(app.state, attr):
+                delattr(app.state, attr)
+
+        assert getattr(app.state, "portfolio_service", None) is None
+        with pytest.raises(AttributeError, match="lifespan"):
+            _ = main.service
+
+        client = TestClient(app)
+        assert getattr(client.app.state, "portfolio_service", None) is None
+        resp = client.post(
+            "/risk/summary",
+            json=SAMPLE_PORTFOLIO.model_dump(mode="json"),
+        )
+        assert resp.status_code == 503, resp.text
+    finally:
+        for attr, value in saved.items():
+            setattr(app.state, attr, value)

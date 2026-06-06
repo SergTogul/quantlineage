@@ -122,19 +122,19 @@ def test_service_compare_var_methodologies():
 
 
 def test_var_compare_api():
-    client = TestClient(app)
-    portfolio = client.get("/portfolio").json()
-    response = client.post(f"/risk/var/compare?observations={_OBS}", json=portfolio)
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["portfolio_id"] == portfolio["id"]
-    assert payload["observations"] == _OBS
-    assert [r["methodology"] for r in payload["results"]] == [
-        "LINEAR",
-        "DELTA_GAMMA",
-        "FULL_REVALUATION",
-    ]
-    for row in payload["results"]:
-        assert row["var_99"] >= row["var_95"] >= 0.0
-        assert row["expected_shortfall_99"] >= row["var_99"]
-        assert row["runtime_ms"] >= 0.0
+    with TestClient(app) as client:
+        portfolio = client.get("/portfolio").json()
+        response = client.post(f"/risk/var/compare?observations={_OBS}", json=portfolio)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["portfolio_id"] == portfolio["id"]
+        assert payload["observations"] == _OBS
+        assert [r["methodology"] for r in payload["results"]] == [
+            "LINEAR",
+            "DELTA_GAMMA",
+            "FULL_REVALUATION",
+        ]
+        for row in payload["results"]:
+            assert row["var_99"] >= row["var_95"] >= 0.0
+            assert row["expected_shortfall_99"] >= row["var_99"]
+            assert row["runtime_ms"] >= 0.0

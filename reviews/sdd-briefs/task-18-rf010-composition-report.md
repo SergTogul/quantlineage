@@ -137,3 +137,62 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 
 Warning is pre-existing (`StarletteDeprecationWarning` from FastAPI TestClient
 httpx). No TestClient-without-lifespan failures in this covering set.
+
+## Follow-up after re-review (leftover TestClient callers)
+
+Moved leftover `TestClient(app)` callers that hit `get_portfolio_service` onto
+lifespan (`with TestClient(app)`). `POST /risk/stress` without lifespan now
+pins **503**; `GET /risk/stress/scenarios` still uses in-code THREAT fallback
+(does not Depends on `get_portfolio_service`). Restored `app.state` after the
+no-lifespan 503 tests so later cases are not poisoned. RF-010 remains
+**IN PROGRESS**.
+
+Required:
+
+```bash
+cd /Users/user/src/riskforge-mvp/backend
+PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
+  tests/test_application_composition.py \
+  tests/test_stress_scenarios_di.py \
+  tests/test_api.py \
+  tests/test_next_phase.py \
+  tests/test_what_if.py \
+  tests/test_es_contributions.py \
+  tests/test_hedge_comparison.py \
+  tests/test_var_compare.py \
+  tests/test_api_typed_models.py \
+  tests/test_limit_drilldown.py \
+  tests/test_scenario_only_engine.py \
+  tests/test_scenario_wire_api.py
+```
+
+```text
+117 passed, 1 warning in 13.70s
+```
+
+Broader API set:
+
+```bash
+cd /Users/user/src/riskforge-mvp/backend
+PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
+  tests/test_api_error_model.py \
+  tests/test_api_v1_compatibility.py \
+  tests/test_api_legacy_deprecation.py \
+  tests/test_api_router_decomposition.py \
+  tests/test_api_openapi_examples.py \
+  tests/test_risk_run_api.py \
+  tests/test_persistence_di.py \
+  tests/test_dashboard_batch.py \
+  tests/test_demo_portfolios.py \
+  tests/test_shared_auth.py \
+  tests/test_backpressure.py \
+  tests/test_workload_limits.py \
+  tests/test_error_sanitization.py
+```
+
+```text
+179 passed, 1 warning in 21.36s
+```
+
+Warning is pre-existing (`StarletteDeprecationWarning` from FastAPI TestClient
+httpx). No unexplained skips.

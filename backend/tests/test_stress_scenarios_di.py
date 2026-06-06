@@ -167,31 +167,41 @@ def test_post_stress_falls_back_to_default_when_repo_empty(clear_db_url):
 
 
 def test_stress_endpoints_fallback_without_lifespan(clear_db_url):
-    """Legacy TestClient without lifespan: no 503; honest in-code fallbacks."""
+    """Bare TestClient: GET /scenarios still falls back; POST /stress is 503."""
     from app.main import app
 
-    # Prior tests may leave lifespan state on the shared app; clear for this case.
-    for attr in (
+    state_attrs = (
+        "portfolio_service",
         "scenario_definition_repo",
         "market_snapshot_repo",
         "limit_definition_repo",
         "session_factory",
         "persistence_enabled",
         "risk_run_worker",
-    ):
-        if hasattr(app.state, attr):
-            delattr(app.state, attr)
-
-    client = TestClient(app)
-    assert getattr(client.app.state, "scenario_definition_repo", None) is None
-
-    scenarios = client.get("/risk/stress/scenarios")
-    assert scenarios.status_code == 200
-    assert {row["id"] for row in scenarios.json()} == {s.id for s in THREAT_SCENARIOS}
-
-    stress = client.post(
-        "/risk/stress",
-        json=SAMPLE_PORTFOLIO.model_dump(mode="json"),
     )
-    assert stress.status_code == 200
-    assert [row["scenario"] for row in stress.json()] == [s.name for s in DEFAULT_SCENARIOS]
+    saved = {
+        attr: getattr(app.state, attr)
+        for attr in state_attrs
+        if hasattr(app.state, attr)
+    }
+    try:
+        for attr in state_attrs:
+            if hasattr(app.state, attr):
+                delattr(app.state, attr)
+
+        client = TestClient(app)
+        assert getattr(client.app.state, "scenario_definition_repo", None) is None
+        assert getattr(client.app.state, "portfolio_service", None) is None
+
+        scenarios = client.get("/risk/stress/scenarios")
+        assert scenarios.status_code == 200
+        assert {row["id"] for row in scenarios.json()} == {s.id for s in THREAT_SCENARIOS}
+
+        stress = client.post(
+            "/risk/stress",
+            json=SAMPLE_PORTFOLIO.model_dump(mode="json"),
+        )
+        assert stress.status_code == 503, stress.text
+    finally:
+        for attr, value in saved.items():
+            setattr(app.state, attr, value)

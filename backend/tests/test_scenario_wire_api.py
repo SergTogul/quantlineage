@@ -39,7 +39,13 @@ from app.risk.scenario_model import (
 from app.risk.stress import StressEngine
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
+
+
 PRICING = BuiltinPricingEngine()
 ENGINE = StressEngine()
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
@@ -120,7 +126,7 @@ def test_stress_to_wire_via_base_expansion():
     ).content_hash()
 
 
-def test_formal_custom_stress_api_matches_legacy_pnl():
+def test_formal_custom_stress_api_matches_legacy_pnl(client):
     portfolio = client.get("/api/v1/portfolio").json()
     legacy_payload = {
         "portfolio": portfolio,
@@ -167,7 +173,7 @@ def test_formal_custom_stress_api_matches_legacy_pnl():
     assert formal.json()[0]["pnl"] == pytest.approx(legacy.json()[0]["pnl"], rel=0, abs=1e-9)
 
 
-def test_formal_evaluate_custom_api_contract():
+def test_formal_evaluate_custom_api_contract(client):
     portfolio = client.get("/api/v1/portfolio").json()
     payload = {
         "portfolio": portfolio,
@@ -195,7 +201,7 @@ def test_formal_evaluate_custom_api_contract():
     assert body["evaluations"][0]["scenario"] == "Formal threat"
 
 
-def test_get_scenarios_default_is_formal_wire():
+def test_get_scenarios_default_is_formal_wire(client):
     """R0.4.2-C: GET /scenarios returns formal ScenarioWire, not StressScenario dicts."""
     response = client.get("/api/v1/risk/stress/scenarios")
     assert response.status_code == 200
@@ -212,7 +218,7 @@ def test_get_scenarios_default_is_formal_wire():
     assert "vol_shock" not in row
 
 
-def test_get_scenarios_formal_alias_matches_default():
+def test_get_scenarios_formal_alias_matches_default(client):
     """R0.4.2-C: /scenarios/formal is an identical JSON alias of the default list."""
     default = client.get("/api/v1/risk/stress/scenarios")
     formal = client.get("/api/v1/risk/stress/scenarios/formal")
@@ -221,7 +227,7 @@ def test_get_scenarios_formal_alias_matches_default():
     assert formal.json() == default.json()
 
 
-def test_legacy_custom_stress_unchanged():
+def test_legacy_custom_stress_unchanged(client):
     """Regression: M3.8 must not break StressScenario custom evaluate."""
     portfolio = SAMPLE_PORTFOLIO.model_dump(mode="json")
     payload = {
@@ -233,7 +239,7 @@ def test_legacy_custom_stress_unchanged():
     assert response.json()["evaluations"][0]["scenario"] == "Custom"
 
 
-def test_formal_ui_style_evaluate_matches_legacy_scalar_pnl():
+def test_formal_ui_style_evaluate_matches_legacy_scalar_pnl(client):
     """R0.4.2-D: UI-style formal expansion (all market factors) matches legacy scalars."""
     portfolio = client.get("/api/v1/portfolio").json()
     legacy_payload = {
@@ -288,7 +294,7 @@ def test_formal_ui_style_evaluate_matches_legacy_scalar_pnl():
     assert fe["threat_level"] == le["threat_level"]
 
 
-def test_formal_compare_api_matches_legacy_pnl():
+def test_formal_compare_api_matches_legacy_pnl(client):
     """R0.4.2-D: POST /stress/formal/compare accepts ScenarioWire and matches legacy."""
     portfolio = client.get("/api/v1/portfolio").json()
     hedged = client.get("/api/v1/portfolio").json()
