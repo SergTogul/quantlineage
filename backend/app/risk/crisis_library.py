@@ -5,8 +5,8 @@ multi-factor shocks inspired by named market episodes. They are never exact
 path replays of observed marks.
 
 ``HISTORICAL_REPLAY`` is reserved for observation-derived scenarios built from
-``FactorObservationSeries`` / ``MarketScenario`` (see
-``replay_scenarios_from_observations`` and ``scenario_from_market_scenario``).
+``FactorObservationSeries`` / canonical ``Scenario`` (see
+``replay_scenarios_from_observations`` and ``historical_market_scenarios``).
 
 Units for template scalars (same as ``StressScenario`` / ``MarketSnapshot.bump``):
 - equity / FX: relative return (``-0.35`` = −35%)
@@ -30,7 +30,6 @@ from app.risk.scenario_model import (
     ScenarioSeverity,
     ScenarioThreshold,
     apply_scenario,
-    scenario_from_market_scenario,
     scenario_from_stress,
     scenario_to_stress,
 )
@@ -184,20 +183,30 @@ def replay_scenarios_from_observations(
     id_prefix: str = "hist",
 ) -> list[Scenario]:
     """Build formal HISTORICAL_REPLAY scenarios from observation series (not crisis presets)."""
-    markets = historical_market_scenarios(base, source, id_prefix=id_prefix)
+    formals = historical_market_scenarios(base, source, id_prefix=id_prefix)
     out: list[Scenario] = []
-    for market in markets:
-        formal = scenario_from_market_scenario(
-            market,
-            category=ScenarioCategory.HISTORICAL_REPLAY,
-            metadata={
+    for formal in formals:
+        meta = dict(formal.metadata)
+        meta.update(
+            {
                 "labeling": ScenarioCategory.HISTORICAL_REPLAY.value,
                 "exact_replay": True,
                 "source": "observation_series",
                 "disclaimer": REPLAY_DISCLAIMER,
-            },
+            }
         )
-        out.append(formal)
+        out.append(
+            Scenario(
+                id=formal.id,
+                name=formal.name,
+                category=formal.category,
+                description=formal.description,
+                shocks=formal.shocks,
+                threshold=formal.threshold,
+                severity=formal.severity,
+                metadata=meta,
+            )
+        )
     return out
 
 

@@ -449,7 +449,7 @@ def full_revaluation_pnl_series(
     """P&L under each historical shocked snapshot (independent, not cumulative).
 
     ``pnl[i] = PV(shocked_i) - PV(base)``. Zero shocks → ~0 (pricing-determinism
-    and empty ``MarketScenario`` preserving marks).
+    and empty ``Scenario`` preserving marks).
 
     Does **not** use the linear Δ-Γ scenario kernel (Python or native): full
     revaluation is pricing-driven and outside the Exposure/Shock ABI.

@@ -32,7 +32,8 @@ from app.risk.reverse_stress import (
     from_wire_bound,
     to_wire_shock,
 )
-from app.risk.scenario_model import ScenarioCategory
+from app.risk.scenario_engine import apply_scenario
+from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
 
@@ -206,6 +207,9 @@ def test_service_and_api_compatibility():
         assert "target_loss" in body
         assert "pnl" in body
         assert body["convergence"]["method"] == "binary_search"
+        assert body["scenario"]["category"] == "reverse"
+        assert body["scenario"]["id"] == "reverse"
+        assert isinstance(body["scenario"]["shocks"], list)
 
 
 def test_invalid_factor_raises(engine, pricing):
@@ -220,3 +224,51 @@ def test_empty_portfolio_no_factor_exposure(engine, pricing):
     assert result.required_shock is None
     assert result.achieved_loss_pct == pytest.approx(0.0)
     assert result.pnl == pytest.approx(0.0)
+
+
+def _achieved_loss_from_scenario(pricing, portfolio, market, scenario, base_mv: float) -> float:
+    shocked = apply_scenario(market, scenario)
+    stressed_mv = sum(pricing.value(p, shocked).market_value for p in portfolio.positions)
+    pnl = stressed_mv - base_mv
+    denom = abs(base_mv) or 1.0
+    return max(0.0, -pnl) / denom
+
+
+def test_reverse_result_carries_canonical_scenario_matching_achieved_loss(engine, pricing):
+    """R0.4.2-G: solved answer includes the Scenario that was applied."""
+    target = 0.01
+    result = engine.solve(SAMPLE_PORTFOLIO, pricing, target, "equity", 0.8, market=SAMPLE_MARKET)
+    assert result.converged is True
+    assert type(result.scenario) is Scenario
+    assert result.scenario.category == ScenarioCategory.REVERSE
+    assert all(isinstance(shock, FactorShock) for shock in result.scenario.shocks)
+    applied = _achieved_loss_from_scenario(
+        pricing, SAMPLE_PORTFOLIO, SAMPLE_MARKET, result.scenario, result.base_market_value
+    )
+    assert applied == pytest.approx(result.achieved_loss_pct, rel=0, abs=1e-4)
+    # Wire units of required_shock stay relative magnitude, not FactorShock amounts.
+    assert result.shock_unit == "relative"
+    assert 0 < result.required_shock <= 0.8
+
+
+def test_reverse_zero_and_bound_paths_carry_applied_scenario(engine, pricing):
+    zero = engine.solve(
+        SAMPLE_PORTFOLIO, pricing, 1e-9, "equity", 0.8, market=SAMPLE_MARKET
+    )
+    assert zero.converged is True
+    assert type(zero.scenario) is Scenario
+    assert zero.scenario.category == ScenarioCategory.REVERSE
+    applied_zero = _achieved_loss_from_scenario(
+        pricing, SAMPLE_PORTFOLIO, SAMPLE_MARKET, zero.scenario, zero.base_market_value
+    )
+    assert applied_zero == pytest.approx(zero.achieved_loss_pct, rel=0, abs=1e-4)
+
+    bound = engine.solve(
+        SAMPLE_PORTFOLIO, pricing, 0.50, "equity", max_shock=0.001, market=SAMPLE_MARKET
+    )
+    assert bound.converged is False
+    assert type(bound.scenario) is Scenario
+    applied_bound = _achieved_loss_from_scenario(
+        pricing, SAMPLE_PORTFOLIO, SAMPLE_MARKET, bound.scenario, bound.base_market_value
+    )
+    assert applied_bound == pytest.approx(bound.achieved_loss_pct, rel=0, abs=1e-4)
