@@ -853,7 +853,7 @@ container; no FastAPI in `app.risk` / `app.domain`.
 
 Report: `reviews/r0.9.2-typed-risk-results-report.md`.
 
-## R0.9.3 Explicit application composition — COMPLETE (2026-09-09); RF-010 stays IN PROGRESS
+## R0.9.3 Explicit application composition — COMPLETE (2026-09-09); **RF-010 CLOSED**
 
 `PortfolioService` is constructed in FastAPI lifespan via the existing
 `build_portfolio_service()` factory and stored on `app.state.portfolio_service`.
@@ -863,10 +863,9 @@ built with the same instance. `app.main.service` is a thin module `__getattr__`
 alias to `app.state` only — no `_legacy_portfolio_service` / module-global HTTP
 cache. No DI container / service locator framework. Risk numbers unchanged.
 
-**Do not CLOSE RF-010** — dual-use `AttributionRequest` /
-`RiskChangeAttributionRequest` / `WhatIfRequest` stay in domain.
-
-Report: `reviews/r0.9.3-application-composition-report.md`.
+**RF-010 CLOSED.** Named residual: dual-use `AttributionRequest` /
+`RiskChangeAttributionRequest` / `WhatIfRequest` stay in domain. Independent
+review APPROVE (`reviews/sdd-briefs/task-18-rf010-composition-review.md`).
 
 ## R0.9.4 Keep refactor bounded
 
