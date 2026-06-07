@@ -39,12 +39,13 @@ from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import (
     FactorShock,
     Scenario,
+    BroadcastScenarioDefinition,
     to_canonical_scenario,
 )
 from app.risk.shock_units import decimal_rate_to_bps
 from app.sample import DemoAggregateMarketDataProvider
 
-ScenarioLike = Union[Scenario, StressScenario]
+ScenarioLike = Union[Scenario, StressScenario, BroadcastScenarioDefinition]
 
 # Cross-factor residual key — always present when any factor shocks exist.
 _INTERACTION_KEY = "interaction"
