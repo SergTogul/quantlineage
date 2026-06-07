@@ -23,7 +23,10 @@ threat convert ``StressScenario`` once at the HTTP or engine boundary via
 ``to_canonical_scenario``; internals apply typed ``Scenario`` only. R0.4.2-F:
 in-code DEFAULT/THREAT libraries are ``BroadcastScenarioDefinition`` templates
 expanded at apply time against the live ``MarketSnapshot`` (do not freeze demo
-names at import). Persistence stores canonical ``Scenario``.
+names at import). Persistence stores canonical ``Scenario``. R0.4.2-G: historical
+replay generates/applies canonical ``Scenario``; reverse-stress results carry
+the applied ``Scenario``. ``MarketScenario`` remains an adapter like deprecated
+``StressScenario``.
 """
 
 from __future__ import annotations

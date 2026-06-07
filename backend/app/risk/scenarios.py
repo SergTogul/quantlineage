@@ -1,23 +1,27 @@
-"""Historical scenario generation (M2.2).
+"""Historical scenario generation (M2.2 / R0.4.2-G).
 
 Pipeline:
 
     FactorObservationSeries
       → AggregateFactorChange[]   (per-observation aggregate moves)
-      → MarketScenario[]          (typed RiskFactor shocks vs a base snapshot)
-      → shocked MarketSnapshot[]  (via MarketSnapshot.apply / bump)
+      → Scenario[]                (typed FactorShock vs the live snapshot)
+      → shocked MarketSnapshot[]  (via apply_scenario)
 
-Approximation VaR paths (`LINEAR` / ``DELTA_GAMMA``) still consume raw observation
-arrays. ``FULL_REVALUATION`` historical VaR (M2.3) consumes shocked snapshots
-from this module via ``iter_historical_shocked_snapshots`` (one snapshot at a
-time). ``historical_shocked_snapshots`` remains a list wrapper for callers
-that still need the materialized collection.
+    ``MarketScenario`` / ``FactorChange`` remain adapters (like deprecated
+    ``StressScenario``). Callers that still need ``MarketScenario`` convert at
+    the boundary via ``scenario_to_market_scenario``.
+
+    Approximation VaR paths (`LINEAR` / ``DELTA_GAMMA``) still consume raw observation
+    arrays. ``FULL_REVALUATION`` historical VaR (M2.3) consumes shocked snapshots
+    from this module via ``iter_historical_shocked_snapshots`` (one snapshot at a
+    time). ``historical_shocked_snapshots`` remains a list wrapper for callers
+    that still need the materialized collection.
 
 Units (aligned with ``FactorObservationSeries`` and ``MarketSnapshot.bump``):
 - equity / FX: relative return (0.01 = +1%)
 - vol: relative change of vol level (0.07 ≈ +7% of current vol)
 - rates: observation / panel stores **basis points**; engine-facing
-  ``FactorChange`` / bump uses **decimal** via
+  ``FactorShock`` / bump uses **decimal** via
   :func:`app.risk.shock_units.bps_to_decimal_rate` at expand boundaries
   (1bp → ``RateZero(..., "ALL")`` with amount ``0.0001``)
 
@@ -32,12 +36,16 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from app.domain.models import MarketSnapshot, ScenarioKind, StressScenario
 from app.risk.factor_panel import FactorPanelObservation, HistoricalFactorPanel
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
 from app.risk.historical_data import FactorObservationSeries, HistoricalMarketDataset
 from app.risk.shock_units import bps_to_decimal_rate, decimal_rate_to_bps
+
+if TYPE_CHECKING:
+    from app.risk.scenario_model import FactorShock, Scenario
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,34 +100,63 @@ def iter_aggregate_changes(series: FactorObservationSeries) -> list[AggregateFac
 def expand_aggregate_change(
     change: AggregateFactorChange,
     base: MarketSnapshot,
-) -> tuple[FactorChange, ...]:
+) -> tuple[FactorShock, ...]:
     """Broadcast aggregate moves onto typed factors present in ``base``.
 
     Order matches ``shock_snapshot``: equity spots, equity vols, FX spots,
-    FX vols, then parallel rates. Zero-amount moves are omitted.
+    FX vols, then parallel rates. Zero-amount moves are omitted. Rate
+    bp→decimal only via ``shock_units``.
     """
-    shocks: list[FactorChange] = []
+    from app.risk.scenario_model import FactorShock
+
+    shocks: list[FactorShock] = []
     eq = change.equity_return
     if eq:
         for sym in base.equity_spots:
-            shocks.append(FactorChange(EquitySpot(sym), eq))
+            shocks.append(FactorShock(EquitySpot(sym), eq))
     vol = change.vol_move
     if vol:
         for sym in base.equity_vols:
-            shocks.append(FactorChange(EquityVol(underlying=sym), vol))
+            shocks.append(FactorShock(EquityVol(underlying=sym), vol))
     fx = change.fx_return
     if fx:
         for pair in base.fx_spots:
-            shocks.append(FactorChange(FXSpot(pair), fx))
+            shocks.append(FactorShock(FXSpot(pair), fx))
     if vol:
         for pair in base.fx_vols:
-            shocks.append(FactorChange(FXVol(pair=pair), vol))
+            shocks.append(FactorShock(FXVol(pair=pair), vol))
     bps = change.rate_move_bps
     if bps:
         decimal_shift = bps_to_decimal_rate(bps)
         for ccy in base.rates:
-            shocks.append(FactorChange(RateZero(currency=ccy, tenor="ALL"), decimal_shift))
+            shocks.append(FactorShock(RateZero(currency=ccy, tenor="ALL"), decimal_shift))
     return tuple(shocks)
+
+
+_HIST_REPLAY_DESCRIPTION = (
+    "Observation-derived historical replay of aggregate equity/vol/rate/FX "
+    "moves onto factors present in the base market snapshot "
+    "(not an illustrative crisis preset)."
+)
+
+
+def scenario_from_change(
+    change: AggregateFactorChange,
+    base: MarketSnapshot,
+    *,
+    id_prefix: str = "hist",
+) -> Scenario:
+    """Build a canonical ``Scenario`` by expanding one aggregate observation."""
+    from app.risk.scenario_model import Scenario, ScenarioCategory
+
+    return Scenario(
+        id=f"{id_prefix}_{change.index}",
+        name=f"Historical observation {change.index}",
+        category=ScenarioCategory.HISTORICAL_REPLAY,
+        description=_HIST_REPLAY_DESCRIPTION,
+        shocks=expand_aggregate_change(change, base),
+        metadata={"observation_index": change.index},
+    )
 
 
 def market_scenario_from_change(
@@ -128,20 +165,10 @@ def market_scenario_from_change(
     *,
     id_prefix: str = "hist",
 ) -> MarketScenario:
-    """Build a typed ``MarketScenario`` by expanding one aggregate observation."""
-    shocks = expand_aggregate_change(change, base)
-    return MarketScenario(
-        id=f"{id_prefix}_{change.index}",
-        name=f"Historical observation {change.index}",
-        shocks=shocks,
-        kind=ScenarioKind.HISTORICAL_STYLE,
-        description=(
-            "Observation-derived historical replay of aggregate equity/vol/rate/FX "
-            "moves onto factors present in the base market snapshot "
-            "(not an illustrative crisis preset)."
-        ),
-        observation_index=change.index,
-    )
+    """Adapter: canonical historical ``Scenario`` → ``MarketScenario``."""
+    from app.risk.scenario_model import scenario_to_market_scenario
+
+    return scenario_to_market_scenario(scenario_from_change(change, base, id_prefix=id_prefix))
 
 
 def historical_market_scenarios(
@@ -149,33 +176,33 @@ def historical_market_scenarios(
     source: HistoricalMarketDataset | FactorObservationSeries,
     *,
     id_prefix: str = "hist",
-) -> list[MarketScenario]:
-    """Generate one ``MarketScenario`` per historical observation."""
+) -> list[Scenario]:
+    """Generate one canonical ``Scenario`` per historical observation."""
     series = source if isinstance(source, FactorObservationSeries) else source.factor_observations()
-    return [market_scenario_from_change(c, base, id_prefix=id_prefix) for c in iter_aggregate_changes(series)]
+    return [scenario_from_change(c, base, id_prefix=id_prefix) for c in iter_aggregate_changes(series)]
 
 
-def apply_market_scenario(base: MarketSnapshot, scenario: MarketScenario) -> MarketSnapshot:
-    """Apply typed shocks via ``MarketSnapshot.apply``; empty shocks leave marks unchanged."""
-    pairs = scenario.shock_pairs()
-    out = base.apply(pairs) if pairs else base
-    if out.id == f"{base.id}:{scenario.id}":
-        return out
-    return out.model_copy(update={"id": f"{base.id}:{scenario.id}"})
+def apply_market_scenario(base: MarketSnapshot, scenario: MarketScenario | Scenario) -> MarketSnapshot:
+    """Adapter: apply ``MarketScenario`` or ``Scenario`` via ``apply_scenario``."""
+    from app.risk.scenario_engine import apply_scenario
+
+    return apply_scenario(base, scenario)
 
 
 def iter_shocked_snapshots(
     base: MarketSnapshot,
-    scenarios: Sequence[MarketScenario],
+    scenarios: Sequence[MarketScenario | Scenario],
 ) -> Iterator[MarketSnapshot]:
     """Yield one shocked snapshot at a time (independent shocks, not cumulative)."""
+    from app.risk.scenario_engine import apply_scenario
+
     for scenario in scenarios:
-        yield apply_market_scenario(base, scenario)
+        yield apply_scenario(base, scenario)
 
 
 def shocked_snapshots(
     base: MarketSnapshot,
-    scenarios: Sequence[MarketScenario],
+    scenarios: Sequence[MarketScenario | Scenario],
 ) -> list[MarketSnapshot]:
     """Apply each scenario to ``base`` (independent shocks, not cumulative)."""
     return list(iter_shocked_snapshots(base, scenarios))
@@ -214,16 +241,50 @@ def panel_amount_to_bump(factor: RiskFactor, amount: float) -> float:
     return float(amount)
 
 
-def factor_changes_from_panel_observation(
+def factor_shocks_from_panel_observation(
     observation: FactorPanelObservation,
-) -> tuple[FactorChange, ...]:
-    """One panel row → typed shocks. Zero-amount moves are omitted."""
-    shocks: list[FactorChange] = []
+) -> tuple[FactorShock, ...]:
+    """One panel row → typed FactorShock. Zero-amount moves are omitted."""
+    from app.risk.scenario_model import FactorShock
+
+    shocks: list[FactorShock] = []
     for factor, amount in observation.changes.items():
         bump = panel_amount_to_bump(factor, amount)
         if bump:
-            shocks.append(FactorChange(factor, bump))
+            shocks.append(FactorShock(factor, bump))
     return tuple(shocks)
+
+
+def factor_changes_from_panel_observation(
+    observation: FactorPanelObservation,
+) -> tuple[FactorChange, ...]:
+    """Adapter: panel row → ``FactorChange`` (MarketScenario)."""
+    return tuple(s.as_factor_change() for s in factor_shocks_from_panel_observation(observation))
+
+
+_PANEL_REPLAY_DESCRIPTION = (
+    "Per-factor historical replay from HistoricalFactorPanel "
+    "(not a four-macro broadcast)."
+)
+
+
+def scenario_from_panel_observation(
+    observation: FactorPanelObservation,
+    *,
+    index: int,
+    id_prefix: str = "hist_panel",
+) -> Scenario:
+    """Build a canonical ``Scenario`` from one per-factor panel row."""
+    from app.risk.scenario_model import Scenario, ScenarioCategory
+
+    return Scenario(
+        id=f"{id_prefix}_{index}",
+        name=f"Panel observation {index}",
+        category=ScenarioCategory.HISTORICAL_REPLAY,
+        description=_PANEL_REPLAY_DESCRIPTION,
+        shocks=factor_shocks_from_panel_observation(observation),
+        metadata={"observation_index": index},
+    )
 
 
 def market_scenario_from_panel_observation(
@@ -232,17 +293,11 @@ def market_scenario_from_panel_observation(
     index: int,
     id_prefix: str = "hist_panel",
 ) -> MarketScenario:
-    """Build a typed ``MarketScenario`` from one per-factor panel row."""
-    return MarketScenario(
-        id=f"{id_prefix}_{index}",
-        name=f"Panel observation {index}",
-        shocks=factor_changes_from_panel_observation(observation),
-        kind=ScenarioKind.HISTORICAL_STYLE,
-        description=(
-            "Per-factor historical replay from HistoricalFactorPanel "
-            "(not a four-macro broadcast)."
-        ),
-        observation_index=index,
+    """Adapter: panel ``Scenario`` → ``MarketScenario``."""
+    from app.risk.scenario_model import scenario_to_market_scenario
+
+    return scenario_to_market_scenario(
+        scenario_from_panel_observation(observation, index=index, id_prefix=id_prefix)
     )
 
 
@@ -250,10 +305,10 @@ def historical_market_scenarios_from_panel(
     panel: HistoricalFactorPanel,
     *,
     id_prefix: str = "hist_panel",
-) -> list[MarketScenario]:
-    """One ``MarketScenario`` per panel date; shocks stay per name / tenor."""
+) -> list[Scenario]:
+    """One canonical ``Scenario`` per panel date; shocks stay per name / tenor."""
     return [
-        market_scenario_from_panel_observation(obs, index=i, id_prefix=id_prefix)
+        scenario_from_panel_observation(obs, index=i, id_prefix=id_prefix)
         for i, obs in enumerate(panel.observations)
     ]
 
@@ -274,17 +329,26 @@ def iter_panel_shocked_snapshots(
     )
 
 
-def to_stress_scenario(scenario: MarketScenario) -> StressScenario:
-    """Convert typed shocks to ``StressScenario`` dict fields for ``shock_snapshot``.
+def to_stress_scenario(scenario: MarketScenario | Scenario) -> StressScenario:
+    """Adapter: typed shocks → ``StressScenario`` dict fields for ``shock_snapshot``.
 
     Aggregate scalar fields stay at zero; per-name dicts carry the moves so
-    ``shock_snapshot(base, to_stress_scenario(s))`` matches ``apply_market_scenario``.
+    ``shock_snapshot(base, to_stress_scenario(s))`` matches ``apply_scenario``.
     """
+    from app.risk.scenario_model import Scenario as CanonicalScenario
+    from app.risk.scenario_model import category_to_kind, scenario_to_market_scenario
+
+    if isinstance(scenario, CanonicalScenario):
+        adapted = scenario_to_market_scenario(scenario)
+        kind = category_to_kind(scenario.category)
+    else:
+        adapted = scenario
+        kind = scenario.kind
     equity_shocks: dict[str, float] = {}
     vol_shocks: dict[str, float] = {}
     rate_shocks_bps: dict[str, float] = {}
     fx_shocks: dict[str, float] = {}
-    for change in scenario.shocks:
+    for change in adapted.shocks:
         factor = change.factor
         amount = change.amount
         if isinstance(factor, EquitySpot):
@@ -300,10 +364,10 @@ def to_stress_scenario(scenario: MarketScenario) -> StressScenario:
         else:
             raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
     return StressScenario(
-        id=scenario.id,
-        name=scenario.name,
-        description=scenario.description,
-        kind=scenario.kind,
+        id=adapted.id,
+        name=adapted.name,
+        description=adapted.description,
+        kind=kind,
         equity_shocks=equity_shocks,
         vol_shocks=vol_shocks,
         rate_shocks_bps=rate_shocks_bps,
@@ -318,6 +382,7 @@ __all__ = [
     "apply_market_scenario",
     "expand_aggregate_change",
     "factor_changes_from_panel_observation",
+    "factor_shocks_from_panel_observation",
     "historical_market_scenarios",
     "historical_market_scenarios_from_panel",
     "historical_shocked_snapshots",
@@ -328,6 +393,8 @@ __all__ = [
     "market_scenario_from_change",
     "market_scenario_from_panel_observation",
     "panel_amount_to_bump",
+    "scenario_from_change",
+    "scenario_from_panel_observation",
     "shocked_snapshots",
     "to_stress_scenario",
 ]

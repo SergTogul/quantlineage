@@ -1008,8 +1008,12 @@ class ReverseStressResult(BaseModel):
     Legacy fields (``factor``, ``target_loss_pct``, ``required_shock``,
     ``achieved_loss_pct``, ``converged``) remain stable for
     ``POST /risk/stress/reverse``. M3.5 adds absolute target loss, resulting
-    P&L, shock unit, base MV, and convergence diagnostics.
+    P&L, shock unit, base MV, and convergence diagnostics. R0.4.2-G adds the
+    canonical ``Scenario`` that was applied (JSON projects as ScenarioWire;
+    ``required_shock`` wire units are unchanged).
     """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     factor: str
     target_loss_pct: float
@@ -1023,6 +1027,33 @@ class ReverseStressResult(BaseModel):
     shock_unit: Literal["relative", "bp"] = "relative"
     base_market_value: float = 0.0
     convergence: ReverseStressConvergence | None = None
+    scenario: Any = Field(
+        default=None,
+        description="Canonical Scenario applied at the solved, bound, or zero shock.",
+    )
+
+    @field_serializer("scenario")
+    def _serialize_scenario(self, value: Any) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        from app.persistence.scenario_codec import scenario_to_definition
+
+        return scenario_to_definition(value)
+
+    @field_validator("scenario", mode="before")
+    @classmethod
+    def _parse_scenario(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        from app.risk.scenario_model import Scenario as CanonicalScenario
+
+        if isinstance(value, CanonicalScenario):
+            return value
+        if isinstance(value, Mapping):
+            from app.persistence.scenario_codec import definition_to_scenario
+
+            return definition_to_scenario(dict(value))
+        return value
 
 
 class FactorShockSolution(BaseModel):

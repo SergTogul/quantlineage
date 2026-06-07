@@ -207,6 +207,7 @@ class ReverseStressEngine:
                     method="binary_search",
                     message="Target already met at zero shock.",
                 ),
+                scenario=build_reverse_scenario(family, 0.0, base_market),
             )
 
         bound_pnl, _, bound_loss_pct = metrics(search_bound)
@@ -229,6 +230,7 @@ class ReverseStressEngine:
                     method="binary_search",
                     message="Target loss not reachable within search bound.",
                 ),
+                scenario=build_reverse_scenario(family, search_bound, base_market),
             )
 
         lo, hi = 0.0, search_bound
@@ -265,6 +267,7 @@ class ReverseStressEngine:
                 method="binary_search",
                 message=None if converged else "Solver did not meet target within tolerance.",
             ),
+            scenario=build_reverse_scenario(family, hi, base_market),
         )
 
 
