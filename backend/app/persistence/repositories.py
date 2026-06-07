@@ -15,8 +15,8 @@ from app.domain.models import (
     RiskLimit,
     RiskRun,
     RiskRunStatus,
-    StressScenario,
 )
+from app.risk.scenario_model import Scenario
 
 
 class PortfolioAlreadyExists(ValueError):
@@ -77,15 +77,15 @@ class MarketSnapshotRepository(ABC):
 
 class ScenarioDefinitionRepository(ABC):
     @abstractmethod
-    def save(self, scenario: StressScenario) -> StressScenario:
+    def save(self, scenario: Scenario) -> Scenario:
         ...
 
     @abstractmethod
-    def get(self, scenario_id: str) -> StressScenario | None:
+    def get(self, scenario_id: str) -> Scenario | None:
         ...
 
     @abstractmethod
-    def list_all(self) -> list[StressScenario]:
+    def list_all(self) -> list[Scenario]:
         ...
 
     @abstractmethod

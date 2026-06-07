@@ -17,7 +17,6 @@ from fastapi import APIRouter, Body, Depends
 from app.api.backpressure import reject_inline_heavy
 from app.api.deps import (
     get_baseline_stress_scenarios,
-    get_default_market_snapshot,
     get_default_stress_scenarios,
     get_portfolio_service,
 )
@@ -37,7 +36,7 @@ from app.api.scenario_wire import (
     FormalCustomStressRequest,
     FormalScenarioComparisonRequest,
     ScenarioWire,
-    stress_to_wire,
+    scenario_to_wire,
     stresses_to_scenarios,
     wires_to_scenarios,
 )
@@ -49,24 +48,21 @@ from app.api.schemas import (
 )
 from app.domain.models import (
     HedgeComparisonReport,
-    MarketSnapshot,
     MultiFactorReverseStressResult,
     Portfolio,
     ReverseStressResult,
     StressResult,
     StressScenario,
 )
+from app.risk.scenario_model import Scenario
 from app.services.portfolio_service import PortfolioService
 
 router = APIRouter(prefix="/risk", tags=["stress"])
 
 
-def _formal_scenario_wires(
-    scenarios: list[StressScenario],
-    base: MarketSnapshot,
-) -> list[ScenarioWire]:
-    """Project DI StressScenario definitions onto the canonical formal list wire."""
-    return [stress_to_wire(s, base) for s in scenarios]
+def _formal_scenario_wires(scenarios: list[Scenario]) -> list[ScenarioWire]:
+    """Project DI canonical Scenario definitions onto the formal list wire."""
+    return [scenario_to_wire(s) for s in scenarios]
 
 
 def _canonical_from_legacy(
@@ -74,7 +70,7 @@ def _canonical_from_legacy(
     scenarios: list[StressScenario],
     service: PortfolioService,
 ):
-    """Adapt deprecated/DI StressScenario lists to engine-facing Scenario."""
+    """Adapt deprecated StressScenario POST bodies to engine-facing Scenario."""
     return stresses_to_scenarios(scenarios, service.market_snapshot(portfolio))
 
 
@@ -89,12 +85,12 @@ def risk_stress(
         Portfolio,
         Body(openapi_examples=STRESS_BODY_EXAMPLES),
     ],
-    scenarios: list[StressScenario] = Depends(get_baseline_stress_scenarios),
+    scenarios: list[Scenario] = Depends(get_baseline_stress_scenarios),
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> list[StressResult]:
     """Baseline stress P&L over DI DEFAULT scenarios (M5.9 follow-up)."""
     reject_inline_heavy(route="POST /risk/stress")
-    return service.stresses(portfolio, _canonical_from_legacy(portfolio, scenarios, service))
+    return service.stresses(portfolio, scenarios)
 
 
 @router.get(
@@ -109,11 +105,10 @@ def risk_stress(
     ),
 )
 def risk_stress_scenarios(
-    scenarios: list[StressScenario] = Depends(get_default_stress_scenarios),
-    base: MarketSnapshot = Depends(get_default_market_snapshot),
+    scenarios: list[Scenario] = Depends(get_default_stress_scenarios),
 ) -> list[ScenarioWire]:
-    """List DI scenario definitions as formal wire; THREAT_SCENARIOS if repo empty."""
-    return _formal_scenario_wires(scenarios, base)
+    """List DI scenario definitions as formal wire; THREAT templates if repo empty."""
+    return _formal_scenario_wires(scenarios)
 
 
 @router.get(
@@ -127,11 +122,10 @@ def risk_stress_scenarios(
     deprecated=False,
 )
 def risk_stress_scenarios_formal(
-    scenarios: list[StressScenario] = Depends(get_default_stress_scenarios),
-    base: MarketSnapshot = Depends(get_default_market_snapshot),
+    scenarios: list[Scenario] = Depends(get_default_stress_scenarios),
 ) -> list[ScenarioWire]:
     """Alias of ``GET /stress/scenarios`` — same formal wire payload."""
-    return _formal_scenario_wires(scenarios, base)
+    return _formal_scenario_wires(scenarios)
 
 
 @router.post(
@@ -175,14 +169,12 @@ def risk_stress_formal_custom(
 @router.post("/stress/evaluate")
 def risk_stress_evaluate(
     portfolio: Portfolio,
-    scenarios: list[StressScenario] = Depends(get_default_stress_scenarios),
+    scenarios: list[Scenario] = Depends(get_default_stress_scenarios),
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     """Threat evaluation over DI-backed scenario defaults (M5.9)."""
     reject_inline_heavy(route="POST /risk/stress/evaluate")
-    return service.threat_evaluation(
-        portfolio, _canonical_from_legacy(portfolio, scenarios, service)
-    )
+    return service.threat_evaluation(portfolio, scenarios)
 
 
 @router.post(

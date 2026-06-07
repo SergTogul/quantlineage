@@ -17,8 +17,13 @@ from app.domain.models import (
     RiskLimit,
     RiskRun,
     RiskRunStatus,
-    ScenarioKind,
-    StressScenario,
+)
+from app.risk.factor_types import EquitySpot
+from app.risk.scenario_model import (
+    FactorShock,
+    Scenario,
+    ScenarioCategory,
+    ScenarioThreshold,
 )
 from app.persistence.session import session_scope
 from app.persistence.sqlalchemy_repos import (
@@ -74,12 +79,22 @@ def test_market_snapshot_meta_and_data(session_factory):
             loaded.equity_spots['SPY'] = 1.0
 
 def test_scenario_definition_round_trip(session_factory):
-    scenario = StressScenario(id='scn-eq-crash', name='Equity crash', description='demo', kind=ScenarioKind.FACTOR, equity_shock=-0.15, max_loss_pct=0.05)
+    scenario = Scenario(
+        id='scn-eq-crash',
+        name='Equity crash',
+        description='demo',
+        category=ScenarioCategory.FACTOR,
+        shocks=(FactorShock(EquitySpot('SPY'), -0.15),),
+        threshold=ScenarioThreshold(max_loss_pct=0.05),
+    )
     with session_scope(session_factory) as session:
         repo = SqlAlchemyScenarioDefinitionRepository(session)
         saved = repo.save(scenario)
         assert saved.id == 'scn-eq-crash'
-        assert repo.get('scn-eq-crash') is not None
+        loaded = repo.get('scn-eq-crash')
+        assert loaded is not None
+        assert isinstance(loaded, Scenario)
+        assert loaded.shocks == scenario.shocks
         assert len(repo.list_all()) == 1
 
 def test_risk_run_lifecycle_and_results(session_factory):

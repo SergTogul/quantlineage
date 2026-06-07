@@ -7,7 +7,7 @@ from collections.abc import Iterator
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.domain.models import MarketSnapshot, Portfolio, StressScenario
+from app.domain.models import MarketSnapshot, Portfolio
 from app.persistence.repositories import (
     LimitDefinitionRepository,
     MarketSnapshotRepository,
@@ -25,7 +25,8 @@ from app.persistence.wiring import (
     load_market_snapshot,
     load_portfolio,
 )
-from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
+from app.risk.scenario_model import Scenario
+from app.risk.stress import DEFAULT_SCENARIOS, default_scenarios, threat_scenarios
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
 from app.services.risk_run_worker import RiskRunWorker
@@ -134,32 +135,35 @@ def get_default_stress_scenarios(
     repo: ScenarioDefinitionRepository | None = Depends(
         get_stress_scenario_definition_repository
     ),
-) -> list[StressScenario]:
-    """Scenario list for stress HTTP defaults (M5.9).
+    base: MarketSnapshot = Depends(get_default_market_snapshot),
+) -> list[Scenario]:
+    """Scenario list for stress HTTP defaults (M5.9 / R0.4.2-F).
 
     Prefer ``scenario_definition_repo`` (memory or SQLAlchemy seed). Fall back to
-    in-code ``THREAT_SCENARIOS`` when the repo is missing or empty so demos and
-    legacy TestClients without lifespan still work.
+    in-code THREAT templates expanded against the live default snapshot when the
+    repo is missing or empty so demos and TestClients without a scenario repo
+    still work.
     """
     scenarios = repo.list_all() if repo is not None else []
     if scenarios:
         return scenarios
-    return list(THREAT_SCENARIOS)
+    return threat_scenarios(base)
 
 
 def get_baseline_stress_scenarios(
-    scenarios: list[StressScenario] = Depends(get_default_stress_scenarios),
-) -> list[StressScenario]:
+    scenarios: list[Scenario] = Depends(get_default_stress_scenarios),
+    base: MarketSnapshot = Depends(get_default_market_snapshot),
+) -> list[Scenario]:
     """DEFAULT-only subset for ``POST /risk/stress`` (M5.9 follow-up).
 
     Filters the DI-backed list to in-code ``DEFAULT_SCENARIOS`` ids so persistence
     overrides apply while keeping the historical baseline set separate from
-    threat/crisis definitions. Falls back to ``DEFAULT_SCENARIOS`` when no
+    threat/crisis definitions. Falls back to expanded DEFAULT templates when no
     DEFAULT-id rows are present (empty/missing repo or threat-only fallback).
     """
     by_id = {s.id: s for s in scenarios if s.id in _DEFAULT_SCENARIO_IDS}
     if not by_id:
-        return list(DEFAULT_SCENARIOS)
+        return default_scenarios(base)
     return [by_id[s.id] for s in DEFAULT_SCENARIOS if s.id in by_id]
 
 

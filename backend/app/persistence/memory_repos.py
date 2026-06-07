@@ -20,7 +20,6 @@ from app.domain.models import (
     RiskResultRef,
     RiskRun,
     RiskRunStatus,
-    StressScenario,
     as_of_wire,
 )
 from app.persistence.repositories import (
@@ -29,6 +28,7 @@ from app.persistence.repositories import (
     RiskRunRepository,
     ScenarioDefinitionRepository,
 )
+from app.risk.scenario_model import Scenario
 
 
 def _utcnow() -> datetime:
@@ -83,27 +83,25 @@ class InMemoryScenarioDefinitionRepository(ScenarioDefinitionRepository):
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        self._rows: dict[str, StressScenario] = {}
+        self._rows: dict[str, Scenario] = {}
 
-    def save(self, scenario: StressScenario) -> StressScenario:
-        scenario_id = scenario.id or scenario.name
+    def save(self, scenario: Scenario) -> Scenario:
+        if not isinstance(scenario, Scenario):
+            raise TypeError(f"scenario definitions store Scenario, got {type(scenario)!r}")
+        scenario_id = scenario.id
         if not scenario_id:
-            raise ValueError("scenario id or name required")
-        stored = scenario.model_copy(deep=True)
-        if stored.id is None:
-            stored = stored.model_copy(update={"id": scenario_id})
+            raise ValueError("scenario id required")
         with self._lock:
-            self._rows[scenario_id] = stored
-            return stored.model_copy(deep=True)
+            self._rows[scenario_id] = scenario
+            return scenario
 
-    def get(self, scenario_id: str) -> StressScenario | None:
+    def get(self, scenario_id: str) -> Scenario | None:
         with self._lock:
-            row = self._rows.get(scenario_id)
-            return None if row is None else row.model_copy(deep=True)
+            return self._rows.get(scenario_id)
 
-    def list_all(self) -> list[StressScenario]:
+    def list_all(self) -> list[Scenario]:
         with self._lock:
-            return [r.model_copy(deep=True) for r in sorted(self._rows.values(), key=lambda s: s.id or s.name)]
+            return [r for r in sorted(self._rows.values(), key=lambda s: s.id)]
 
     def delete(self, scenario_id: str) -> bool:
         with self._lock:

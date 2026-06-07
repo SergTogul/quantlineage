@@ -23,6 +23,8 @@ from typing import Any, Mapping, Sequence
 from app.domain.models import MarketSnapshot, ScenarioKind, StressScenario
 from app.risk.historical_data import FactorObservationSeries, HistoricalMarketDataset
 from app.risk.scenario_model import (
+    BroadcastScenarioDefinition,
+    BroadcastShockTemplate,
     Scenario,
     ScenarioCategory,
     ScenarioSeverity,
@@ -88,6 +90,25 @@ def _crisis_metadata(defn: CrisisDefinition) -> dict[str, Any]:
     meta["exact_replay"] = False
     meta["disclaimer"] = APPROXIMATION_DISCLAIMER
     return meta
+
+
+def crisis_as_broadcast(defn: CrisisDefinition) -> BroadcastScenarioDefinition:
+    """Library template for apply-time expansion (not a frozen ``Scenario``)."""
+    return BroadcastScenarioDefinition(
+        id=defn.id,
+        name=defn.name,
+        description=defn.description,
+        category=ScenarioCategory.HISTORICAL_APPROXIMATION,
+        shocks=BroadcastShockTemplate(
+            equity_shock=defn.shocks.equity_shock,
+            vol_shock=defn.shocks.vol_shock,
+            rates_shift_bps=defn.shocks.rates_shift_bps,
+            fx_shock=defn.shocks.fx_shock,
+        ),
+        threshold=defn.threshold,
+        severity=defn.severity,
+        metadata=_crisis_metadata(defn),
+    )
 
 
 def crisis_as_stress(defn: CrisisDefinition) -> StressScenario:
@@ -344,6 +365,7 @@ __all__ = [
     "REPLAY_DISCLAIMER",
     "apply_crisis",
     "assert_honest_historical_labeling",
+    "crisis_as_broadcast",
     "crisis_as_stress",
     "crisis_scenario",
     "crisis_scenarios",

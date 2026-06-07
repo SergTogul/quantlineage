@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any, Sequence
-from uuid import uuid4
 
 from pydantic import TypeAdapter
 from sqlalchemy import select
@@ -17,7 +16,6 @@ from app.domain.models import (
     RiskLimit,
     RiskRun,
     RiskRunStatus,
-    StressScenario,
     as_of_wire,
 )
 from app.persistence.models import (
@@ -43,6 +41,8 @@ from app.persistence.risk_run_mapping import (
     risk_run_to_row,
     row_to_risk_run,
 )
+from app.persistence.scenario_codec import definition_to_scenario, scenario_to_definition
+from app.risk.scenario_model import Scenario
 
 _POSITION_ADAPTER = TypeAdapter(Position)
 
@@ -168,33 +168,34 @@ class SqlAlchemyScenarioDefinitionRepository(ScenarioDefinitionRepository):
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def save(self, scenario: StressScenario) -> StressScenario:
-        sid = scenario.id or str(uuid4())
-        scenario = scenario.model_copy(update={"id": sid})
-        payload = scenario.model_dump(mode="json")
+    def save(self, scenario: Scenario) -> Scenario:
+        if not isinstance(scenario, Scenario):
+            raise TypeError(f"scenario definitions store Scenario, got {type(scenario)!r}")
+        sid = scenario.id
+        payload = scenario_to_definition(scenario)
         row = self._session.get(ScenarioDefinitionRow, sid)
         if row is None:
             row = ScenarioDefinitionRow(id=sid)
             self._session.add(row)
         row.name = scenario.name
-        row.category = scenario.kind.value if hasattr(scenario.kind, "value") else str(scenario.kind)
+        row.category = scenario.category.value
         row.description = scenario.description
         row.definition = payload
         row.updated_at = _utcnow()
         self._session.flush()
         return scenario
 
-    def get(self, scenario_id: str) -> StressScenario | None:
+    def get(self, scenario_id: str) -> Scenario | None:
         row = self._session.get(ScenarioDefinitionRow, scenario_id)
         if row is None:
             return None
-        return StressScenario.model_validate(row.definition)
+        return definition_to_scenario(row.definition)
 
-    def list_all(self) -> list[StressScenario]:
+    def list_all(self) -> list[Scenario]:
         rows = self._session.scalars(
             select(ScenarioDefinitionRow).order_by(ScenarioDefinitionRow.id)
         ).all()
-        return [StressScenario.model_validate(r.definition) for r in rows]
+        return [definition_to_scenario(r.definition) for r in rows]
 
     def delete(self, scenario_id: str) -> bool:
         row = self._session.get(ScenarioDefinitionRow, scenario_id)

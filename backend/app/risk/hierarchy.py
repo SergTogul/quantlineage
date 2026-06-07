@@ -48,7 +48,6 @@ from app.domain.models import (
     Portfolio,
     RiskSummary,
     StressResult,
-    StressScenario,
 )
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
@@ -65,7 +64,9 @@ from app.risk.historical import (
     require_explicit_market,
 )
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
+from app.risk.scenario_attribution import ScenarioLike
 from app.risk.scenario_engine import apply_scenario
+from app.risk.scenario_model import to_canonical_scenario
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.risk.trade_artifacts import TradeCalculationArtifact
 
@@ -165,7 +166,7 @@ def _artifact_trade_id(position_id: str) -> str:
     return "__empty__"
 
 
-def _scenario_artifact_key(scenario: StressScenario) -> str:
+def _scenario_artifact_key(scenario: ScenarioLike) -> str:
     """Stable stress_pnl key: prefer scenario id, else non-empty name."""
     sid = getattr(scenario, "id", None)
     if isinstance(sid, str) and sid.strip():
@@ -232,7 +233,7 @@ class HierarchyEngine:
         *,
         stress_engine: StressEngine | None = None,
         limit_engine: LimitEngine | None = None,
-        stress_scenarios: list[StressScenario] | None = None,
+        stress_scenarios: Sequence[ScenarioLike] | None = None,
     ):
         self.risk = risk
         self.stress_engine = stress_engine or StressEngine()
@@ -302,7 +303,8 @@ class HierarchyEngine:
         if valuations:
             for scenario in self.stress_scenarios:
                 key = _scenario_artifact_key(scenario)
-                shocked = apply_scenario(market, scenario)
+                formal = to_canonical_scenario(scenario, market)
+                shocked = apply_scenario(market, formal)
                 for position in portfolio.positions:
                     shocked_mv = pricing.value(position, shocked).market_value
                     stress_by_trade[position.id][key] = (
