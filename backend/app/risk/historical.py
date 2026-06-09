@@ -13,24 +13,17 @@ from app.compute.kernel import (
     get_scenario_kernel,
 )
 from app.domain.models import (
-    BondPosition,
-    EquityFuturePosition,
-    EquityPosition,
-    EuropeanOptionPosition,
-    FXForwardPosition,
-    FXOptionPosition,
-    InterestRateFuturePosition,
     MarketSnapshot,
     Portfolio,
     Position,
     RiskSummary,
-    SwapPosition,
     Valuation,
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.pricing.cache import bypass_valuation_lru
+from app.pricing.instrument_capabilities import named_risk_factors
 from app.risk.factor_panel import HistoricalFactorPanel, panel_factor_identity
 from app.risk.factor_types import (
     EquitySpot,
@@ -281,30 +274,16 @@ def historical_pnl_for_valuation(
     return tuple(float(point) for point in series)
 
 
-def _rate_tenor(maturity_years: float) -> str:
-    return f"{round(float(maturity_years))}Y"
-
-
 def required_factors_for_position(position: Position) -> tuple[RiskFactor, ...]:
     """Typed factors a panel must contain for one position (fail-closed).
 
-    Identity matches ``RiskFactorEngine.calculate_typed``: per-name equity/FX
-    and per-tenor rates via ``round(maturity_years)Y``. Options also require
-    their vol factor. Cap/floor and swaption are not mapped here.
+    Identity matches ``RiskFactorEngine.calculate_typed`` via the capability
+    registry: per-name equity/FX and per-tenor rates via
+    ``round(maturity_years)Y`` (swaption: ``option_maturity_years``). Options
+    also require their vol factor. Cap/floor and swaption map to
+    ``RateZero``. Unknown families fail closed.
     """
-    if isinstance(position, (EquityPosition, EquityFuturePosition, EuropeanOptionPosition)):
-        factors: list[RiskFactor] = [EquitySpot(position.symbol)]
-        if isinstance(position, EuropeanOptionPosition):
-            factors.append(EquityVol(underlying=position.symbol))
-        return tuple(factors)
-    if isinstance(position, (BondPosition, SwapPosition, InterestRateFuturePosition)):
-        return (RateZero(currency=position.currency, tenor=_rate_tenor(position.maturity_years)),)
-    if isinstance(position, (FXForwardPosition, FXOptionPosition)):
-        factors = [FXSpot(position.pair)]
-        if isinstance(position, FXOptionPosition):
-            factors.append(FXVol(pair=position.pair))
-        return tuple(factors)
-    raise TypeError(f"unsupported position type for panel path: {type(position)!r}")
+    return named_risk_factors(position)
 
 
 def required_panel_factors(portfolio: Portfolio) -> tuple[RiskFactor, ...]:

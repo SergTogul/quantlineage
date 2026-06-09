@@ -1,10 +1,10 @@
-"""Static instrument capability registry (R0.5.1 / RF-012 wire).
+"""Static instrument capability registry (R0.5.1 / RF-012 remaining ladders).
 
 Declares adapter identity, required factor kinds, produced sensitivities,
-and snapshot-map exposure for each production family. Production pricing,
-snapshot overlay, cache identity, and typed factor extraction consult
-``get_capability`` so unknown families fail closed. Does not import
-pricing engines.
+snapshot-map exposure, and trade-cache schema ids for each production family.
+Production pricing, snapshot overlay, cache identity, and typed factor
+extraction consult ``get_capability`` / ``named_risk_factors`` so unknown
+families fail closed. Does not import pricing engines.
 """
 
 from __future__ import annotations
@@ -227,3 +227,231 @@ def test_trade_cache_key_consults_get_capability(monkeypatch):
     position = EquityPosition(type="equity", id="e", symbol="ABC", quantity=1)
     with pytest.raises(AssertionError, match="wired:equity"):
         trade_cache_key(position)
+
+
+# --- R0.5.7 remaining ladders (RF-012) ---
+
+_TRADE_CACHE_SCHEMA_IDS = {
+    "equity": "equity_terms_v1",
+    "equity_future": "equity_future_terms_v1",
+    "european_option": "equity_option_terms_v1",
+    "bond": "bond_terms_v1",
+    "swap": "swap_terms_v1",
+    "fx_forward": "fx_forward_terms_v1",
+    "fx_option": "fx_option_terms_v1",
+    "ir_future": "ir_future_terms_v1",
+    "cap_floor": "cap_floor_terms_v1",
+    "swaption": "swaption_terms_v1",
+}
+
+
+class _AllGreeksPricing:
+    def value(self, position, market=None):
+        from app.domain.models import Valuation
+
+        return Valuation(
+            position_id=position.id,
+            market_value=1.0,
+            delta=1.0,
+            gamma=1.0,
+            vega=3.0,
+            dv01=12.5,
+            fx_delta=1.0,
+        )
+
+
+def _position_for_family(family: str):
+    from app.domain.models import (
+        BondPosition,
+        CapFloorPosition,
+        EquityFuturePosition,
+        EquityPosition,
+        EuropeanOptionPosition,
+        FXForwardPosition,
+        FXOptionPosition,
+        InterestRateFuturePosition,
+        SwapPosition,
+        SwaptionPosition,
+    )
+
+    factories = {
+        "equity": lambda: EquityPosition(type="equity", id="e", symbol="SPY", quantity=1),
+        "equity_future": lambda: EquityFuturePosition(
+            type="equity_future", id="f", symbol="SPY", quantity=1, maturity_years=0.25
+        ),
+        "european_option": lambda: EuropeanOptionPosition(
+            type="european_option",
+            id="o",
+            symbol="SPY",
+            quantity=1,
+            strike=100.0,
+            maturity_years=0.5,
+            option_type="call",
+        ),
+        "bond": lambda: BondPosition(
+            type="bond",
+            id="b",
+            issuer="UST",
+            face_value=100.0,
+            quantity=1,
+            maturity_years=10.0,
+            duration=8.0,
+        ),
+        "swap": lambda: SwapPosition(
+            type="swap",
+            id="s",
+            currency="USD",
+            notional=1_000_000.0,
+            maturity_years=5.0,
+            fixed_rate=0.04,
+            duration=4.0,
+        ),
+        "fx_forward": lambda: FXForwardPosition(
+            type="fx_forward",
+            id="xf",
+            pair="EURUSD",
+            notional_base=1.0,
+            strike=1.1,
+            maturity_years=0.5,
+        ),
+        "fx_option": lambda: FXOptionPosition(
+            type="fx_option",
+            id="xo",
+            pair="EURUSD",
+            notional_base=1.0,
+            strike=1.1,
+            maturity_years=0.5,
+            option_type="call",
+        ),
+        "ir_future": lambda: InterestRateFuturePosition(
+            type="ir_future", id="ir", currency="USD", quantity=1, maturity_years=0.25
+        ),
+        "cap_floor": lambda: CapFloorPosition(
+            type="cap_floor",
+            id="c",
+            currency="USD",
+            notional=1_000_000.0,
+            strike=0.03,
+            maturity_years=2.0,
+            option_type="cap",
+        ),
+        "swaption": lambda: SwaptionPosition(
+            type="swaption",
+            id="w",
+            currency="USD",
+            notional=1_000_000.0,
+            strike=0.03,
+            option_maturity_years=1.0,
+            swap_tenor_years=5.0,
+            option_type="payer",
+        ),
+    }
+    return factories[family]()
+
+
+def test_trade_cache_schema_lives_on_capability_registry():
+    import inspect
+
+    from app.pricing import cache as cache_mod
+    from app.pricing.instrument_capabilities import get_capability
+
+    for family, schema in _TRADE_CACHE_SCHEMA_IDS.items():
+        assert get_capability(family).trade_cache_schema == schema
+    source = inspect.getsource(cache_mod)
+    assert "_TRADE_CACHE_SCHEMAS" not in source
+
+
+def test_calculate_typed_includes_cap_floor_rate_zero():
+    from app.domain.models import Portfolio
+    from app.risk.factor_types import RateZero
+    from app.risk.factors import RiskFactorEngine
+
+    book = Portfolio(id="p", name="p", positions=[_position_for_family("cap_floor")])
+    typed = RiskFactorEngine().calculate_typed(book, _AllGreeksPricing(), _empty_market())
+    by_factor = dict(typed)
+    assert RateZero("USD", "2Y") in by_factor
+    assert by_factor[RateZero("USD", "2Y")] == pytest.approx(12.5)
+    assert by_factor[RateZero("USD", "2Y")] != pytest.approx(15.5)
+
+
+def test_calculate_typed_includes_swaption_rate_zero():
+    from app.domain.models import Portfolio
+    from app.risk.factor_types import RateZero
+    from app.risk.factors import RiskFactorEngine
+
+    book = Portfolio(id="p", name="p", positions=[_position_for_family("swaption")])
+    typed = RiskFactorEngine().calculate_typed(book, _AllGreeksPricing(), _empty_market())
+    by_factor = dict(typed)
+    assert RateZero("USD", "1Y") in by_factor
+    assert by_factor[RateZero("USD", "1Y")] == pytest.approx(12.5)
+
+
+@pytest.mark.parametrize("family", PRODUCTION_FAMILY_TYPES)
+def test_calculate_typed_extracts_every_production_family(family):
+    from app.domain.models import Portfolio
+    from app.risk.factors import RiskFactorEngine
+
+    book = Portfolio(id="p", name="p", positions=[_position_for_family(family)])
+    typed = RiskFactorEngine().calculate_typed(book, _AllGreeksPricing(), _empty_market())
+    assert typed, f"{family} was skipped after get_capability"
+
+
+def test_required_factors_for_position_maps_cap_floor_and_swaption():
+    from app.risk.factor_types import RateZero
+    from app.risk.historical import required_factors_for_position
+
+    assert required_factors_for_position(_position_for_family("cap_floor")) == (
+        RateZero("USD", "2Y"),
+    )
+    assert required_factors_for_position(_position_for_family("swaption")) == (
+        RateZero("USD", "1Y"),
+    )
+
+
+def test_required_factors_unknown_family_fails_closed():
+    from app.risk.historical import required_factors_for_position
+
+    with pytest.raises((KeyError, TypeError), match="unknown instrument family"):
+        required_factors_for_position(_UnknownPosition())  # type: ignore[arg-type]
+
+
+def test_required_factors_driven_from_registry_not_isinstance_ladder():
+    import inspect
+
+    from app.risk import historical as historical_mod
+
+    source = inspect.getsource(historical_mod.required_factors_for_position)
+    assert "get_capability" in source or "named_risk_factors" in source
+    assert "isinstance" not in source
+
+
+def test_builtin_ir_option_calculate_typed_matches_valuation_dv01():
+    from app.domain.models import CapFloorPosition, MarketSnapshot, Portfolio
+    from app.pricing.builtin import BuiltinPricingEngine
+    from app.risk.factor_types import RateZero
+    from app.risk.factors import RiskFactorEngine
+
+    cap = CapFloorPosition(
+        type="cap_floor",
+        id="usd-cap",
+        currency="USD",
+        notional=1_000_000.0,
+        strike=0.04,
+        maturity_years=2.0,
+        option_type="cap",
+    )
+    market = MarketSnapshot(
+        id="ir-opt",
+        rates={"USD": 0.035},
+        projection_rates={"USD": 0.04},
+        ir_vols={"USD": 0.20},
+    )
+    pricing = BuiltinPricingEngine()
+    valuation = pricing.value(cap, market)
+    typed = dict(
+        RiskFactorEngine().calculate_typed(
+            Portfolio(id="p", name="p", positions=[cap]), pricing, market
+        )
+    )
+    assert valuation.vega != 0.0
+    assert typed[RateZero("USD", "2Y")] == pytest.approx(valuation.dv01)
