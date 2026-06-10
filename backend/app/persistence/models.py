@@ -199,6 +199,7 @@ class RiskResultRow(Base):
         String(128), ForeignKey("risk_runs.id", ondelete="CASCADE"), nullable=False
     )
     result_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Physical JSON column; writes are validated per result_type (R0.8.7 / PERF-016).
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

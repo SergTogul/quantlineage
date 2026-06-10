@@ -69,7 +69,23 @@ def test_happy_path_queued_running_completed(session_factory):
         assert running.completed_at is None
         assert elapsed_seconds(running) is not None
         assert elapsed_seconds(running) >= 0.0
-        done = svc.complete('run-ok', result_type='summary', payload={'var_99': 100.0})
+        done = svc.complete(
+            'run-ok',
+            result_type='summary',
+            payload={
+                'portfolio_id': 'p-life',
+                'market_value': 100.0,
+                'delta': 0.0,
+                'gamma': 0.0,
+                'vega': 0.0,
+                'dv01': 0.0,
+                'fx_delta': 0.0,
+                'var_95': 0.0,
+                'var_99': 100.0,
+                'expected_shortfall_99': 0.0,
+                'methodology': 'DELTA_GAMMA',
+            },
+        )
         assert done.status == RiskRunStatus.COMPLETED
         assert done.completed_at is not None
         assert done.duration is not None

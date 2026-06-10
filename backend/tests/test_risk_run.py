@@ -93,7 +93,23 @@ def test_risk_run_repository_domain_round_trip(session_factory):
         stored = runs.create(queued)
         assert stored.status == RiskRunStatus.QUEUED
         runs.set_status('run-1', RiskRunStatus.RUNNING)
-        runs.add_result('run-1', 'summary', {'portfolio_id': 'p-run', 'var_99': 1234.5, 'market_value': 100.0})
+        runs.add_result(
+            'run-1',
+            'summary',
+            {
+                'portfolio_id': 'p-run',
+                'market_value': 100.0,
+                'delta': 0.0,
+                'gamma': 0.0,
+                'vega': 0.0,
+                'dv01': 0.0,
+                'fx_delta': 0.0,
+                'var_95': 0.0,
+                'var_99': 1234.5,
+                'expected_shortfall_99': 0.0,
+                'methodology': 'DELTA_GAMMA',
+            },
+        )
         completed = runs.set_status('run-1', RiskRunStatus.COMPLETED)
         assert completed.status == RiskRunStatus.COMPLETED
         assert completed.duration is not None

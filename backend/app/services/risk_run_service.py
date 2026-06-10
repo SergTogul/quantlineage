@@ -21,6 +21,7 @@ from app.domain.models import (
     VaRMethodology,
 )
 from app.persistence.repositories import RiskRunRepository
+from app.persistence.result_payloads import parse_result_payload
 
 Clock = Callable[[], datetime]
 
@@ -166,6 +167,7 @@ class RiskRunService:
                 RiskRunStatus.COMPLETED,
                 run_id=run_id,
             )
+            parse_result_payload(result_type, payload)
             self._repo.add_result(run_id, result_type, payload)
         return self._transition(run_id, RiskRunStatus.COMPLETED)
 

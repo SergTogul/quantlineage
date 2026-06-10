@@ -28,6 +28,7 @@ from app.persistence.repositories import (
     RiskRunRepository,
     ScenarioDefinitionRepository,
 )
+from app.persistence.result_payloads import parse_result_payload
 from app.risk.scenario_model import Scenario
 
 
@@ -214,8 +215,9 @@ class InMemoryRiskRunRepository(RiskRunRepository):
             row = self._runs.get(run_id)
             if row is None:
                 raise KeyError(f"risk run not found: {run_id}")
+            typed = parse_result_payload(result_type, payload)
             payloads = self._payloads.setdefault(run_id, {})
-            payloads[result_type] = dict(payload)
+            payloads[result_type] = typed
             refs = [r for r in row.result_refs if r.result_type != result_type]
             refs.append(
                 RiskResultRef(result_type=result_type, result_id=self._next_result_id)
