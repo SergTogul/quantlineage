@@ -106,7 +106,23 @@ def test_risk_run_lifecycle_and_results(session_factory):
         runs = SqlAlchemyRiskRunRepository(session)
         runs.create(RiskRun(id='run-1', portfolio_id='p-run', market_snapshot_id='snap-run', run_type='summary', request={'methodology': 'delta_gamma'}))
         runs.set_status('run-1', RiskRunStatus.RUNNING)
-        runs.add_result('run-1', 'summary', {'portfolio_id': 'p-run', 'var_99': 1234.5, 'market_value': 100.0})
+        runs.add_result(
+            'run-1',
+            'summary',
+            {
+                'portfolio_id': 'p-run',
+                'market_value': 100.0,
+                'delta': 0.0,
+                'gamma': 0.0,
+                'vega': 0.0,
+                'dv01': 0.0,
+                'fx_delta': 0.0,
+                'var_95': 0.0,
+                'var_99': 1234.5,
+                'expected_shortfall_99': 0.0,
+                'methodology': 'DELTA_GAMMA',
+            },
+        )
         runs.set_status('run-1', RiskRunStatus.COMPLETED)
     with session_scope(session_factory) as session:
         got = SqlAlchemyRiskRunRepository(session).get('run-1')

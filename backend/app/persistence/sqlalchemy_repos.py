@@ -36,6 +36,7 @@ from app.persistence.repositories import (
     RiskRunRepository,
     ScenarioDefinitionRepository,
 )
+from app.persistence.result_payloads import parse_result_payload
 from app.persistence.risk_run_mapping import (
     results_payload_map,
     risk_run_to_row,
@@ -247,6 +248,7 @@ class SqlAlchemyRiskRunRepository(RiskRunRepository):
     def add_result(self, run_id: str, result_type: str, payload: dict[str, Any]) -> None:
         if self._session.get(RiskRunRow, run_id) is None:
             raise KeyError(f"risk run not found: {run_id}")
+        typed = parse_result_payload(result_type, payload)
         existing = self._session.scalars(
             select(RiskResultRow).where(
                 RiskResultRow.risk_run_id == run_id,
@@ -254,10 +256,10 @@ class SqlAlchemyRiskRunRepository(RiskRunRepository):
             )
         ).first()
         if existing is not None:
-            existing.payload = payload
+            existing.payload = typed
         else:
             self._session.add(
-                RiskResultRow(risk_run_id=run_id, result_type=result_type, payload=payload)
+                RiskResultRow(risk_run_id=run_id, result_type=result_type, payload=typed)
             )
         self._session.flush()
 
