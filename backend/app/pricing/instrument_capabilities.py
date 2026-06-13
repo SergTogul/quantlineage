@@ -12,8 +12,9 @@ This is a frozen lookup table, not a plugin framework. Production pricing,
 snapshot overlay, cache identity, and typed factor extraction call
 :func:`get_capability` so unknown families fail closed. Trade-cache schema
 ids live on each row. Named typed factors for panel / ``calculate_typed``
-come from :func:`named_risk_factors`. Per-family ``isinstance`` pricing
-adapters remain; this is not a plugin registry.
+come from :func:`named_risk_factors`. Builtin/QuantLib ``value()`` and the
+shared overlay dispatch by ``terms.type`` handler maps after
+:func:`get_capability`. This is not a plugin registry.
 Dividend yields and IR vols have no typed factor class yet; they appear
 only as snapshot maps.
 """

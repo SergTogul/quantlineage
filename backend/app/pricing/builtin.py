@@ -2,35 +2,29 @@ from __future__ import annotations
 
 import math
 from statistics import NormalDist
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 
-from app.domain.instrument_terms import (
-    BondTerms,
-    CapFloorTerms,
-    EquityFutureTerms,
-    EquityTerms,
-    EuropeanOptionTerms,
-    FXForwardTerms,
-    FXOptionTerms,
-    InstrumentTerms,
-    InterestRateFutureTerms,
-    SwapTerms,
-    SwaptionTerms,
-    terms_from_position,
-)
+from app.domain.instrument_terms import terms_from_position
 from app.domain.models import (
     MarketSnapshot,
     Position,
     Valuation,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.demo_snapshot import MissingMarketDataError
 from app.pricing.curve_rates import (
     discount_factor,
     required_continuous_zero,
     required_ir_future_quote,
 )
 from app.pricing.instrument_capabilities import get_capability
+from app.pricing.snapshot_overlay import (
+    pricing_view,
+    required_dividend_yield,
+    required_equity_spot,
+    required_fx_spot,
+    required_settlement_rate,
+    snapshot_marks_from_terms,
+)
 from app.pricing.surface_vol import (
     required_equity_option_vol,
     required_fx_option_vol,
@@ -38,16 +32,16 @@ from app.pricing.surface_vol import (
 )
 from app.risk.historical import require_explicit_market
 
+_pricing_view = pricing_view
+_required_dividend_yield = required_dividend_yield
+_required_equity_spot = required_equity_spot
+_required_fx_spot = required_fx_spot
+_required_settlement_rate = required_settlement_rate
+_snapshot_marks_from_terms = snapshot_marks_from_terms
+
 _N = NormalDist()
 def _cdf(x: float) -> float: return _N.cdf(x)
 def _pdf(x: float) -> float: return math.exp(-0.5*x*x)/math.sqrt(2*math.pi)
-
-
-def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
-    try:
-        return market.equity_spots[symbol]
-    except KeyError:
-        raise MissingMarketDataError(f"equity_spots[{symbol}]") from None
 
 
 def _equity_settlement_currency(position) -> str:
@@ -55,159 +49,6 @@ def _equity_settlement_currency(position) -> str:
     if not currency:
         raise ValueError("equity settlement currency is required on terms")
     return str(currency)
-
-
-def _required_settlement_rate(market: MarketSnapshot, currency: str) -> float:
-    try:
-        return market.rates[currency]
-    except KeyError:
-        raise MissingMarketDataError(f"rates[{currency}]") from None
-
-
-def _required_dividend_yield(market: MarketSnapshot, symbol: str) -> float:
-    try:
-        return market.dividend_yields[symbol]
-    except KeyError:
-        raise MissingMarketDataError(f"dividend_yields[{symbol}]") from None
-
-
-def _required_fx_spot(market: MarketSnapshot, pair: str) -> float:
-    try:
-        return market.fx_spots[pair]
-    except KeyError:
-        raise MissingMarketDataError(f"fx_spots[{pair}]") from None
-
-
-def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -> dict:
-    """Resolve live marks from the explicit snapshot using terms keys only."""
-    get_capability(getattr(terms, "type", None))
-    if isinstance(terms, EquityTerms):
-        return {"price": _required_equity_spot(market, terms.symbol)}
-    if isinstance(terms, EquityFutureTerms):
-        return {
-            "spot": _required_equity_spot(market, terms.symbol),
-            "risk_free_rate": _required_settlement_rate(market, terms.currency),
-            "dividend_yield": _required_dividend_yield(market, terms.symbol),
-        }
-    if isinstance(terms, EuropeanOptionTerms):
-        spot = _required_equity_spot(market, terms.symbol)
-        return {
-            "spot": spot,
-            "volatility": required_equity_option_vol(
-                market,
-                name=terms.symbol,
-                maturity_years=terms.maturity_years,
-                strike=terms.strike,
-                spot=spot,
-            ),
-            "risk_free_rate": _required_settlement_rate(market, terms.currency),
-            "dividend_yield": _required_dividend_yield(market, terms.symbol),
-        }
-    if isinstance(terms, BondTerms):
-        return {
-            "yield_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.maturity_years,
-            )
-        }
-    if isinstance(terms, SwapTerms):
-        return {
-            "market_swap_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.maturity_years,
-            )
-        }
-    if isinstance(terms, InterestRateFutureTerms):
-        return {
-            "forward_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.maturity_years,
-                prefer_projection=True,
-            ),
-            "quoted_rate": required_ir_future_quote(market, terms.currency),
-        }
-    if isinstance(terms, CapFloorTerms):
-        forward = required_continuous_zero(
-            market,
-            terms.currency,
-            terms.maturity_years,
-            prefer_projection=True,
-        )
-        return {
-            "forward_rate": forward,
-            "discount_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.maturity_years,
-            ),
-            "volatility": required_ir_option_vol(
-                market,
-                name=terms.currency,
-                maturity_years=terms.maturity_years,
-                strike=terms.strike,
-                forward=forward,
-            ),
-        }
-    if isinstance(terms, SwaptionTerms):
-        forward = required_continuous_zero(
-            market,
-            terms.currency,
-            terms.option_maturity_years,
-            prefer_projection=True,
-        )
-        return {
-            "forward_swap_rate": forward,
-            "discount_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.option_maturity_years + terms.swap_tenor_years,
-            ),
-            "volatility": required_ir_option_vol(
-                market,
-                name=terms.currency,
-                maturity_years=terms.option_maturity_years,
-                strike=terms.strike,
-                forward=forward,
-            ),
-        }
-    if isinstance(terms, FXForwardTerms):
-        return {
-            "spot": _required_fx_spot(market, terms.pair),
-            "domestic_rate": _required_settlement_rate(market, terms.pair[-3:]),
-            "foreign_rate": _required_settlement_rate(market, terms.pair[:3]),
-        }
-    if isinstance(terms, FXOptionTerms):
-        spot = _required_fx_spot(market, terms.pair)
-        return {
-            "spot": spot,
-            "volatility": required_fx_option_vol(
-                market,
-                name=terms.pair,
-                maturity_years=terms.maturity_years,
-                strike=terms.strike,
-                spot=spot,
-            ),
-            "domestic_rate": _required_settlement_rate(market, terms.pair[-3:]),
-            "foreign_rate": _required_settlement_rate(market, terms.pair[:3]),
-        }
-    raise TypeError(
-        f"unknown instrument family: {getattr(terms, 'type', type(terms).__name__)!r}"
-    )
-
-
-def _pricing_view(
-    position: Position, terms: InstrumentTerms, market: MarketSnapshot
-) -> SimpleNamespace:
-    """Terms + snapshot marks (+ Position duration when present). Never reads DTO marks."""
-    attrs = dict(terms.model_dump())
-    attrs.update(_snapshot_marks_from_terms(terms, market))
-    duration = getattr(position, "duration", None)
-    if duration is not None:
-        attrs["duration"] = duration
-    return SimpleNamespace(**attrs)
 
 
 def _act365_fixed_years(maturity_years: float) -> float:
@@ -238,51 +79,43 @@ class BuiltinPricingEngine(PricingEngine):
 
         # Snapshot is the sole mark authority; working view never reads Position marks.
         working = _pricing_view(position, terms, market)
+        try:
+            handler = self._VALUE_HANDLERS[terms.type]
+        except KeyError as exc:
+            raise TypeError(f"Unsupported position: {type(position)!r}") from exc
+        return handler(self, working, market)
 
-        if isinstance(terms, EquityTerms):
-            return Valuation(
-                position_id=terms.id,
-                market_value=terms.quantity * working.price,
-                delta=terms.quantity * working.price,
-            )
-        if isinstance(terms, EquityFutureTerms):
-            s = _required_equity_spot(market, terms.symbol)
-            r = _required_settlement_rate(market, terms.currency)
-            q = _required_dividend_yield(market, terms.symbol)
-            f = s * math.exp((r - q) * terms.maturity_years)
-            mv = terms.quantity * terms.multiplier * f
-            return Valuation(
-                position_id=terms.id,
-                market_value=mv,
-                delta=mv,
-                dv01=mv * terms.maturity_years * 0.0001,
-            )
-        if isinstance(terms, EuropeanOptionTerms):
-            return self._equity_option(working, market)
-        if isinstance(terms, BondTerms):
-            return self._bond(working, market)
-        if isinstance(terms, SwapTerms):
-            return self._swap(working, market)
-        if isinstance(terms, FXForwardTerms):
-            s = _required_fx_spot(market, terms.pair)
-            rd = _required_settlement_rate(market, terms.pair[-3:])
-            rf = _required_settlement_rate(market, terms.pair[:3])
-            forward = s * math.exp((rd - rf) * terms.maturity_years)
-            pv = terms.notional_base * (forward - terms.strike) * math.exp(-rd * terms.maturity_years)
-            return Valuation(
-                position_id=terms.id,
-                market_value=pv,
-                fx_delta=terms.notional_base * s,
-            )
-        if isinstance(terms, FXOptionTerms):
-            return self._fx_option(working, market)
-        if isinstance(terms, InterestRateFutureTerms):
-            return self._ir_future(working, market)
-        if isinstance(terms, CapFloorTerms):
-            return self._cap_floor(working, market)
-        if isinstance(terms, SwaptionTerms):
-            return self._swaption(working, market)
-        raise TypeError(f"Unsupported position: {type(position)!r}")
+    def _equity(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
+        return Valuation(
+            position_id=p.id,
+            market_value=p.quantity * p.price,
+            delta=p.quantity * p.price,
+        )
+
+    def _equity_future(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
+        s = _required_equity_spot(market, p.symbol)
+        r = _required_settlement_rate(market, p.currency)
+        q = _required_dividend_yield(market, p.symbol)
+        f = s * math.exp((r - q) * p.maturity_years)
+        mv = p.quantity * p.multiplier * f
+        return Valuation(
+            position_id=p.id,
+            market_value=mv,
+            delta=mv,
+            dv01=mv * p.maturity_years * 0.0001,
+        )
+
+    def _fx_forward(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
+        s = _required_fx_spot(market, p.pair)
+        rd = _required_settlement_rate(market, p.pair[-3:])
+        rf = _required_settlement_rate(market, p.pair[:3])
+        forward = s * math.exp((rd - rf) * p.maturity_years)
+        pv = p.notional_base * (forward - p.strike) * math.exp(-rd * p.maturity_years)
+        return Valuation(
+            position_id=p.id,
+            market_value=pv,
+            fx_delta=p.notional_base * s,
+        )
 
     def _bond(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         df = discount_factor(
@@ -487,3 +320,19 @@ class BuiltinPricingEngine(PricingEngine):
         pv, vega = self._swaption_components(p, market)
         bumped, _ = self._swaption_components(p, market, rate_shift=0.0001)
         return Valuation(position_id=p.id, market_value=pv, vega=vega, dv01=bumped - pv)
+
+
+BuiltinPricingEngine._VALUE_HANDLERS = MappingProxyType(
+    {
+        "equity": BuiltinPricingEngine._equity,
+        "equity_future": BuiltinPricingEngine._equity_future,
+        "european_option": BuiltinPricingEngine._equity_option,
+        "bond": BuiltinPricingEngine._bond,
+        "swap": BuiltinPricingEngine._swap,
+        "fx_forward": BuiltinPricingEngine._fx_forward,
+        "fx_option": BuiltinPricingEngine._fx_option,
+        "ir_future": BuiltinPricingEngine._ir_future,
+        "cap_floor": BuiltinPricingEngine._cap_floor,
+        "swaption": BuiltinPricingEngine._swaption,
+    }
+)
