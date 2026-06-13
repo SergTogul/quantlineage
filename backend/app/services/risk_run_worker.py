@@ -341,8 +341,7 @@ class RiskRunWorker:
             stored = repo.get(portfolio.id)
             if stored is not None:
                 return stored
-            repo.create(portfolio)
-            return portfolio
+            return repo.create(portfolio)
 
     def _to_view(self, run: RiskRun) -> RiskRunView:
         payloads = self._with_service(lambda svc: svc.get_result_payloads(run.id))
@@ -413,6 +412,7 @@ class RiskRunWorker:
             return svc.enqueue(
                 run_id=rid,
                 portfolio_id=book.id,
+                portfolio_version=book.version,
                 run_type=run_type,
                 request=req,
                 market_snapshot_id=market_snapshot_id,

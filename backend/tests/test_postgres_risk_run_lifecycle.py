@@ -104,6 +104,7 @@ def test_postgres_save_load_run_create_claim_complete_lifecycle():
             execute=False,
         )
         assert accepted.status == RiskRunStatus.QUEUED
+        assert accepted.portfolio_version == 1
         assert accepted.historical_dataset_id == SYNTHETIC_HISTORICAL_DATASET_ID
         with session_scope(factory) as session:
             stored = SqlAlchemyRiskRunRepository(session).get(accepted.id)

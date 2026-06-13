@@ -66,6 +66,7 @@ def row_to_risk_run(row: RiskRunRow) -> RiskRun:
     return RiskRun(
         id=row.id,
         portfolio_id=row.portfolio_id,
+        portfolio_version=row.portfolio_version,
         market_snapshot_id=row.market_snapshot_id,
         created_at=_as_utc(row.created_at) or datetime.now(UTC),
         started_at=_as_utc(row.started_at),
@@ -89,6 +90,7 @@ def apply_risk_run_to_row(run: RiskRun, row: RiskRunRow) -> None:
     """Copy domain header fields onto an ORM row (does not sync result payloads)."""
     row.id = run.id
     row.portfolio_id = run.portfolio_id
+    row.portfolio_version = run.portfolio_version
     row.market_snapshot_id = run.market_snapshot_id
     row.status = run.status
     row.run_type = run.run_type

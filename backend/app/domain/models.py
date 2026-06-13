@@ -470,6 +470,9 @@ class Portfolio(FiniteInputMixin):
     firm: str = "RiskForge"
     desk: str = "Global Macro"
     strategy: str = "Multi-Asset"
+    # Server-owned monotonic identity (R0.8.8). Create starts at 1; clients may
+    # send a value on first persist but the repository overwrites it.
+    version: int = Field(default=1, ge=1)
 
     @model_validator(mode="after")
     def unique_ids(self):
@@ -1491,6 +1494,8 @@ class RiskRun(BaseModel):
     - ``historical_dataset_id``, ``historical_dataset_version``, ``as_of``,
       ``calculation_config`` are first-class spec columns
       (Alembic ``003_risk_run_spec_fields``); omitted remains valid for old rows.
+    - ``portfolio_version`` is captured from the stored book at submit
+      (Alembic ``004_portfolio_version``); omitted remains valid for old rows.
     - ``run_type`` / ``request`` remain the generic envelope for M5.3/M5.4.
     """
 
@@ -1498,6 +1503,7 @@ class RiskRun(BaseModel):
 
     id: str = Field(min_length=1)
     portfolio_id: str = Field(min_length=1)
+    portfolio_version: int | None = Field(default=None, ge=1)
     market_snapshot_id: str | None = None
     created_at: datetime = Field(default_factory=_utcnow_domain)
     started_at: datetime | None = None

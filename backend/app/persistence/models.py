@@ -21,6 +21,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -55,6 +56,10 @@ class PortfolioRow(Base):
     firm: Mapped[str] = mapped_column(String(128), nullable=False, default="RiskForge")
     desk: Mapped[str] = mapped_column(String(128), nullable=False, default="Global Macro")
     strategy: Mapped[str] = mapped_column(String(128), nullable=False, default="Multi-Asset")
+    # Server-owned monotonic version (R0.8.8). Create starts at 1.
+    version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
@@ -142,6 +147,8 @@ class RiskRunRow(Base):
     ``methodology``, ``scenario_set``. Spec columns (R0.8.1):
     ``historical_dataset_id``, ``historical_dataset_version``, ``as_of``,
     ``calculation_config`` — nullable so pre-spec rows still load.
+    ``portfolio_version`` (R0.8.8) is the stored book version at submit;
+    nullable so pre-version rows still load. Not a historical book archive.
     """
 
     __tablename__ = "risk_runs"
@@ -151,6 +158,7 @@ class RiskRunRow(Base):
     portfolio_id: Mapped[str] = mapped_column(
         String(128), ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
     )
+    portfolio_version: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     market_snapshot_id: Mapped[Optional[str]] = mapped_column(
         String(128), ForeignKey("market_snapshots.id", ondelete="SET NULL"), nullable=True
     )

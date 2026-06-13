@@ -35,6 +35,18 @@ class PortfolioNotFound(ValueError):
         super().__init__(f"portfolio not found: {portfolio_id}")
 
 
+class PortfolioVersionConflict(ValueError):
+    """``update`` expected version does not match the stored book (optimistic lock)."""
+
+    def __init__(self, portfolio_id: str, expected: int, actual: int) -> None:
+        self.portfolio_id = portfolio_id
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"portfolio version conflict: {portfolio_id} expected {expected}, actual {actual}"
+        )
+
+
 class PortfolioRepository(ABC):
     @abstractmethod
     def create(self, portfolio: Portfolio) -> Portfolio:
@@ -42,11 +54,20 @@ class PortfolioRepository(ABC):
 
     @abstractmethod
     def update(self, portfolio: Portfolio) -> Portfolio:
-        """Replace an existing portfolio. Raise if the id is missing."""
+        """Replace an existing portfolio with compare-and-swap on ``version``.
+
+        Caller supplies the last-read version. On match the stored version
+        increments; on mismatch raise ``PortfolioVersionConflict``. Raise
+        ``PortfolioNotFound`` if the id is missing.
+        """
 
     @abstractmethod
     def save(self, portfolio: Portfolio) -> Portfolio:
-        """Legacy upsert. Prefer :meth:`create` / :meth:`update` for identity-safe writes."""
+        """Legacy upsert for seed callers.
+
+        Insert starts at version 1. Overwrite bumps version and does **not**
+        compare-and-swap. Prefer :meth:`create` / :meth:`update` for identity-safe writes.
+        """
 
     @abstractmethod
     def get(self, portfolio_id: str) -> Portfolio | None:
