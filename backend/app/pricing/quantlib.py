@@ -4,21 +4,11 @@ import math
 from contextlib import contextmanager
 from datetime import date, timedelta
 from threading import RLock
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 from typing import Any
 
 from app.domain.instrument_terms import (
-    BondTerms,
-    CapFloorTerms,
-    EquityFutureTerms,
-    EquityTerms,
-    EuropeanOptionTerms,
-    FXForwardTerms,
-    FXOptionTerms,
     InstrumentTerms,
-    InterestRateFutureTerms,
-    SwapTerms,
-    SwaptionTerms,
     terms_from_position,
 )
 from app.domain.models import (
@@ -29,22 +19,18 @@ from app.domain.models import (
     calendar_as_of,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.demo_snapshot import MissingMarketDataError
 from app.market.vol_surfaces import vol_surface_from_dict
 from app.pricing.curve_rates import (
     continuous_zero,
     has_curve_or_key_rates,
-    required_continuous_zero,
-    required_ir_future_quote,
     select_yield_curve,
 )
 from app.pricing.instrument_capabilities import get_capability
-from app.pricing.surface_vol import (
-    required_equity_option_vol,
-    required_fx_option_vol,
-    required_ir_option_vol,
-)
+from app.pricing.snapshot_overlay import pricing_view, snapshot_marks_from_terms
 from app.risk.historical import require_explicit_market
+
+_pricing_view = pricing_view
+_snapshot_marks_from_terms = snapshot_marks_from_terms
 
 try:
     import QuantLib as ql
@@ -68,166 +54,6 @@ class QuantLibUnavailableError(RuntimeError):
 def _parse_snapshot_as_of(as_of: object) -> date | None:
     """Return a calendar date from snapshot ``as_of``, or None for engine labels."""
     return calendar_as_of(as_of)
-
-
-def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
-    try:
-        return market.equity_spots[symbol]
-    except KeyError:
-        raise MissingMarketDataError(f"equity_spots[{symbol}]") from None
-
-
-def _required_settlement_rate(market: MarketSnapshot, currency: str) -> float:
-    try:
-        return market.rates[currency]
-    except KeyError:
-        raise MissingMarketDataError(f"rates[{currency}]") from None
-
-
-def _required_dividend_yield(market: MarketSnapshot, symbol: str) -> float:
-    try:
-        return market.dividend_yields[symbol]
-    except KeyError:
-        raise MissingMarketDataError(f"dividend_yields[{symbol}]") from None
-
-
-def _required_fx_spot(market: MarketSnapshot, pair: str) -> float:
-    try:
-        return market.fx_spots[pair]
-    except KeyError:
-        raise MissingMarketDataError(f"fx_spots[{pair}]") from None
-
-
-def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -> dict:
-    """Resolve live marks from the explicit snapshot using terms keys only."""
-    get_capability(getattr(terms, "type", None))
-    if isinstance(terms, EquityTerms):
-        return {"price": _required_equity_spot(market, terms.symbol)}
-    if isinstance(terms, EquityFutureTerms):
-        return {
-            "spot": _required_equity_spot(market, terms.symbol),
-            "risk_free_rate": _required_settlement_rate(market, terms.currency),
-            "dividend_yield": _required_dividend_yield(market, terms.symbol),
-        }
-    if isinstance(terms, EuropeanOptionTerms):
-        spot = _required_equity_spot(market, terms.symbol)
-        return {
-            "spot": spot,
-            "volatility": required_equity_option_vol(
-                market,
-                name=terms.symbol,
-                maturity_years=terms.maturity_years,
-                strike=terms.strike,
-                spot=spot,
-            ),
-            "risk_free_rate": _required_settlement_rate(market, terms.currency),
-            "dividend_yield": _required_dividend_yield(market, terms.symbol),
-        }
-    if isinstance(terms, BondTerms):
-        return {
-            "yield_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.maturity_years,
-            )
-        }
-    if isinstance(terms, SwapTerms):
-        return {
-            "market_swap_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.maturity_years,
-            )
-        }
-    if isinstance(terms, InterestRateFutureTerms):
-        return {
-            "forward_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.maturity_years,
-                prefer_projection=True,
-            ),
-            "quoted_rate": required_ir_future_quote(market, terms.currency),
-        }
-    if isinstance(terms, CapFloorTerms):
-        forward = required_continuous_zero(
-            market,
-            terms.currency,
-            terms.maturity_years,
-            prefer_projection=True,
-        )
-        return {
-            "forward_rate": forward,
-            "discount_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.maturity_years,
-            ),
-            "volatility": required_ir_option_vol(
-                market,
-                name=terms.currency,
-                maturity_years=terms.maturity_years,
-                strike=terms.strike,
-                forward=forward,
-            ),
-        }
-    if isinstance(terms, SwaptionTerms):
-        forward = required_continuous_zero(
-            market,
-            terms.currency,
-            terms.option_maturity_years,
-            prefer_projection=True,
-        )
-        return {
-            "forward_swap_rate": forward,
-            "discount_rate": required_continuous_zero(
-                market,
-                terms.currency,
-                terms.option_maturity_years + terms.swap_tenor_years,
-            ),
-            "volatility": required_ir_option_vol(
-                market,
-                name=terms.currency,
-                maturity_years=terms.option_maturity_years,
-                strike=terms.strike,
-                forward=forward,
-            ),
-        }
-    if isinstance(terms, FXForwardTerms):
-        return {
-            "spot": _required_fx_spot(market, terms.pair),
-            "domestic_rate": _required_settlement_rate(market, terms.pair[-3:]),
-            "foreign_rate": _required_settlement_rate(market, terms.pair[:3]),
-        }
-    if isinstance(terms, FXOptionTerms):
-        spot = _required_fx_spot(market, terms.pair)
-        return {
-            "spot": spot,
-            "volatility": required_fx_option_vol(
-                market,
-                name=terms.pair,
-                maturity_years=terms.maturity_years,
-                strike=terms.strike,
-                spot=spot,
-            ),
-            "domestic_rate": _required_settlement_rate(market, terms.pair[-3:]),
-            "foreign_rate": _required_settlement_rate(market, terms.pair[:3]),
-        }
-    raise TypeError(
-        f"unknown instrument family: {getattr(terms, 'type', type(terms).__name__)!r}"
-    )
-
-
-def _pricing_view(
-    position: Position, terms: InstrumentTerms, market: MarketSnapshot
-) -> SimpleNamespace:
-    """Terms + snapshot marks (+ Position duration when present). Never reads DTO marks."""
-    attrs = dict(terms.model_dump())
-    attrs.update(_snapshot_marks_from_terms(terms, market))
-    duration = getattr(position, "duration", None)
-    if duration is not None:
-        attrs["duration"] = duration
-    return SimpleNamespace(**attrs)
 
 
 def _terms_key(position: Position) -> tuple[str, str]:
@@ -420,36 +246,23 @@ class QuantLibPricingEngine(PricingEngine):
             session_date = parsed_as_of
         # Snapshot is the sole mark authority; working view never reads Position marks.
         working = _pricing_view(position, terms, market)
-
-        with self._session(evaluation_date=session_date):
-            if isinstance(terms, EquityTerms):
-                return Valuation(
-                    position_id=terms.id,
-                    market_value=terms.quantity * working.price,
-                    delta=terms.quantity * working.price,
-                )
-            if isinstance(terms, EquityFutureTerms):
-                return self._equity_future(working)
-            if isinstance(terms, EuropeanOptionTerms):
-                return self._option(working, market)
-            if isinstance(terms, BondTerms):
-                return self._bond(working, market)
-            if isinstance(terms, SwapTerms):
-                return self._swap(working, market)
-            if isinstance(terms, InterestRateFutureTerms):
-                return self._ir_future(working)
-            if isinstance(terms, CapFloorTerms):
-                return self._cap_floor(working, market)
-            if isinstance(terms, SwaptionTerms):
-                return self._swaption(working, market)
-            if isinstance(terms, FXForwardTerms):
-                return self._fx_forward(working)
-            if isinstance(terms, FXOptionTerms):
-                return self._fx_option(working, market)
+        try:
+            handler = self._VALUE_HANDLERS[terms.type]
+        except KeyError as exc:
             raise TypeError(
                 f"unsupported instrument for QuantLib production pricing: "
                 f"{type(position).__name__}"
-            )
+            ) from exc
+
+        with self._session(evaluation_date=session_date):
+            return handler(self, working, market)
+
+    def _equity(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
+        return Valuation(
+            position_id=p.id,
+            market_value=p.quantity * p.price,
+            delta=p.quantity * p.price,
+        )
 
     def _flat_curve(self, rate: float):
         today = self._ql_date(self.evaluation_date)
@@ -725,7 +538,7 @@ class QuantLibPricingEngine(PricingEngine):
         bumped = self._swap_npv(p, p.market_swap_rate + 0.0001)
         return Valuation(position_id=p.id, market_value=pv, dv01=bumped - pv)
 
-    def _equity_future(self, p: SimpleNamespace) -> Valuation:
+    def _equity_future(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
         # CIP/carry via QL FlatForward DFs (not a QL Futures/ForwardTrade instrument).
         # F = S * DF_q / DF_r; Time(years) discount matches Builtin exactly.
         t = p.maturity_years
@@ -741,7 +554,7 @@ class QuantLibPricingEngine(PricingEngine):
             dv01=mv * t * 0.0001,
         )
 
-    def _fx_forward(self, p: SimpleNamespace) -> Valuation:
+    def _fx_forward(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
         # CIP parity via QL FlatForward DFs (not a QL ForwardTrade instrument):
         # N * (F - K) * DF_d with F = S * DF_f / DF_d; Time discount matches Builtin.
         t = p.maturity_years
@@ -823,7 +636,7 @@ class QuantLibPricingEngine(PricingEngine):
             vega=p.notional_base * unit_vega * 0.01,
         )
 
-    def _ir_future(self, p: SimpleNamespace) -> Valuation:
+    def _ir_future(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
         # Algebraic STIR mark (same as Builtin). QuantLib Futures/ForwardRateAgreement
         # wiring waits on production curves (M1.4). Kept inside the QL adapter session
         # so evaluation-date locking stays consistent with other instruments.
@@ -948,3 +761,19 @@ class QuantLibPricingEngine(PricingEngine):
 
     def shocked_value(self, position: Position, scenario: StressScenario, market: MarketSnapshot | None = None) -> float:
         return super().shocked_value(position, scenario, market)
+
+
+QuantLibPricingEngine._VALUE_HANDLERS = MappingProxyType(
+    {
+        "equity": QuantLibPricingEngine._equity,
+        "equity_future": QuantLibPricingEngine._equity_future,
+        "european_option": QuantLibPricingEngine._option,
+        "bond": QuantLibPricingEngine._bond,
+        "swap": QuantLibPricingEngine._swap,
+        "fx_forward": QuantLibPricingEngine._fx_forward,
+        "fx_option": QuantLibPricingEngine._fx_option,
+        "ir_future": QuantLibPricingEngine._ir_future,
+        "cap_floor": QuantLibPricingEngine._cap_floor,
+        "swaption": QuantLibPricingEngine._swaption,
+    }
+)

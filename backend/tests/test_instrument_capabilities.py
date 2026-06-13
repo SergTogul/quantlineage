@@ -455,3 +455,249 @@ def test_builtin_ir_option_calculate_typed_matches_valuation_dv01():
     )
     assert valuation.vega != 0.0
     assert typed[RateZero("USD", "2Y")] == pytest.approx(valuation.dv01)
+
+
+# --- R0.5.8 family-keyed dispatch + shared overlay (RF-012) ---
+
+_TERMS_TYPE_NAMES = frozenset(
+    {
+        "EquityTerms",
+        "EquityFutureTerms",
+        "EuropeanOptionTerms",
+        "BondTerms",
+        "SwapTerms",
+        "FXForwardTerms",
+        "FXOptionTerms",
+        "InterestRateFutureTerms",
+        "CapFloorTerms",
+        "SwaptionTerms",
+        "InstrumentTerms",
+    }
+)
+_POSITION_TYPE_NAMES = frozenset(
+    {
+        "EquityPosition",
+        "EquityFuturePosition",
+        "EuropeanOptionPosition",
+        "BondPosition",
+        "SwapPosition",
+        "FXForwardPosition",
+        "FXOptionPosition",
+        "InterestRateFuturePosition",
+        "CapFloorPosition",
+        "SwaptionPosition",
+        "Position",
+    }
+)
+
+
+def _ast_names(node) -> set[str]:
+    import ast
+
+    names: set[str] = set()
+    if isinstance(node, ast.Name):
+        names.add(node.id)
+    elif isinstance(node, ast.Attribute):
+        names.add(node.attr)
+    elif isinstance(node, ast.Tuple):
+        for elt in node.elts:
+            names |= _ast_names(elt)
+    return names
+
+
+def _family_isinstance_hits(source: str, type_names: frozenset[str]) -> list[str]:
+    import ast
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(source))
+    hits: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        is_isinstance = (isinstance(func, ast.Name) and func.id == "isinstance") or (
+            isinstance(func, ast.Attribute) and func.attr == "isinstance"
+        )
+        if not is_isinstance or len(node.args) < 2:
+            continue
+        overlap = sorted(_ast_names(node.args[1]) & type_names)
+        hits.extend(overlap)
+    return hits
+
+
+def _function_defs(source: str, name: str) -> list[str]:
+    import ast
+
+    tree = ast.parse(source)
+    return [
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == name
+    ]
+
+
+def test_snapshot_overlay_is_one_shared_module():
+    import inspect
+    from types import MappingProxyType
+
+    from app.pricing import builtin, quantlib
+    from app.pricing.instrument_capabilities import PRODUCTION_FAMILIES
+    from app.pricing.snapshot_overlay import snapshot_marks_from_terms
+
+    assert builtin._snapshot_marks_from_terms is snapshot_marks_from_terms
+    assert quantlib._snapshot_marks_from_terms is snapshot_marks_from_terms
+    assert _function_defs(inspect.getsource(builtin), "_snapshot_marks_from_terms") == []
+    assert _function_defs(inspect.getsource(quantlib), "_snapshot_marks_from_terms") == []
+    assert _function_defs(inspect.getsource(builtin), "snapshot_marks_from_terms") == []
+    assert _function_defs(inspect.getsource(quantlib), "snapshot_marks_from_terms") == []
+
+    from app.pricing import snapshot_overlay as overlay_mod
+
+    overlay_source = inspect.getsource(overlay_mod)
+    assert "from app.pricing.builtin" not in overlay_source
+    assert "from app.pricing.quantlib" not in overlay_source
+    assert "BuiltinPricingEngine" not in overlay_source
+    assert "QuantLibPricingEngine" not in overlay_source
+    assert isinstance(overlay_mod._OVERLAY_HANDLERS, MappingProxyType)
+    assert frozenset(overlay_mod._OVERLAY_HANDLERS) == frozenset(PRODUCTION_FAMILIES)
+    assert not _family_isinstance_hits(overlay_source, _TERMS_TYPE_NAMES)
+
+
+def test_snapshot_overlay_unknown_family_fails_closed():
+    from app.pricing.snapshot_overlay import snapshot_marks_from_terms
+
+    with pytest.raises((KeyError, TypeError), match="unknown instrument family"):
+        snapshot_marks_from_terms(_UnknownTerms(), _empty_market())  # type: ignore[arg-type]
+
+
+def test_snapshot_overlay_identity_for_production_families():
+    from app.domain.instrument_terms import terms_from_position
+    from app.domain.models import MarketSnapshot
+    from app.pricing.snapshot_overlay import snapshot_marks_from_terms
+
+    market = MarketSnapshot(
+        id="overlay-pin",
+        equity_spots={"SPY": 100.0},
+        equity_vols={"SPY": 0.20},
+        dividend_yields={"SPY": 0.015},
+        rates={"USD": 0.04, "EUR": 0.03},
+        fx_spots={"EURUSD": 1.10},
+        fx_vols={"EURUSD": 0.12},
+        projection_rates={"USD": 0.045},
+        ir_vols={"USD": 0.25},
+        ir_future_quotes={"USD": 0.05},
+    )
+    expected = {
+        "equity": {"price": 100.0},
+        "equity_future": {
+            "spot": 100.0,
+            "risk_free_rate": 0.04,
+            "dividend_yield": 0.015,
+        },
+        "european_option": {
+            "spot": 100.0,
+            "volatility": 0.20,
+            "risk_free_rate": 0.04,
+            "dividend_yield": 0.015,
+        },
+        "bond": {"yield_rate": 0.04},
+        "swap": {"market_swap_rate": 0.04},
+        "fx_forward": {
+            "spot": 1.10,
+            "domestic_rate": 0.04,
+            "foreign_rate": 0.03,
+        },
+        "fx_option": {
+            "spot": 1.10,
+            "volatility": 0.12,
+            "domestic_rate": 0.04,
+            "foreign_rate": 0.03,
+        },
+        "ir_future": {"forward_rate": 0.045, "quoted_rate": 0.05},
+        "cap_floor": {
+            "forward_rate": 0.045,
+            "discount_rate": 0.04,
+            "volatility": 0.25,
+        },
+        "swaption": {
+            "forward_swap_rate": 0.045,
+            "discount_rate": 0.04,
+            "volatility": 0.25,
+        },
+    }
+    for family, marks in expected.items():
+        terms = terms_from_position(_position_for_family(family))
+        got = snapshot_marks_from_terms(terms, market)
+        assert got.keys() == marks.keys(), family
+        for key, value in marks.items():
+            assert got[key] == pytest.approx(value), f"{family}.{key}"
+
+
+def test_builtin_value_dispatch_is_family_keyed_not_isinstance():
+    import inspect
+    from types import MappingProxyType
+
+    from app.pricing.builtin import BuiltinPricingEngine
+    from app.pricing.instrument_capabilities import PRODUCTION_FAMILIES
+
+    source = inspect.getsource(BuiltinPricingEngine.value)
+    assert "get_capability" in source
+    assert not _family_isinstance_hits(source, _TERMS_TYPE_NAMES)
+    handlers = BuiltinPricingEngine._VALUE_HANDLERS
+    assert isinstance(handlers, MappingProxyType)
+    assert frozenset(handlers) == frozenset(PRODUCTION_FAMILIES)
+
+
+def test_quantlib_value_dispatch_is_family_keyed_not_isinstance():
+    import inspect
+    from types import MappingProxyType
+
+    from app.pricing.instrument_capabilities import PRODUCTION_FAMILIES
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    source = inspect.getsource(QuantLibPricingEngine.value)
+    assert "get_capability" in source
+    assert not _family_isinstance_hits(source, _TERMS_TYPE_NAMES)
+    handlers = QuantLibPricingEngine._VALUE_HANDLERS
+    assert isinstance(handlers, MappingProxyType)
+    assert frozenset(handlers) == frozenset(PRODUCTION_FAMILIES)
+
+
+def test_position_label_dispatch_is_family_keyed_not_isinstance():
+    import inspect
+    from types import MappingProxyType
+
+    from app.pricing.instrument_capabilities import PRODUCTION_FAMILIES
+    from app.services.portfolio_service import _LABEL_HANDLERS, position_label
+
+    source = inspect.getsource(position_label)
+    assert "get_capability" in source
+    assert not _family_isinstance_hits(source, _POSITION_TYPE_NAMES)
+    assert isinstance(_LABEL_HANDLERS, MappingProxyType)
+    assert frozenset(_LABEL_HANDLERS) == frozenset(PRODUCTION_FAMILIES)
+
+
+def test_position_label_unknown_family_fails_closed():
+    from app.services.portfolio_service import position_label
+
+    with pytest.raises((KeyError, TypeError), match="unknown instrument family"):
+        position_label(_UnknownPosition())  # type: ignore[arg-type]
+
+
+def test_position_label_identity_for_production_families():
+    from app.services.portfolio_service import position_label
+
+    expected = {
+        "equity": "SPY equity",
+        "equity_future": "SPY future",
+        "european_option": "SPY call",
+        "bond": "UST",
+        "swap": "USD 5Y swap",
+        "fx_forward": "EURUSD fwd",
+        "fx_option": "EURUSD call",
+        "ir_future": "USD IR future",
+        "cap_floor": "c",
+        "swaption": "w",
+    }
+    for family, label in expected.items():
+        assert position_label(_position_for_family(family)) == label
