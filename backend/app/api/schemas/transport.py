@@ -346,6 +346,7 @@ class RiskRunView(BaseModel):
                 {
                     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                     "portfolio_id": "demo",
+                    "portfolio_version": 1,
                     "market_snapshot_id": None,
                     "status": "QUEUED",
                     "run_type": "summary",
@@ -370,6 +371,7 @@ class RiskRunView(BaseModel):
 
     id: str
     portfolio_id: str
+    portfolio_version: int | None = None
     market_snapshot_id: str | None = None
     status: RiskRunStatus
     run_type: str
@@ -412,6 +414,7 @@ class RiskRunView(BaseModel):
         return cls(
             id=run.id,
             portfolio_id=run.portfolio_id,
+            portfolio_version=run.portfolio_version,
             market_snapshot_id=run.market_snapshot_id,
             status=run.status,
             run_type=run.run_type,

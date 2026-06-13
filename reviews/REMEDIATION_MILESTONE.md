@@ -758,7 +758,7 @@ Hierarchy time is driven primarily by one base calculation + aggregation, not nu
 Related findings:
 
 - RF-009 (**CLOSED**)
-- RF-013 (**IN PROGRESS**; HTTP overwrite pin R0.8.6; typed `risk_results.payload` R0.8.7; finding not CLOSED — `reviews/r0.8.7-typed-result-payload-report.md`)
+- RF-013 (**CLOSED**; R0.8.8 `portfolio_version` — `reviews/r0.8.8-portfolio-version-report.md`)
 - RF-010
 
 ## R0.8.1 Deterministic RiskRun specification — COMPLETE (2026-09-04)
@@ -846,6 +846,22 @@ Residuals (keep finding IN PROGRESS): no `portfolio_version` / server-issued ids
 
 Report: `reviews/r0.8.7-typed-result-payload-report.md`.
 
+## R0.8.8 portfolio_version — COMPLETE; RF-013 CLOSED (2026-09-09)
+
+Server-owned monotonic `Portfolio.version` (create = 1; `update` compare-and-swap; stale version fails closed). `RiskRun.portfolio_version` captured from the stored book at submit. Alembic `004_portfolio_version`. Execute still uses the current stored book (not a historical archive of every revision). Evidence: `backend/tests/test_portfolio_identity.py` version/CAS/submit pins; `global-macro` overwrite still holds. **RF-013 CLOSED.**
+
+Named residuals (not blocking close): leftover seed `save` upsert; live debug calculate POST; object ACLs = RF-014; client id on first create.
+
+Acceptance:
+
+- overwrite `global-macro` — **MET** (cite R0.8.6; re-run this slice).
+- Persisted RiskRun reproduced from IDs — **MET** (cite R0.8.5).
+- PostgreSQL pytest/integration — **MET** (cite R0.8.5; skip without DSN).
+- Derived payloads not unconstrained JSON — **MET** (cite R0.8.7).
+- `portfolio_id` / `portfolio_version` stored and checked — **MET** (this slice).
+
+Report: `reviews/r0.8.8-portfolio-version-report.md`.
+
 ---
 
 # R0.9 — Separate Domain, API, and Application Contracts
@@ -853,7 +869,7 @@ Report: `reviews/r0.8.7-typed-result-payload-report.md`.
 Related findings:
 
 - RF-010
-- RF-013 (identity **IN PROGRESS** after R0.8.6 HTTP pin; remaining domain/API split is RF-010)
+- RF-013 (identity **CLOSED** after R0.8.8 `portfolio_version`; remaining domain/API split is RF-010)
 
 ## R0.9.1 Split transport schemas — COMPLETE (2026-09-09); RF-010 stays IN PROGRESS
 

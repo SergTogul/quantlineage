@@ -688,7 +688,7 @@ Adding a new instrument requires one coherent adapter registration plus tests, n
 
 ## RF-013 — Persistence and HTTP identity are not canonical; client IDs can overwrite stored portfolios
 
-Status: **IN PROGRESS** (2026-09-09). Independent review KEEP OPEN — do not CLOSE. R0.8.3 create vs update + RiskRun create-if-absent/attach-stored; R0.8.6 HTTP pin: `POST /api/v1/risk/runs` (and `/risk/runs`) with `portfolio.id=global-macro` does not replace the seeded Cross-Asset book (`GET /portfolio` and SQL row unchanged). Reproduction from IDs: R0.8.5 same-spec (`test_same_spec_parity.py`). Postgres coverage: R0.8.5 (`test_postgres_risk_run_lifecycle.py`, including identity-on-execute). R0.8.7: `risk_results.payload` writes validate against a known schema per `result_type` (`extra='forbid'`) at `add_result` / `complete`. **Residuals:** no `portfolio_version` / server-issued ids (first persist is still create-if-absent with a client id); live calculate still POSTs a full book; leftover `save` upsert for seed callers (not on submit); object ACLs = RF-014. Physical JSON column remains (PERF-016 storage-size residual is not this cell).
+Status: **CLOSED** (2026-09-09). R0.8.8: `Portfolio.version` is server-owned (create starts at 1; `update` compare-and-swap increments or fails closed; Alembic `004_portfolio_version`). `RiskRun.portfolio_version` is copied from the **stored** book at submit (attach-stored path). Overwrite `global-macro` **MET** (R0.8.6); reproduce from IDs **MET** (R0.8.5); Postgres **MET** (R0.8.5; skipped without DSN); cell 4 **MET** (R0.8.7). Version is a real stored/checked identity, not a dead column. Report: `reviews/r0.8.8-portfolio-version-report.md`. **Named residuals (not blocking close):** leftover seed `save` upsert (insert=1, overwrite bumps, no CAS); live debug calculate still POSTs a full book; object ACLs = RF-014; client-chosen id on first create-if-absent. Not a historical archive of every book revision.
 
 Priority: **P1**  
 Risk types: INTEGRITY, ARCHITECTURE, SECURITY  
@@ -724,7 +724,8 @@ Keep an explicit inline/debug calculation endpoint only for tests/demo tooling.
 - a request cannot overwrite `global-macro` merely by supplying that ID — **MET** (`tests/test_portfolio_identity.py` HTTP + worker pins; R0.8.3 attach-stored);
 - a persisted risk run can be reproduced from IDs — **MET** (R0.8.5 `tests/test_same_spec_parity.py`; RF-009 CLOSED);
 - PostgreSQL path has real pytest/integration coverage — **MET** (R0.8.5 `tests/test_postgres_risk_run_lifecycle.py`; not duplicated here);
-- large derived payloads are not blindly duplicated as unconstrained JSON where a structured/reference model is better — **MET** (R0.8.7: `parse_result_payload` gates `add_result` / `complete` on a known `result_type` → existing domain/API result model, `extra='forbid'`; unknown type and extra keys fail closed. Physical JSON column remains; unconstrained `dict[str, Any]` writes are rejected. R0.8.4 typed **request** bodies are not this cell).
+- large derived payloads are not blindly duplicated as unconstrained JSON where a structured/reference model is better — **MET** (R0.8.7: `parse_result_payload` gates `add_result` / `complete` on a known `result_type` → existing domain/API result model, `extra='forbid'`; unknown type and extra keys fail closed. Physical JSON column remains; unconstrained `dict[str, Any]` writes are rejected. R0.8.4 typed **request** bodies are not this cell);
+- `portfolio_id` / `portfolio_version` is a real stored identity — **MET** (R0.8.8: create stores version 1 ignoring client; `update` CAS; RiskRun header copies stored version at submit; SQL column pins in `tests/test_portfolio_identity.py`).
 
 ---
 
