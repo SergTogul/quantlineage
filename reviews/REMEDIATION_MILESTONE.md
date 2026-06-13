@@ -848,7 +848,7 @@ Report: `reviews/r0.8.7-typed-result-payload-report.md`.
 
 ## R0.8.8 portfolio_version — COMPLETE; RF-013 CLOSED (2026-09-09)
 
-Server-owned monotonic `Portfolio.version` (create = 1; `update` compare-and-swap; stale version fails closed). `RiskRun.portfolio_version` captured from the stored book at submit. Alembic `004_portfolio_version`. Execute still uses the current stored book (not a historical archive of every revision). Evidence: `backend/tests/test_portfolio_identity.py` version/CAS/submit pins; `global-macro` overwrite still holds. **RF-013 CLOSED.**
+Independent review **APPROVE** (`reviews/sdd-briefs/task-23-rf013-portfolio-version-review.md`). Server-owned monotonic `Portfolio.version` (create = 1; `update` compare-and-swap; stale version fails closed). `RiskRun.portfolio_version` captured from the stored book at submit. Alembic `004_portfolio_version`. Execute still uses the current stored book (not a historical archive of every revision). Evidence: `backend/tests/test_portfolio_identity.py` version/CAS/submit pins; `global-macro` overwrite still holds. **RF-013 CLOSED.**
 
 Named residuals (not blocking close): leftover seed `save` upsert; live debug calculate POST; object ACLs = RF-014; client id on first create.
 

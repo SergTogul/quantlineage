@@ -73,7 +73,7 @@ The reviews nevertheless converge on six foundational problems:
 7. **RF-007 — Full revaluation and contribution paths are N×S reconstruction loops**
 8. **RF-008 — Hierarchy recomputes full risk independently at every node**
 9. **RF-009 — API and worker risk runs can use different historical datasets**
-10. **RF-013 — Persistence/API identity is not yet canonical and client IDs can overwrite books**
+10. **RF-013 — Persistence/API identity** — **CLOSED** (R0.8.8); named residuals: seed `save`, live debug calculate POST, client id on first create
 
 ---
 
@@ -688,7 +688,7 @@ Adding a new instrument requires one coherent adapter registration plus tests, n
 
 ## RF-013 — Persistence and HTTP identity are not canonical; client IDs can overwrite stored portfolios
 
-Status: **CLOSED** (2026-09-09). R0.8.8: `Portfolio.version` is server-owned (create starts at 1; `update` compare-and-swap increments or fails closed; Alembic `004_portfolio_version`). `RiskRun.portfolio_version` is copied from the **stored** book at submit (attach-stored path). Overwrite `global-macro` **MET** (R0.8.6); reproduce from IDs **MET** (R0.8.5); Postgres **MET** (R0.8.5; skipped without DSN); cell 4 **MET** (R0.8.7). Version is a real stored/checked identity, not a dead column. Report: `reviews/r0.8.8-portfolio-version-report.md`. **Named residuals (not blocking close):** leftover seed `save` upsert (insert=1, overwrite bumps, no CAS); live debug calculate still POSTs a full book; object ACLs = RF-014; client-chosen id on first create-if-absent. Not a historical archive of every book revision.
+Status: **CLOSED** (2026-09-09). Independent review of R0.8.8 **APPROVE** (`reviews/sdd-briefs/task-23-rf013-portfolio-version-review.md`). R0.8.8: `Portfolio.version` is server-owned (create starts at 1; `update` compare-and-swap increments or fails closed; Alembic `004_portfolio_version`). `RiskRun.portfolio_version` is copied from the **stored** book at submit (attach-stored path). Overwrite `global-macro` **MET** (R0.8.6); reproduce from IDs **MET** (R0.8.5); Postgres **MET** (R0.8.5; skipped without DSN); cell 4 **MET** (R0.8.7). Version is a real stored/checked identity, not a dead column. Report: `reviews/r0.8.8-portfolio-version-report.md`. **Named residuals (not blocking close):** leftover seed `save` upsert (insert=1, overwrite bumps, no CAS); live debug calculate still POSTs a full book; object ACLs = RF-014; client-chosen id on first create-if-absent. Not a historical archive of every book revision.
 
 Priority: **P1**  
 Risk types: INTEGRITY, ARCHITECTURE, SECURITY  
