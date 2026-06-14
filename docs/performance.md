@@ -53,7 +53,7 @@ backend/.venv/bin/python benchmarks/check_m6_sla.py
 - It does not prove multi-tenant capacity planning or production SLOs.
 - It does not prove `1 x N` aggregated-Greek Historical VaR is 50x faster than NumPy. The current product path can be FFI-bound at small exposure counts.
 - It is not a CI hard gate on arbitrary runner hardware.
-- RF-016 residual: labeled-runner SLA-K1/K2 is PARTIAL. This repository has no labeled self-hosted Actions runner (`actions/runners total_count=0` as of 2026-09-09). Nightly GitHub-hosted `ubuntu-latest` jobs must not run `benchmarks/check_m6_sla.py`.
+- RF-016 residual: labeled-runner SLA-K1/K2 is PARTIAL. This repository has no labeled self-hosted Actions runner (`actions/runners total_count=0` as of 2026-09-09). Nightly GitHub-hosted `ubuntu-latest` jobs must not run `benchmarks/check_m6_sla.py`. R0.12.7 accepted this as a named residual when RF-016 CLOSED; SLA-K1/K2 is not CI-enforced.
 
 ## Operational Notes
 

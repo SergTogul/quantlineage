@@ -1125,7 +1125,15 @@ Capture/assert request units where percent/bp conversion matters.
 
 ## R0.12.6 Labeled-runner SLA-K1/K2 (honest residual)
 
-RF-016 leftover. No self-hosted runner is registered (`actions/runners total_count=0`, 2026-09-09). Do **not** run `benchmarks/check_m6_sla.py` on `ubuntu-latest`. Harness + `docs/performance.md` + `benchmarks/RESULTS.md` exist; CI does not enforce host floors. Score **PARTIAL**. Do not CLOSE RF-016. Evidence: `reviews/r0.12.6-rf016-sla-k-report.md`.
+RF-016 leftover. No self-hosted runner is registered (`actions/runners total_count=0`, 2026-09-09). Do **not** run `benchmarks/check_m6_sla.py` on `ubuntu-latest`. Harness + `docs/performance.md` + `benchmarks/RESULTS.md` exist; CI does not enforce host floors. Score **PARTIAL**. Evidence: `reviews/r0.12.6-rf016-sla-k-report.md`. Close disposition is R0.12.7.
+
+## R0.12.7 RF-016 close gate — CLOSED pending independent review (2026-09-09)
+
+QA close gate **CLOSE** (`reviews/r0.12.7-rf016-close-gate-report.md`). Independent review **pending**. **RF-016 CLOSED** (not final until Task 26 review APPROVE).
+
+Required PR-FAST / PR-FULL (QuantLib cannot be skipped) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. Labeled-runner SLA-K1/K2 is an **accepted residual** (not MET): no labeled runner; SLA-K1/K2 not CI-enforced; do not run `check_m6_sla.py` on `ubuntu-latest`. QA-024 demo-artifact range check remains a leftover residual (not MET). Do not invent host floors.
+
+Evidence: `reviews/r0.12.7-rf016-close-gate-report.md`.
 
 ## R0.12.5 Native ABI safety
 

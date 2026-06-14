@@ -840,7 +840,7 @@ A dashboard load does not execute redundant full valuations of the same book and
 Priority: **P1**  
 Risk types: TEST_GAP, CI, OPERABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-09). R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Labeled-runner SLA-K1/K2 is **PARTIAL**: harness (`benchmarks/check_m6_sla.py`) + `docs/performance.md` + `benchmarks/RESULTS.md` exist; this repo has no self-hosted runner (`actions/runners total_count=0`, 2026-09-09); CI does not enforce host floors on `ubuntu-latest`. Not CLOSED.
+Status: **CLOSED** (2026-09-09). QA close gate (`reviews/r0.12.7-rf016-close-gate-report.md`); independent review pending. R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Required PR-FAST / PR-FULL (including QuantLib hard-gate) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. Labeled-runner SLA-K1/K2 is an **accepted residual** (not MET): no labeled runner; SLA-K1/K2 not CI-enforced (`actions/runners total_count=0`; do not run `check_m6_sla.py` on `ubuntu-latest`). QA-024 demo-artifact range check remains a leftover residual (not MET). Not a production SLA rollout.
 
 Source findings:
 
@@ -878,11 +878,11 @@ Deterministic core unit/golden/property tests.
 - benchmark/SLA on labeled runner;
 - optional QuantLib E2E/demo range check.
 
-NIGHTLY scoring (R0.12.6): Postgres two-worker **MET**; larger full-reval samples **MET** (sample + N=100 identity, not host SLA); QuantLib E2E **MET** (nightly only). Labeled-runner SLA-K1/K2 (`check_m6_sla.py`) **PARTIAL** — harness and reference-host evidence exist; no labeled runner is registered; do not invent `ubuntu-latest` floors. Demo-artifact range check (QA-024) remains a leftover, not this slice.
+Close-gate scoring (R0.12.7): PR-FAST **MET**; PR-FULL QuantLib hard-gate / native compile-parity / frontend / semantic API / Playwright **MET**. NIGHTLY Postgres two-worker **MET**; larger full-reval samples **MET** (sample + N=100 identity, not host SLA); QuantLib E2E **MET** (nightly only). Labeled-runner SLA-K1/K2 (`check_m6_sla.py`) **PARTIAL** / **accepted residual** — harness and reference-host evidence exist; no labeled runner is registered; SLA-K1/K2 not CI-enforced; do not invent `ubuntu-latest` floors. QA-024 demo-artifact range check remains a leftover residual (not MET).
 
 ### Acceptance evidence
 
-A broken QuantLib installation cannot produce a green "full" CI run.
+A broken QuantLib installation cannot produce a green "full" CI run. — **MET** (R0.1.6 `backend-quantlib-hard-gate` is a required `pr-full` need; `RISKFORGE_REQUIRE_QUANTLIB`; no `requirements-no-ql` fallback; no `continue-on-error`). Labeled-runner SLA-K1/K2 and QA-024 range remain named residuals, not MET.
 
 ---
 
