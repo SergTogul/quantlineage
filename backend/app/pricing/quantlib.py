@@ -247,7 +247,7 @@ class QuantLibPricingEngine(PricingEngine):
         # Snapshot is the sole mark authority; working view never reads Position marks.
         working = _pricing_view(position, terms, market)
         try:
-            handler = self._VALUE_HANDLERS[terms.type]
+            handler_name = self._VALUE_HANDLERS[terms.type]
         except KeyError as exc:
             raise TypeError(
                 f"unsupported instrument for QuantLib production pricing: "
@@ -255,7 +255,7 @@ class QuantLibPricingEngine(PricingEngine):
             ) from exc
 
         with self._session(evaluation_date=session_date):
-            return handler(self, working, market)
+            return getattr(self, handler_name)(working, market)
 
     def _equity(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
         return Valuation(
@@ -765,15 +765,15 @@ class QuantLibPricingEngine(PricingEngine):
 
 QuantLibPricingEngine._VALUE_HANDLERS = MappingProxyType(
     {
-        "equity": QuantLibPricingEngine._equity,
-        "equity_future": QuantLibPricingEngine._equity_future,
-        "european_option": QuantLibPricingEngine._option,
-        "bond": QuantLibPricingEngine._bond,
-        "swap": QuantLibPricingEngine._swap,
-        "fx_forward": QuantLibPricingEngine._fx_forward,
-        "fx_option": QuantLibPricingEngine._fx_option,
-        "ir_future": QuantLibPricingEngine._ir_future,
-        "cap_floor": QuantLibPricingEngine._cap_floor,
-        "swaption": QuantLibPricingEngine._swaption,
+        "equity": "_equity",
+        "equity_future": "_equity_future",
+        "european_option": "_option",
+        "bond": "_bond",
+        "swap": "_swap",
+        "fx_forward": "_fx_forward",
+        "fx_option": "_fx_option",
+        "ir_future": "_ir_future",
+        "cap_floor": "_cap_floor",
+        "swaption": "_swaption",
     }
 )
