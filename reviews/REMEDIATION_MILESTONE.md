@@ -591,7 +591,7 @@ Do not allow an omitted factor to disappear into `interaction` without a reconci
 
 ## R0.5.8 Family-keyed dispatch + shared overlay — COMPLETE (2026-09-09)
 
-Builtin/QuantLib `value()` dispatch by frozen `terms.type` handler maps after `get_capability`. One overlay module (`app.pricing.snapshot_overlay`) serves both working views; unknown families fail closed. `position_label` is family-keyed via `get_capability` (existing labels unchanged). **RF-012 CLOSED** with named residual: discriminated Position/Terms unions in `domain/`. Report: `reviews/r0.5.8-rf012-family-dispatch-report.md`.
+Independent review **APPROVE** (`reviews/sdd-briefs/task-24-rf012-family-dispatch-review.md`; instance-handler fix `3857892`). Builtin/QuantLib `value()` dispatch by frozen `terms.type` handler **names** after `get_capability`, then `getattr(self, name)`. One overlay module (`app.pricing.snapshot_overlay`) serves both working views; unknown families fail closed. `position_label` is family-keyed via `get_capability` (existing labels unchanged). **RF-012 CLOSED** with named residual: discriminated Position/Terms unions in `domain/`. Report: `reviews/r0.5.8-rf012-family-dispatch-report.md`.
 
 ### Exit criteria
 
