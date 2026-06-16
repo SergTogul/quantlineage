@@ -840,7 +840,7 @@ A dashboard load does not execute redundant full valuations of the same book and
 Priority: **P1**  
 Risk types: TEST_GAP, CI, OPERABILITY  
 Confidence: HIGH  
-Status: **CLOSED** (2026-09-09). QA close gate (`reviews/r0.12.7-rf016-close-gate-report.md`); independent review pending. R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Required PR-FAST / PR-FULL (including QuantLib hard-gate) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. Labeled-runner SLA-K1/K2 is an **accepted residual** (not MET): no labeled runner; SLA-K1/K2 not CI-enforced (`actions/runners total_count=0`; do not run `check_m6_sla.py` on `ubuntu-latest`). QA-024 demo-artifact range check remains a leftover residual (not MET). Not a production SLA rollout.
+Status: **CLOSED** (2026-09-09). Independent review **APPROVE** (`reviews/sdd-briefs/task-26-rf016-close-gate-review.md`). QA close gate (`reviews/r0.12.7-rf016-close-gate-report.md`). R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Required PR-FAST / PR-FULL (including QuantLib hard-gate) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. Labeled-runner SLA-K1/K2 is an **accepted residual** (not MET): no labeled runner; SLA-K1/K2 not CI-enforced (`actions/runners total_count=0`; do not run `check_m6_sla.py` on `ubuntu-latest`). QA-024 demo-artifact range check remains a leftover residual (not MET). Not a production SLA rollout.
 
 Source findings:
 
