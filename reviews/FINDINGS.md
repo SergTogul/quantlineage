@@ -1,7 +1,8 @@
 # RiskForge Consolidated Engineering Findings
 
-Date: 2026-09-03  
-Status: R0 IN PROGRESS — Phase B COMPLETE (RF-001 CLOSED)  
+Date: 2026-09-09  
+Status: Milestone R0 COMPLETE (2026-09-09) — all P0/P1 CLOSED; P2 RF-017/RF-018/RF-019 ACCEPTED / DEFERRED; RF-020 CLOSED  
+
 Inputs:
 
 - `architecture-review.md`
@@ -47,9 +48,9 @@ Important but not allowed to distract from P0/P1 remediation. These can be compl
 
 ## Recommended engineering decision
 
-**Pause net-new feature development.**
+**Milestone R0 — Core Remediation & Trustworthiness is COMPLETE** (2026-09-09).
 
-Create and complete **Milestone R0 — Core Remediation & Trustworthiness** before continuing the feature roadmap.
+All P0 and P1 root findings are CLOSED. Named accepted residuals are **not MET** (RF-014 shared auth/ACLs/TLS; RF-016 labeled-runner SLA-K1/K2; QA-024 range). P2 RF-017 / RF-018 / RF-019 are **ACCEPTED / DEFERRED**. Net-new feature development may resume; do not treat accepted residuals as MET.
 
 The current repository is a strong MVP with unusually broad test coverage, real QuantLib integration, deterministic demo data, a credible pricing seam, native parity tests, and good separation of the native numerical kernel from business logic.
 
@@ -891,7 +892,7 @@ A broken QuantLib installation cannot produce a green "full" CI run. — **MET**
 Priority: **P2**  
 Risk types: PERFORMANCE, MAINTAINABILITY, NATIVE_SAFETY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.12.5 ABI fail-closed APPROVE; contiguous `pnl_from_arrays` + serial-below-4096 APPROVE; native Historical VaR uses arrays APPROVE. Remaining: default kernel is still python/NumPy; do not expand native VaR/QuantLib.)
+Status: **ACCEPTED / DEFERRED** (2026-09-09). R0 non-goal: do not expand C++ VaR/QuantLib. ABI fail-closed / contiguous `pnl_from_arrays` / serial-below-4096 landed; native Historical VaR uses arrays. Remaining: default kernel is still python/NumPy. Not CLOSED as MET.
 
 Source findings:
 
@@ -927,7 +928,8 @@ At the same time, the reviews agree that the native kernel is not the dominant b
 
 Priority: **P2**  
 Risk types: MAINTAINABILITY, SUPPLY_CHAIN, UI_CORRECTNESS  
-Confidence: HIGH
+Confidence: HIGH  
+Status: **ACCEPTED / DEFERRED** (2026-09-09). R0 non-goal: do not TypeScript-rewrite. Frontend remains JavaScript with Vitest; generated/centralized API contracts and TS migration wait until after R0. Not CLOSED as MET.
 
 Source findings:
 
@@ -954,7 +956,8 @@ The frontend is untyped JavaScript, API request shaping is manual, and runtime d
 
 Priority: **P2**  
 Risk types: MAINTAINABILITY, AI_GUARDRAILS  
-Confidence: HIGH
+Confidence: HIGH  
+Status: **ACCEPTED / DEFERRED** (2026-09-09). AI expansion stays after deterministic APIs. Current slice is keyword/tool-loop over existing `PortfolioService` tools. Not CLOSED as MET.
 
 Source findings:
 
@@ -990,7 +993,7 @@ AI remains **after** deterministic risk remediation.
 Priority: **P2**  
 Risk types: DOCUMENTATION, PROCESS  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0 row in ROADMAP; known_limitations aligned; dated suite counts disclaimed as not a live re-run; workstream COMPLETE ≠ Milestone R0 COMPLETE. Residual: Current gate is the recorded Phase A baseline, not a live matrix.)
+Status: **CLOSED** (2026-09-09). Milestone R0 is COMPLETE. `reviews/FINDINGS.md` is the authoritative remediation backlog. `ROADMAP.md` Current gate records Milestone R0 COMPLETE with named accepted residuals. `docs/known_limitations.md` names RF-014 ACLs/TLS, RF-016 labeled-runner SLA-K1/K2, QA-024 range, and P2 RF-017/RF-018/RF-019 ACCEPTED / DEFERRED. Suite counts remain the recorded Phase A baseline (**not a live** re-run); dated historical tables are snapshots, not today's suite size.
 
 Source findings:
 
@@ -1106,9 +1109,9 @@ Do not use the review as justification to add:
 
 # Release / Development Gate
 
-Net-new product feature development should remain paused until **Milestone R0** is complete.
+**Milestone R0 COMPLETE** (2026-09-09). Net-new product feature development may resume. Named accepted residuals (RF-014 shared auth/ACLs/TLS; RF-016 labeled-runner SLA-K1/K2; QA-024 range) are **not MET**. P2 RF-017 / RF-018 / RF-019 are **ACCEPTED / DEFERRED**.
 
-At minimum, R0 requires:
+R0 required, and now records:
 
 - all P0 findings CLOSED;
 - all P1 findings CLOSED or explicitly accepted with written rationale;
