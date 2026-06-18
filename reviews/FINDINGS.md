@@ -993,7 +993,7 @@ AI remains **after** deterministic risk remediation.
 Priority: **P2**  
 Risk types: DOCUMENTATION, PROCESS  
 Confidence: HIGH  
-Status: **CLOSED** (2026-09-09). Milestone R0 is COMPLETE. `reviews/FINDINGS.md` is the authoritative remediation backlog. `ROADMAP.md` Current gate records Milestone R0 COMPLETE with named accepted residuals. `docs/known_limitations.md` names RF-014 ACLs/TLS, RF-016 labeled-runner SLA-K1/K2, QA-024 range, and P2 RF-017/RF-018/RF-019 ACCEPTED / DEFERRED. Suite counts remain the recorded Phase A baseline (**not a live** re-run); dated historical tables are snapshots, not today's suite size.
+Status: **CLOSED** (2026-09-09). Independent review **APPROVE** (`reviews/sdd-briefs/task-27-r0-exit-review.md`). Milestone R0 is COMPLETE. `reviews/FINDINGS.md` is the authoritative remediation backlog. `ROADMAP.md` Current gate records Milestone R0 COMPLETE with named accepted residuals. `docs/known_limitations.md` names RF-014 ACLs/TLS, RF-016 labeled-runner SLA-K1/K2, QA-024 range, and P2 RF-017/RF-018/RF-019 ACCEPTED / DEFERRED. Suite counts remain the recorded Phase A baseline (**not a live** re-run); dated historical tables are snapshots, not today's suite size.
 
 Source findings:
 
