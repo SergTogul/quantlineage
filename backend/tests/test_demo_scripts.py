@@ -16,7 +16,9 @@ from app.demo.run_demo_risk import (
     main,
     run_demo_risk,
 )
-from app.risk.historical_data import DEMO_HISTORICAL_DATASET_ID
+from app.risk.historical_data import (
+    DEMO_MULTI_FACTOR_DATASET_ID,
+)
 from app.sample import DEMO_PORTFOLIOS
 
 
@@ -35,7 +37,7 @@ def test_build_artifact_covers_all_demo_portfolios():
     assert artifact["schema_version"] == DEMO_ARTIFACT_SCHEMA_VERSION
     assert artifact["milestone"] == "M10.3"
     assert artifact["pricing_engine"] == "builtin"
-    assert artifact["historical_dataset"] == DEMO_HISTORICAL_DATASET_ID
+    assert artifact["historical_dataset"] == DEMO_MULTI_FACTOR_DATASET_ID
     assert artifact["methodology"] == "DELTA_GAMMA"
     ids = [b["id"] for b in artifact["portfolios"]]
     assert ids == [p.id for p in DEMO_PORTFOLIOS]

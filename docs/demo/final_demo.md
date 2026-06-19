@@ -5,7 +5,7 @@ This runbook is the deterministic 3-5 minute demo path for a clean checkout. It 
 ## Scope
 
 - Demo books: `equity-vol`, `rates-macro`, `global-macro`.
-- Historical data: packaged `data/demo_historical_factors.csv` synthetic replay.
+- Historical data: packaged `data/demo_multi_factor_history.csv` per-factor synthetic replay (four-macro `data/demo_historical_factors.csv` remains a labeled fixture).
 - Deterministic artifact: `data/demo_risk_artifact.json`.
 - Artifact path: builtin pricing adapter, Python scenario kernel, caches disabled.
 - No live market-data vendors or LLM-computed risk values.
@@ -27,7 +27,7 @@ For a CI-style artifact smoke, run from the repo root after dependencies are ins
 PYTHONPATH=backend backend/.venv/bin/python scripts/check_final_demo.py
 ```
 
-Expected result: JSON with `"status": "ok"`, the three portfolio ids, builtin pricing, `demo-historical-factors`, and `scenario_count` matching the committed default scenario set. The check writes a temporary artifact, verifies `--check` double-run determinism, and asserts byte equality with `data/demo_risk_artifact.json`.
+Expected result: JSON with `"status": "ok"`, the three portfolio ids, builtin pricing, `demo-multi-factor-history`, and `scenario_count` matching the committed default scenario set. The check writes a temporary artifact, verifies `--check` double-run determinism, and asserts byte equality with `data/demo_risk_artifact.json`.
 
 To regenerate the committed artifact intentionally:
 

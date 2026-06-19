@@ -13,9 +13,10 @@ four-macro demo projection (``projection != "four_macro_demo"``) and
 Production API/worker wiring (``build_historical_risk_engine``) builds the
 panel from the selected historical dataset via :func:`factor_panel_from_dataset`.
 Bare ``HistoricalRiskEngine()`` / explicit ``factor_panel=None`` still uses the
-labeled ``four_macro_demo`` dataset path. Demo/file CSV datasets remain
-``projection="four_macro_demo"`` fixtures (R0.5.4) whose four columns are
-broadcast onto typed factor families.
+labeled ``four_macro_demo`` dataset path. File four-macro CSVs still broadcast
+onto typed factor families **only when** ``projection="four_macro_demo"``.
+The production demo dataset is ``projection="per_factor"`` with a 1:1 column
+map and ``is_per_name_per_tenor_panel is True``.
 
 Units (match ``historical_data.py`` / ``FactorObservationSeries``):
 
@@ -48,9 +49,11 @@ from app.risk.factor_types import (
     RateZero,
     RiskFactor,
     factor_sort_key,
+    parse_factor_column_id,
 )
 from app.risk.historical_data import (
     FactorObservationSeries,
+    PerFactorFileHistoricalDataset,
     SyntheticHistoricalDataset,
 )
 
@@ -61,12 +64,17 @@ RATE_CHANGE_UNIT = "basis_points"
 VOL_CHANGE_UNIT = "relative_vol"
 FX_CHANGE_UNIT = "relative_return"
 
-# Documented default universe for the production synthetic panel (demo books).
+# Documented default universe for the production demo panel.
 # Independent RNG streams per column — never a silent broadcast of one equity
-# or one rate series onto every name/tenor.
+# or one rate series onto every name/tenor. Includes SPY and USD 0Y so existing
+# demo books (index / IR future) fail-closed-cover rather than missing a factor.
 DEFAULT_PRODUCTION_PANEL_FACTORS: tuple[RiskFactor, ...] = (
+    EquitySpot("AAPL"),
+    EquitySpot("MSFT"),
     EquitySpot("NVDA"),
     EquitySpot("SPY"),
+    EquityVol(underlying="AAPL"),
+    EquityVol(underlying="MSFT"),
     EquityVol(underlying="NVDA"),
     EquityVol(underlying="SPY"),
     RateZero("USD", "0Y"),
@@ -291,7 +299,7 @@ def create_synthetic_factor_panel(
 
     Each factor gets its own RNG child of ``SeedSequence(seed)`` so two equities
     or two rate tenors are not copies of one series. Columns default to
-    :data:`DEFAULT_PRODUCTION_PANEL_FACTORS` (demo NVDA/SPY, USD tenors, EURUSD).
+    :data:`DEFAULT_PRODUCTION_PANEL_FACTORS` (AAPL/MSFT/NVDA/SPY, USD tenors, EURUSD).
 
     This is synthetic stand-in history — not a live market-data vendor feed.
     """
@@ -345,6 +353,50 @@ def _series_for_factor(factor: RiskFactor, series: FactorObservationSeries) -> n
     raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
 
 
+def _panel_from_per_factor_dataset(
+    dataset: PerFactorFileHistoricalDataset,
+    *,
+    factors: Sequence[RiskFactor] | None,
+    observations: int | None,
+) -> HistoricalFactorPanel:
+    """Map CSV columns onto typed factors 1:1. Dates come from the file."""
+    parsed: dict[RiskFactor, Sequence[float]] = {}
+    for name, series in dataset.columns.items():
+        parsed[parse_factor_column_id(name)] = series
+    if factors is None:
+        column_factors = tuple(parsed.keys())
+    else:
+        column_factors = tuple(factors)
+        available = {panel_factor_identity(f) for f in parsed}
+        missing = [
+            factor
+            for factor in column_factors
+            if panel_factor_identity(factor) not in available
+        ]
+        if missing:
+            identities = ", ".join(str(panel_factor_identity(f)) for f in missing)
+            raise ValueError(f"panel missing required factor(s): {identities}")
+    if not column_factors:
+        raise ValueError("empty factor panel: at least one factor column is required")
+    source_len = dataset.n_observations
+    if observations is None:
+        n = source_len
+    else:
+        if observations < 1:
+            raise ValueError("observations must be >= 1")
+        if observations > source_len:
+            raise ValueError(
+                f"observations {observations} exceeds historical dataset length {source_len}"
+            )
+        n = observations
+    by_id = {panel_factor_identity(f): (f, parsed[f]) for f in parsed}
+    changes: dict[RiskFactor, Sequence[float]] = {}
+    for factor in column_factors:
+        stored, series = by_id[panel_factor_identity(factor)]
+        changes[stored] = series[:n]
+    return HistoricalFactorPanel.from_columns(dataset.dates[:n], changes)
+
+
 def factor_panel_from_dataset(
     dataset: object,
     *,
@@ -352,13 +404,20 @@ def factor_panel_from_dataset(
     observations: int | None = None,
     seed: int | None = None,
 ) -> HistoricalFactorPanel:
-    """Build a typed panel owned by ``dataset`` (synthetic streams vs four-macro map).
+    """Build a typed panel owned by ``dataset`` (per-factor 1:1 vs four-macro map).
 
     ``SyntheticHistoricalDataset`` keeps independent per-name / per-tenor RNG
-    streams. File / array / four-macro demo sources broadcast each of the four
-    CSV columns onto every typed factor of that family. ``observations`` smaller
-    than the source truncates; larger than a file source raises (no invented rows).
+    streams. File datasets with ``projection="per_factor"`` map CSV columns
+    onto typed ``RiskFactor``s 1:1 using the file calendar. File / array
+    four-macro sources broadcast each of the four CSV columns onto every typed
+    factor of that family **only when** ``projection="four_macro_demo"``.
+    ``observations`` smaller than the source truncates; larger than a file
+    source raises (no invented rows).
     """
+    if isinstance(dataset, PerFactorFileHistoricalDataset):
+        return _panel_from_per_factor_dataset(
+            dataset, factors=factors, observations=observations
+        )
     column_factors = tuple(factors) if factors is not None else DEFAULT_PRODUCTION_PANEL_FACTORS
     if isinstance(dataset, SyntheticHistoricalDataset):
         obs = dataset.observations if observations is None else observations

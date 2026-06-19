@@ -1,7 +1,7 @@
 """R0.5.3 leftover — production factory defaults to HistoricalFactorPanel.
 
 Bare ``HistoricalRiskEngine()`` / ``factor_panel=None`` remains the labeled
-four-macro path. Demo/synthetic datasets stay ``projection="four_macro_demo"``.
+four-macro path. Production default dataset is the per-factor demo panel.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_panel import DEFAULT_PRODUCTION_PANEL_FACTORS, PER_FACTOR_PANEL_PROJECTION
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero
 from app.risk.historical import HistoricalRiskEngine
-from app.risk.historical_data import create_historical_dataset
+from app.risk.historical_data import load_demo_historical_dataset
 from app.risk.scenarios import iter_panel_shocked_snapshots
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.risk_factories import (
@@ -40,15 +40,17 @@ def test_build_historical_risk_engine_uses_per_factor_panel(
     assert engine.factor_panel.is_per_name_per_tenor_panel is True
     assert engine.factor_panel.projection == PER_FACTOR_PANEL_PROJECTION
     assert engine.factor_panel.projection != "four_macro_demo"
-    # Dataset identity stays for run-spec / compat; labeled four-macro fixture.
-    assert engine.dataset.projection == "four_macro_demo"
-    assert engine.dataset.is_per_name_per_tenor_panel is False
-    assert len(engine.factor_panel.dates) == len(engine.dataset.factor_observations().equity_returns)
+    # Dataset identity is the per-factor demo panel (not four-macro broadcast).
+    assert engine.dataset.projection == PER_FACTOR_PANEL_PROJECTION
+    assert engine.dataset.is_per_name_per_tenor_panel is True
+    assert len(engine.factor_panel.dates) == engine.dataset.n_observations
     panel_ids = {(type(f).__name__, f.key, f.bucket) for f in engine.factor_panel.factors}
     expected_ids = {(type(f).__name__, f.key, f.bucket) for f in DEFAULT_PRODUCTION_PANEL_FACTORS}
     assert panel_ids == expected_ids
     assert "NVDA" in {f.key for f in engine.factor_panel.factors if isinstance(f, EquitySpot)}
     assert "SPY" in {f.key for f in engine.factor_panel.factors if isinstance(f, EquitySpot)}
+    assert "AAPL" in {f.key for f in engine.factor_panel.factors if isinstance(f, EquitySpot)}
+    assert "MSFT" in {f.key for f in engine.factor_panel.factors if isinstance(f, EquitySpot)}
 
 
 def test_production_panel_equities_and_tenors_move_independently(
@@ -110,7 +112,7 @@ def test_four_macro_path_still_available_without_panel(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
-    engine = HistoricalRiskEngine(dataset=create_historical_dataset(), factor_panel=None)
+    engine = HistoricalRiskEngine(dataset=load_demo_historical_dataset(), factor_panel=None)
     assert engine.factor_panel is None
     assert engine.dataset.projection == "four_macro_demo"
     assert engine.dataset.is_per_name_per_tenor_panel is False

@@ -5,8 +5,8 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 ## Market Data
 
 - No live market-data vendor integration is implemented.
-- Demo historical factors are a packaged synthetic replay (`data/demo_historical_factors.csv`), not observed licensed market data.
-- Shipped demo and synthetic history is a four-macro demo projection (`projection="four_macro_demo"`): equity/vol/rate/fx aggregates, not a per-name or per-tenor factor panel (RF-005).
+- Production demo historical factors are a packaged per-factor synthetic replay (`data/demo_multi_factor_history.csv`, id `demo-multi-factor-history` / `v1`), not observed licensed market data.
+- The four-column CSV (`data/demo_historical_factors.csv`) remains an explicit `four_macro_demo` fixture for goldens and `factor_panel=None`. It is not the production demo default.
 - `PositionMarketDataProvider` always raises `SampleMarksRemovedError`; it is not a last-writer constructor of market state from positions. Positions are contractual economics only. Live marks live on an explicit `MarketSnapshot` (canned demos bind `_DEMO_*` tables).
 - Snapshot shock application (`shock_snapshot`) still delegates to risk-layer helpers (`app.risk.scenario_engine`); a domain-layer rewrite of that dependency is not claimed.
 - Market snapshots are immutable and deterministic, but production entitlement, quality checks, market close processes, and vendor symbology are out of scope.

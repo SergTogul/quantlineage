@@ -1,6 +1,6 @@
 {
   "artifact_id": "demo-risk-artifact",
-  "historical_dataset": "demo-historical-factors",
+  "historical_dataset": "demo-multi-factor-history",
   "methodology": "DELTA_GAMMA",
   "milestone": "M10.3",
   "portfolios": [
@@ -8,57 +8,57 @@
       "desk": "Equity Derivatives",
       "id": "equity-vol",
       "name": "Equity Vol Demo",
-      "position_count": 6,
+      "position_count": 9,
       "strategy": "Vol Trading",
       "stress": [
         {
-          "pnl": -72409.6007034,
+          "pnl": -97156.82394861,
           "scenario": "Equities -10%"
         },
         {
-          "pnl": 533.70458811,
+          "pnl": 483.84382447,
           "scenario": "Rates +100bp"
         },
         {
-          "pnl": 1343.68623587,
+          "pnl": 854.10614588,
           "scenario": "Vol +25%"
         },
         {
-          "pnl": -104529.01995035,
+          "pnl": -142390.25686036,
           "scenario": "Equities -15% / Vol +40%"
         },
         {
-          "pnl": -138480.00804084,
+          "pnl": -189065.40370028,
           "scenario": "Combined Crisis"
         }
       ],
       "summary": {
-        "delta": 728417.03341209,
+        "delta": 972728.76492704,
         "dv01": 10.70021896,
-        "expected_shortfall_99": 25036.0437486,
+        "expected_shortfall_99": 23862.76712913,
         "fx_delta": 0.0,
-        "gamma": -27101.17460847,
-        "market_value": 863917.51718982,
+        "gamma": -89591.25783176,
+        "market_value": 1120594.35510325,
         "methodology": "DELTA_GAMMA",
         "portfolio_id": "equity-vol",
-        "var_95": 15955.29773405,
-        "var_99": 21250.46969408,
-        "vega": 270.92394446
+        "var_95": 15314.39505891,
+        "var_99": 22228.9307819,
+        "vega": 200.93505125
       },
       "var_report": {
         "methodology": "DELTA_GAMMA",
         "methods": [
           {
             "confidence": 0.99,
-            "expected_shortfall": 25036.0437486,
+            "expected_shortfall": 23862.76712913,
             "method": "historical",
-            "var": 21250.46969408
+            "var": 22228.9307819
           },
           {
             "confidence": 0.99,
-            "expected_shortfall": 23922.90694188,
+            "expected_shortfall": 24042.62444742,
             "method": "parametric",
-            "var": 20881.24972479
+            "var": 20985.74585212
           }
         ],
         "portfolio_id": "equity-vol"
@@ -95,14 +95,14 @@
       "summary": {
         "delta": 0.0,
         "dv01": -981.56976189,
-        "expected_shortfall_99": 17397.13939842,
+        "expected_shortfall_99": 55677.73912868,
         "fx_delta": 0.0,
         "gamma": 0.0,
         "market_value": 4123297.18737161,
         "methodology": "DELTA_GAMMA",
         "portfolio_id": "rates-macro",
-        "var_95": 11970.06657355,
-        "var_99": 15406.50334577,
+        "var_95": 32267.53501892,
+        "var_99": 45692.50925557,
         "vega": 0.0
       },
       "var_report": {
@@ -110,15 +110,15 @@
         "methods": [
           {
             "confidence": 0.99,
-            "expected_shortfall": 17397.13939842,
+            "expected_shortfall": 55677.73912868,
             "method": "historical",
-            "var": 15406.50334577
+            "var": 45692.50925557
           },
           {
             "confidence": 0.99,
-            "expected_shortfall": 18477.70776094,
+            "expected_shortfall": 52637.47228244,
             "method": "parametric",
-            "var": 16128.37566251
+            "var": 45944.92660453
           }
         ],
         "portfolio_id": "rates-macro"
@@ -128,57 +128,57 @@
       "desk": "Global Macro",
       "id": "global-macro",
       "name": "Global Macro Demo",
-      "position_count": 9,
+      "position_count": 12,
       "strategy": "Multi-Asset",
       "stress": [
         {
-          "pnl": -108304.87579588,
+          "pnl": -142328.16403522,
           "scenario": "Equities -10%"
         },
         {
-          "pnl": 93097.67213957,
+          "pnl": 92959.35568106,
           "scenario": "Rates +100bp"
         },
         {
-          "pnl": 4861.09592191,
+          "pnl": 6093.9860293,
           "scenario": "Vol +25%"
         },
         {
-          "pnl": -152384.52095555,
+          "pnl": -200978.56754061,
           "scenario": "Equities -15% / Vol +40%"
         },
         {
-          "pnl": -84386.75736622,
+          "pnl": -149033.88601677,
           "scenario": "Combined Crisis"
         }
       ],
       "summary": {
-        "delta": 1115725.94342605,
+        "delta": 1466264.03096977,
         "dv01": 877.89893818,
-        "expected_shortfall_99": 46522.35505529,
+        "expected_shortfall_99": 65964.00613814,
         "fx_delta": 1220007.64093984,
-        "gamma": 1993122.85712689,
-        "market_value": 2632439.42316225,
+        "gamma": 2181353.25511893,
+        "market_value": 3014205.862133,
         "methodology": "DELTA_GAMMA",
         "portfolio_id": "global-macro",
-        "var_95": 28242.11511252,
-        "var_99": 39303.04539332,
-        "vega": 1285.72583667
+        "var_95": 40200.67841746,
+        "var_99": 58959.66300399,
+        "vega": 1489.0146665
       },
       "var_report": {
         "methodology": "DELTA_GAMMA",
         "methods": [
           {
             "confidence": 0.99,
-            "expected_shortfall": 46522.35505529,
+            "expected_shortfall": 65964.00613814,
             "method": "historical",
-            "var": 39303.04539332
+            "var": 58959.66300399
           },
           {
             "confidence": 0.99,
-            "expected_shortfall": 45133.32951136,
+            "expected_shortfall": 67077.822406,
             "method": "parametric",
-            "var": 39394.8915459
+            "var": 58549.2709585
           }
         ],
         "portfolio_id": "global-macro"

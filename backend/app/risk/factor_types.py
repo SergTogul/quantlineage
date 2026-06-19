@@ -158,3 +158,38 @@ def parse_risk_factor(
 def factor_sort_key(factor: RiskFactor) -> tuple[str, str, str]:
     """Stable sort key matching historical RiskFactorEngine ordering."""
     return (factor.key, factor.factor_type, factor.bucket)
+
+
+def factor_column_id(factor: RiskFactor) -> str:
+    """Stable CSV / panel column id (``EquitySpot:AAPL``, ``RateZero:USD:2Y``, …)."""
+    if isinstance(factor, EquitySpot):
+        return f"EquitySpot:{factor.symbol}"
+    if isinstance(factor, EquityVol):
+        return f"EquityVol:{factor.underlying}"
+    if isinstance(factor, RateZero):
+        return f"RateZero:{factor.currency}:{factor.tenor}"
+    if isinstance(factor, FXSpot):
+        return f"FXSpot:{factor.pair}"
+    if isinstance(factor, FXVol):
+        return f"FXVol:{factor.pair}"
+    raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
+
+
+def parse_factor_column_id(column: str) -> RiskFactor:
+    """Parse a ``factor_column_id`` header into a typed ``RiskFactor``."""
+    raw = column.strip()
+    parts = raw.split(":")
+    if len(parts) < 2:
+        raise ValueError(f"unrecognized factor column: {column!r}")
+    kind, rest = parts[0], parts[1:]
+    if kind == "EquitySpot" and len(rest) == 1 and rest[0]:
+        return EquitySpot(rest[0])
+    if kind == "EquityVol" and len(rest) == 1 and rest[0]:
+        return EquityVol(underlying=rest[0])
+    if kind == "RateZero" and len(rest) == 2 and rest[0] and rest[1]:
+        return RateZero(rest[0], rest[1])
+    if kind == "FXSpot" and len(rest) == 1 and rest[0]:
+        return FXSpot(rest[0])
+    if kind == "FXVol" and len(rest) == 1 and rest[0]:
+        return FXVol(pair=rest[0])
+    raise ValueError(f"unrecognized factor column: {column!r}")
