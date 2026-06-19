@@ -35,7 +35,9 @@ from app.risk.factor_panel import factor_panel_from_dataset, truncate_factor_pan
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import (
     DEMO_HISTORICAL_DATASET_ID,
+    DEMO_MULTI_FACTOR_DATASET_ID,
     FileHistoricalDataset,
+    PerFactorFileHistoricalDataset,
     SyntheticHistoricalDataset,
     create_historical_dataset,
     file_csv_dataset_id,
@@ -48,6 +50,10 @@ SYNTHETIC_HISTORICAL_DATASET_ID = "synthetic-historical-factors"
 
 # Canonical id / short alias → create_historical_dataset source key.
 _DATASET_SOURCE_BY_ID: dict[str, str] = {
+    DEMO_MULTI_FACTOR_DATASET_ID: DEMO_MULTI_FACTOR_DATASET_ID,
+    "demo-multi-factor": DEMO_MULTI_FACTOR_DATASET_ID,
+    "per_factor": DEMO_MULTI_FACTOR_DATASET_ID,
+    "per-factor": DEMO_MULTI_FACTOR_DATASET_ID,
     DEMO_HISTORICAL_DATASET_ID: "demo",
     "demo": "demo",
     "demo-historical": "demo",
@@ -104,8 +110,8 @@ def resolve_dataset_source(historical_dataset_id: str) -> str:
         return str(path.resolve())
     raise ValueError(
         f"unsupported historical_dataset_id: {historical_dataset_id!r}; "
-        f"use {DEMO_HISTORICAL_DATASET_ID!r}, {SYNTHETIC_HISTORICAL_DATASET_ID!r}, "
-        "or a path to a factor CSV"
+        f"use {DEMO_MULTI_FACTOR_DATASET_ID!r}, {DEMO_HISTORICAL_DATASET_ID!r}, "
+        f"{SYNTHETIC_HISTORICAL_DATASET_ID!r}, or a path to a factor CSV"
     )
 
 
@@ -115,10 +121,11 @@ def build_historical_risk_engine(
     seed: int | None = None,
     observations: int | None = None,
 ) -> HistoricalRiskEngine:
-    """Wire production historical VaR to a per-factor panel (R0.5.3 / RF-005).
+    """Wire production historical VaR to a per-factor panel.
 
     When ``historical_dataset_id`` is set, selects that dataset via
-    :func:`resolve_dataset_source` (rebind). Otherwise uses env / demo default.
+    :func:`resolve_dataset_source` (rebind). Otherwise uses env / per-factor
+    demo default (not the four-macro fixture).
     """
     panel_seed = DEFAULT_HISTORICAL_PANEL_SEED if seed is None else seed
     dataset_kwargs: dict[str, Any] = {"seed": panel_seed}
@@ -168,6 +175,14 @@ def build_portfolio_service(
 
 def dataset_identity(dataset: object) -> tuple[str, str]:
     """Stable id/version for a resolved historical dataset instance."""
+    if isinstance(dataset, PerFactorFileHistoricalDataset):
+        raw_id = (dataset.dataset_id or "").strip()
+        version = (dataset.dataset_version or "").strip() or DEFAULT_HISTORICAL_DATASET_VERSION
+        if raw_id and raw_id != "file":
+            return raw_id, version
+        if dataset.source_path:
+            return file_csv_dataset_id(dataset.source_path), version
+        return DEMO_MULTI_FACTOR_DATASET_ID, version
     if isinstance(dataset, FileHistoricalDataset):
         raw_id = (dataset.dataset_id or "").strip()
         if raw_id and raw_id != "file":
@@ -228,7 +243,12 @@ def resize_historical_risk_engine(
         if isinstance(dataset, SyntheticHistoricalDataset):
             new_dataset = replace(dataset, observations=observations)
         else:
-            source_len = dataset.factor_observations().n_observations
+            n_obs = getattr(dataset, "n_observations", None)
+            source_len = (
+                int(n_obs)
+                if isinstance(n_obs, int)
+                else dataset.factor_observations().n_observations
+            )
             if observations > source_len:
                 raise ValueError(
                     f"observations {observations} exceeds historical dataset length {source_len}"
@@ -267,7 +287,10 @@ def resize_historical_risk_engine(
             factor_panel=new_panel,
         )
 
-    source_len = dataset.factor_observations().n_observations
+    n_obs = getattr(dataset, "n_observations", None)
+    source_len = (
+        int(n_obs) if isinstance(n_obs, int) else dataset.factor_observations().n_observations
+    )
     if observations > source_len:
         raise ValueError(
             f"observations {observations} exceeds historical dataset length {source_len}"

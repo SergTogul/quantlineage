@@ -11,8 +11,9 @@ import pytest
 
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import (
-    DEMO_HISTORICAL_DATASET_ID,
+    DEMO_MULTI_FACTOR_DATASET_ID,
     FileHistoricalDataset,
+    PerFactorFileHistoricalDataset,
     SyntheticHistoricalDataset,
     create_historical_dataset,
     file_csv_dataset_id,
@@ -52,9 +53,9 @@ def test_build_portfolio_service_wires_create_historical_dataset(
 
     assert isinstance(service.risk, HistoricalRiskEngine)
     assert isinstance(service.risk.dataset, type(expected))
-    assert isinstance(service.risk.dataset, FileHistoricalDataset)
-    assert service.risk.dataset.dataset_id == DEMO_HISTORICAL_DATASET_ID
-    assert expected.dataset_id == DEMO_HISTORICAL_DATASET_ID
+    assert isinstance(service.risk.dataset, PerFactorFileHistoricalDataset)
+    assert service.risk.dataset.dataset_id == DEMO_MULTI_FACTOR_DATASET_ID
+    assert expected.dataset_id == DEMO_MULTI_FACTOR_DATASET_ID
 
 
 def test_factory_default_spec_is_demo_dataset(monkeypatch: pytest.MonkeyPatch):
@@ -62,7 +63,7 @@ def test_factory_default_spec_is_demo_dataset(monkeypatch: pytest.MonkeyPatch):
     service = build_portfolio_service()
     spec = resolve_run_spec(risk_engine=service.risk)
 
-    assert spec.historical_dataset_id == DEMO_HISTORICAL_DATASET_ID
+    assert spec.historical_dataset_id == DEMO_MULTI_FACTOR_DATASET_ID
     assert spec.historical_dataset_version == DEFAULT_HISTORICAL_DATASET_VERSION
     assert spec.as_of is None
     assert spec.calculation_config is not None
@@ -98,7 +99,7 @@ def test_resolve_run_spec_rebinds_synthetic_from_demo_engine(
 ):
     monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service()
-    assert service.risk.dataset.dataset_id == DEMO_HISTORICAL_DATASET_ID
+    assert service.risk.dataset.dataset_id == DEMO_MULTI_FACTOR_DATASET_ID
 
     spec = resolve_run_spec(
         {"historical_dataset_id": SYNTHETIC_HISTORICAL_DATASET_ID},
@@ -219,7 +220,7 @@ def test_resolve_execute_spec_prefers_persisted_columns(
         risk_engine=service.risk,
         run_type=run.run_type,
     )
-    assert blob_only.historical_dataset_id == DEMO_HISTORICAL_DATASET_ID
+    assert blob_only.historical_dataset_id == DEMO_MULTI_FACTOR_DATASET_ID
     spec = resolve_execute_spec(run, risk_engine=service.risk)
     assert spec.historical_dataset_id == SYNTHETIC_HISTORICAL_DATASET_ID
     assert spec.historical_dataset_version == "v1"

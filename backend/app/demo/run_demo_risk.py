@@ -1,12 +1,13 @@
 """Deterministic demo risk artifacts (M10.3).
 
-Loads M10.1 demo portfolios and the M10.2 historical factor dataset, then
-runs summary VaR + default stress through ``PortfolioService``. Numbers come
-only from deterministic engines — no live market vendors, no LLM math.
+Loads M10.1 demo portfolios and the production per-factor historical panel,
+then runs summary VaR + default stress through ``PortfolioService``. Numbers
+come only from deterministic engines — no live market vendors, no LLM math.
 
 Default pricing adapter for artifact stability is **builtin** (override with
-``RISKFORGE_PRICING_ENGINE``). Historical source is always the packaged demo
-CSV unless ``--dataset`` / ``RISKFORGE_HISTORICAL_DATASET`` is overridden.
+``RISKFORGE_PRICING_ENGINE``). Historical source is the per-factor demo panel
+unless ``--dataset`` / ``RISKFORGE_HISTORICAL_DATASET`` is overridden. The
+four-macro CSV remains available as ``--dataset demo``.
 """
 
 from __future__ import annotations
@@ -21,15 +22,10 @@ from typing import Any
 from app.domain.models import VaRMethodology
 from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.factory import create_pricing_engine
-from app.risk.historical import HistoricalRiskEngine
-from app.risk.historical_data import (
-    DEMO_HISTORICAL_DATASET_ID,
-    create_historical_dataset,
-    load_demo_historical_dataset,
-)
 from app.risk.stress import DEFAULT_SCENARIOS
 from app.sample import DEMO_PORTFOLIOS, get_demo_portfolio
 from app.services.portfolio_service import PortfolioService
+from app.services.risk_factories import build_historical_risk_engine, dataset_identity
 
 DEMO_ARTIFACT_SCHEMA_VERSION = 1
 DEMO_ARTIFACT_ID = "demo-risk-artifact"
@@ -74,8 +70,8 @@ def build_demo_risk_artifact(
     portfolio_ids:
         Subset of demo catalog ids; default is all ``DEMO_PORTFOLIOS`` in catalog order.
     dataset_source:
-        Passed to ``create_historical_dataset`` (``demo`` / ``synthetic`` / CSV path).
-        ``None`` → packaged demo CSV.
+        Passed to ``create_historical_dataset`` (``demo`` / ``synthetic`` / CSV path
+        / ``demo-multi-factor-history``). ``None`` → production per-factor demo panel.
     methodology:
         VaR methodology for summary / var_report.
     prefer_builtin:
@@ -86,14 +82,13 @@ def build_demo_risk_artifact(
     os.environ.setdefault("RISKFORGE_SCENARIO_KERNEL", "python")
 
     if dataset_source is None:
-        dataset = load_demo_historical_dataset()
-        dataset_label = DEMO_HISTORICAL_DATASET_ID
+        risk = build_historical_risk_engine()
+        dataset_label, _ = dataset_identity(risk.dataset)
     else:
-        dataset = create_historical_dataset(dataset_source)
-        dataset_label = dataset_source
+        risk = build_historical_risk_engine(historical_dataset_id=dataset_source)
+        dataset_label, _ = dataset_identity(risk.dataset)
 
     pricing, pricing_name = _make_pricing(prefer_builtin=prefer_builtin)
-    risk = HistoricalRiskEngine(dataset=dataset, methodology=methodology)
     service = PortfolioService(pricing, risk)
 
     if portfolio_ids is None:
@@ -228,7 +223,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dataset",
         default=None,
-        help="Historical source: demo|synthetic|/path.csv (default: packaged demo CSV).",
+        help="Historical source: demo-multi-factor-history|demo|synthetic|/path.csv "
+        "(default: production per-factor demo panel).",
     )
     parser.add_argument(
         "--check",

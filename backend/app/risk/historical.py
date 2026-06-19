@@ -503,11 +503,11 @@ class HistoricalRiskEngine(RiskEngine):
     Default dataset is :class:`SyntheticHistoricalDataset` (deterministic RNG)
     so MVP results stay reproducible without an external market-data feed.
 
-    ``factor_panel`` (R0.5.3): when supplied, LINEAR / DELTA_GAMMA /
+    ``factor_panel``: when supplied, LINEAR / DELTA_GAMMA /
     FULL_REVALUATION consume per-name and per-tenor panel columns instead of
     ``dataset.factor_observations()``. Production
-    :func:`app.services.risk_factories.build_historical_risk_engine` wires a
-    seeded synthetic panel. Bare ``HistoricalRiskEngine()`` /
+    :func:`app.services.risk_factories.build_historical_risk_engine` wires the
+    per-factor demo panel. Bare ``HistoricalRiskEngine()`` /
     ``factor_panel=None`` keeps the labeled ``four_macro_demo`` dataset path.
     """
 

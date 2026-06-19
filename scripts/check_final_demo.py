@@ -27,6 +27,7 @@ REQUIRED_PATHS = (
     "README.md",
     "ROADMAP.md",
     "data/demo_historical_factors.csv",
+    "data/demo_multi_factor_history.csv",
     "data/demo_risk_artifact.json",
     "docs/demo/final_demo.md",
     "docs/demo/riskforge_demo_01_overview.png",
@@ -56,7 +57,7 @@ def check_final_demo(*, output: Path | None = None) -> dict[str, Any]:
     os.environ["RISKFORGE_SCENARIO_CACHE"] = "0"
 
     from app.demo.run_demo_risk import run_demo_risk
-    from app.risk.historical_data import DEMO_HISTORICAL_DATASET_ID
+    from app.risk.historical_data import DEMO_MULTI_FACTOR_DATASET_ID
     from app.risk.stress import DEFAULT_SCENARIOS
     from app.sample import DEMO_PORTFOLIOS
 
@@ -91,6 +92,12 @@ def check_final_demo(*, output: Path | None = None) -> dict[str, Any]:
     if scenario_ids != expected_scenarios:
         raise RuntimeError(f"demo scenario set changed: got {scenario_ids}, want {expected_scenarios}")
 
+    if artifact["historical_dataset"] != DEMO_MULTI_FACTOR_DATASET_ID:
+        raise RuntimeError(
+            f"demo historical dataset changed: got {artifact['historical_dataset']!r}, "
+            f"want {DEMO_MULTI_FACTOR_DATASET_ID!r}"
+        )
+
     return {
         "status": "ok",
         "artifact": str(artifact_path) if output is not None else "temporary",
@@ -98,7 +105,7 @@ def check_final_demo(*, output: Path | None = None) -> dict[str, Any]:
         "portfolio_ids": portfolio_ids,
         "scenario_count": len(scenario_ids),
         "pricing_engine": artifact["pricing_engine"],
-        "historical_dataset": DEMO_HISTORICAL_DATASET_ID,
+        "historical_dataset": artifact["historical_dataset"],
         "methodology": artifact["methodology"],
     }
 

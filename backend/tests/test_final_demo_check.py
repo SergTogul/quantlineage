@@ -28,7 +28,7 @@ def test_final_demo_check_validates_committed_artifact(tmp_path: Path):
     assert result["artifact"] == str(output)
     assert result["portfolio_ids"] == ["equity-vol", "rates-macro", "global-macro"]
     assert result["pricing_engine"] == "builtin"
-    assert result["historical_dataset"] == "demo-historical-factors"
+    assert result["historical_dataset"] == "demo-multi-factor-history"
     assert result["methodology"] == "DELTA_GAMMA"
     assert result["scenario_count"] == 5
     assert output.read_text(encoding="utf-8") == (

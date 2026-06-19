@@ -1,7 +1,7 @@
-"""R0.5.4 — shipped history is a four-macro demo projection, not a factor panel.
+"""Labeled four-macro fixture vs production per-factor demo history.
 
-RF-005 stays open: this labels the existing four-column fixture. It does not
-add a per-name / per-tenor historical panel (R0.5.3).
+Four-column demo/synthetic sources stay ``projection="four_macro_demo"``.
+Production factory default is the per-factor panel (Stage 10.1).
 """
 
 from __future__ import annotations
@@ -36,6 +36,13 @@ def test_create_historical_dataset_demo_exposes_projection():
     assert dataset.projection == HistoricalDatasetProjection.FOUR_MACRO_DEMO
     assert dataset.projection == "four_macro_demo"
     assert dataset.is_per_name_per_tenor_panel is False
+
+
+def test_create_historical_dataset_multi_factor_exposes_per_factor_projection():
+    dataset = create_historical_dataset("demo-multi-factor-history")
+    assert dataset.projection == HistoricalDatasetProjection.PER_FACTOR
+    assert dataset.projection == "per_factor"
+    assert dataset.is_per_name_per_tenor_panel is True
 
 
 def test_four_columns_are_mvp_aggregates_not_a_factor_panel():

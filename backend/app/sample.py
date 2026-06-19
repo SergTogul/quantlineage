@@ -54,6 +54,20 @@ EQUITY_VOL_PORTFOLIO = Portfolio.model_validate(
             },
             {
                 "type": "equity",
+                "id": "eq-aapl",
+                "symbol": "AAPL",
+                "quantity": 500,
+                "sector": "Technology",
+            },
+            {
+                "type": "equity",
+                "id": "eq-msft",
+                "symbol": "MSFT",
+                "quantity": 400,
+                "sector": "Technology",
+            },
+            {
+                "type": "equity",
                 "id": "eq-spy",
                 "symbol": "SPY",
                 "quantity": 600,
@@ -76,6 +90,16 @@ EQUITY_VOL_PORTFOLIO = Portfolio.model_validate(
                 "quantity": -250,
                 "strike": 130.0,
                 "maturity_years": 0.35,
+                "option_type": "call",
+                "sector": "Technology",
+            },
+            {
+                "type": "european_option",
+                "id": "opt-aapl-call",
+                "symbol": "AAPL",
+                "quantity": -150,
+                "strike": 190.0,
+                "maturity_years": 0.4,
                 "option_type": "call",
                 "sector": "Technology",
             },
@@ -186,6 +210,20 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
             },
             {
                 "type": "equity",
+                "id": "eq-aapl",
+                "symbol": "AAPL",
+                "quantity": 700,
+                "sector": "Technology",
+            },
+            {
+                "type": "equity",
+                "id": "eq-msft",
+                "symbol": "MSFT",
+                "quantity": 600,
+                "sector": "Technology",
+            },
+            {
+                "type": "equity",
                 "id": "eq-spy",
                 "symbol": "SPY",
                 "quantity": 900,
@@ -209,6 +247,16 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
                 "strike": 130.0,
                 "maturity_years": 0.35,
                 "option_type": "call",
+                "sector": "Technology",
+            },
+            {
+                "type": "european_option",
+                "id": "opt-msft-put",
+                "symbol": "MSFT",
+                "quantity": 200,
+                "strike": 400.0,
+                "maturity_years": 0.45,
+                "option_type": "put",
                 "sector": "Technology",
             },
             {
@@ -265,7 +313,7 @@ SAMPLE_PORTFOLIO = CROSS_ASSET_PORTFOLIO
 _DEMO_DESCRIPTIONS: dict[str, str] = {
     "equity-vol": (
         "Equity and listed-option book with index future hedge — "
-        "illustrates equity spot and vol risk factors."
+        "illustrates per-name equity spot and vol risk (AAPL/MSFT/NVDA/SPY)."
     ),
     "rates-macro": (
         "Treasury, IRS, and STIR-future book — "
@@ -312,6 +360,8 @@ def _spy_demo_surface() -> dict:
 # Production HistoricalFactorPanel (DEFAULT_PRODUCTION_PANEL_FACTORS) shocks every
 # RateZero column via MarketSnapshot.apply on FULL_REVALUATION. Demo key_rates
 # must include USD 0Y/2Y/5Y/10Y or panel apply fail-closes (HTTP 500 on /risk/es).
+# Equity/FX names on the per-factor panel must likewise exist on every demo
+# snapshot so FULL_REVALUATION does not KeyError a missing mark.
 _PANEL_USD_KEY_RATES: dict[str, float] = {
     "0Y": 0.04,
     "2Y": 0.043,
@@ -319,18 +369,40 @@ _PANEL_USD_KEY_RATES: dict[str, float] = {
     "10Y": 0.0415,
 }
 
+_PANEL_EQUITY_SPOTS: dict[str, float] = {
+    "AAPL": 185.00,
+    "MSFT": 415.00,
+    "NVDA": 118.50,
+    "SPY": 565.00,
+}
+_PANEL_EQUITY_VOLS: dict[str, float] = {
+    "AAPL": 0.28,
+    "MSFT": 0.24,
+    "NVDA": 0.46,
+    "SPY": 0.22,
+}
+_PANEL_DIVIDEND_YIELDS: dict[str, float] = {symbol: 0.0 for symbol in _PANEL_EQUITY_SPOTS}
+_PANEL_FX_SPOTS: dict[str, float] = {"EURUSD": 1.10}
+_PANEL_FX_VOLS: dict[str, float] = {"EURUSD": 0.12}
+
 _DEMO_MARKETS: dict[str, MarketSnapshot] = {
     "equity-vol": MarketSnapshot(
         id="demo:equity-vol",
-        equity_spots={"NVDA": 118.50, "SPY": 565.00},
-        equity_vols={"NVDA": 0.46, "SPY": 0.22},
+        equity_spots=dict(_PANEL_EQUITY_SPOTS),
+        equity_vols=dict(_PANEL_EQUITY_VOLS),
+        fx_spots=dict(_PANEL_FX_SPOTS),
+        fx_vols=dict(_PANEL_FX_VOLS),
         rates={"USD": 0.04},
         key_rates={"USD": dict(_PANEL_USD_KEY_RATES)},
-        dividend_yields={"NVDA": 0.0, "SPY": 0.0},
+        dividend_yields=dict(_PANEL_DIVIDEND_YIELDS),
         vol_surfaces={"SPY": _spy_demo_surface()},
     ),
     "rates-macro": MarketSnapshot(
         id="demo:rates-macro",
+        equity_spots=dict(_PANEL_EQUITY_SPOTS),
+        equity_vols=dict(_PANEL_EQUITY_VOLS),
+        fx_spots=dict(_PANEL_FX_SPOTS),
+        fx_vols=dict(_PANEL_FX_VOLS),
         rates={"USD": 0.04},
         key_rates={
             "USD": {
@@ -340,15 +412,16 @@ _DEMO_MARKETS: dict[str, MarketSnapshot] = {
                 "9.5Y": 0.041 * ((3468.0 / 365.0) / 9.5),
             }
         },
+        dividend_yields=dict(_PANEL_DIVIDEND_YIELDS),
         projection_rates={"USD": 0.0425},
         ir_future_quotes={"USD": 0.042},
     ),
     "global-macro": MarketSnapshot(
         id="demo:global-macro",
-        equity_spots={"NVDA": 118.50, "SPY": 565.00},
-        equity_vols={"NVDA": 0.46, "SPY": 0.22},
-        fx_spots={"EURUSD": 1.10},
-        fx_vols={"EURUSD": 0.12},
+        equity_spots=dict(_PANEL_EQUITY_SPOTS),
+        equity_vols=dict(_PANEL_EQUITY_VOLS),
+        fx_spots=dict(_PANEL_FX_SPOTS),
+        fx_vols=dict(_PANEL_FX_VOLS),
         rates={"USD": 0.04, "EUR": 0.03},
         key_rates={
             "USD": {
@@ -356,31 +429,38 @@ _DEMO_MARKETS: dict[str, MarketSnapshot] = {
                 "9.5Y": 0.041 * ((3468.0 / 365.0) / 9.5),
             }
         },
-        dividend_yields={"NVDA": 0.0, "SPY": 0.0},
+        dividend_yields=dict(_PANEL_DIVIDEND_YIELDS),
     ),
 }
 
 _DEMO_AGGREGATE_MARKETS: dict[str, MarketSnapshot] = {
     "equity-vol": MarketSnapshot(
         id="demo-aggregate:equity-vol",
-        equity_spots={"NVDA": 118.50, "SPY": 565.00},
-        equity_vols={"NVDA": 0.46, "SPY": 0.18},
+        equity_spots=dict(_PANEL_EQUITY_SPOTS),
+        equity_vols={**_PANEL_EQUITY_VOLS, "SPY": 0.18},
+        fx_spots=dict(_PANEL_FX_SPOTS),
+        fx_vols=dict(_PANEL_FX_VOLS),
         rates={"USD": 0.04},
-        dividend_yields={"NVDA": 0.0, "SPY": 0.0},
+        dividend_yields=dict(_PANEL_DIVIDEND_YIELDS),
     ),
     "rates-macro": MarketSnapshot(
         id="demo-aggregate:rates-macro",
+        equity_spots=dict(_PANEL_EQUITY_SPOTS),
+        equity_vols=dict(_PANEL_EQUITY_VOLS),
+        fx_spots=dict(_PANEL_FX_SPOTS),
+        fx_vols=dict(_PANEL_FX_VOLS),
         rates={"USD": 0.0425},
+        dividend_yields=dict(_PANEL_DIVIDEND_YIELDS),
         ir_future_quotes={"USD": 0.042},
     ),
     "global-macro": MarketSnapshot(
         id="demo-aggregate:global-macro",
-        equity_spots={"NVDA": 118.50, "SPY": 565.00},
-        equity_vols={"NVDA": 0.46, "SPY": 0.22},
-        fx_spots={"EURUSD": 1.10},
-        fx_vols={"EURUSD": 0.12},
+        equity_spots=dict(_PANEL_EQUITY_SPOTS),
+        equity_vols=dict(_PANEL_EQUITY_VOLS),
+        fx_spots=dict(_PANEL_FX_SPOTS),
+        fx_vols=dict(_PANEL_FX_VOLS),
         rates={"USD": 0.04, "EUR": 0.03},
-        dividend_yields={"NVDA": 0.0, "SPY": 0.0},
+        dividend_yields=dict(_PANEL_DIVIDEND_YIELDS),
     ),
 }
 
