@@ -1,7 +1,7 @@
 # RiskForge Consolidated Engineering Findings
 
 Date: 2026-09-09  
-Status: Milestone R0 COMPLETE (2026-09-09) — all P0/P1 CLOSED; P2 RF-017/RF-018/RF-019 ACCEPTED / DEFERRED; RF-020 CLOSED  
+Status: leftover wave IN PROGRESS (2026-09-09) — P0/P1 code CLOSED; user rejected “accepted residual” as done. Remaining MET work: RF-014 shared ACLs/TLS/secrets, QA-024 QuantLib demo range, RF-016 labeled-runner SLA (needs a runner), RF-017 ABI close-as-MET or remaining kernel, RF-018 contracts, RF-019 tool evals.  
 
 Inputs:
 
@@ -48,9 +48,9 @@ Important but not allowed to distract from P0/P1 remediation. These can be compl
 
 ## Recommended engineering decision
 
-**Milestone R0 — Core Remediation & Trustworthiness is COMPLETE** (2026-09-09).
+**Milestone R0 leftover wave is IN PROGRESS** (2026-09-09). “Accepted residual” is not done.
 
-All P0 and P1 root findings are CLOSED. Named accepted residuals are **not MET** (RF-014 shared auth/ACLs/TLS; RF-016 labeled-runner SLA-K1/K2; QA-024 range). P2 RF-017 / RF-018 / RF-019 are **ACCEPTED / DEFERRED**. Net-new feature development may resume; do not treat accepted residuals as MET.
+P0/P1 code paths stay CLOSED except RF-014 shared ACLs/TLS/secrets (reopened). QA-024 QuantLib demo range, RF-017 ABI close, RF-018 frontend contracts, and RF-019 tool evals are **IN PROGRESS**. RF-016 labeled-runner SLA still needs a self-hosted runner (cannot fake ubuntu-latest floors).
 
 The current repository is a strong MVP with unusually broad test coverage, real QuantLib integration, deterministic demo data, a credible pricing seam, native parity tests, and good separation of the native numerical kernel from business logic.
 
@@ -735,7 +735,7 @@ Keep an explicit inline/debug calculation endpoint only for tests/demo tooling.
 Priority: **P1**  
 Risk types: SECURITY, AVAILABILITY, OPERABILITY  
 Confidence: HIGH  
-Status: **CLOSED** (2026-09-09). QA local-demo close gate (`reviews/r0.11.7-rf014-close-gate-report.md`); independent review **APPROVE** (`reviews/sdd-briefs/task-15-rf014-close-gate-review.md`). R0.11.1–R0.11.6 APPROVE. Local-demo required direction is **MET** (loopback Compose, finite numbers, positions/scenarios/body caps, error sanitization; local demo stays unauthenticated). Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** are **accepted residuals** (not MET). Not production IAM.
+Status: **IN PROGRESS** (2026-09-09). Local-demo required direction remains MET. Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** were papered as accepted residuals — reopened to MET them. Not production OIDC.
 
 Source findings:
 
@@ -892,7 +892,7 @@ A broken QuantLib installation cannot produce a green "full" CI run. — **MET**
 Priority: **P2**  
 Risk types: PERFORMANCE, MAINTAINABILITY, NATIVE_SAFETY  
 Confidence: HIGH  
-Status: **ACCEPTED / DEFERRED** (2026-09-09). R0 non-goal: do not expand C++ VaR/QuantLib. ABI fail-closed / contiguous `pnl_from_arrays` / serial-below-4096 landed; native Historical VaR uses arrays. Remaining: default kernel is still python/NumPy. Not CLOSED as MET.
+Status: **IN PROGRESS** (2026-09-09). ABI work landed; leftover wave will CLOSE only when ABI/validation/contiguous buffers are scored MET (not “deferred because we refused C++ VaR”).
 
 Source findings:
 
@@ -929,7 +929,7 @@ At the same time, the reviews agree that the native kernel is not the dominant b
 Priority: **P2**  
 Risk types: MAINTAINABILITY, SUPPLY_CHAIN, UI_CORRECTNESS  
 Confidence: HIGH  
-Status: **ACCEPTED / DEFERRED** (2026-09-09). R0 non-goal: do not TypeScript-rewrite. Frontend remains JavaScript with Vitest; generated/centralized API contracts and TS migration wait until after R0. Not CLOSED as MET.
+Status: **IN PROGRESS** (2026-09-09). `npm ci` and version pins exist; leftover is request-boundary percent/bp assertions and a centralized OpenAPI contract. Not a TypeScript rewrite.
 
 Source findings:
 
@@ -957,7 +957,7 @@ The frontend is untyped JavaScript, API request shaping is manual, and runtime d
 Priority: **P2**  
 Risk types: MAINTAINABILITY, AI_GUARDRAILS  
 Confidence: HIGH  
-Status: **ACCEPTED / DEFERRED** (2026-09-09). AI expansion stays after deterministic APIs. Current slice is keyword/tool-loop over existing `PortfolioService` tools. Not CLOSED as MET.
+Status: **IN PROGRESS** (2026-09-09). Deterministic APIs are stable. Leftover: JSON-schema tool allowlist, injection/ambiguity evals. LLM still must not invent numbers.
 
 Source findings:
 
@@ -993,7 +993,7 @@ AI remains **after** deterministic risk remediation.
 Priority: **P2**  
 Risk types: DOCUMENTATION, PROCESS  
 Confidence: HIGH  
-Status: **CLOSED** (2026-09-09). Independent review **APPROVE** (`reviews/sdd-briefs/task-27-r0-exit-review.md`). Milestone R0 is COMPLETE. `reviews/FINDINGS.md` is the authoritative remediation backlog. `ROADMAP.md` Current gate records Milestone R0 COMPLETE with named accepted residuals. `docs/known_limitations.md` names RF-014 ACLs/TLS, RF-016 labeled-runner SLA-K1/K2, QA-024 range, and P2 RF-017/RF-018/RF-019 ACCEPTED / DEFERRED. Suite counts remain the recorded Phase A baseline (**not a live** re-run); dated historical tables are snapshots, not today's suite size.
+Status: **IN PROGRESS** (2026-09-09). Prior COMPLETE stamp was dishonest while leftovers were unmet. FINDINGS remains the backlog.
 
 Source findings:
 
@@ -1109,7 +1109,7 @@ Do not use the review as justification to add:
 
 # Release / Development Gate
 
-**Milestone R0 COMPLETE** (2026-09-09). Net-new product feature development may resume. Named accepted residuals (RF-014 shared auth/ACLs/TLS; RF-016 labeled-runner SLA-K1/K2; QA-024 range) are **not MET**. P2 RF-017 / RF-018 / RF-019 are **ACCEPTED / DEFERRED**.
+**Milestone R0 leftover wave IN PROGRESS** (2026-09-09). Net-new feature development stays paused until RF-014 shared ACLs/TLS/secrets, QA-024 range, RF-017/018/019 are MET. Labeled-runner SLA still needs a self-hosted runner.
 
 R0 required, and now records:
 

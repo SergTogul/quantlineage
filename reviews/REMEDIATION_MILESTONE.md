@@ -1,8 +1,8 @@
 # Milestone R0 — Core Remediation & Trustworthiness
 
-Status: **COMPLETE** (2026-09-09)
+Status: **IN PROGRESS** (2026-09-09 leftover wave)
 
-Current phase: **R0 exit** — all P0/P1 CLOSED; accepted residuals named not MET  
+Current phase: **leftovers** — ACLs/TLS, QA-024, RF-017/018/019; SLA runner still missing  
 Branch: `r0-core-remediation`  
 Date: 2026-09-09
 

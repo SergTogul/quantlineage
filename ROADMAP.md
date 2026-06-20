@@ -4,7 +4,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent**; do not recreate
 
 ## Current gate
 
-Milestone R0 — Core Remediation & Trustworthiness is **COMPLETE** (2026-09-09) on branch `r0-core-remediation`. Named accepted residuals are **not MET**: RF-014 shared auth/ACLs/TLS; RF-016 labeled-runner SLA-K1/K2; QA-024 demo-artifact range. P2 RF-017 / RF-018 / RF-019 are **ACCEPTED / DEFERRED**. `reviews/FINDINGS.md` and `reviews/REMEDIATION_MILESTONE.md` remain the authoritative remediation record.
+Milestone R0 leftover wave is **IN PROGRESS** (2026-09-09) on branch `r0-core-remediation`. Shared ACLs/TLS, QA-024 QuantLib range, RF-017/018/019 are open. Labeled-runner SLA still needs a self-hosted runner. `reviews/FINDINGS.md` remains the authoritative record.
 
 ### Recorded Phase A baseline (2026-09-03; not re-run)
 
