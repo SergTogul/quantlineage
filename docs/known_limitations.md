@@ -74,18 +74,18 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 - The React terminal is a demo-quality risk workflow UI.
 - It displays API responses and helper formatting only; it does not duplicate pricing, VaR, stress, or optimization formulas.
 - Screenshots in the demo docs represent a deterministic local app capture, not hosted production availability.
-- TypeScript rewrite and generated/centralized API contracts are **ACCEPTED / DEFERRED** (RF-018); not MET.
+- TypeScript rewrite is out of scope. Centralized OpenAPI scenario POST pins and request-boundary %/bp assertions are **MET** (RF-018 **CLOSED**).
 
 ## AI Assistant
 
 - The implemented AI slice is deterministic risk-query orchestration with explicit tool contracts.
 - No full external LLM runtime, prompt stack, or model tool-calling loop is claimed as complete.
 - The assistant must refuse unsupported advisory requests and ask clarification for ambiguous prompts rather than inventing risk values.
-- Broader AI routing maturity is **ACCEPTED / DEFERRED** (RF-019) until after deterministic APIs; not MET.
+- JSON-schema tool allowlist, arg validation, and ambiguity/injection/advisory evals are **MET** (RF-019 CLOSED). No live LLM provider. The assistant still must not invent risk numbers.
 
 ## Native kernel (RF-017)
 
-- ABI fail-closed, contiguous array P&L, and serial-below-threshold paths landed. Default Historical VaR remains python/NumPy. Expanding native VaR or QuantLib into C++ is **ACCEPTED / DEFERRED** (RF-017); not MET.
+- ABI fail-closed, contiguous array P&L, and serial-below-threshold paths are **MET**. Default Historical VaR remains python/NumPy **by design** (do not move VaR or QuantLib into C++). RF-017 is CLOSED as MET for ABI; that residual is not an open ABI gap.
 
 ## CI And Verification
 
@@ -93,4 +93,4 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 - This limitations catalog is not a live CI badge. Before claiming a branch is merge-ready, rerun the relevant local checks and verify required CI is green.
 - Suite counts in `ROADMAP.md` Current gate are the recorded Phase A baseline (**not a live** re-run).
 - Labeled-runner SLA-K1 and SLA-K2 are **not MET** (RF-016 accepted residual): no labeled runner; SLA-K1/K2 not CI-enforced; do not run `check_m6_sla.py` on `ubuntu-latest`.
-- QA-024 demo-artifact range check against QuantLib E2E is **not MET** (leftover residual; not a CI range gate).
+- QA-024 demo-artifact range check against QuantLib is **MET** (relative 25% on market value / named stress P&Ls; `var_99` in `[0.25×, 4×]` of `data/demo_risk_artifact.json`; nightly `tests/test_qa024_ql_demo_range.py`). Not byte-equality.

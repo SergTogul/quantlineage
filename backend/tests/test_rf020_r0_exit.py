@@ -1,8 +1,10 @@
 """Leftover-wave honesty pins.
 
 P0/P1 code findings stay CLOSED except RF-014 shared ACLs/TLS (reopened).
-RF-017/018/019 are IN PROGRESS, not ACCEPTED / DEFERRED.
-Do not claim Milestone R0 COMPLETE until those leftovers are MET.
+RF-018/019 are IN PROGRESS, not ACCEPTED / DEFERRED.
+RF-017 is CLOSED as MET for ABI (not ACCEPTED / DEFERRED); product Historical
+VaR stays Python/NumPy by design.
+Do not claim Milestone R0 COMPLETE until remaining leftovers are MET.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ MILESTONE = REPO_ROOT / "reviews" / "REMEDIATION_MILESTONE.md"
 ROADMAP = REPO_ROOT / "ROADMAP.md"
 
 CLOSED_P0_P1 = [f"RF-{n:03d}" for n in range(1, 17) if n != 14]
-OPEN_LEFTOVERS = ("RF-014", "RF-017", "RF-018", "RF-019")
+OPEN_LEFTOVERS = ("RF-014", "RF-018", "RF-019")
 
 
 def _findings() -> str:
@@ -57,6 +59,18 @@ def test_leftover_findings_are_in_progress_not_accepted_deferred():
         status = _status_line(_finding_section(text, rf_id))
         assert "IN PROGRESS" in status, rf_id
         assert "ACCEPTED / DEFERRED" not in status, rf_id
+
+
+def test_rf017_closed_as_met_abi_not_accepted_deferred():
+    """RF-017 ABI/validation/contiguous buffers are MET; not a C++ VaR deferral."""
+    section = _finding_section(_findings(), "RF-017")
+    status = _status_line(section)
+    assert "Status: **CLOSED**" in section
+    assert "IN PROGRESS" not in status
+    assert "ACCEPTED / DEFERRED" not in status
+    assert "**MET**" in section
+    assert "by design" in section
+    assert "python/NumPy" in section or "Python/NumPy" in section
 
 
 def test_roadmap_does_not_claim_complete_while_leftovers_open():

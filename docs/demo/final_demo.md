@@ -65,6 +65,15 @@ These ranges are derived from `data/demo_risk_artifact.json` and should be treat
 - Default `global-macro` exposures: delta is about `$1.12M`, DV01 is about `$1.1K`, and vega is about `$1.3K`.
 - Default `global-macro` stress P&L ranges from about `+$91.9K` on `Rates +100bp` to about `-$152.4K` on `Equities -15% / Vol +40%`.
 
+### QuantLib vs builtin artifact bands (QA-024)
+
+The committed artifact is **builtin**. A QuantLib rebuild is **not** byte-identical (swap NPV/DV01 conventions differ). Nightly `quantlib-e2e` runs `backend/tests/test_qa024_ql_demo_range.py`:
+
+- `market_value` and named stress P&Ls: within **25%** relative of the artifact, with a **$1** absolute floor for near-zero P&Ls.
+- `var_99`: within **`[0.25×, 4×]`** of the artifact. Observed QuantLib/builtin ratio on the rates-macro book is about **2.9×**; the upper bound leaves headroom for QuantLib version drift without allowing collapse or a 5× blow-up.
+
+These QuantLib bands are CI guardrails against a wrong engine or empty book, not a claim that builtin and QuantLib VaR match.
+
 ## 3-5 Minute Flow
 
 1. Start with the portfolio catalog.

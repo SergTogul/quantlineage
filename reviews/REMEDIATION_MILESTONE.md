@@ -2,7 +2,7 @@
 
 Status: **IN PROGRESS** (2026-09-09 leftover wave)
 
-Current phase: **leftovers** — ACLs/TLS, QA-024, RF-017/018/019; SLA runner still missing  
+Current phase: **leftovers** — ACLs/TLS; SLA runner still missing. RF-017 ABI, RF-018 contracts, and RF-019 tool evals CLOSED as MET.  
 Branch: `r0-core-remediation`  
 Date: 2026-09-09
 
@@ -20,10 +20,10 @@ Source of truth:
 Milestone R0 is **COMPLETE** (2026-09-09):
 
 1. every P0 root finding in `FINDINGS.md` is CLOSED;
-2. every P1 root finding is CLOSED, with accepted residuals named **not MET** (RF-014 ACLs/TLS; RF-016 labeled-runner SLA; QA-024);
+2. every P1 root finding is CLOSED, with accepted residuals named **not MET** (RF-014 ACLs/TLS; RF-016 labeled-runner SLA);
 3. the final exit checklist distinguishes MET (`[x]`) vs accepted residual (`[~]`).
 
-P2 findings RF-017 / RF-018 / RF-019 are **ACCEPTED / DEFERRED**. Do not treat `[~]` items as MET.
+P2 RF-017 is **CLOSED** as **MET** for ABI (product Historical VaR stays python/NumPy by design). RF-018 is **CLOSED** as **MET** (OpenAPI snapshot + request-boundary units; not a TypeScript rewrite). RF-019 is **CLOSED** as **MET** (JSON-schema allowlist + evals). Do not treat `[~]` items as MET. Do not restore Milestone R0 COMPLETE while leftovers remain.
 
 ---
 
@@ -1135,6 +1135,12 @@ Required PR-FAST / PR-FULL (QuantLib cannot be skipped) / NIGHTLY Postgres two-w
 
 Evidence: `reviews/r0.12.7-rf016-close-gate-report.md`.
 
+## R0.12.8 QA-024 QuantLib demo-artifact range — MET (2026-09-09)
+
+QA-024 demo-artifact range check is **MET**. Nightly `quantlib-e2e` runs `tests/test_qa024_ql_demo_range.py`: QuantLib prices the demo books and compares `var_99`, `market_value`, and named stress P&Ls to `data/demo_risk_artifact.json` bands (market value / stress P&L relative 25% with $1 abs floor; `var_99` in `[0.25×, 4×]` of builtin because swap DV01 differs). Not byte-equality. Skip-unless-QuantLib locally; nightly fail-closes. Labeled-runner SLA-K1/K2 remains **not MET**: no labeled runner; SLA-K1/K2 not CI-enforced; do not run `check_m6_sla.py` on `ubuntu-latest`. Leftover wave stays IN PROGRESS.
+
+Evidence: `reviews/r0.12.8-qa024-ql-range-report.md`.
+
 ## R0.12.5 Native ABI safety
 
 Add explicit ABI/version/error/length validation before expanding native use.
@@ -1142,6 +1148,12 @@ Add explicit ABI/version/error/length validation before expanding native use.
 ### Exit criteria
 
 A "green full CI" means the production-relevant QuantLib, native, frontend build, API, and persistence paths actually executed.
+
+## R0.12.9 RF-017 ABI close as MET — COMPLETE (2026-09-09)
+
+**RF-017 CLOSED** as **MET** for ABI. On disk: ABI version, status/error return, length validation, contiguous `pnl_from_arrays`, serial-below-4096. QA-025 mismatch is pinned in `kernel_test.cpp` and the Python ctypes wrapper. Default Historical VaR remains python/NumPy **by design** (Decision: do not move VaR/QuantLib into C++). That named residual is not an open ABI gap and is not ACCEPTED / DEFERRED. No C++ VaR or QuantLib kernels added.
+
+Evidence: `reviews/r0.12.9-rf017-abi-close-report.md`. Leftover wave stays **IN PROGRESS** (do not restore Milestone R0 COMPLETE).
 
 ---
 
@@ -1186,19 +1198,17 @@ These findings stay visible as **ACCEPTED / DEFERRED**. They did not delay R0 cl
 
 ## Native micro-optimization
 
-Related: RF-017 — **ACCEPTED / DEFERRED**. Do not expand C++ VaR/QuantLib.
+Related: RF-017 — **CLOSED** as **MET** for ABI. Product Historical VaR stays python/NumPy **by design**. Do not expand C++ VaR/QuantLib.
 
 Do not pursue SIMD/thread-pool tuning until profiling after RF-005/RF-007.
 
 ## Frontend TypeScript migration
 
-Related: RF-018 — **ACCEPTED / DEFERRED**.
-
-Not required solely for optics. Consider only after API schemas stabilize.
+Related: RF-018 — **CLOSED** as **MET** without a TypeScript rewrite. Centralized OpenAPI scenario POST pins and request-boundary %/bp assertions. A generated TS client remains out of scope.
 
 ## AI routing expansion
 
-Related: RF-019 — **ACCEPTED / DEFERRED**.
+Related: RF-019 — **CLOSED** as **MET** (JSON-schema allowlist, arg validation, injection/ambiguity/advisory evals; no live LLM).
 
 Deferred until deterministic tools are stable.
 
@@ -1260,7 +1270,7 @@ Milestone R0 is **COMPLETE** (2026-09-09). `[x]` = MET. `[~]` = accepted residua
 - [x] critical E2E workflow passes
 - [x] static analysis passes at documented strictness
 - [~] labeled-runner SLA-K1/K2 — accepted residual (not MET): RF-016; no labeled runner; SLA-K1/K2 not CI-enforced
-- [~] QA-024 demo-artifact range check — leftover residual, not MET
+- [x] QA-024 demo-artifact range check — **MET** (QuantLib vs builtin bands; nightly `test_qa024_ql_demo_range.py`)
 
 ## Documentation
 
@@ -1269,6 +1279,6 @@ Milestone R0 is **COMPLETE** (2026-09-09). `[x]` = MET. `[~]` = accepted residua
 - [x] known limitations match reality
 - [x] benchmark/test claims are current and reproducible (dated-count disclaimer retained; not a live matrix)
 
-P2 RF-017 / RF-018 / RF-019 are **ACCEPTED / DEFERRED** (not CLOSED as MET).
+P2 RF-017 is **CLOSED** as **MET** for ABI (named residual: python/NumPy Historical VaR by design). RF-018 is **CLOSED** as **MET** (not a TypeScript rewrite). RF-019 is **CLOSED** as **MET**.
 
-Normal net-new feature development may resume. Do not treat `[~]` items as MET.
+Leftover-wave net-new feature development stays paused. Do not treat `[~]` items as MET. Do not restore Milestone R0 COMPLETE while leftovers remain.
