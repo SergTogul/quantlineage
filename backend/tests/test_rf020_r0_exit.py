@@ -1,9 +1,10 @@
 """Leftover-wave honesty pins.
 
 P0/P1 code findings stay CLOSED except RF-014 shared ACLs/TLS (reopened).
-RF-018 is IN PROGRESS, not ACCEPTED / DEFERRED.
 RF-017 is CLOSED as MET for ABI (not ACCEPTED / DEFERRED); product Historical
 VaR stays Python/NumPy by design.
+RF-018 is CLOSED as MET (OpenAPI snapshot + request-boundary units; not a TS rewrite).
+RF-019 is CLOSED as MET (JSON-schema allowlist + injection/ambiguity evals).
 Do not claim Milestone R0 COMPLETE until remaining leftovers are MET.
 """
 
@@ -17,7 +18,7 @@ MILESTONE = REPO_ROOT / "reviews" / "REMEDIATION_MILESTONE.md"
 ROADMAP = REPO_ROOT / "ROADMAP.md"
 
 CLOSED_P0_P1 = [f"RF-{n:03d}" for n in range(1, 17) if n != 14]
-OPEN_LEFTOVERS = ("RF-014", "RF-018")
+OPEN_LEFTOVERS = ("RF-014",)
 
 
 def _findings() -> str:
@@ -61,6 +62,17 @@ def test_leftover_findings_are_in_progress_not_accepted_deferred():
         assert "ACCEPTED / DEFERRED" not in status, rf_id
 
 
+def test_rf018_frontend_contracts_closed():
+    """RF-018 MET without a TypeScript rewrite: pins, npm ci, OpenAPI, wire units."""
+    assert "RF-018" not in OPEN_LEFTOVERS
+    section = _finding_section(_findings(), "RF-018")
+    status = _status_line(section)
+    assert "Status: **CLOSED**" in section
+    assert "IN PROGRESS" not in status
+    assert "ACCEPTED / DEFERRED" not in status
+    assert "TypeScript rewrite" in section or "TS rewrite" in section or "not a TypeScript" in section.lower()
+
+
 def test_rf017_closed_as_met_abi_not_accepted_deferred():
     """RF-017 ABI/validation/contiguous buffers are MET; not a C++ VaR deferral."""
     section = _finding_section(_findings(), "RF-017")
@@ -71,6 +83,13 @@ def test_rf017_closed_as_met_abi_not_accepted_deferred():
     assert "**MET**" in section
     assert "by design" in section
     assert "python/NumPy" in section or "Python/NumPy" in section
+
+def test_rf019_is_closed_and_not_an_open_leftover():
+    assert "RF-019" not in OPEN_LEFTOVERS
+    status = _status_line(_finding_section(_findings(), "RF-019"))
+    assert "CLOSED" in status
+    assert "IN PROGRESS" not in status
+    assert "ACCEPTED / DEFERRED" not in status
 
 
 def test_roadmap_does_not_claim_complete_while_leftovers_open():

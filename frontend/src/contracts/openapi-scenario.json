@@ -1,0 +1,699 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "RiskForge API",
+    "version": "0.3.0"
+  },
+  "paths": {
+    "/api/v1/risk/stress/formal/evaluate/custom": {
+      "post": {
+        "tags": [
+          "stress"
+        ],
+        "summary": "Threat evaluation (formal Scenario wire)",
+        "description": "Accept formal Scenario wire; evaluate via StressEngine without StressScenario collapse.",
+        "operationId": "risk_stress_formal_evaluate_custom_api_v1_risk_stress_formal_evaluate_custom_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormalCustomStressRequest"
+              },
+              "examples": {
+                "formal_equity_vol": {
+                  "summary": "Custom stress with formal Scenario wire (M3.8)",
+                  "description": "Illustrative OpenAPI example only \u2014 numbers are not live engine output.",
+                  "value": {
+                    "portfolio": {
+                      "id": "demo-book",
+                      "name": "Demo Book",
+                      "firm": "RiskForge",
+                      "desk": "Global Macro",
+                      "strategy": "Multi-Asset",
+                      "positions": [
+                        {
+                          "type": "equity",
+                          "id": "eq-spy",
+                          "symbol": "SPY",
+                          "quantity": 100.0,
+                          "price": 565.0,
+                          "sector": "ETF",
+                          "book": "Equity"
+                        },
+                        {
+                          "type": "european_option",
+                          "id": "opt-spy-put",
+                          "symbol": "SPY",
+                          "quantity": 50.0,
+                          "spot": 565.0,
+                          "strike": 540.0,
+                          "maturity_years": 0.5,
+                          "volatility": 0.22,
+                          "risk_free_rate": 0.04,
+                          "option_type": "put",
+                          "sector": "ETF",
+                          "book": "Equity Derivatives"
+                        }
+                      ]
+                    },
+                    "scenarios": [
+                      {
+                        "id": "formal-equity-vol",
+                        "name": "Equity \u221210% + vol +25%",
+                        "category": "factor",
+                        "description": "Illustrative formal Scenario wire",
+                        "shocks": [
+                          {
+                            "factor_type": "equity",
+                            "key": "SPY",
+                            "amount": -0.1,
+                            "bucket": "SPY"
+                          },
+                          {
+                            "factor_type": "vol",
+                            "key": "SPY:VOL",
+                            "amount": 0.25,
+                            "bucket": "SPY",
+                            "expiry": "GENERIC",
+                            "moneyness": "ATM"
+                          }
+                        ],
+                        "max_loss_pct": 0.05,
+                        "metadata": {}
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/stress/formal/compare": {
+      "post": {
+        "tags": [
+          "stress"
+        ],
+        "summary": "Hedge comparison (formal Scenario wire)",
+        "description": "Accept formal Scenario wire; compare via ScenarioComparisonEngine.",
+        "operationId": "risk_stress_formal_compare_api_v1_risk_stress_formal_compare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormalScenarioComparisonRequest"
+              },
+              "examples": {
+                "flatten_equity_formal": {
+                  "summary": "Compare base vs reduced equity hedge (formal Scenario wire)",
+                  "description": "Illustrative OpenAPI example only \u2014 numbers are not live engine output.",
+                  "value": {
+                    "portfolio": {
+                      "id": "demo-book",
+                      "name": "Demo Book",
+                      "firm": "RiskForge",
+                      "desk": "Global Macro",
+                      "strategy": "Multi-Asset",
+                      "positions": [
+                        {
+                          "type": "equity",
+                          "id": "eq-spy",
+                          "symbol": "SPY",
+                          "quantity": 100.0,
+                          "price": 565.0,
+                          "sector": "ETF",
+                          "book": "Equity"
+                        },
+                        {
+                          "type": "european_option",
+                          "id": "opt-spy-put",
+                          "symbol": "SPY",
+                          "quantity": 50.0,
+                          "spot": 565.0,
+                          "strike": 540.0,
+                          "maturity_years": 0.5,
+                          "volatility": 0.22,
+                          "risk_free_rate": 0.04,
+                          "option_type": "put",
+                          "sector": "ETF",
+                          "book": "Equity Derivatives"
+                        }
+                      ]
+                    },
+                    "hedged_portfolio": {
+                      "id": "demo-book-hedged",
+                      "name": "Demo Book (hedged)",
+                      "firm": "RiskForge",
+                      "desk": "Global Macro",
+                      "strategy": "Multi-Asset",
+                      "positions": [
+                        {
+                          "type": "equity",
+                          "id": "eq-spy",
+                          "symbol": "SPY",
+                          "quantity": 40.0,
+                          "price": 565.0,
+                          "sector": "ETF",
+                          "book": "Equity"
+                        },
+                        {
+                          "type": "european_option",
+                          "id": "opt-spy-put",
+                          "symbol": "SPY",
+                          "quantity": 50.0,
+                          "spot": 565.0,
+                          "strike": 540.0,
+                          "maturity_years": 0.5,
+                          "volatility": 0.22,
+                          "risk_free_rate": 0.04,
+                          "option_type": "put",
+                          "sector": "ETF",
+                          "book": "Equity Derivatives"
+                        }
+                      ]
+                    },
+                    "scenarios": [
+                      {
+                        "id": "Crash",
+                        "name": "Crash",
+                        "category": "factor",
+                        "shocks": [
+                          {
+                            "factor_type": "equity",
+                            "key": "SPY",
+                            "amount": -0.2,
+                            "bucket": "SPY"
+                          }
+                        ],
+                        "metadata": {}
+                      }
+                    ],
+                    "methodology": "DELTA_GAMMA"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "HedgeComparisonReport \u2014 VaR/ES improvement and scenario P&L",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HedgeComparisonReport"
+                },
+                "examples": {
+                  "illustrative": {
+                    "summary": "Illustrative hedge comparison",
+                    "description": "Illustrative OpenAPI example only \u2014 numbers are not live engine output.",
+                    "value": {
+                      "hedge_cost": -33900.0,
+                      "base_market_value": 62000.0,
+                      "hedged_market_value": 28100.0,
+                      "base_var_99": 12500.0,
+                      "hedged_var_99": 7200.0,
+                      "base_expected_shortfall_99": 18200.0,
+                      "hedged_expected_shortfall_99": 10500.0,
+                      "var_improvement": 5300.0,
+                      "es_improvement": 7700.0,
+                      "methodology": "DELTA_GAMMA",
+                      "factor_exposure_changes": [
+                        {
+                          "factor": "SPY",
+                          "factor_type": "equity",
+                          "bucket": "spot",
+                          "before": 56500.0,
+                          "after": 22600.0,
+                          "delta": -33900.0
+                        }
+                      ],
+                      "scenarios": [
+                        {
+                          "scenario": "Equity crash \u221220%",
+                          "base_pnl": -8500.0,
+                          "hedged_pnl": -3400.0,
+                          "improvement": 5100.0,
+                          "base_loss": 8500.0,
+                          "hedged_loss": 3400.0,
+                          "loss_improvement": 5100.0
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error (`{code,message,details}`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                "examples": {
+                  "validation_error": {
+                    "summary": "Request validation failed",
+                    "description": "Illustrative OpenAPI example only \u2014 numbers are not live engine output.",
+                    "value": {
+                      "code": "validation_error",
+                      "message": "Request validation failed",
+                      "details": {
+                        "errors": [
+                          {
+                            "type": "missing",
+                            "loc": [
+                              "body",
+                              "portfolio"
+                            ],
+                            "msg": "Field required",
+                            "input": {}
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/stress/reverse/multi": {
+      "post": {
+        "tags": [
+          "stress"
+        ],
+        "summary": "Multi-factor reverse stress",
+        "operationId": "risk_stress_reverse_multi_api_v1_risk_stress_reverse_multi_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MultiFactorReverseStressRequest"
+              },
+              "examples": {
+                "equity_vol": {
+                  "summary": "Multi-factor reverse stress",
+                  "description": "Illustrative OpenAPI example only \u2014 numbers are not live engine output.",
+                  "value": {
+                    "portfolio": {
+                      "id": "demo-book",
+                      "name": "Demo Book",
+                      "firm": "RiskForge",
+                      "desk": "Global Macro",
+                      "strategy": "Multi-Asset",
+                      "positions": [
+                        {
+                          "type": "equity",
+                          "id": "eq-spy",
+                          "symbol": "SPY",
+                          "quantity": 100.0,
+                          "price": 565.0,
+                          "sector": "ETF",
+                          "book": "Equity"
+                        },
+                        {
+                          "type": "european_option",
+                          "id": "opt-spy-put",
+                          "symbol": "SPY",
+                          "quantity": 50.0,
+                          "spot": 565.0,
+                          "strike": 540.0,
+                          "maturity_years": 0.5,
+                          "volatility": 0.22,
+                          "risk_free_rate": 0.04,
+                          "option_type": "put",
+                          "sector": "ETF",
+                          "book": "Equity Derivatives"
+                        }
+                      ]
+                    },
+                    "target_loss_pct": 0.05,
+                    "factors": [
+                      "equity",
+                      "vol"
+                    ],
+                    "weights": {
+                      "equity": 0.7,
+                      "vol": 0.3
+                    },
+                    "max_shock": 0.8
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Multi-factor reverse-stress solution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiFactorReverseStressResult"
+                },
+                "examples": {
+                  "illustrative": {
+                    "summary": "Illustrative multi-factor reverse-stress result",
+                    "description": "Illustrative OpenAPI example only \u2014 numbers are not live engine output.",
+                    "value": {
+                      "target_loss_pct": 0.05,
+                      "target_loss": 3100.0,
+                      "achieved_loss_pct": 0.05,
+                      "pnl": -3100.0,
+                      "base_market_value": 62000.0,
+                      "converged": true,
+                      "objective_l2": 0.12,
+                      "shocks": [
+                        {
+                          "factor": "equity",
+                          "required_shock": -0.14,
+                          "shock_unit": "relative",
+                          "weight": 0.7,
+                          "max_shock": 0.8
+                        },
+                        {
+                          "factor": "vol",
+                          "required_shock": 0.25,
+                          "shock_unit": "relative",
+                          "weight": 0.3,
+                          "max_shock": 0.8
+                        }
+                      ],
+                      "factors": [
+                        "equity",
+                        "vol"
+                      ],
+                      "method": "ray_search_coordinate_descent",
+                      "iterations": 8,
+                      "assumptions": [
+                        "Weights normalize shock search direction across selected factors."
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error (`{code,message,details}`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                "examples": {
+                  "validation_error": {
+                    "summary": "Request validation failed",
+                    "description": "Illustrative OpenAPI example only \u2014 numbers are not live engine output.",
+                    "value": {
+                      "code": "validation_error",
+                      "message": "Request validation failed",
+                      "details": {
+                        "errors": [
+                          {
+                            "type": "missing",
+                            "loc": [
+                              "body",
+                              "portfolio"
+                            ],
+                            "msg": "Field required",
+                            "input": {}
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FactorShockWire": {
+        "properties": {
+          "factor_type": {
+            "type": "string",
+            "enum": [
+              "equity",
+              "vol",
+              "rate",
+              "fx"
+            ],
+            "title": "Factor Type"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Stable factor key (e.g. SPY, SPY:VOL, USD:RATE, EURUSD)."
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "description": "Shock in MarketSnapshot.bump units: relative for equity/FX/vol; absolute decimal rate for RateZero (0.0001 = +1bp)."
+          },
+          "bucket": {
+            "type": "string",
+            "title": "Bucket",
+            "description": "Rate tenor or vol underlying bucket; unused for equity/FX spot.",
+            "default": "ALL"
+          },
+          "expiry": {
+            "type": "string",
+            "title": "Expiry",
+            "default": "GENERIC"
+          },
+          "moneyness": {
+            "type": "string",
+            "title": "Moneyness",
+            "default": "ATM"
+          }
+        },
+        "type": "object",
+        "required": [
+          "factor_type",
+          "key",
+          "amount"
+        ],
+        "title": "FactorShockWire",
+        "description": "One typed factor shock on the HTTP wire."
+      },
+      "ScenarioWire": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ScenarioCategory"
+          },
+          "shocks": {
+            "items": {
+              "$ref": "#/components/schemas/FactorShockWire"
+            },
+            "type": "array",
+            "title": "Shocks"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "max_loss_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "gt": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Loss Pct"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScenarioSeverity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "category"
+        ],
+        "title": "ScenarioWire",
+        "description": "Formal Scenario HTTP wire type (M3.8)."
+      },
+      "FormalCustomStressRequest": {
+        "properties": {
+          "portfolio": {
+            "$ref": "#/components/schemas/Portfolio"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioWire"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          }
+        },
+        "type": "object",
+        "required": [
+          "portfolio",
+          "scenarios"
+        ],
+        "title": "FormalCustomStressRequest",
+        "description": "Custom stress / threat evaluate using formal Scenario wire payloads."
+      },
+      "FormalScenarioComparisonRequest": {
+        "properties": {
+          "portfolio": {
+            "$ref": "#/components/schemas/Portfolio"
+          },
+          "hedged_portfolio": {
+            "$ref": "#/components/schemas/Portfolio"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioWire"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "methodology": {
+            "$ref": "#/components/schemas/VaRMethodology",
+            "default": "DELTA_GAMMA"
+          }
+        },
+        "type": "object",
+        "required": [
+          "portfolio",
+          "hedged_portfolio",
+          "scenarios"
+        ],
+        "title": "FormalScenarioComparisonRequest",
+        "description": "Hedge comparison using formal Scenario wire payloads (R0.4.2-D)."
+      },
+      "MultiFactorReverseStressRequest": {
+        "properties": {
+          "portfolio": {
+            "$ref": "#/components/schemas/Portfolio"
+          },
+          "target_loss_pct": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Target Loss Pct"
+          },
+          "factors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "equity",
+                    "rates",
+                    "vol",
+                    "fx"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Factors"
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights"
+          },
+          "max_shocks": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Shocks"
+          },
+          "max_shock": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Shock",
+            "default": 0.8
+          }
+        },
+        "type": "object",
+        "required": [
+          "portfolio",
+          "target_loss_pct"
+        ],
+        "title": "MultiFactorReverseStressRequest",
+        "description": "Constrained multi-factor reverse stress (M3.6)."
+      }
+    }
+  }
+}

@@ -1,3 +1,13 @@
+import {
+  PATH_FORMAL_COMPARE,
+  PATH_FORMAL_EVALUATE_CUSTOM,
+  PATH_REVERSE_MULTI,
+} from './contracts/scenarioApi.js'
+import {
+  assertFormalScenarioShocks,
+  assertFormalScenarios,
+  assertReverseMultiFractions,
+} from './contracts/wireUnits.js'
 import { RISK_RUN_POLL_MS, isRiskRunTerminal, riskRunStatus } from './lib/risk.mjs'
 
 /** Canonical API prefix (M7.6 / M8). Bodies unchanged vs legacy dual-mount. */
@@ -117,9 +127,10 @@ export function getPortfolio() {
 }
 
 export function evaluateCustomScenario(portfolio, scenario) {
+  assertFormalScenarioShocks(scenario)
   const body = { portfolio, scenarios: [scenario] }
   return postHeavyOrRiskRun(
-    `${API_V1}/risk/stress/formal/evaluate/custom`,
+    PATH_FORMAL_EVALUATE_CUSTOM,
     { method: 'POST', body: JSON.stringify(body) },
     {
       portfolio,
@@ -142,6 +153,10 @@ export function reverseStress(portfolio, factor, target_loss_pct) {
 }
 /** Multi-factor reverse stress → MultiFactorReverseStressResult. */
 export function reverseStressMulti(portfolio, target_loss_pct, options = {}) {
+  assertReverseMultiFractions({
+    target_loss_pct,
+    max_shock: options.max_shock,
+  })
   const request = {
     target_loss_pct,
     factors: options.factors,
@@ -150,7 +165,7 @@ export function reverseStressMulti(portfolio, target_loss_pct, options = {}) {
     max_shocks: options.max_shocks,
   }
   return postHeavyOrRiskRun(
-    `${API_V1}/risk/stress/reverse/multi`,
+    PATH_REVERSE_MULTI,
     {
       method: 'POST',
       body: JSON.stringify({
@@ -171,9 +186,10 @@ export function reverseStressMulti(portfolio, target_loss_pct, options = {}) {
  * R0.4.2-D: formal ScenarioWire via /risk/stress/formal/compare.
  */
 export function compareHedge(portfolio, hedged_portfolio, scenarios, methodology = 'DELTA_GAMMA') {
+  assertFormalScenarios(scenarios)
   const body = { portfolio, hedged_portfolio, scenarios, methodology }
   return postHeavyOrRiskRun(
-    `${API_V1}/risk/stress/formal/compare`,
+    PATH_FORMAL_COMPARE,
     { method: 'POST', body: JSON.stringify(body) },
     {
       portfolio,
