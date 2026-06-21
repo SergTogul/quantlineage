@@ -1,7 +1,7 @@
 """Leftover-wave honesty pins.
 
 P0/P1 code findings stay CLOSED except RF-014 shared ACLs/TLS (reopened).
-RF-018/019 are IN PROGRESS, not ACCEPTED / DEFERRED.
+RF-018 is IN PROGRESS, not ACCEPTED / DEFERRED.
 RF-017 is CLOSED as MET for ABI (not ACCEPTED / DEFERRED); product Historical
 VaR stays Python/NumPy by design.
 Do not claim Milestone R0 COMPLETE until remaining leftovers are MET.
@@ -17,7 +17,7 @@ MILESTONE = REPO_ROOT / "reviews" / "REMEDIATION_MILESTONE.md"
 ROADMAP = REPO_ROOT / "ROADMAP.md"
 
 CLOSED_P0_P1 = [f"RF-{n:03d}" for n in range(1, 17) if n != 14]
-OPEN_LEFTOVERS = ("RF-014", "RF-018", "RF-019")
+OPEN_LEFTOVERS = ("RF-014", "RF-018")
 
 
 def _findings() -> str:
