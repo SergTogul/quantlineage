@@ -45,7 +45,8 @@ async def lifespan(app: FastAPI):
     When unset, in-memory repos (pre-seeded) live on ``app.state`` for Depends.
 
     Shared / non-loopback profiles fail closed here unless ``RISKFORGE_API_TOKEN``
-    is set (R0.11.5). Local loopback / default Compose stays unauthenticated.
+    or ``RISKFORGE_API_TOKENS`` is set (R0.11.5 / RF-014). Local loopback /
+    default Compose stays unauthenticated.
 
     ``PortfolioService`` is constructed here via ``build_portfolio_service()``
     and stored on ``app.state`` so HTTP Depends and ``RiskRunWorker`` share

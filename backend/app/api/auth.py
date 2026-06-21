@@ -1,14 +1,16 @@
-"""Shared-deployment token gate (R0.11.5 / RF-014).
+"""Shared-deployment token gate + principal map (R0.11.5 / RF-014).
 
 Local demo (loopback bind, default Compose) stays unauthenticated.
 
 A shared / non-loopback profile is active when ``RISKFORGE_SHARED_DEPLOYMENT``
 is truthy or ``RISKFORGE_BIND`` is set to an address outside
 ``{127.0.0.1, localhost, ::1}``. That profile fails closed without
-``RISKFORGE_API_TOKEN`` and rejects unauthenticated API requests with 401.
+``RISKFORGE_API_TOKEN`` or ``RISKFORGE_API_TOKENS`` and rejects
+unauthenticated API requests with 401.
 
-This is a single shared-secret Bearer gate, not production IAM (no OIDC,
-SSO, object ACLs, or in-process TLS).
+``RISKFORGE_API_TOKENS`` is ``principal:token`` pairs (comma-separated).
+``RISKFORGE_API_TOKEN`` still maps to ``RISKFORGE_API_PRINCIPAL`` (default
+``shared``). This is not OIDC, SSO, or production IAM.
 """
 
 from __future__ import annotations
@@ -25,14 +27,18 @@ from app.api.errors import error_payload
 
 ENV_SHARED_DEPLOYMENT = "RISKFORGE_SHARED_DEPLOYMENT"
 ENV_API_TOKEN = "RISKFORGE_API_TOKEN"
+ENV_API_TOKENS = "RISKFORGE_API_TOKENS"
+ENV_API_PRINCIPAL = "RISKFORGE_API_PRINCIPAL"
 ENV_BIND = "RISKFORGE_BIND"
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
+DEFAULT_PRINCIPAL = "shared"
 
 UNAUTHORIZED_MESSAGE = "Authentication required"
 BOOT_ERROR = (
-    "Shared/non-loopback deployment requires RISKFORGE_API_TOKEN. "
+    "Shared/non-loopback deployment requires RISKFORGE_API_TOKEN "
+    "or RISKFORGE_API_TOKENS. "
     "Local demo (loopback bind, default Compose) stays unauthenticated. "
     "This token gate is not production IAM."
 )
@@ -95,11 +101,47 @@ def api_token() -> str | None:
     return stripped or None
 
 
+def configured_principals() -> list[tuple[str, str]]:
+    """Return ``(principal, token)`` pairs from env. Later pairs win on match."""
+    pairs: list[tuple[str, str]] = []
+    raw_map = os.environ.get(ENV_API_TOKENS, "")
+    for part in raw_map.split(","):
+        item = part.strip()
+        if not item or ":" not in item:
+            continue
+        name, token = item.split(":", 1)
+        name, token = name.strip(), token.strip()
+        if name and token:
+            pairs.append((name, token))
+    single = api_token()
+    if single:
+        principal = os.environ.get(ENV_API_PRINCIPAL, DEFAULT_PRINCIPAL).strip()
+        pairs.append((principal or DEFAULT_PRINCIPAL, single))
+    return pairs
+
+
+def _token_matches(presented: str, expected: str) -> bool:
+    if len(presented) != len(expected):
+        return False
+    return hmac.compare_digest(presented, expected)
+
+
+def principal_for_bearer(header: str | None) -> str | None:
+    presented = _extract_bearer(header)
+    if presented is None:
+        return None
+    matched: str | None = None
+    for name, token in configured_principals():
+        if _token_matches(presented, token):
+            matched = name
+    return matched
+
+
 def require_shared_auth_configured() -> None:
     """Fail closed at process start when a shared profile has no token."""
     if not is_shared_deployment():
         return
-    if api_token() is None:
+    if not configured_principals():
         raise RuntimeError(BOOT_ERROR)
 
 
@@ -117,13 +159,6 @@ def _extract_bearer(header: str | None) -> str | None:
         return None
     token = parts[1].strip()
     return token or None
-
-
-def _bearer_matches(header: str | None, expected: str) -> bool:
-    presented = _extract_bearer(header)
-    if presented is None:
-        return False
-    return hmac.compare_digest(presented, expected)
 
 
 def _unauthorized_response() -> JSONResponse:
@@ -155,14 +190,22 @@ class SharedTokenMiddleware:
             await self.app(scope, receive, send)
             return
 
-        token = api_token()
-        if token is None:
+        if not configured_principals():
             await _unauthorized_response()(scope, receive, send)
             return
 
         headers = Headers(scope=scope)
-        if not _bearer_matches(headers.get("authorization"), token):
+        principal = principal_for_bearer(headers.get("authorization"))
+        if principal is None:
             await _unauthorized_response()(scope, receive, send)
             return
+
+        raw_state = scope.get("state")
+        if raw_state is None:
+            scope["state"] = {"principal": principal}
+        elif isinstance(raw_state, dict):
+            raw_state["principal"] = principal
+        else:
+            raw_state.principal = principal
 
         await self.app(scope, receive, send)

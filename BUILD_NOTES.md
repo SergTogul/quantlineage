@@ -111,16 +111,17 @@ Three deployment profiles, not a production IAM story:
 | Profile | How it is selected | Auth |
 |---|---|---|
 | **Local demo** | Default. Compose publishes `127.0.0.1` only. `RISKFORGE_BIND` unset or in `{127.0.0.1, localhost, ::1}`. `RISKFORGE_SHARED_DEPLOYMENT` unset. | None. Laptop `uvicorn` / default Compose stay unauthenticated. |
-| **Shared / non-loopback** | Set `RISKFORGE_SHARED_DEPLOYMENT=1`, or set `RISKFORGE_BIND` to a non-loopback address (e.g. `0.0.0.0`). | Fail closed: process refuses to boot without `RISKFORGE_API_TOKEN`. `/api` and dual-mount routes require `Authorization: Bearer <token>` (401 otherwise). `/health`, `/docs`, `/redoc`, `/openapi.json` stay open. |
-| **Not production-like** | Anything beyond the shared-token gate. | Not provided. No OIDC/SSO, no object ACLs, no in-app TLS, no secret manager, no tenant isolation. Demo DB password and unpublished-Postgres leftovers remain. Do not treat this repo as internet-ready. |
+| **Shared / non-loopback** | Set `RISKFORGE_SHARED_DEPLOYMENT=1`, or set `RISKFORGE_BIND` to a non-loopback address (e.g. `0.0.0.0`). Shared Compose: `docker compose --env-file .env.shared -f docker-compose.shared.yml up`. | Fail closed: process refuses to boot without `RISKFORGE_API_TOKEN` or `RISKFORGE_API_TOKENS` (`principal:token` map). `/api` and dual-mount routes require `Authorization: Bearer <token>` (401 otherwise). Authenticated principals cannot read/update another principal’s stored portfolio or its risk runs (403). Seed/demo catalog is owned by principal `demo` (readable; not writable by others). TLS terminator (Caddy) publishes 443; API stays on the compose network. Shared DB password is `${POSTGRES_PASSWORD:?}` (see `.env.shared.example`). `/health`, `/docs`, `/redoc`, `/openapi.json` stay open. |
+| **Not production-like** | Anything beyond the shared token/ACL/TLS profile. | Not provided. No OIDC/SSO, no in-app TLS, no cloud secret manager, no tenant isolation. Do not treat this repo as internet-ready. |
 
-In-container `uvicorn --host 0.0.0.0` (backend Dockerfile) is not a host publish. Default Compose still binds host ports to loopback and does **not** set the shared flag. Operators who publish the API beyond loopback must set `RISKFORGE_SHARED_DEPLOYMENT=1` (or `RISKFORGE_BIND=0.0.0.0`) **and** `RISKFORGE_API_TOKEN`.
+In-container `uvicorn --host 0.0.0.0` (backend Dockerfile) is not a host publish. Default Compose still binds host ports to loopback and does **not** set the shared flag. Operators who publish the API beyond loopback must set `RISKFORGE_SHARED_DEPLOYMENT=1` (or `RISKFORGE_BIND=0.0.0.0`) **and** `RISKFORGE_API_TOKEN` (or `RISKFORGE_API_TOKENS`). Shared Compose publishes only 443 via Caddy.
 
 ```bash
-# Shared profile example (still not production-like):
+# Shared profile example (still not OIDC / production IAM):
 export RISKFORGE_SHARED_DEPLOYMENT=1
-export RISKFORGE_API_TOKEN='replace-me'
-# curl -H "Authorization: Bearer $RISKFORGE_API_TOKEN" http://127.0.0.1:8000/api/v1/portfolio
+export RISKFORGE_API_TOKENS='alice:replace-me,bob:replace-me-too'
+# curl -H "Authorization: Bearer replace-me" http://127.0.0.1:8000/api/v1/portfolio
+# TLS compose: docker compose --env-file .env.shared -f docker-compose.shared.yml up
 ```
 
 ## Interactive vs heavy endpoints (R0.10.1)

@@ -66,8 +66,8 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 ## Local Demo Security
 
 - Default Compose binds published Postgres (`5432`), API (`8000`), and frontend (`5173`) ports to loopback (`127.0.0.1`). The local/demo profile is still unauthenticated and is not internet-ready; it must not be treated as a production security or IAM deployment (RF-014).
-- A shared / non-loopback profile (`RISKFORGE_SHARED_DEPLOYMENT=1` or non-loopback `RISKFORGE_BIND`) fails closed without `RISKFORGE_API_TOKEN` and requires Bearer auth on API routes. That single shared-token gate is not OIDC, object authorization, TLS, or production IAM. See `BUILD_NOTES.md` (R0.11.5).
-- Shared-profile object ACLs, TLS/reverse-proxy, and secret management are **not MET** (RF-014 accepted residuals).
+- A shared / non-loopback profile (`RISKFORGE_SHARED_DEPLOYMENT=1` or non-loopback `RISKFORGE_BIND`) fails closed without `RISKFORGE_API_TOKEN` or `RISKFORGE_API_TOKENS` and requires Bearer auth on API routes. Object ACLs, TLS terminator (`docker-compose.shared.yml` Caddy on 443), and shared-profile secret placeholders are **MET**. That is not OIDC, SSO, in-app TLS, or a cloud secret manager. See `BUILD_NOTES.md` (R0.11.5 / R0.11.8).
+- Seed/demo catalog books are owned by principal `demo` (readable; updates by other principals return 403). Local Compose may keep the demo `POSTGRES_PASSWORD=riskforge`.
 
 ## Frontend
 

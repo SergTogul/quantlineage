@@ -128,12 +128,14 @@ class RiskRunService:
         historical_dataset_version: str | None = None,
         as_of: AsOf | None = None,
         calculation_config: RiskRunCalculationConfig | None = None,
+        owner: str | None = None,
     ) -> RiskRun:
         """Create a run in ``QUEUED``. Spec fields are optional (pre-R0.8.2 callers)."""
         run = RiskRun(
             id=run_id,
             portfolio_id=portfolio_id,
             portfolio_version=portfolio_version,
+            owner=owner,
             market_snapshot_id=market_snapshot_id,
             pricing_engine_version=pricing_engine_version,
             methodology=methodology,

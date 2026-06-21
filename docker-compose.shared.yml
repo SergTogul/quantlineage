@@ -1,0 +1,71 @@
+# Shared / internal profile (RF-014). Not production IAM / OIDC.
+#
+# Usage:
+#   cp .env.shared.example .env.shared   # fill POSTGRES_PASSWORD and tokens
+#   docker compose --env-file .env.shared -f docker-compose.shared.yml up --build
+#
+# TLS terminator (Caddy) is the only host publish (443). Backend stays on the
+# compose network (loopback/internal). Local docker-compose.yml is unchanged.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: riskforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: riskforge
+    volumes:
+      - riskforge_shared_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U riskforge -d riskforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      RISKFORGE_PRICING_ENGINE: quantlib
+      RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:${POSTGRES_PASSWORD:?}@postgres:5432/riskforge
+      RISKFORGE_EXTERNAL_WORKER: "1"
+      RISKFORGE_SHARED_DEPLOYMENT: "1"
+      RISKFORGE_API_TOKEN: ${RISKFORGE_API_TOKEN:?}
+      RISKFORGE_API_TOKENS: ${RISKFORGE_API_TOKENS:-}
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      RISKFORGE_PRICING_ENGINE: quantlib
+      RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:${POSTGRES_PASSWORD:?}@postgres:5432/riskforge
+      RISKFORGE_WORKER_POLL_INTERVAL: "2"
+      RISKFORGE_WORKER_POLL_BATCH: "10"
+      RISKFORGE_SHARED_DEPLOYMENT: "1"
+      RISKFORGE_API_TOKEN: ${RISKFORGE_API_TOKEN:?}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    expose:
+      - "80"
+    depends_on: [backend]
+
+  proxy:
+    image: caddy:2-alpine
+    ports:
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  riskforge_shared_pgdata:

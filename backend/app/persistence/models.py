@@ -60,6 +60,8 @@ class PortfolioRow(Base):
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default="1"
     )
+    # Shared-profile object owner (RF-014). Seed/demo catalog uses ``demo``.
+    owner: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
@@ -149,6 +151,8 @@ class RiskRunRow(Base):
     ``calculation_config`` — nullable so pre-spec rows still load.
     ``portfolio_version`` (R0.8.8) is the stored book version at submit;
     nullable so pre-version rows still load. Not a historical book archive.
+    ``owner`` (RF-014) is the submitting principal; nullable so pre-ACL rows
+    still load.
     """
 
     __tablename__ = "risk_runs"
@@ -159,6 +163,7 @@ class RiskRunRow(Base):
         String(128), ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
     )
     portfolio_version: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    owner: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     market_snapshot_id: Mapped[Optional[str]] = mapped_column(
         String(128), ForeignKey("market_snapshots.id", ondelete="SET NULL"), nullable=True
     )
