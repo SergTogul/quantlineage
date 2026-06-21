@@ -1,3 +1,5 @@
+import { displayBpsToDecimal, displayPercentToFraction } from '../contracts/wireUnits.js'
+
 export function money(value) {
   const sign = value < 0 ? '-' : ''; const n = Math.abs(value)
   if (n >= 1_000_000) return `${sign}$${(n / 1_000_000).toFixed(2)}M`
@@ -275,9 +277,9 @@ export function validateReverseMultiForm(form) {
 export function reverseMultiRequestBody(form) {
   const factors = selectedReverseMultiFactors(form)
   const body = {
-    target_loss_pct: Number(form.target_loss_pct) / 100,
+    target_loss_pct: displayPercentToFraction(form.target_loss_pct),
     factors,
-    max_shock: Number(form.max_shock) / 100,
+    max_shock: displayPercentToFraction(form.max_shock),
   }
   const anyWeight = factors.some((f) => String(form?.weights?.[f] ?? '').trim() !== '')
   if (anyWeight) {
@@ -391,11 +393,10 @@ export function stressFactorKeysFromPortfolio(portfolio) {
  * Expands family shocks onto portfolio (or demo) factor keys for legacy parity.
  */
 export function scenarioPayload(form, portfolio) {
-  const equityFrac = Number(form.equity) / 100
-  const volFrac = Number(form.vol) / 100
-  const ratesBps = Number(form.rates)
-  const ratesAmt = ratesBps / 10_000
-  const fxFrac = Number(form.fx) / 100
+  const equityFrac = displayPercentToFraction(form.equity)
+  const volFrac = displayPercentToFraction(form.vol)
+  const ratesAmt = displayBpsToDecimal(form.rates)
+  const fxFrac = displayPercentToFraction(form.fx)
   const { equities, fxPairs, rateCcys } = stressFactorKeysFromPortfolio(portfolio)
   const shocks = []
   for (const sym of equities) {
@@ -439,7 +440,7 @@ export function scenarioPayload(form, portfolio) {
     }
   }
   for (const ccy of rateCcys) {
-    if (ratesBps) {
+    if (ratesAmt) {
       shocks.push({
         factor_type: 'rate',
         key: `${ccy}:RATE`,
@@ -453,7 +454,7 @@ export function scenarioPayload(form, portfolio) {
     name: form.name || 'Custom Scenario',
     category: 'custom',
     shocks,
-    max_loss_pct: Number(form.limit) / 100,
+    max_loss_pct: displayPercentToFraction(form.limit),
   }
 }
 
