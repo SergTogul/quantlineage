@@ -13,7 +13,16 @@ import { RISK_RUN_POLL_MS, isRiskRunTerminal, riskRunStatus } from './lib/risk.m
 /** Canonical API prefix (M7.6 / M8). Bodies unchanged vs legacy dual-mount. */
 export const API_V1 = '/api/v1'
 
-const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const LOCAL_DEMO_API = 'http://localhost:8000'
+
+/** Resolve the baked API origin. Empty / ``same-origin`` → relative ``/api/v1`` (shared Caddy). */
+export function resolveApiBase(raw = import.meta.env.VITE_API_BASE_URL) {
+  if (raw === '' || raw === 'same-origin') return ''
+  if (raw == null) return LOCAL_DEMO_API
+  return String(raw)
+}
+
+const BASE = resolveApiBase()
 
 async function parseJsonBody(res) {
   const text = await res.text()

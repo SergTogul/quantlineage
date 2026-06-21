@@ -51,3 +51,10 @@ def test_local_compose_keeps_demo_password_and_loopback_8000() -> None:
     assert "POSTGRES_PASSWORD: riskforge" in text
     assert "127.0.0.1:8000:8000" in text
     assert "RISKFORGE_SHARED_DEPLOYMENT:" not in text
+
+
+def test_shared_frontend_bakes_same_origin_api() -> None:
+    text = SHARED_COMPOSE.read_text(encoding="utf-8")
+    assert "VITE_API_BASE_URL: same-origin" in text
+    dockerfile = (REPO_ROOT / "frontend" / "Dockerfile").read_text(encoding="utf-8")
+    assert "ARG VITE_API_BASE_URL" in dockerfile

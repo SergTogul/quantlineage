@@ -39,7 +39,7 @@ def _assert_error_shape(body: dict[str, Any]) -> None:
 def _clear_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(auth_mod.ENV_SHARED_DEPLOYMENT, raising=False)
     monkeypatch.delenv(auth_mod.ENV_API_TOKEN, raising=False)
-    monkeypatch.delenv("RISKFORGE_API_TOKENS", raising=False)
+    monkeypatch.delenv(auth_mod.ENV_API_TOKENS, raising=False)
     monkeypatch.delenv(auth_mod.ENV_BIND, raising=False)
     monkeypatch.delenv("RISKFORGE_DATABASE_URL", raising=False)
     monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
@@ -229,3 +229,50 @@ def test_shared_cannot_update_demo_owned_seed_book(
     assert after.status_code == 200
     assert after.json()["id"] == "global-macro"
     assert after.json()["name"] != "Attacker Book"
+
+
+def test_shared_null_owner_is_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Pre-ACL / NULL owner must not become public (403 for every mapped principal)."""
+    import sqlite3
+
+    _enable_shared_sqlite(monkeypatch, tmp_path)
+    db_path = tmp_path / "rf014_acls.db"
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/v1/risk/runs",
+            headers=_auth(ALICE_TOKEN),
+            json={"portfolio": _TINY, "run_type": "summary"},
+        )
+        assert created.status_code == 202, created.text
+        run_id = created.json()["id"]
+        conn = sqlite3.connect(db_path)
+        try:
+            conn.execute(
+                "UPDATE portfolios SET owner = NULL WHERE id = ?",
+                ("alice-private-book",),
+            )
+            conn.execute("UPDATE risk_runs SET owner = NULL WHERE id = ?", (run_id,))
+            conn.commit()
+        finally:
+            conn.close()
+        book = client.get(
+            "/api/v1/portfolios/alice-private-book",
+            headers=_auth(ALICE_TOKEN),
+        )
+        run = client.get(
+            f"/api/v1/risk/runs/{run_id}",
+            headers=_auth(ALICE_TOKEN),
+        )
+        bob_book = client.get(
+            "/api/v1/portfolios/alice-private-book",
+            headers=_auth(BOB_TOKEN),
+        )
+    assert book.status_code == 403
+    assert run.status_code == 403
+    assert bob_book.status_code == 403
+    for response in (book, run, bob_book):
+        body = response.json()
+        _assert_error_shape(body)
+        assert body["code"] == "forbidden"

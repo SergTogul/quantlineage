@@ -6,6 +6,7 @@ import {
   evaluateCustomScenario,
   explainPnL,
   loadDashboard,
+  resolveApiBase,
   reverseStress,
   reverseStressMulti,
 } from './api.js'
@@ -26,6 +27,17 @@ const DASHBOARD_KEYS = [
 ]
 
 const DEMO_PORTFOLIO = { id: 'demo', name: 'Demo', positions: [] }
+
+describe('resolveApiBase (RF-014 shared TLS)', () => {
+  it('defaults to the local demo host when unset', () => {
+    expect(resolveApiBase(undefined)).toBe('http://localhost:8000')
+  })
+
+  it('uses same-origin for shared Caddy', () => {
+    expect(resolveApiBase('')).toBe('')
+    expect(resolveApiBase('same-origin')).toBe('')
+  })
+})
 
 const batchFixture = Object.fromEntries(
   DASHBOARD_KEYS.map((key) => [key, key === 'portfolio' ? DEMO_PORTFOLIO : { ok: key }]),

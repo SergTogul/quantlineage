@@ -26,4 +26,9 @@ describe('frontend dependency reproducibility (RF-018)', () => {
     expect(runs.some((line) => /\bnpm ci\b/.test(line))).toBe(true)
     expect(runs.some((line) => /\bnpm install\b/.test(line))).toBe(false)
   })
+
+  it('Dockerfile accepts VITE_API_BASE_URL for shared same-origin builds', () => {
+    const text = readFileSync(join(frontendRoot, 'Dockerfile'), 'utf8')
+    expect(text).toMatch(/ARG VITE_API_BASE_URL=http:\/\/localhost:8000/)
+  })
 })
