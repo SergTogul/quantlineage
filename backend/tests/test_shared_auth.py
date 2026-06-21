@@ -30,6 +30,7 @@ def _assert_error_shape(body: dict[str, Any]) -> None:
 def _clear_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(auth_mod.ENV_SHARED_DEPLOYMENT, raising=False)
     monkeypatch.delenv(auth_mod.ENV_API_TOKEN, raising=False)
+    monkeypatch.delenv(auth_mod.ENV_API_TOKENS, raising=False)
     monkeypatch.delenv(auth_mod.ENV_BIND, raising=False)
 
 
@@ -162,3 +163,32 @@ def test_default_compose_stays_unauthenticated_local_demo() -> None:
     assert "RISKFORGE_SHARED_DEPLOYMENT:" not in text
     assert "RISKFORGE_API_TOKEN:" not in text
     assert "RISKFORGE_BIND:" not in text
+
+
+def test_overlapping_token_keeps_tokens_map_principal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Compose requires TOKEN; overlapping secret must not remap Alice to shared."""
+    _clear_gate(monkeypatch)
+    monkeypatch.setenv(auth_mod.ENV_SHARED_DEPLOYMENT, "1")
+    monkeypatch.setenv(auth_mod.ENV_API_TOKENS, f"alice:{SHARED_TOKEN}")
+    monkeypatch.setenv(auth_mod.ENV_API_TOKEN, SHARED_TOKEN)
+    monkeypatch.setenv(auth_mod.ENV_API_PRINCIPAL, "shared")
+    principal = auth_mod.principal_for_bearer(f"Bearer {SHARED_TOKEN}")
+    assert principal == "alice"
+    assert principal != "shared"
+
+
+def test_tokens_only_boots_without_single_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_gate(monkeypatch)
+    monkeypatch.setenv(auth_mod.ENV_SHARED_DEPLOYMENT, "1")
+    monkeypatch.setenv(auth_mod.ENV_API_TOKENS, f"alice:{SHARED_TOKEN}")
+    auth_mod.require_shared_auth_configured()
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/v1/portfolio",
+            headers={"Authorization": f"Bearer {SHARED_TOKEN}"},
+        )
+    assert response.status_code == 200
