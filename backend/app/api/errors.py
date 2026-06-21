@@ -125,6 +125,25 @@ PUBLIC_BAD_REQUEST_MESSAGE = "Invalid request"
 PUBLIC_RISK_RUN_FAILURE_MESSAGE = "Risk run failed"
 
 
+PUBLIC_FORBIDDEN_MESSAGE = "Forbidden"
+
+
+def http_forbidden(
+    *,
+    message: str = PUBLIC_FORBIDDEN_MESSAGE,
+    details: dict[str, Any] | list[Any] | None = None,
+) -> HTTPException:
+    """403 with a stable envelope. Used for shared-profile object ACLs."""
+    return HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=error_payload(
+            code=code_for_status(status.HTTP_403_FORBIDDEN),
+            message=message,
+            details=details,
+        ),
+    )
+
+
 def http_bad_request(
     exc: BaseException,
     *,

@@ -2,7 +2,7 @@
 
 Status: **IN PROGRESS** (2026-09-09 leftover wave)
 
-Current phase: **leftovers** — ACLs/TLS; SLA runner still missing. RF-017 ABI, RF-018 contracts, and RF-019 tool evals CLOSED as MET.  
+Current phase: **leftovers** — SLA runner still missing. RF-014 shared ACLs/TLS/secrets CLOSED as MET. RF-017 ABI, RF-018 contracts, and RF-019 tool evals CLOSED as MET.  
 Branch: `r0-core-remediation`  
 Date: 2026-09-09
 
@@ -20,7 +20,7 @@ Source of truth:
 Milestone R0 is **COMPLETE** (2026-09-09):
 
 1. every P0 root finding in `FINDINGS.md` is CLOSED;
-2. every P1 root finding is CLOSED, with accepted residuals named **not MET** (RF-014 ACLs/TLS; RF-016 labeled-runner SLA);
+2. every P1 root finding is CLOSED, with accepted residuals named **not MET** (RF-016 labeled-runner SLA); RF-014 shared ACLs/TLS/secrets are **MET**;
 3. the final exit checklist distinguishes MET (`[x]`) vs accepted residual (`[~]`).
 
 P2 RF-017 is **CLOSED** as **MET** for ABI (product Historical VaR stays python/NumPy by design). RF-018 is **CLOSED** as **MET** (OpenAPI snapshot + request-boundary units; not a TypeScript rewrite). RF-019 is **CLOSED** as **MET** (JSON-schema allowlist + evals). Do not treat `[~]` items as MET. Do not restore Milestone R0 COMPLETE while leftovers remain.
@@ -1063,6 +1063,10 @@ R0.11.1–R0.11.6 APPROVE. Local-demo required direction **MET**: Compose loopba
 
 Evidence: `reviews/r0.11.7-rf014-close-gate-report.md`; focused suite 87 passed.
 
+## R0.11.8 shared ACLs / TLS / secrets — MET (2026-09-09)
+
+RF-014 shared leftovers **MET** (`reviews/r0.11.8-rf014-shared-acls-tls-report.md`). Object ACLs (Bearer `principal:token` map; IDOR 403); `docker-compose.shared.yml` Caddy TLS on 443 (API unpublished to host); `${POSTGRES_PASSWORD:?}` + `.env.shared.example`. Local `docker-compose.yml` unchanged (loopback, unauthenticated, demo DB password allowed). Not OIDC. HTTP enqueue queue-depth remains a named leftover, not MET. Labeled-runner SLA remains RF-016, not MET. Do not restore Milestone R0 COMPLETE.
+
 ---
 
 # R0.12 — Production-Relevant Verification Matrix
@@ -1257,7 +1261,7 @@ Milestone R0 is **COMPLETE** (2026-09-09). `[x]` = MET. `[~]` = accepted residua
 - [x] non-finite financial inputs rejected
 - [x] workload limits enforced
 - [x] failed runs do not expose raw internal errors
-- [~] shared deployment requires auth/authorization — accepted residual (not MET): RF-014 ACLs/TLS
+- [x] shared deployment requires auth/authorization — **MET** (RF-014): Bearer principal map + object ACLs (403 IDOR); Caddy TLS terminator on 443; shared secrets via `${POSTGRES_PASSWORD:?}` / `.env.shared.example`. Local demo stays unauthenticated. Not OIDC.
 
 ## QA / CI
 
