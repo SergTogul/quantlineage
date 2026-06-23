@@ -1,8 +1,8 @@
 """R0.12.7 / RF-016 — close-gate residual pins.
 
 PR-FULL QuantLib remains a hard gate (cannot skip-green). Labeled-runner
-SLA-K1/K2 is an accepted residual (not MET). QA-024 demo-artifact range is
-MET via the QuantLib band gate. Do not invent ubuntu-latest SLA floors.
+SLA-K1/K2 is post-R0 (still not MET). QA-024 demo-artifact range is MET via
+the QuantLib band gate. Do not invent ubuntu-latest SLA floors.
 """
 
 from __future__ import annotations
@@ -21,16 +21,11 @@ def _rf016_section() -> str:
     return text[start:end]
 
 
-def test_findings_rf016_closed_with_named_accepted_residuals():
+def test_findings_rf016_closed_with_sla_post_r0():
     section = _rf016_section()
     assert "Status: **CLOSED**" in section
-    assert "accepted residual" in section
-    assert "no labeled runner" in section
-    assert "SLA-K1/K2 not CI-enforced" in section
-    assert (
-        "Labeled-runner SLA-K1/K2 is an **accepted residual** (not MET)"
-        in section
-    )
+    assert "post-R0" in section
+    assert "still not MET" in section
     leftover = "QA-024 demo-artifact range check remains a leftover residual"
     assert leftover not in section
     assert "QA-024 demo-artifact range check is **MET**" in section
@@ -38,12 +33,10 @@ def test_findings_rf016_closed_with_named_accepted_residuals():
     assert "A broken QuantLib installation cannot produce a green" in section
 
 
-def test_milestone_r0127_records_accepted_labeled_runner_residual():
+def test_milestone_r0127_records_sla_post_r0():
     text = MILESTONE.read_text(encoding="utf-8")
     assert "## R0.12.7" in text
-    assert "accepted residual" in text
-    assert "no labeled runner" in text
-    assert "SLA-K1/K2 not CI-enforced" in text
+    assert "post-R0" in text
     assert "check_m6_sla.py" in text
     assert "ubuntu-latest" in text
 
@@ -59,5 +52,5 @@ def test_milestone_r0128_records_qa024_range_met():
     assert leftover not in section
     assert "labeled-runner SLA" in section.lower() or "SLA-K1/K2" in section
     assert "not MET" in section
-    assert "check_m6_sla.py" in section
+    assert "post-R0" in section
     assert "Milestone R0 COMPLETE" not in section

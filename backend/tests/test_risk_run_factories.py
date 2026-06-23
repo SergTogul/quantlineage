@@ -28,10 +28,10 @@ from app.services.risk_factories import (
 
 
 def test_deps_and_worker_use_same_factory_callable():
-    import app.api.deps as deps
+    import app.main as main
     import app.worker as worker
 
-    assert deps.build_portfolio_service is build_portfolio_service
+    assert main.build_portfolio_service is build_portfolio_service
     assert worker.build_portfolio_service is build_portfolio_service
 
 
