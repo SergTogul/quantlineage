@@ -84,7 +84,7 @@ def test_wired_call_sites_import_shock_units_helpers():
     assert "bps_to_decimal_rate" in inspect.getsource(reverse_stress.build_single_factor_shocks)
     sens_src = inspect.getsource(sensitivities.SensitivityEngine)
     assert "bps_to_decimal_rate" in sens_src
-    assert "bps_to_decimal_rate" in inspect.getsource(scenario_model._expand_stress_to_shocks)
+    assert "bps_to_decimal_rate" in inspect.getsource(scenario_model._expand_macro_to_shocks)
     assert "decimal_rate_to_bps" in inspect.getsource(scenario_model.scenario_to_stress)
     assert "bps_to_decimal_rate" in inspect.getsource(scenarios.expand_aggregate_change)
     assert "bps_to_decimal_rate" in inspect.getsource(scenarios.panel_amount_to_bump)
