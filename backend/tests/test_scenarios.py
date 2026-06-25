@@ -10,10 +10,10 @@ Conventions / tolerances:
 
 from __future__ import annotations
 
+from datetime import date
+
 import numpy as np
 import pytest
-
-from datetime import date
 
 from app.domain.models import MarketSnapshot
 from app.market.snapshot import shock_snapshot
@@ -26,7 +26,12 @@ from app.risk.historical_data import (
     SyntheticHistoricalDataset,
 )
 from app.risk.scenario_engine import apply_scenario
-from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory, scenario_to_market_scenario
+from app.risk.scenario_model import (
+    FactorShock,
+    Scenario,
+    ScenarioCategory,
+    scenario_to_market_scenario,
+)
 from app.risk.scenarios import (
     AggregateFactorChange,
     apply_market_scenario,

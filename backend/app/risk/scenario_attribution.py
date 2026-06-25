@@ -37,9 +37,9 @@ from app.risk.historical import (
 )
 from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import (
+    BroadcastScenarioDefinition,
     FactorShock,
     Scenario,
-    BroadcastScenarioDefinition,
     to_canonical_scenario,
 )
 from app.risk.shock_units import decimal_rate_to_bps

@@ -18,13 +18,6 @@ from app.domain.models import (
     RiskRun,
     RiskRunStatus,
 )
-from app.risk.factor_types import EquitySpot
-from app.risk.scenario_model import (
-    FactorShock,
-    Scenario,
-    ScenarioCategory,
-    ScenarioThreshold,
-)
 from app.persistence.session import session_scope
 from app.persistence.sqlalchemy_repos import (
     SqlAlchemyLimitDefinitionRepository,
@@ -34,6 +27,13 @@ from app.persistence.sqlalchemy_repos import (
     SqlAlchemyScenarioDefinitionRepository,
 )
 from app.persistence.testing import make_sqlite_engine, make_sqlite_session_factory
+from app.risk.factor_types import EquitySpot
+from app.risk.scenario_model import (
+    FactorShock,
+    Scenario,
+    ScenarioCategory,
+    ScenarioThreshold,
+)
 
 
 @pytest.fixture
