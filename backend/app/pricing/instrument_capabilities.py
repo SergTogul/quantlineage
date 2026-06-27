@@ -22,6 +22,7 @@ only as snapshot maps.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, cast
 
 from app.risk.factor_types import (
     EquitySpot,
@@ -203,14 +204,15 @@ def named_risk_factors(position: object) -> tuple[RiskFactor, ...]:
     cap = get_capability(getattr(position, "type", None))
     kinds = cap.required_factor_kinds
     factors: list[RiskFactor] = []
+    p = cast(Any, position)
     if EquitySpot in kinds:
-        factors.append(EquitySpot(position.symbol))
+        factors.append(EquitySpot(p.symbol))
     if EquityVol in kinds:
-        factors.append(EquityVol(underlying=position.symbol))
+        factors.append(EquityVol(underlying=p.symbol))
     if FXSpot in kinds:
-        factors.append(FXSpot(position.pair))
+        factors.append(FXSpot(p.pair))
     if FXVol in kinds:
-        factors.append(FXVol(pair=position.pair))
+        factors.append(FXVol(pair=p.pair))
     if (
         RateZero in kinds
         and "dv01" in cap.supported_sensitivities
@@ -218,7 +220,7 @@ def named_risk_factors(position: object) -> tuple[RiskFactor, ...]:
         and FXSpot not in kinds
     ):
         tenor = f"{round(_rate_tenor_years(position))}Y"
-        factors.append(RateZero(currency=position.currency, tenor=tenor))
+        factors.append(RateZero(currency=p.currency, tenor=tenor))
     if not factors:
         raise TypeError(
             f"capability {cap.family!r} declares no named typed risk factors"
