@@ -5,7 +5,8 @@ Conventions:
 - VaR / ES: VaR/ES of the summed trade historical P&L vector (not sum of
   child VaRs). Matches ``HistoricalRiskEngine.calculate`` for LINEAR /
   DELTA_GAMMA without a factor panel (series is linear in Greeks).
-- Limits: omitted on the default trade-artifact path (``limits == []``).
+- Limits: evaluated from artifact PV/Greeks/VaR/ES + artifact stress_loss
+  (concentration / key-rate DV01 may still call LimitEngine pricing).
   Stress: default producer fills ``DEFAULT_SCENARIOS`` once per run and
   aggregates; empty books keep ``stress == []``.
 - Position desk/strategy None → inherit Portfolio defaults
@@ -226,10 +227,11 @@ def test_empty_portfolio_zero_risk_tree():
     assert root.delta == 0.0
     # Empty book: no positions → no stress scenarios applied.
     assert root.stress == []
-    assert root.limits == []
     assert root.children[0].market_value == 0.0
     assert root.children[0].var_99 == 0.0
     assert root.children[0].children == []
+    assert root.limits
+    assert {row.metric for row in root.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}
 
 
 def test_portfolio_at_filters_by_desk_and_book():
@@ -326,7 +328,7 @@ def test_risk_at_matches_subset_var():
 
 
 def test_greeks_var_es_stress_limits_on_nodes():
-    """M4.2: full additive set; VaR/ES match subset; stress filled; limits omitted."""
+    """M4.2: full additive set; VaR/ES match subset; stress filled; limits evaluated."""
     pricing = BuiltinPricingEngine()
     risk = HistoricalRiskEngine(seed=1, observations=40)
     engine = HierarchyEngine(risk)
@@ -336,7 +338,8 @@ def test_greeks_var_es_stress_limits_on_nodes():
 
     _assert_additive_reconciles(root)
 
-    assert root.limits == []
+    assert root.limits
+    assert {row.metric for row in root.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}
     assert {s.scenario for s in root.stress} == {s.id for s in engine.stress_scenarios}
     assert any(s.pnl != 0.0 for s in root.stress)
 
@@ -370,4 +373,5 @@ def test_risk_at_includes_stress_and_limits():
     node = engine.risk_at(pf, pricing, ref, market=_multi_desk_market())
     assert node.level == "strategy"
     assert {s.scenario for s in node.stress} == {s.id for s in engine.stress_scenarios}
-    assert node.limits == []
+    assert node.limits
+    assert {row.metric for row in node.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}

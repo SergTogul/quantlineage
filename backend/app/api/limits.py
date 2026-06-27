@@ -41,6 +41,13 @@ def risk_limits_drilldown(
 ) -> LimitDrilldownReport:
     """Limit breach drill-down: hierarchy node, metric, utilization, top contributors (M4.6)."""
     try:
-        return service.limit_drilldown(request)
+        return service.limit_drilldown(
+            portfolio=request.portfolio,
+            metric=request.metric,
+            hierarchy=request.hierarchy,
+            limits=request.limits,
+            top_n=request.top_n,
+            breaches_only=request.breaches_only,
+        )
     except ValueError as exc:
         raise http_bad_request(exc) from exc

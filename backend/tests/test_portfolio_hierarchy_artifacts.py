@@ -12,7 +12,9 @@ Conventions:
   ES = mean of losses >= VaR (same as ``test_var_es_golden.py``)
 - Sign: same as Valuation / HierarchyNode (currency PV and Greeks)
 - Two-trade same-desk book has 7 nodes (firm…book + two trades)
-- Value budget: N_positions × (1 + len(DEFAULT_SCENARIOS))
+- Value budget: N_positions × (1 + len(DEFAULT_SCENARIOS)) for base+stress;
+  limit evaluation may add concentration / key-rate pricing
+- Limits: evaluated from artifact PV/Greeks/VaR/ES + artifact stress_loss
 """
 from __future__ import annotations
 
@@ -120,8 +122,9 @@ def test_hierarchy_values_each_position_once_not_once_per_node():
     n_positions = len(pf.positions)
     assert n_nodes == 7
     assert n_positions == 2
-    assert pricing.value_calls == _default_value_budget(n_positions)
+    assert pricing.value_calls >= _default_value_budget(n_positions)
     assert pricing.value_calls < n_nodes * (1 + _N_DEFAULT_SCENARIOS)
+    assert root.limits
 
 
 def test_hierarchy_parent_additives_equal_sum_of_trade_valuations():
@@ -163,7 +166,8 @@ def test_hierarchy_artifact_path_var_es_equals_summed_trade_vectors():
 
     Independent reconstruction: one ``approximate_pnl_series`` per already-
     valued trade (same seed/observations/methodology as the service). Does
-    not invent numbers. Limits stay omitted.
+    not invent numbers. Limits are evaluated from the summed artifact
+    RiskSummary (not omitted).
     """
     pf = _two_trade_book()
     pricing = _CountingPricing()
@@ -188,6 +192,7 @@ def test_hierarchy_artifact_path_var_es_equals_summed_trade_vectors():
                 rates_bps=obs.rate_moves_bps,
                 fx_ret=obs.fx_returns,
                 methodology=engine.methodology,
+                base_vol=_representative_base_vol(market),
             )
         )
     expected_95, expected_99, expected_es = _var_es_from_pnl(series[0] + series[1])
@@ -197,7 +202,8 @@ def test_hierarchy_artifact_path_var_es_equals_summed_trade_vectors():
     assert root.var_99 == pytest.approx(expected_99, rel=0, abs=1e-12)
     assert root.expected_shortfall_99 == pytest.approx(expected_es, rel=0, abs=1e-12)
     assert root.var_99 != 0.0
-    assert root.limits == []
+    assert root.limits
+    assert {row.metric for row in root.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}
     assert root.stress
 
 
@@ -209,3 +215,13 @@ def _var_es_from_pnl(pnl: np.ndarray) -> tuple[float, float, float]:
     tail = losses[losses >= var_99]
     es_99 = float(max(0.0, tail.mean() if len(tail) else var_99))
     return (var_95, var_99, es_99)
+
+
+def _representative_base_vol(market: MarketSnapshot) -> float:
+    for vol in market.equity_vols.values():
+        if vol:
+            return float(vol)
+    for vol in market.fx_vols.values():
+        if vol:
+            return float(vol)
+    return 0.0

@@ -26,6 +26,7 @@ from app.risk import (
 from app.risk.shock_units import (
     bps_to_decimal_rate,
     decimal_rate_to_bps,
+    decimal_vol_change_to_vol_points,
     relative_vol_move_to_vol_points,
 )
 
@@ -56,22 +57,33 @@ def test_decimal_rate_to_bps_round_trip():
 
 
 def test_relative_vol_move_to_vol_points_scalar():
-    assert relative_vol_move_to_vol_points(0.01) == pytest.approx(1.0, abs=1e-12)
-    assert relative_vol_move_to_vol_points(0.04) == pytest.approx(4.0, abs=1e-12)
-    # Forgetting ×100 (vega÷100 style)
-    assert relative_vol_move_to_vol_points(0.04) != pytest.approx(0.04, abs=1e-12)
-    assert relative_vol_move_to_vol_points(0.04) != pytest.approx(0.04 / 100.0, abs=1e-18)
-    # Treating relative move as whole percent points without /100 first
-    assert relative_vol_move_to_vol_points(0.04) != pytest.approx(4.0 / 100.0, abs=1e-12)
+    """absolute vol points = base_vol * relative_move * 100 (not relative×100)."""
+    assert relative_vol_move_to_vol_points(0.10, base_vol=0.20) == pytest.approx(2.0, abs=1e-12)
+    assert relative_vol_move_to_vol_points(0.10, base_vol=0.20) != pytest.approx(10.0, abs=1e-12)
+    assert relative_vol_move_to_vol_points(0.01, base_vol=0.20) == pytest.approx(0.2, abs=1e-12)
+    assert relative_vol_move_to_vol_points(0.04, base_vol=0.20) == pytest.approx(0.8, abs=1e-12)
+    # Old bug: relative×100 with no base vol
+    assert relative_vol_move_to_vol_points(0.04, base_vol=0.20) != pytest.approx(4.0, abs=1e-12)
+    assert relative_vol_move_to_vol_points(0.04, base_vol=0.0) == pytest.approx(0.0, abs=1e-12)
 
 
 def test_relative_vol_move_to_vol_points_array():
     vol_pct = np.array([0.0, 0.01, -0.02, 0.25], dtype=float)
-    points = relative_vol_move_to_vol_points(vol_pct)
-    np.testing.assert_allclose(points, np.array([0.0, 1.0, -2.0, 25.0]), atol=1e-12)
-    assert not np.allclose(points, vol_pct)  # missing ×100
-    assert not np.allclose(points, vol_pct / 100.0)  # ÷100
-    assert not np.allclose(points, vol_pct * 100.0 / 100.0)  # cancel scales
+    points = relative_vol_move_to_vol_points(vol_pct, base_vol=0.20)
+    np.testing.assert_allclose(points, np.array([0.0, 0.2, -0.4, 5.0]), atol=1e-12)
+    assert not np.allclose(points, vol_pct * 100.0)  # old relative×100
+    assert not np.allclose(points, vol_pct)  # missing conversion
+    assert not np.allclose(points, vol_pct / 100.0)
+
+
+def test_decimal_vol_change_to_vol_points_for_attribution():
+    """Attribution passes absolute decimal vol differences (v1−v0), not relative."""
+    assert decimal_vol_change_to_vol_points(0.02) == pytest.approx(2.0, abs=1e-12)
+    assert decimal_vol_change_to_vol_points(0.01) == pytest.approx(1.0, abs=1e-12)
+    delta = np.array([0.0, 0.02, -0.01], dtype=float)
+    np.testing.assert_allclose(
+        decimal_vol_change_to_vol_points(delta), np.array([0.0, 2.0, -1.0]), atol=1e-12
+    )
 
 
 def test_wired_call_sites_import_shock_units_helpers():
@@ -79,7 +91,7 @@ def test_wired_call_sites_import_shock_units_helpers():
     assert "relative_vol_move_to_vol_points" in inspect.getsource(historical.approximate_pnl_series)
     assert "relative_vol_move_to_vol_points" in inspect.getsource(historical._panel_linear_contribution)
     assert "relative_vol_move_to_vol_points" in inspect.getsource(es._aggregate_factor_pnl_linear)
-    assert "relative_vol_move_to_vol_points" in inspect.getsource(attribution._greek_buckets_for_position)
+    assert "decimal_vol_change_to_vol_points" in inspect.getsource(attribution._greek_buckets_for_position)
     assert "decimal_rate_to_bps" in inspect.getsource(attribution._greek_buckets_for_position)
     assert "bps_to_decimal_rate" in inspect.getsource(reverse_stress.build_single_factor_shocks)
     sens_src = inspect.getsource(sensitivities.SensitivityEngine)

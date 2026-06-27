@@ -30,8 +30,11 @@ from app.domain.models import (
     MarketSnapshot,
     Portfolio,
 )
+from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.hierarchy import HierarchyEngine
 from app.risk.historical import HistoricalRiskEngine
+from app.sample import SAMPLE_PORTFOLIO
+from app.services.risk_factories import build_portfolio_service
 from app.risk.trade_artifacts import TradeCalculationArtifact
 
 ABS_TOL = 1e-12
@@ -76,10 +79,12 @@ def test_node_var_es_equals_var_es_of_summed_trade_vectors():
     expected_95, expected_99, expected_es = _var_es_from_pnl(np.array(summed))
     pf = _two_trade_book()
     artifacts = {'eq-a': _artifact('eq-a', pv=100.0, historical_pnl=vec_a), 'eq-b': _artifact('eq-b', pv=40.0, historical_pnl=vec_b)}
-    root = _engine().build(pf, _ForbiddenPricing(), market=_two_trade_market(), artifacts=artifacts)
+    root = _engine().build(pf, BuiltinPricingEngine(), market=_two_trade_market(), artifacts=artifacts)
     assert root.var_95 == pytest.approx(expected_95, rel=0, abs=ABS_TOL)
     assert root.var_99 == pytest.approx(expected_99, rel=0, abs=ABS_TOL)
     assert root.expected_shortfall_99 == pytest.approx(expected_es, rel=0, abs=ABS_TOL)
+    assert root.limits
+    assert {row.metric for row in root.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}
     child_var_99 = root.children[0].var_99
     assert child_var_99 == pytest.approx(expected_99, rel=0, abs=ABS_TOL)
     book = root.children[0].children[0].children[0].children[0]
@@ -101,21 +106,37 @@ def test_risk_at_var_es_from_summed_vectors():
     _, expected_99, expected_es = _var_es_from_pnl(np.array(summed))
     pf = _two_trade_book()
     artifacts = {'eq-a': _artifact('eq-a', pv=100.0, historical_pnl=vec_a), 'eq-b': _artifact('eq-b', pv=40.0, historical_pnl=vec_b)}
-    node = _engine().risk_at(pf, _ForbiddenPricing(), HierarchyRef(level=HierarchyLevel.BOOK, firm='Acme Capital', portfolio_id='two-trade', desk='Equity Desk', strategy='Momentum', book='Cash'), market=_two_trade_market(), artifacts=artifacts)
+    node = _engine().risk_at(pf, BuiltinPricingEngine(), HierarchyRef(level=HierarchyLevel.BOOK, firm='Acme Capital', portfolio_id='two-trade', desk='Equity Desk', strategy='Momentum', book='Cash'), market=_two_trade_market(), artifacts=artifacts)
     assert node.var_99 == pytest.approx(expected_99, rel=0, abs=ABS_TOL)
     assert node.expected_shortfall_99 == pytest.approx(expected_es, rel=0, abs=ABS_TOL)
 
 def test_omitted_historical_vectors_stay_zero_var_es():
     pf = _two_trade_book()
     artifacts = {'eq-a': _artifact('eq-a', pv=100.0), 'eq-b': _artifact('eq-b', pv=40.0)}
-    root = _engine().build(pf, _ForbiddenPricing(), market=_two_trade_market(), artifacts=artifacts)
+    root = _engine().build(pf, BuiltinPricingEngine(), market=_two_trade_market(), artifacts=artifacts)
     assert root.var_95 == 0.0
     assert root.var_99 == 0.0
     assert root.expected_shortfall_99 == 0.0
-    assert root.limits == []
+    assert root.limits
+    assert {row.metric for row in root.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}
 
 def test_mixed_historical_vectors_fail_closed():
     pf = _two_trade_book()
     artifacts = {'eq-a': _artifact('eq-a', pv=100.0, historical_pnl=(-1.0, -2.0)), 'eq-b': _artifact('eq-b', pv=40.0, historical_pnl=None)}
     with pytest.raises(ValueError, match='historical_pnl is present on only one'):
         _engine().build(pf, _ForbiddenPricing(), market=_two_trade_market(), artifacts=artifacts)
+
+
+def test_production_factory_hierarchy_var_es_matches_summary():
+    """Review Test B: production factor-panel path must not zero hierarchy VaR/ES."""
+    service = build_portfolio_service(observations=40, seed=7)
+    summary = service.summary(SAMPLE_PORTFOLIO)
+    root = service.hierarchy(SAMPLE_PORTFOLIO)
+    assert summary.var_99 != 0.0
+    assert root.var_99 == pytest.approx(summary.var_99, rel=1e-9, abs=1e-6)
+    assert root.var_95 == pytest.approx(summary.var_95, rel=1e-9, abs=1e-6)
+    assert root.expected_shortfall_99 == pytest.approx(
+        summary.expected_shortfall_99, rel=1e-9, abs=1e-6
+    )
+    assert root.limits
+    assert {row.metric for row in root.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}

@@ -197,9 +197,12 @@ class LimitEngine:
         if "fx_delta" in want:
             out["fx_delta"] = _risk_abs(risk, "fx_delta", extra)
         if "single_position_pct" in want:
-            out["single_position_pct"] = _concentration_pct(
-                portfolio, pricing_engine, market
-            )
+            if extra is not None and "single_position_pct" in extra:
+                out["single_position_pct"] = abs(float(extra["single_position_pct"]))
+            else:
+                out["single_position_pct"] = _concentration_pct(
+                    portfolio, pricing_engine, market
+                )
         if "key_rate_dv01" in want:
             out["key_rate_dv01"] = _key_rate_dv01_abs(
                 portfolio, pricing_engine, risk, market, extra

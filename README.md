@@ -243,6 +243,7 @@ export RISKFORGE_SCENARIO_KERNEL_LIB=/abs/path/to/libriskkernel.so # optional
 The MVP is intentionally honest about what is not complete:
 
 - No live market-data vendor integration; demo history is a packaged synthetic replay.
+- Typed historical factors are `EquitySpot`, `EquityVol`, `RateZero`, `FXSpot`, and `FXVol` only; IR vol, dividend yield, and funding/projection rates are snapshot maps, not a fully general factor taxonomy.
 - Curves use deterministic offline helpers and scoped bootstrap inputs, not production multi-curve calibration.
 - Volatility surfaces are grid/smile inputs consumed by option pricing where attached, not calibrated SABR/local-vol models.
 - Caps/floors/swaptions are scoped vanilla Black-76 implementations; no Bermudan/callable, settlement variation, or IR vol cube.

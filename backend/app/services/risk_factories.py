@@ -12,7 +12,7 @@ dataset.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -24,12 +24,14 @@ from app.api.schemas import (
 )
 from app.domain.models import (
     AsOfLabel,
+    MarketSnapshot,
     RiskRun,
     RiskRunCalculationConfig,
     as_of_wire,
 )
+from app.market.snapshot import FixedMarketDataProvider
 from app.pricing.factory import create_pricing_engine
-from app.risk.factor_panel import create_synthetic_factor_panel
+from app.risk.factor_panel import factor_panel_from_dataset, truncate_factor_panel
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import (
     DEMO_HISTORICAL_DATASET_ID,
@@ -129,18 +131,14 @@ def build_historical_risk_engine(
     else:
         dataset = create_historical_dataset(**dataset_kwargs)
 
-    obs_count = (
-        observations
-        if observations is not None
-        else len(dataset.factor_observations().equity_returns)
-    )
-    panel = create_synthetic_factor_panel(
+    panel = factor_panel_from_dataset(
+        dataset,
+        observations=observations,
         seed=panel_seed,
-        observations=obs_count,
     )
     return HistoricalRiskEngine(
         dataset=dataset,
-        observations=obs_count,
+        observations=panel.n_observations,
         seed=panel_seed,
         factor_panel=panel,
     )
@@ -185,6 +183,109 @@ def dataset_identity(dataset: object) -> tuple[str, str]:
     return SYNTHETIC_HISTORICAL_DATASET_ID, DEFAULT_HISTORICAL_DATASET_VERSION
 
 
+def _copy_historical_engine(
+    engine: HistoricalRiskEngine,
+    *,
+    observations: int,
+    dataset: object,
+    factor_panel: object,
+) -> HistoricalRiskEngine:
+    return HistoricalRiskEngine(
+        seed=engine.seed,
+        observations=observations,
+        dataset=dataset,  # type: ignore[arg-type]
+        methodology=engine.methodology,
+        scenario_kernel=engine.scenario_kernel,
+        scenario_backend=engine.scenario_backend,
+        factor_panel=factor_panel,  # type: ignore[arg-type]
+    )
+
+
+def resize_historical_risk_engine(
+    engine: HistoricalRiskEngine,
+    observations: int,
+) -> HistoricalRiskEngine:
+    """Rebuild/truncate from the same dataset and factor identities.
+
+    Shrinking truncates the current panel (and a synthetic dataset's observation
+    count). Growing a synthetic dataset regenerates the panel with the same seed
+    and factors. Growing past a file dataset's length raises — it does not
+    switch to a bare four-macro synthetic engine. A source engine with
+    ``factor_panel is None`` stays on the four-macro path (no default panel).
+    """
+    if observations == engine.observations:
+        return engine
+    if observations < 1:
+        raise ValueError("observations must be >= 1")
+
+    panel = engine.factor_panel
+    dataset = engine.dataset
+    factors = None if panel is None else panel.factors
+
+    if panel is None:
+        # Keep the labeled four-macro path. Do not invent DEFAULT_PRODUCTION_PANEL_FACTORS.
+        new_dataset = dataset
+        if isinstance(dataset, SyntheticHistoricalDataset):
+            new_dataset = replace(dataset, observations=observations)
+        else:
+            source_len = dataset.factor_observations().n_observations
+            if observations > source_len:
+                raise ValueError(
+                    f"observations {observations} exceeds historical dataset length {source_len}"
+                )
+        return _copy_historical_engine(
+            engine,
+            observations=observations,
+            dataset=new_dataset,
+            factor_panel=None,
+        )
+
+    if observations < panel.n_observations:
+        new_panel = truncate_factor_panel(panel, observations)
+        new_dataset = dataset
+        if isinstance(dataset, SyntheticHistoricalDataset):
+            new_dataset = replace(dataset, observations=observations)
+        return _copy_historical_engine(
+            engine,
+            observations=observations,
+            dataset=new_dataset,
+            factor_panel=new_panel,
+        )
+
+    if isinstance(dataset, SyntheticHistoricalDataset):
+        new_dataset = replace(dataset, observations=observations)
+        new_panel = factor_panel_from_dataset(
+            new_dataset,
+            factors=factors,
+            observations=observations,
+            seed=engine.seed,
+        )
+        return _copy_historical_engine(
+            engine,
+            observations=observations,
+            dataset=new_dataset,
+            factor_panel=new_panel,
+        )
+
+    source_len = dataset.factor_observations().n_observations
+    if observations > source_len:
+        raise ValueError(
+            f"observations {observations} exceeds historical dataset length {source_len}"
+        )
+    new_panel = factor_panel_from_dataset(
+        dataset,
+        factors=factors,
+        observations=observations,
+        seed=engine.seed,
+    )
+    return _copy_historical_engine(
+        engine,
+        observations=observations,
+        dataset=dataset,
+        factor_panel=new_panel,
+    )
+
+
 def build_historical_risk_engine_for_spec(
     spec: ResolvedRiskRunSpec,
 ) -> HistoricalRiskEngine:
@@ -200,8 +301,17 @@ def build_historical_risk_engine_for_spec(
 def portfolio_service_for_spec(
     base: PortfolioService,
     spec: ResolvedRiskRunSpec,
+    *,
+    market: MarketSnapshot | None = None,
 ) -> PortfolioService:
-    """Return ``base`` when its engine already matches ``spec``; otherwise rebound."""
+    """Return ``base`` when its engine already matches ``spec``; otherwise rebound.
+
+    When ``market`` is provided, the returned service always binds
+    :class:`FixedMarketDataProvider` to that snapshot (RiskRun lineage).
+    """
+    market_data = (
+        FixedMarketDataProvider(market) if market is not None else base.market_data
+    )
     engine = getattr(base, "risk", None)
     if isinstance(engine, HistoricalRiskEngine):
         current_id, current_version = dataset_identity(engine.dataset)
@@ -218,12 +328,14 @@ def portfolio_service_for_spec(
             and seed_ok
             and obs_ok
         ):
-            return base
+            if market is None:
+                return base
+            return PortfolioService(base.pricing, engine, market_data=market_data)
     rebound = build_historical_risk_engine_for_spec(spec)
     return PortfolioService(
         base.pricing,
         rebound,
-        market_data=base.market_data,
+        market_data=market_data,
     )
 
 

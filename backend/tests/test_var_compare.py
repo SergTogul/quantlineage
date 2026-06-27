@@ -4,17 +4,24 @@ from __future__ import annotations
 
 import math
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.domain.models import EquityPosition, MarketSnapshot, Portfolio, VaRMethodology
 from app.main import app
 from app.pricing.builtin import BuiltinPricingEngine
+from app.risk.factor_panel import HistoricalFactorPanel, panel_factor_identity
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.var_compare import DEFAULT_COMPARE_METHODOLOGIES, compare_methodologies
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+from app.services.portfolio_service import PortfolioService
+from app.services.risk_factories import (
+    SYNTHETIC_HISTORICAL_DATASET_ID,
+    build_portfolio_service,
+    dataset_identity,
+)
 
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
-from app.services.portfolio_service import PortfolioService
 
 # Small path length keeps FULL_REVALUATION tests fast while preserving quantile shape.
 _OBS = 40
@@ -138,3 +145,85 @@ def test_var_compare_api():
             assert row["var_99"] >= row["var_95"] >= 0.0
             assert row["expected_shortfall_99"] >= row["var_99"]
             assert row["runtime_ms"] >= 0.0
+
+
+def test_compare_var_keeps_panel_dataset_and_market_identity():
+    """Review Test E: shrinking observations must not switch to four-macro synthetic."""
+    service = build_portfolio_service(
+        historical_dataset_id=SYNTHETIC_HISTORICAL_DATASET_ID,
+        observations=_OBS,
+        seed=_SEED,
+    )
+    panel = service.risk.factor_panel
+    assert panel is not None
+    original_factors = tuple(panel_factor_identity(f) for f in panel.factors)
+    original_dataset = dataset_identity(service.risk.dataset)
+    market = service.market_snapshot(SAMPLE_PORTFOLIO)
+
+    default_report = service.compare_var_methodologies(SAMPLE_PORTFOLIO)
+    custom_report = service.compare_var_methodologies(SAMPLE_PORTFOLIO, observations=10)
+
+    assert tuple(panel_factor_identity(f) for f in service.risk.factor_panel.factors) == original_factors
+    assert dataset_identity(service.risk.dataset) == original_dataset
+    assert service.market_snapshot(SAMPLE_PORTFOLIO) is market
+    assert default_report.observations == _OBS
+    assert custom_report.observations == 10
+    assert default_report.portfolio_id == custom_report.portfolio_id == SAMPLE_PORTFOLIO.id
+
+    truncated = HistoricalFactorPanel.from_pairs(
+        dates=panel.dates[:10],
+        rows=[
+            [(factor, obs.change(factor)) for factor in panel.factors]
+            for obs in panel.observations[:10]
+        ],
+    )
+    resized = HistoricalRiskEngine(
+        seed=service.risk.seed,
+        observations=10,
+        dataset=service.risk.dataset,
+        methodology=service.risk.methodology,
+        scenario_kernel=service.risk.scenario_kernel,
+        scenario_backend=service.risk.scenario_backend,
+        factor_panel=truncated,
+    )
+    assert tuple(panel_factor_identity(f) for f in resized.factor_panel.factors) == original_factors
+    assert dataset_identity(resized.dataset) == original_dataset
+
+    expected = resized.calculate(
+        SAMPLE_PORTFOLIO,
+        service.pricing,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=market,
+    )
+    custom_dg = next(r for r in custom_report.results if r.methodology is VaRMethodology.DELTA_GAMMA)
+    assert math.isclose(custom_dg.var_99, expected.var_99, rel_tol=0.0, abs_tol=_TOL)
+    assert math.isclose(custom_dg.var_95, expected.var_95, rel_tol=0.0, abs_tol=_TOL)
+    assert math.isclose(
+        custom_dg.expected_shortfall_99,
+        expected.expected_shortfall_99,
+        rel_tol=0.0,
+        abs_tol=_TOL,
+    )
+
+    bare = HistoricalRiskEngine(seed=_SEED, observations=10)
+    bare_result = bare.calculate(
+        SAMPLE_PORTFOLIO,
+        service.pricing,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=market,
+    )
+    assert custom_dg.var_99 != bare_result.var_99
+
+
+def test_compare_var_rejects_observations_beyond_file_dataset(tmp_path):
+    path = tmp_path / "short_hist.csv"
+    path.write_text(
+        "equity_return,vol_move,rate_move_bps,fx_return\n"
+        "0.01,0.0,1.0,0.001\n"
+        "-0.02,0.05,-2.0,-0.001\n"
+        "0.0,-0.01,0.0,0.0\n",
+        encoding="utf-8",
+    )
+    service = build_portfolio_service(historical_dataset_id=str(path))
+    with pytest.raises(ValueError, match="observation"):
+        service.compare_var_methodologies(SAMPLE_PORTFOLIO, observations=10)

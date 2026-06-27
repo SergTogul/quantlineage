@@ -147,11 +147,13 @@ def _factor_keys_for_position(position: Position) -> set[str] | None:
         return None
 
 
-def _linear_shock_pnl(valuation: Valuation, shock: FactorShock) -> float:
+def _linear_shock_pnl(
+    valuation: Valuation, shock: FactorShock, *, base_market: MarketSnapshot
+) -> float:
     """Additive Greek P&L for one typed shock (same units as panel LINEAR/Δ-Γ)."""
     factor = shock.factor
     move = decimal_rate_to_bps(shock.amount) if isinstance(factor, RateZero) else float(shock.amount)
-    pnl = _panel_linear_contribution(factor, valuation, move)
+    pnl = _panel_linear_contribution(factor, valuation, move, base_market=base_market)
     if isinstance(factor, EquitySpot):
         pnl += 0.5 * float(valuation.gamma) * move * move
     return pnl
@@ -162,6 +164,8 @@ def _factor_isolated_pnl(
     formal: Scenario,
     base_valuations: dict[str, Valuation],
     total_pnl: float,
+    *,
+    base_market: MarketSnapshot,
 ) -> tuple[dict[str, float], dict[str, str]]:
     """Family P&L from base Greeks + shocks; interaction vs joint scenario P&L.
 
@@ -181,7 +185,7 @@ def _factor_isolated_pnl(
             for shock in shocks:
                 if keys is not None and shock.factor.key not in keys:
                     continue
-                attributed += _linear_shock_pnl(valuation, shock)
+                attributed += _linear_shock_pnl(valuation, shock, base_market=base_market)
         factor_pnl[key] = attributed
         labels[key] = _factor_label(shocks)
 
@@ -266,7 +270,7 @@ class ScenarioAttributionEngine:
         )
 
         factor_pnl, factor_labels = _factor_isolated_pnl(
-            portfolio, formal, base_valuations, portfolio_pnl
+            portfolio, formal, base_valuations, portfolio_pnl, base_market=base_market
         )
         by_risk_factor = (
             _items_from_pnl_map(factor_pnl, portfolio_pnl, labels=factor_labels)

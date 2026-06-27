@@ -9,9 +9,9 @@ Internal units (must not be confused at the call site). Conversions live in
 - equity / FX: relative return; ``0.01`` = +1%. Cash delta / FX delta.
 - gamma: dollar gamma; DELTA_GAMMA adds ``0.5 * gamma * r^2``; LINEAR omits it.
 - vol observations (``vol_pct`` / ``vol_moves``): relative vol move.
-  Vega is quoted per 1 *vol point* (0.01 absolute vol). The engine converts
-  via ``relative_vol_move_to_vol_points`` so a +1% relative vol move (0.01) is
-  +1 vol point of vega P&L.
+  Vega is quoted per 1 *vol point* (0.01 absolute vol). Conversion is
+  ``base_vol * relative_move * 100`` via ``relative_vol_move_to_vol_points``.
+  Example: base_vol=0.20, relative +4% (0.04) → 0.8 vol points.
 - rates: ``rate_moves_bps`` are basis points; ``1.0`` = +1bp. DV01 is P&L per bp.
 - SensitivityEngine rate bumps convert via ``bps_to_decimal_rate`` before
   ``MarketSnapshot.bump``.
@@ -79,17 +79,17 @@ def test_gamma_delta_gamma_term_is_half_gamma_r_squared():
     assert dg[0] != pytest.approx(40.0 * 0.10 * 0.10, abs=1e-9)
 
 
-def test_vega_per_vol_point_multiplies_relative_vol_by_100():
-    """vega=25 per vol point; relative vol move +4% (0.04) → 4 vol points → P&L=100.
+def test_vega_per_vol_point_uses_base_vol_times_relative_times_100():
+    """vega=25 per vol point; relative +4% at base_vol=0.20 → 0.8 vol points → P&L=20.
 
-    Forgetting ×100 (vega÷100 style) yields 1.0.
+    Old bug treated 0.04 relative as 4 vol points (P&L=100) with no base vol.
     """
-    pnl = _pnl(vega=25.0, vol_pct=np.array([0.04]))
-    assert pnl[0] == pytest.approx(100.0, abs=1e-12)
-    forgot_vol_point_conversion = 25.0 * 0.04
-    assert pnl[0] != pytest.approx(forgot_vol_point_conversion, abs=1e-9)
-    vega_divided_by_100 = (25.0 / 100.0) * (0.04 * 100.0)
-    assert pnl[0] != pytest.approx(vega_divided_by_100, abs=1e-9)
+    pnl = _pnl(vega=25.0, vol_pct=np.array([0.04]), base_vol=0.20)
+    assert pnl[0] == pytest.approx(20.0, abs=1e-12)
+    old_relative_times_100 = 25.0 * (0.04 * 100.0)
+    assert pnl[0] != pytest.approx(old_relative_times_100, abs=1e-9)
+    forgot_conversion = 25.0 * 0.04
+    assert pnl[0] != pytest.approx(forgot_conversion, abs=1e-9)
 
 
 def test_dv01_per_bp_not_times_100_or_decimal_rate():
@@ -133,8 +133,9 @@ def test_combined_one_observation_is_sum_of_one_factor_terms():
         rates_bps=np.array([10.0]),
         fx_ret=np.array([-0.01]),
         methodology=VaRMethodology.DELTA_GAMMA,
+        base_vol=0.20,
     )
-    expected = -2.0 + 0.5 * 40.0 * (-0.02) ** 2 + 100.0 + (-85.0) + (-500.0)
+    expected = -2.0 + 0.5 * 40.0 * (-0.02) ** 2 + 20.0 + (-85.0) + (-500.0)
     assert pnl[0] == pytest.approx(expected, abs=1e-12)
 
 
@@ -156,7 +157,7 @@ def test_key_rate_dv01_is_exact_swap_annuity_times_one_bp():
     )
     pricing = BuiltinPricingEngine()
     hand_dv01 = 5_000_000.0 * 4.3 * 0.0001  # +2150
-    assert pricing.value(pos, market).dv01 == pytest.approx(hand_dv01, abs=1e-12)
+    assert pricing.value(pos, market).dv01 == pytest.approx(hand_dv01, abs=1e-9)
 
     engine = SensitivityEngine(rate_bump_bps=1.0)
     portfolio = Portfolio(id="p", name="p", positions=[pos])

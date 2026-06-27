@@ -241,7 +241,14 @@ def test_api_request_model_roundtrip():
         breaches_only=False,
         top_n=1,
     )
-    report = _svc().limit_drilldown(req)
+    report = _svc().limit_drilldown(
+        portfolio=req.portfolio,
+        metric=req.metric,
+        hierarchy=req.hierarchy,
+        limits=req.limits,
+        top_n=req.top_n,
+        breaches_only=req.breaches_only,
+    )
     assert len(report.items) == 1
     assert report.items[0].metric == "vega"
     assert len(report.items[0].contributors) == 1
@@ -262,11 +269,11 @@ def test_stress_loss_contributors_nonempty():
 
 
 def _kr_bond_book() -> tuple[Portfolio, MarketSnapshot]:
-    """10Y + 2Y bonds with key_rates so tenor KR ≠ parallel Valuation.dv01 ranking.
+    """10Y + 2Y bonds with key_rates so 10Y KR isolates from the 2Y trade.
 
-    Valuation.dv01 uses the trade ``duration`` field; KR FD uses curve/tenor PV
-    sensitivity (~maturity). Deliberately mismatch duration vs maturity so parallel
-    greek ranking prefers the 2Y bond while binding KR is the 10Y pillar.
+    Reported DV01 is PARALLEL +1bp bump-and-revalue (~maturity), so parallel
+    ranking also prefers the 10Y bond. Drill-down still follows the binding
+    10Y pillar (2Y trade ≈ 0 on that tenor), not a duration×PV shortcut.
     """
     portfolio = Portfolio(
         id="kr-book",
@@ -281,7 +288,6 @@ def _kr_bond_book() -> tuple[Portfolio, MarketSnapshot]:
                 face_value=1_000_000,
                 quantity=1,
                 maturity_years=10.0,
-                # Understate analytic DV01 vs true 10Y ZCB sensitivity.
                 duration=1.5,
                 book="Core",
             ),
@@ -292,7 +298,6 @@ def _kr_bond_book() -> tuple[Portfolio, MarketSnapshot]:
                 face_value=1_000_000,
                 quantity=1,
                 maturity_years=2.0,
-                # Overstate analytic DV01 vs true 2Y ZCB sensitivity.
                 duration=12.0,
                 book="Core",
             ),
@@ -309,8 +314,8 @@ def _kr_bond_book() -> tuple[Portfolio, MarketSnapshot]:
 def test_key_rate_dv01_contributors_use_binding_tenor_not_parallel_dv01():
     """M4.7: with key_rates, drill-down ranks by tenor KR on LimitEngine binding pillar.
 
-    2Y bond has larger abs parallel Valuation.dv01 (duration×PV) but ~0 sensitivity
-    to the 10Y pillar; 10Y bond drives portfolio KR. Contributors must follow KR.
+    2Y bond has ~0 sensitivity to the 10Y pillar; 10Y bond drives portfolio KR.
+    Contributors must follow the binding tenor, not a duration×PV shortcut.
     """
     pricing = BuiltinPricingEngine()
     portfolio, market = _kr_bond_book()
@@ -325,11 +330,10 @@ def test_key_rate_dv01_contributors_use_binding_tenor_not_parallel_dv01():
     assert binding.factor.tenor == "10Y"
     assert binding.method == "bump_revalue"
 
-    # Parallel Valuation.dv01 would prefer the larger 2Y notionals.
     parallel = {
         p.id: abs(pricing.value(p, market).dv01 or 0.0) for p in portfolio.positions
     }
-    assert parallel["b2"] > parallel["b10"]
+    assert parallel["b10"] > parallel["b2"]
 
     contribs = contributors_for_metric(
         portfolio,
@@ -368,9 +372,8 @@ def test_key_rate_dv01_contributors_use_binding_tenor_not_parallel_dv01():
 def test_key_rate_dv01_contributors_fallback_matches_parallel_without_key_rates():
     """Without key_rates / curves, KR uses parallel bump-revalue (SensitivityEngine).
 
-    That parallel FD can differ from Valuation.dv01 when the trade ``duration``
-    field ≠ true modified duration — contributors must follow SensitivityEngine,
-    same as LimitEngine._key_rate_dv01_abs.
+    Contributors follow SensitivityEngine, same as LimitEngine._key_rate_dv01_abs.
+    Reported Valuation.dv01 is also same-curve PARALLEL +1bp (one-sided).
     """
     pricing = BuiltinPricingEngine()
     bond = BondPosition(
@@ -399,8 +402,9 @@ def test_key_rate_dv01_contributors_fallback_matches_parallel_without_key_rates(
     dv01_m = sens.calculate_position(bond, pricing, measures=("dv01",), market=market)[0]
     assert kr_m.method == "bump_revalue_parallel_fallback"
     assert abs(kr_m.value) == pytest.approx(abs(dv01_m.value), rel=1e-9, abs=1e-9)
-    # Analytic Valuation.dv01 uses duration field — not the FD reference.
-    assert abs(pricing.value(bond, market).dv01) != pytest.approx(abs(kr_m.value), rel=1e-3)
+    reported = abs(pricing.value(bond, market).dv01)
+    assert reported == pytest.approx(abs(dv01_m.value), rel=1e-2, abs=1.0)
+    assert reported == pytest.approx(abs(kr_m.value), rel=1e-2, abs=1.0)
 
     kr = contributors_for_metric(
         portfolio, pricing, "key_rate_dv01", top_n=2, market=market
