@@ -201,6 +201,8 @@ def snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) ->
     """Resolve live marks from the explicit snapshot using terms keys only."""
     family = getattr(terms, "type", None)
     get_capability(family)
+    if not isinstance(family, str):
+        raise TypeError(f"unknown instrument family: {family!r}")
     try:
         handler = _OVERLAY_HANDLERS[family]
     except KeyError:

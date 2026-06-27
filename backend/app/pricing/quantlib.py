@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from datetime import date, timedelta
 from threading import RLock
 from types import MappingProxyType, SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar
 
 from app.domain.instrument_terms import (
     InstrumentTerms,
@@ -170,6 +170,7 @@ class QuantLibPricingEngine(PricingEngine):
     separate processes (R0.3.5), not additional in-process QuantLib engines.
     """
 
+    _VALUE_HANDLERS: ClassVar[MappingProxyType[str, str]]
     _process_lock = _QL_PROCESS_LOCK
 
     def __init__(self, evaluation_date: date | None = None):
