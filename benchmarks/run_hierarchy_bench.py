@@ -52,7 +52,7 @@ EXPECTED_N_NODES = (
 )
 EXPECTED_MARKET_VALUE = EXPECTED_N_POSITIONS * QUANTITY * SPOT
 # SHA-256 of rounded path/level/MV/delta/VaR/ES/stress lines (host-independent).
-EXPECTED_CHECKSUM = "2a51c37798de149329b37c58729c13302de6f902bcc26e3316542dab12537d1d"
+EXPECTED_CHECKSUM = "6a9c1124e91805528f550cfe4ae922f19155342cbac3c0d4947bdc95aa82ef75"
 
 _ADDITIVE = ("market_value", "delta", "gamma", "vega", "dv01", "fx_delta")
 DESKS = tuple(f"Desk-{i}" for i in range(N_DESKS))
@@ -75,7 +75,6 @@ def bench_book() -> tuple[Portfolio, MarketSnapshot]:
                             id=f"eq-{n:03d}",
                             symbol=symbol,
                             quantity=QUANTITY,
-                            price=SPOT,
                             book=book,
                             desk=desk,
                             strategy=strategy,

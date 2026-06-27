@@ -310,7 +310,7 @@ jobs:
           assert int(row['n_nodes']) == 94, row
           assert float(row['market_value']) == 64000.0, row
           assert row.get('additive_ok') is True, row
-          assert row['checksum'] == '2a51c37798de149329b37c58729c13302de6f902bcc26e3316542dab12537d1d', row
+          assert row['checksum'] == '6a9c1124e91805528f550cfe4ae922f19155342cbac3c0d4947bdc95aa82ef75', row
           print('hierarchy benchmark 64-trade / 94-node checksum/identity ok')
           "
 
