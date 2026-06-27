@@ -6,15 +6,24 @@ four-macro path. Demo/synthetic datasets stay ``projection="four_macro_demo"``.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from app.domain.models import MarketSnapshot
+from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_panel import DEFAULT_PRODUCTION_PANEL_FACTORS, PER_FACTOR_PANEL_PROJECTION
-from app.risk.factor_types import EquitySpot, RateZero
+from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import create_historical_dataset
 from app.risk.scenarios import iter_panel_shocked_snapshots
-from app.services.risk_factories import build_historical_risk_engine, build_portfolio_service
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+from app.services.risk_factories import (
+    SYNTHETIC_HISTORICAL_DATASET_ID,
+    build_historical_risk_engine,
+    build_portfolio_service,
+    resize_historical_risk_engine,
+)
 
 NVDA = EquitySpot("NVDA")
 SPY = EquitySpot("SPY")
@@ -45,9 +54,15 @@ def test_build_historical_risk_engine_uses_per_factor_panel(
 def test_production_panel_equities_and_tenors_move_independently(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """RF-005 exit: two equities and two rate tenors differ in one observation."""
+    """RF-005 exit: two equities and two rate tenors differ in one observation.
+
+    Independence is a synthetic-panel property. Demo/file CSVs broadcast the
+    four macro columns onto each typed factor family, so NVDA and SPY match.
+    """
     monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
-    engine = build_historical_risk_engine()
+    engine = build_historical_risk_engine(
+        historical_dataset_id=SYNTHETIC_HISTORICAL_DATASET_ID
+    )
     panel = engine.factor_panel
     assert panel is not None
 
@@ -99,6 +114,9 @@ def test_four_macro_path_still_available_without_panel(
     assert engine.factor_panel is None
     assert engine.dataset.projection == "four_macro_demo"
     assert engine.dataset.is_per_name_per_tenor_panel is False
+    resized = resize_historical_risk_engine(engine, 40)
+    assert resized.factor_panel is None
+    assert resized.observations == 40
 
 
 def test_build_portfolio_service_inherits_factory_panel(
@@ -151,3 +169,63 @@ def test_production_full_revaluation_es_on_sample_book(
     assert report.methodology is VaRMethodology.FULL_REVALUATION
     assert report.portfolio_es >= 0.0
     assert report.by_position
+
+
+def _write_factor_csv(path: Path, *, equity: list[float], vol: list[float], rate: list[float], fx: list[float]) -> None:
+    lines = ["equity_return,vol_move,rate_move_bps,fx_return"]
+    for e, v, r, x in zip(equity, vol, rate, fx, strict=True):
+        lines.append(f"{e},{v},{r},{x}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def test_csv_dataset_owns_factor_panel_and_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Review Test A: two same-length CSVs must not share a synthetic panel."""
+    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    n = 24
+    path_a = tmp_path / "hist_a.csv"
+    path_b = tmp_path / "hist_b.csv"
+    _write_factor_csv(
+        path_a,
+        equity=[0.04] * n,
+        vol=[0.01] * n,
+        rate=[2.0] * n,
+        fx=[0.002] * n,
+    )
+    _write_factor_csv(
+        path_b,
+        equity=[-0.05] * n,
+        vol=[-0.02] * n,
+        rate=[-8.0] * n,
+        fx=[-0.003] * n,
+    )
+
+    engine_a = build_historical_risk_engine(historical_dataset_id=str(path_a))
+    engine_b = build_historical_risk_engine(historical_dataset_id=str(path_b))
+    panel_a = engine_a.factor_panel
+    panel_b = engine_b.factor_panel
+    assert panel_a is not None and panel_b is not None
+    assert panel_a.n_observations == n
+    assert panel_b.n_observations == n
+
+    first_a = panel_a.dates[0]
+    first_b = panel_b.dates[0]
+    for factor in panel_a.factors:
+        if isinstance(factor, EquitySpot):
+            assert panel_a.change(first_a, factor) == pytest.approx(0.04)
+        elif isinstance(factor, (EquityVol, FXVol)):
+            assert panel_a.change(first_a, factor) == pytest.approx(0.01)
+        elif isinstance(factor, RateZero):
+            assert panel_a.change(first_a, factor) == pytest.approx(2.0)
+        elif isinstance(factor, FXSpot):
+            assert panel_a.change(first_a, factor) == pytest.approx(0.002)
+    for factor in panel_b.factors:
+        if isinstance(factor, EquitySpot):
+            assert panel_b.change(first_b, factor) == pytest.approx(-0.05)
+
+    pricing = BuiltinPricingEngine()
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
+    result_a = engine_a.calculate(SAMPLE_PORTFOLIO, pricing, market=market)
+    result_b = engine_b.calculate(SAMPLE_PORTFOLIO, pricing, market=market)
+    assert result_a.var_95 != result_b.var_95
+    assert result_a.var_99 != result_b.var_99
+    assert result_a.expected_shortfall_99 != result_b.expected_shortfall_99

@@ -12,6 +12,16 @@ class MarketDataProvider(ABC):
         raise NotImplementedError
 
 
+class FixedMarketDataProvider(MarketDataProvider):
+    """Always return one explicit snapshot (RiskRun / dashboard binding)."""
+
+    def __init__(self, market: MarketSnapshot) -> None:
+        self._market = market
+
+    def snapshot(self, portfolio: Portfolio) -> MarketSnapshot:  # noqa: ARG002
+        return self._market
+
+
 class PositionMarketDataProvider(MarketDataProvider):
     """Deprecated name retained for import compatibility.
 

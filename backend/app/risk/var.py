@@ -19,6 +19,7 @@ from app.risk.factor_panel import HistoricalFactorPanel
 from app.risk.historical import (
     approximate_pnl_series,
     approximate_position_pnls_from_panel,
+    representative_base_vol,
     require_explicit_market,
     require_panel_covers_portfolio,
 )
@@ -81,6 +82,7 @@ class VaRAnalytics:
                 rates_bps=rb,
                 fx_ret=fx,
                 methodology=methodology,
+                base_vol=representative_base_vol(market),
             )
         return out
 

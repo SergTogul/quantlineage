@@ -75,7 +75,11 @@ def main() -> int:
         return 2
 
     service = build_portfolio_service()
-    worker = RiskRunWorker(service, session_factory=wiring.session_factory)
+    worker = RiskRunWorker(
+        service,
+        session_factory=wiring.session_factory,
+        market_snapshots=wiring.market_snapshot_repo,
+    )
     interval = _poll_interval_s()
     batch = _poll_batch()
     stop = False

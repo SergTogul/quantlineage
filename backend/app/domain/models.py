@@ -329,7 +329,11 @@ class EuropeanOptionPosition(PositionHierarchyMixin):
 
 
 class BondPosition(PositionHierarchyMixin):
-    """Zero-bond economics. Yield marks live on the snapshot; ``duration`` is a DV01 shortcut."""
+    """Zero-bond economics. Yield marks live on the snapshot.
+
+    ``duration`` is contractual/schedule metadata. Reported ``Valuation.dv01``
+    is a same-curve PARALLEL +1bp bump-and-revalue, not duration × PV.
+    """
 
     type: Literal["bond"]
     id: str
@@ -343,7 +347,11 @@ class BondPosition(PositionHierarchyMixin):
 
 
 class SwapPosition(PositionHierarchyMixin):
-    """IRS economics. Market swap rate lives on the snapshot; ``duration`` is a DV01 shortcut."""
+    """IRS economics. Market swap rate lives on the snapshot.
+
+    ``duration`` is the annuity factor used by the builtin swap PV. Reported
+    ``Valuation.dv01`` is a same-curve PARALLEL +1bp bump-and-revalue.
+    """
 
     type: Literal["swap"]
     id: str

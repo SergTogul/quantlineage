@@ -70,3 +70,25 @@ def test_dashboard_batch_is_heavy() -> None:
     """Hierarchy + VaR + evaluate in one request is HEAVY (R0.10.1 map)."""
     assert classify("POST", "/risk/dashboard") is ExecutionClass.HEAVY
     assert classify("POST", "/api/v1/risk/dashboard") is ExecutionClass.HEAVY
+
+
+def test_dashboard_resolves_one_market_snapshot() -> None:
+    """Review Test G: dashboard must snapshot the market once and reuse it."""
+    from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+    from app.services.risk_factories import build_portfolio_service
+
+    class CountingProvider:
+        def __init__(self) -> None:
+            self.snapshot_call_count = 0
+
+        def snapshot(self, portfolio):
+            self.snapshot_call_count += 1
+            snap = demo_market_snapshot(SAMPLE_PORTFOLIO)
+            return snap.model_copy(update={"id": f"dash-{self.snapshot_call_count}"})
+
+    provider = CountingProvider()
+    service = build_portfolio_service(observations=8, seed=7, market_data=provider)
+    batch = service.dashboard(SAMPLE_PORTFOLIO)
+    assert provider.snapshot_call_count == 1
+    assert batch["summary"].portfolio_id == SAMPLE_PORTFOLIO.id
+    assert service.market_data is provider

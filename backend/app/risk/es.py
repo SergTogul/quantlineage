@@ -34,6 +34,7 @@ from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
 from app.risk.historical import (
     _panel_linear_contribution,
+    representative_base_vol,
     require_explicit_market,
     require_panel_covers_portfolio,
     required_factors_for_position,
@@ -129,7 +130,9 @@ def _aggregate_factor_pnl_linear(
         out["equity"] += v.delta * equity_ret
         if methodology is VaRMethodology.DELTA_GAMMA:
             out["equity"] += 0.5 * v.gamma * equity_ret * equity_ret
-        out["vol"] += v.vega * relative_vol_move_to_vol_points(vol_pct)
+        out["vol"] += v.vega * relative_vol_move_to_vol_points(
+            vol_pct, base_vol=representative_base_vol(market)
+        )
         out["rate"] += v.dv01 * rates_bps
         out["fx"] += v.fx_delta * fx_ret
     return out
@@ -155,7 +158,9 @@ def _aggregate_factor_pnl_from_panel(
             for factor in factors:
                 move = observation.change(factor)
                 family = _factor_family(factor)
-                out[family][i] += _panel_linear_contribution(factor, valuation, move)
+                out[family][i] += _panel_linear_contribution(
+                    factor, valuation, move, base_market=market
+                )
                 if use_gamma and isinstance(factor, EquitySpot):
                     out[family][i] += 0.5 * float(valuation.gamma) * move * move
     return out

@@ -35,14 +35,14 @@
       "summary": {
         "delta": 728417.03341209,
         "dv01": 10.70021896,
-        "expected_shortfall_99": 25445.91537057,
+        "expected_shortfall_99": 25036.0437486,
         "fx_delta": 0.0,
         "gamma": -27101.17460847,
         "market_value": 863917.51718982,
         "methodology": "DELTA_GAMMA",
         "portfolio_id": "equity-vol",
-        "var_95": 15846.97456721,
-        "var_99": 22035.90094582,
+        "var_95": 15955.29773405,
+        "var_99": 21250.46969408,
         "vega": 270.92394446
       },
       "var_report": {
@@ -50,15 +50,15 @@
         "methods": [
           {
             "confidence": 0.99,
-            "expected_shortfall": 25445.91537057,
+            "expected_shortfall": 25036.0437486,
             "method": "historical",
-            "var": 22035.90094582
+            "var": 21250.46969408
           },
           {
             "confidence": 0.99,
-            "expected_shortfall": 24338.08195827,
+            "expected_shortfall": 23922.90694188,
             "method": "parametric",
-            "var": 21243.63767446
+            "var": 20881.24972479
           }
         ],
         "portfolio_id": "equity-vol"
@@ -94,15 +94,15 @@
       ],
       "summary": {
         "delta": 0.0,
-        "dv01": -738.10683701,
-        "expected_shortfall_99": 13082.05288407,
+        "dv01": -981.56976189,
+        "expected_shortfall_99": 17397.13939842,
         "fx_delta": 0.0,
         "gamma": 0.0,
         "market_value": 4123297.18737161,
         "methodology": "DELTA_GAMMA",
         "portfolio_id": "rates-macro",
-        "var_95": 9001.08002556,
-        "var_99": 11585.16276223,
+        "var_95": 11970.06657355,
+        "var_99": 15406.50334577,
         "vega": 0.0
       },
       "var_report": {
@@ -110,15 +110,15 @@
         "methods": [
           {
             "confidence": 0.99,
-            "expected_shortfall": 13082.05288407,
+            "expected_shortfall": 17397.13939842,
             "method": "historical",
-            "var": 11585.16276223
+            "var": 15406.50334577
           },
           {
             "confidence": 0.99,
-            "expected_shortfall": 13894.60327754,
+            "expected_shortfall": 18477.70776094,
             "method": "parametric",
-            "var": 12127.9860165
+            "var": 16128.37566251
           }
         ],
         "portfolio_id": "rates-macro"
@@ -154,15 +154,15 @@
       ],
       "summary": {
         "delta": 1115725.94342605,
-        "dv01": 1107.5893473,
-        "expected_shortfall_99": 51875.26999951,
+        "dv01": 877.89893818,
+        "expected_shortfall_99": 46522.35505529,
         "fx_delta": 1220007.64093984,
         "gamma": 1993122.85712689,
         "market_value": 2632439.42316225,
         "methodology": "DELTA_GAMMA",
         "portfolio_id": "global-macro",
-        "var_95": 32502.22584068,
-        "var_99": 44073.37356089,
+        "var_95": 28242.11511252,
+        "var_99": 39303.04539332,
         "vega": 1285.72583667
       },
       "var_report": {
@@ -170,15 +170,15 @@
         "methods": [
           {
             "confidence": 0.99,
-            "expected_shortfall": 51875.26999951,
+            "expected_shortfall": 46522.35505529,
             "method": "historical",
-            "var": 44073.37356089
+            "var": 39303.04539332
           },
           {
             "confidence": 0.99,
-            "expected_shortfall": 51558.83165213,
+            "expected_shortfall": 45133.32951136,
             "method": "parametric",
-            "var": 45003.42879995
+            "var": 39394.8915459
           }
         ],
         "portfolio_id": "global-macro"

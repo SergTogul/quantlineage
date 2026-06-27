@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
     if wiring.enabled and wiring.session_factory is not None:
         worker = RiskRunWorker(service, session_factory=wiring.session_factory)
     else:
-        worker = RiskRunWorker(service)
+        worker = RiskRunWorker(service, market_snapshots=wiring.market_snapshot_repo)
         worker.ensure_running()
 
     app.state.risk_run_worker = worker
