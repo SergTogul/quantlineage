@@ -217,7 +217,7 @@ def test_nightly_hierarchy_asserts_identity_not_sla():
     block = _job_block(_text(NIGHTLY_YML), "hierarchy-benchmark")
     assert "check_m6_sla.py" not in block
     assert "checksum" in block
-    assert "2a51c37798de149329b37c58729c13302de6f902bcc26e3316542dab12537d1d" in block
+    assert "6a9c1124e91805528f550cfe4ae922f19155342cbac3c0d4947bdc95aa82ef75" in block
     assert "64000" in block
     assert "SLA-sized" not in block
     assert not re.search(r"(?im)^      - name:.*SLA", block)
@@ -234,7 +234,7 @@ def test_hierarchy_bench_script_is_identity_not_sla():
     assert not re.search(r"(?m)^\s*(import |from ).*check_m6_sla", text)
     assert not re.search(r"check_m6_sla\.py\s", text)
     assert not re.search(r"throughput\s*>\s*0", text)
-    assert "2a51c37798de149329b37c58729c13302de6f902bcc26e3316542dab12537d1d" in text
+    assert "6a9c1124e91805528f550cfe4ae922f19155342cbac3c0d4947bdc95aa82ef75" in text
     assert "EXPECTED_N_NODES" in text
     assert "EXPECTED_MARKET_VALUE" in text
 
