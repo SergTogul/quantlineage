@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from app.domain.models import MarketSnapshot
-from app.market.snapshot import FixedMarketDataProvider as FixedMarketProvider
+from app.market.snapshot import FixedMarketDataProvider
+
+# Compatibility alias for tests that still import the old fixture name.
+FixedMarketProvider = FixedMarketDataProvider
 
 
 def equity_spot_market(

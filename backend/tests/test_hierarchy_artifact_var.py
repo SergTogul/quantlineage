@@ -33,9 +33,9 @@ from app.domain.models import (
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.hierarchy import HierarchyEngine
 from app.risk.historical import HistoricalRiskEngine
+from app.risk.trade_artifacts import TradeCalculationArtifact
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.risk_factories import build_portfolio_service
-from app.risk.trade_artifacts import TradeCalculationArtifact
 
 ABS_TOL = 1e-12
 
