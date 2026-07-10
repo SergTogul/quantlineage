@@ -10,6 +10,7 @@ from app.domain.models import (
     Position,
     RiskChangeAttributionReport,
     RiskChangeAttributionRequest,
+    RiskChangeReport,
     RiskLimit,
     RiskSummary,
     ScenarioEvaluationReport,
@@ -166,6 +167,7 @@ class PortfolioService:
             market_data=self.market_data,
         )
         self.query_engine = RiskQueryEngine()
+        self.risk_run_compare = None
 
     def market_snapshot(self, portfolio: Portfolio): return self.market_data.snapshot(portfolio)
 
@@ -345,6 +347,17 @@ class PortfolioService:
         self, request: RiskChangeAttributionRequest
     ) -> RiskChangeAttributionReport:
         return self.risk_change_engine.explain(request, self.pricing)
+
+    def explain_risk_change(
+        self,
+        t0_run_id: str,
+        t1_run_id: str,
+        metric: str = "var_99",
+    ) -> RiskChangeReport:
+        compare = self.risk_run_compare
+        if compare is None:
+            raise ValueError("risk-run compare is not configured")
+        return compare(t0_run_id, t1_run_id, metric=metric)
     def demo_attribution(self, portfolio):
         from app.domain.models import AttributionRequest
         current=self.market_snapshot(portfolio)

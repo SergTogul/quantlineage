@@ -15,6 +15,7 @@ class RiskToolName(str, Enum):
     GET_WORST_STRESS = "get_worst_stress"
     GET_LIMITS = "get_limits"
     GET_CONTRIBUTORS = "get_contributors"
+    EXPLAIN_RISK_CHANGE = "explain_risk_change"
 
 
 class RiskToolContract(BaseModel):
@@ -67,6 +68,16 @@ class RiskToolArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ExplainRiskChangeArgs(BaseModel):
+    """t0/t1 run ids are required; the model never invents metric values."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    t0_run_id: str = Field(min_length=1)
+    t1_run_id: str = Field(min_length=1)
+    metric: str = "var_99"
+
+
 class ToolCallValidation(BaseModel):
     allowed: bool
     tool_name: RiskToolName | None = None
@@ -115,16 +126,28 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
         returns=["list[Contributor]"],
         numeric_source="deterministic PortfolioService.contributors payload",
     ),
+    RiskToolName.EXPLAIN_RISK_CHANGE: RiskToolContract(
+        name=RiskToolName.EXPLAIN_RISK_CHANGE,
+        description=(
+            "Explain why a risk metric changed between two COMPLETED RiskRuns. "
+            "Requires t0_run_id and t1_run_id; never invent VaR or other numbers."
+        ),
+        service_method="explain_risk_change",
+        required_inputs=["t0_run_id", "t1_run_id"],
+        returns=["RiskChangeReport"],
+        numeric_source="deterministic PortfolioService.explain_risk_change payload",
+    ),
 }
 
 TOOL_ARG_MODELS: dict[RiskToolName, type[BaseModel]] = {
     name: RiskToolArgs for name in TOOL_CONTRACTS
 }
+TOOL_ARG_MODELS[RiskToolName.EXPLAIN_RISK_CHANGE] = ExplainRiskChangeArgs
 
 SAFE_UNGROUNDED_ANSWER = (
     "I cannot ignore deterministic tools or invent VaR, Greeks, P&L, prices, "
     "stress losses, or limit values. Ask a supported portfolio risk question: "
-    "VaR/ES, limits, contributors, worst stress, or portfolio summary."
+    "VaR/ES, limits, contributors, worst stress, portfolio summary, or why risk changed."
 )
 
 _INJECTION_MARKERS = (
@@ -218,6 +241,16 @@ class RiskQueryEngine:
             )
         if _is_prompt_injection(q):
             return _clarification_plan("unsupported", SAFE_UNGROUNDED_ANSWER)
+        if _is_risk_change_question(q):
+            return RiskQueryPlan(
+                intent="explain_risk_change",
+                tool_name=RiskToolName.EXPLAIN_RISK_CHANGE,
+                needs_clarification=True,
+                clarification=(
+                    "Provide two completed RiskRun identifiers to explain why the "
+                    "risk metric changed. Do not invent VaR."
+                ),
+            )
         if _mentions(q, "worst", "largest") and _mentions(q, "stress", "scenario", "threat"):
             return RiskQueryPlan(
                 intent="worst_scenario",
@@ -251,7 +284,7 @@ class RiskQueryEngine:
 
     def answer(self, question: str, portfolio: Portfolio, service) -> RiskQueryResponse:
         plan = self.route(question)
-        if plan.tool_name is None:
+        if plan.tool_name is None or plan.needs_clarification:
             return RiskQueryResponse(
                 intent=plan.intent,
                 answer=plan.clarification or "",
@@ -348,7 +381,7 @@ class RiskQueryEngine:
             )
 
         contract = TOOL_CONTRACTS[checked.tool_name]
-        payload = _execute_tool(checked.tool_name, portfolio, service)
+        payload = _execute_tool(checked.tool_name, portfolio, service, args=checked.args)
         return RiskQueryResponse(
             intent=model_response.intent or _intent_for_tool(checked.tool_name),
             answer=_format_answer(checked.tool_name, payload),
@@ -361,7 +394,13 @@ class RiskQueryEngine:
         )
 
 
-def _execute_tool(tool_name: RiskToolName, portfolio: Portfolio, service) -> dict[str, Any]:
+def _execute_tool(
+    tool_name: RiskToolName,
+    portfolio: Portfolio,
+    service,
+    args: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    args = args or {}
     if tool_name == RiskToolName.GET_PORTFOLIO_SUMMARY:
         return _dump(service.summary(portfolio))
     if tool_name == RiskToolName.GET_VAR_ES:
@@ -372,6 +411,14 @@ def _execute_tool(tool_name: RiskToolName, portfolio: Portfolio, service) -> dic
         return {"limits": [_dump(item) for item in service.limits(portfolio)]}
     if tool_name == RiskToolName.GET_CONTRIBUTORS:
         return {"contributors": [_dump(item) for item in service.contributors(portfolio)[:5]]}
+    if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
+        return _dump(
+            service.explain_risk_change(
+                args["t0_run_id"],
+                args["t1_run_id"],
+                args.get("metric", "var_99"),
+            )
+        )
     raise ValueError(f"unsupported risk tool: {tool_name}")
 
 
@@ -415,6 +462,13 @@ def _format_answer(tool_name: RiskToolName, payload: dict[str, Any]) -> str:
             for item in contributors
         ]
         return "Top risk contributors: " + ", ".join(names) + "."
+    if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
+        return (
+            f"Metric {payload.get('metric')} changed from {_fmt(payload.get('previous_risk'))} "
+            f"to {_fmt(payload.get('current_risk'))} "
+            f"(total {_fmt(payload.get('total_change'))}); "
+            f"residual {_fmt(payload.get('residual'))}."
+        )
     raise ValueError(f"unsupported risk tool: {tool_name}")
 
 
@@ -429,6 +483,8 @@ def _intent_for_tool(tool_name: RiskToolName) -> str:
         return "limits"
     if tool_name == RiskToolName.GET_CONTRIBUTORS:
         return "contributors"
+    if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
+        return "explain_risk_change"
     raise ValueError(f"unsupported risk tool: {tool_name}")
 
 
@@ -444,6 +500,14 @@ def _fmt(value: Any) -> str:
 
 def _mentions(question: str, *terms: str) -> bool:
     return any(term in question for term in terms)
+
+
+def _is_risk_change_question(question: str) -> bool:
+    if not _mentions(question, "why", "explain"):
+        return False
+    if not _mentions(question, "var", "risk", "es", "expected shortfall", "dv01", "vega"):
+        return False
+    return _mentions(question, "change", "increase", "decrease", "moved", "up", "down")
 
 
 def _is_prompt_injection(question: str) -> bool:

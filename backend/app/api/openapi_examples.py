@@ -789,6 +789,100 @@ RESP_RISK_RUN_GET = {
 }
 
 
+EXAMPLE_RISK_RUN_COMPARE_REQUEST: dict[str, Any] = {
+    "t0_run_id": "run-t0",
+    "t1_run_id": "run-t1",
+    "metric": "var_99",
+}
+
+EXAMPLE_RISK_CHANGE_REPORT: dict[str, Any] = {
+    "t0_run_id": "run-t0",
+    "t1_run_id": "run-t1",
+    "metric": "var_99",
+    "unit": "currency loss",
+    "sign_convention": "positive total_change means the selected metric increased (more loss-risk for VaR/ES)",
+    "currency_convention": "T0/T1 portfolio currencies; this report does not FX-convert",
+    "previous_risk": 10000.0,
+    "current_risk": 12500.0,
+    "total_change": 2500.0,
+    "portfolio_trade_change": 1800.0,
+    "market_change": 600.0,
+    "explained_change": 2400.0,
+    "residual": 100.0,
+    "residual_name": "residual / interactions",
+    "disclosed_changes": [],
+    "identity": {
+        "changed_fields": ["market_snapshot_id"],
+        "t0": {
+            "run_id": "run-t0",
+            "portfolio_id": "demo-book",
+            "portfolio_version": 1,
+            "market_snapshot_id": "snap-t0",
+            "as_of": "current",
+            "historical_dataset_id": "demo-multi-factor-history",
+            "historical_dataset_version": "v1",
+            "pricing_engine_version": "builtin-0.3.0",
+            "methodology": "DELTA_GAMMA",
+            "scenario_set": [],
+            "calculation_config": None,
+            "status": "COMPLETED",
+        },
+        "t1": {
+            "run_id": "run-t1",
+            "portfolio_id": "demo-book",
+            "portfolio_version": 1,
+            "market_snapshot_id": "snap-t1",
+            "as_of": "current",
+            "historical_dataset_id": "demo-multi-factor-history",
+            "historical_dataset_version": "v1",
+            "pricing_engine_version": "builtin-0.3.0",
+            "methodology": "DELTA_GAMMA",
+            "scenario_set": [],
+            "calculation_config": None,
+            "status": "COMPLETED",
+        },
+    },
+    "factor_contributors": [
+        {
+            "factor_id": "EquitySpot:SPY",
+            "factor_type": "equity",
+            "factor": "SPY",
+            "bucket": "SPY",
+            "delta_risk": 600.0,
+        }
+    ],
+    "hierarchy_contributors": [
+        {
+            "level": "firm",
+            "name": "RiskForge",
+            "path": "RiskForge",
+            "delta_risk": 1800.0,
+            "position_id": None,
+            "children": [],
+        }
+    ],
+    "items": [
+        {"driver": "Position change eq-spy", "delta_risk": 1800.0},
+        {"driver": "EquitySpot:SPY", "delta_risk": 600.0},
+        {"driver": "residual / interactions", "delta_risk": 100.0},
+    ],
+}
+
+RISK_RUN_COMPARE_BODY_EXAMPLES: dict[str, dict[str, Any]] = {
+    "var_increase": _ex("Compare two completed RiskRuns", EXAMPLE_RISK_RUN_COMPARE_REQUEST),
+}
+
+RESP_RISK_RUN_COMPARE = {
+    200: success_response(
+        "Two-RiskRun risk-change explain (not a regulatory P&L-explain certification)",
+        {"illustrative": _ex("Illustrative RiskChangeReport", EXAMPLE_RISK_CHANGE_REPORT)},
+    ),
+    400: RESP_400,
+    404: RESP_404,
+    422: RESP_422,
+}
+
+
 # Paths covered by M7.4 (legacy; dual-mounted under /api/v1 as well).
 CRITICAL_OPENAPI_PATHS: tuple[tuple[str, str], ...] = (
     ("post", "/risk/var"),
@@ -803,6 +897,7 @@ CRITICAL_OPENAPI_PATHS: tuple[tuple[str, str], ...] = (
     ("post", "/risk/limits/drilldown"),
     ("post", "/risk/runs"),
     ("get", "/risk/runs/{run_id}"),
+    ("post", "/risk/runs/compare"),
 )
 
 # M7.3: OpenAPI component schema names expected for response_model= on critical paths.
@@ -821,4 +916,5 @@ TYPED_RESPONSE_SCHEMAS: tuple[tuple[str, str, str, str | None], ...] = (
     ("post", "/risk/limits/drilldown", "LimitDrilldownReport", None),
     ("post", "/risk/runs", "RiskRunView", None),
     ("get", "/risk/runs/{run_id}", "RiskRunView", None),
+    ("post", "/risk/runs/compare", "RiskChangeReport", None),
 )

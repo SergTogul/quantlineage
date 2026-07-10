@@ -9,6 +9,7 @@ import {
   spyFlatHedgePortfolio, defaultHedgeScenarios, stressFactorKeysFromPortfolio,
   riskRunStatus, riskRunStatusClass, isRiskRunTerminal, riskRunSummary, RISK_RUN_POLL_MS,
   spyScaledPortfolio, demoChangeAttributionRequest, riskChangeAttributionSummary,
+  riskChangeReportSummary,
   demoPnLAttributionRequest, overviewKpis, overviewCollage,
   SCENARIO_PRESETS, defaultScenarioForm, validateScenarioForm,
   esContributionSummary, ES_CONTRIBUTION_DIMENSIONS, varCompareSummary,
@@ -471,6 +472,43 @@ test('riskChangeAttributionSummary passes drivers / delta_risk through', () => {
   assert.deepEqual(s.drivers, ['New trades', 'Equity moves', 'Correlation / residual'])
   assert.equal(s.items[0].delta_risk, 20)
   assert.equal(riskChangeAttributionSummary(null), null)
+})
+
+test('riskChangeReportSummary passes run identity / contributors / residual through', () => {
+  const report = {
+    t0_run_id: 'run-t0',
+    t1_run_id: 'run-t1',
+    metric: 'var_99',
+    unit: 'currency loss',
+    sign_convention: 'positive total_change means the selected metric increased',
+    previous_risk: 100,
+    current_risk: 140,
+    total_change: 40,
+    portfolio_trade_change: 25,
+    market_change: 14,
+    explained_change: 39,
+    residual: 1,
+    residual_name: 'residual / interactions',
+    disclosed_changes: ['methodology'],
+    identity: {
+      changed_fields: ['methodology'],
+      t0: { run_id: 'run-t0', portfolio_id: 'demo', portfolio_version: 1 },
+      t1: { run_id: 'run-t1', portfolio_id: 'demo', portfolio_version: 2 },
+    },
+    factor_contributors: [{ factor_id: 'EquitySpot:SPY', factor_type: 'equity', factor: 'SPY', bucket: 'SPY', delta_risk: 14 }],
+    hierarchy_contributors: [{ level: 'trade', name: 'eq-spy', path: 'RiskForge/Global Macro/Equity/eq-spy', position_id: 'eq-spy', delta_risk: 25, children: [] }],
+    items: [{ driver: 'Position changes', delta_risk: 25 }],
+  }
+  const s = riskChangeReportSummary(report)
+  assert.equal(s.t0_run_id, 'run-t0')
+  assert.equal(s.t1_run_id, 'run-t1')
+  assert.equal(s.total_change, 40)
+  assert.equal(s.residual, 1)
+  assert.equal(s.unit, 'currency loss')
+  assert.equal(s.factor_contributors[0].factor_id, 'EquitySpot:SPY')
+  assert.equal(s.hierarchy_contributors[0].delta_risk, 25)
+  assert.deepEqual(s.disclosed_changes, ['methodology'])
+  assert.equal(riskChangeReportSummary(null), null)
 })
 
 test('esContributionSummary slices dimension and recon error', () => {

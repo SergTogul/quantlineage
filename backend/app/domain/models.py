@@ -1593,3 +1593,96 @@ class RiskRun(BaseModel):
             if self.error is None or not str(self.error).strip():
                 raise ValueError("FAILED runs require a non-empty error")
         return self
+
+
+RiskChangeMetric = Literal[
+    "var_99",
+    "var_95",
+    "expected_shortfall_99",
+    "dv01",
+    "vega",
+    "stress",
+]
+
+
+class RiskChangeFactorContributor(BaseModel):
+    """Typed factor driver of a risk-metric change (not a four-macro family label)."""
+
+    factor_id: str
+    factor_type: Literal["equity", "vol", "rate", "fx"]
+    factor: str
+    bucket: str
+    delta_risk: float
+
+
+class RiskChangeHierarchyContributor(BaseModel):
+    """Firm→Desk→Book→Trade node whose ``delta_risk`` is a trade-bucket allocation."""
+
+    level: Literal["firm", "desk", "book", "trade"]
+    name: str
+    path: str
+    delta_risk: float
+    position_id: str | None = None
+    children: list["RiskChangeHierarchyContributor"] = Field(default_factory=list)
+
+
+class RiskRunIdentitySnapshot(BaseModel):
+    """Identity fields surfaced for one side of a two-RiskRun compare."""
+
+    run_id: str
+    portfolio_id: str
+    portfolio_version: int | None = None
+    market_snapshot_id: str | None = None
+    as_of: str | None = None
+    historical_dataset_id: str | None = None
+    historical_dataset_version: str | None = None
+    pricing_engine_version: str | None = None
+    methodology: str | None = None
+    scenario_set: list[str] = Field(default_factory=list)
+    calculation_config: RiskRunCalculationConfig | None = None
+    status: RiskRunStatus
+
+
+class RiskRunIdentityDiff(BaseModel):
+    t0: RiskRunIdentitySnapshot
+    t1: RiskRunIdentitySnapshot
+    changed_fields: list[str] = Field(default_factory=list)
+
+
+class RiskChangeReport(BaseModel):
+    """Flagship two-RiskRun explain (Stage 10.2).
+
+    Units / signs (also on ``unit`` / ``sign_convention``):
+    - VaR/ES: currency loss; positive ``total_change`` = more loss-risk
+    - DV01: currency per 1bp; Vega: engine vega units
+    - Stress: scenario P&L (not loss); positive ``total_change`` = P&L increased
+
+    Reconciliation: ``portfolio_trade_change + market_change + residual
+    == total_change`` within abs 1e-6 or rel 1e-8. Factor contributors
+    reconcile to ``market_change``. Hierarchy *trade* rows reconcile to
+    ``portfolio_trade_change`` (not to non-additive VaR).
+    """
+
+    t0_run_id: str
+    t1_run_id: str
+    metric: RiskChangeMetric
+    unit: str
+    sign_convention: str
+    currency_convention: str = (
+        "T0/T1 portfolio currencies; this report does not FX-convert"
+    )
+    previous_risk: float
+    current_risk: float
+    total_change: float
+    portfolio_trade_change: float
+    market_change: float
+    explained_change: float
+    residual: float
+    residual_name: str = "residual / interactions"
+    identity: RiskRunIdentityDiff
+    disclosed_changes: list[str] = Field(default_factory=list)
+    factor_contributors: list[RiskChangeFactorContributor] = Field(default_factory=list)
+    hierarchy_contributors: list[RiskChangeHierarchyContributor] = Field(
+        default_factory=list
+    )
+    items: list[RiskChangeItem] = Field(default_factory=list)
