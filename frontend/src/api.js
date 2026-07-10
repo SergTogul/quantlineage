@@ -289,6 +289,21 @@ export function getRiskRun(runId) {
 }
 
 /**
+ * Flagship two-RiskRun explain → RiskChangeReport (Stage 10.2).
+ * Body: { t0_run_id, t1_run_id, metric }. Display only — no client-side risk math.
+ */
+export function compareRiskRuns(request) {
+  return json(`${API_V1}/risk/runs/compare`, {
+    method: 'POST',
+    body: JSON.stringify({
+      t0_run_id: request.t0_run_id,
+      t1_run_id: request.t1_run_id,
+      metric: request.metric ?? 'var_99',
+    }),
+  })
+}
+
+/**
  * Risk-metric change waterfall → RiskChangeAttributionReport (M8.10).
  * Body: RiskChangeAttributionRequest (previous/current portfolio ± markets).
  */

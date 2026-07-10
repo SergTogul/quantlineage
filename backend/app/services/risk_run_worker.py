@@ -39,6 +39,7 @@ from app.domain.models import (
     MarketSnapshot,
     Portfolio,
     RiskChangeAttributionRequest,
+    RiskChangeReport,
     RiskRun,
     RiskRunStatus,
     VaRMethodology,
@@ -53,8 +54,10 @@ from app.persistence.sqlalchemy_repos import (
     SqlAlchemyRiskRunRepository,
 )
 from app.risk.historical import HistoricalRiskEngine
+from app.risk.risk_run_compare import BoundRiskRun, explain_risk_runs
 from app.services.portfolio_service import PortfolioService
 from app.services.risk_factories import (
+    build_historical_risk_engine_for_spec,
     portfolio_service_for_spec,
     request_blob_for_execute,
     resolve_execute_spec,
@@ -289,6 +292,8 @@ class RiskRunWorker:
             self._memory_repo = InMemoryRiskRunRepository()
         self._max_workers = max_workers
         self._portfolios: dict[str, Portfolio] = {}
+        self._completed_portfolios: dict[str, Portfolio] = {}
+        self._completed_markets: dict[str, MarketSnapshot] = {}
         self._portfolios_lock = threading.Lock()
         self._executor_lock = threading.Lock()
         self._executor = ThreadPoolExecutor(
@@ -444,6 +449,7 @@ class RiskRunWorker:
         run = self._with_service(_enqueue)
         with self._portfolios_lock:
             self._portfolios[rid] = book.model_copy(deep=True)
+            self._completed_portfolios[rid] = book.model_copy(deep=True)
 
         should_execute = (not external_worker_enabled()) if execute is None else bool(execute)
         if should_execute:
@@ -455,6 +461,108 @@ class RiskRunWorker:
         if not allow_run_read(run.owner, principal):
             raise PortfolioAccessDenied(run.portfolio_id)
         return self._to_view(run)
+
+    def _bound_portfolio(self, run: RiskRun) -> Portfolio:
+        with self._portfolios_lock:
+            book = self._completed_portfolios.get(run.id) or self._portfolios.get(run.id)
+        if book is not None:
+            return book.model_copy(deep=True)
+        loaded = self._load_portfolio(run.portfolio_id)
+        if loaded is None:
+            raise ValueError(f"portfolio payload missing for completed run {run.id}")
+        return loaded
+
+    def _bound_market(self, run: RiskRun, portfolio: Portfolio) -> MarketSnapshot:
+        with self._portfolios_lock:
+            cached = self._completed_markets.get(run.id)
+        if cached is not None:
+            return cached.model_copy(deep=True)
+        if run.market_snapshot_id:
+            market = self._load_market_snapshot(run.market_snapshot_id)
+            if market is None:
+                raise ValueError(f"market snapshot {run.market_snapshot_id!r} not found")
+            return market
+        return self._portfolio_service.market_snapshot(portfolio)
+
+    @staticmethod
+    def _persisted_metrics(payloads: dict[str, dict[str, Any]] | None) -> dict[str, float]:
+        out: dict[str, float] = {}
+        if not payloads:
+            return out
+        for payload in payloads.values():
+            if not isinstance(payload, dict):
+                continue
+            for key in ("var_99", "var_95", "expected_shortfall_99", "dv01", "vega"):
+                raw = payload.get(key)
+                if isinstance(raw, int | float):
+                    out[key] = float(raw)
+            items = payload.get("items")
+            if isinstance(items, list) and items:
+                first = items[0]
+                if isinstance(first, dict) and isinstance(first.get("pnl"), int | float):
+                    out.setdefault("stress", float(first["pnl"]))
+        return out
+
+    def compare_runs(
+        self,
+        t0_run_id: str,
+        t1_run_id: str,
+        *,
+        metric: str = "var_99",
+        principal: str | None = None,
+    ) -> RiskChangeReport:
+        t0 = self._with_service(lambda svc: svc.get(t0_run_id))
+        t1 = self._with_service(lambda svc: svc.get(t1_run_id))
+        if not allow_run_read(t0.owner, principal):
+            raise PortfolioAccessDenied(t0.portfolio_id)
+        if not allow_run_read(t1.owner, principal):
+            raise PortfolioAccessDenied(t1.portfolio_id)
+        if t0.status != RiskRunStatus.COMPLETED or t1.status != RiskRunStatus.COMPLETED:
+            raise ValueError("both RiskRuns must be COMPLETED")
+        p0 = self._bound_portfolio(t0)
+        p1 = self._bound_portfolio(t1)
+        m0 = self._bound_market(t0, p0)
+        m1 = self._bound_market(t1, p1)
+        payloads0 = self._with_service(lambda svc: svc.get_result_payloads(t0.id))
+        payloads1 = self._with_service(lambda svc: svc.get_result_payloads(t1.id))
+        engine = getattr(self._portfolio_service, "risk", None)
+        spec0 = resolve_execute_spec(
+            t0, risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None
+        )
+        spec1 = resolve_execute_spec(
+            t1, risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None
+        )
+        engine_t0 = (
+            engine
+            if isinstance(engine, HistoricalRiskEngine)
+            else build_historical_risk_engine_for_spec(spec0)
+        )
+        if (
+            spec0.historical_dataset_id != spec1.historical_dataset_id
+            or spec0.historical_dataset_version != spec1.historical_dataset_version
+            or spec0.calculation_config != spec1.calculation_config
+        ):
+            engine_t1: HistoricalRiskEngine | None = build_historical_risk_engine_for_spec(spec1)
+        else:
+            engine_t1 = None
+        return explain_risk_runs(
+            BoundRiskRun(
+                run=t0,
+                portfolio=p0,
+                market=m0,
+                persisted_metrics=self._persisted_metrics(payloads0),
+            ),
+            BoundRiskRun(
+                run=t1,
+                portfolio=p1,
+                market=m1,
+                persisted_metrics=self._persisted_metrics(payloads1),
+            ),
+            metric=metric,
+            pricing=self._portfolio_service.pricing,
+            risk_engine=engine_t0 if isinstance(engine_t0, HistoricalRiskEngine) else None,
+            t1_risk_engine=engine_t1,
+        )
 
     def poll_once(self, *, limit: int = 10) -> int:
         """Claim up to ``limit`` QUEUED runs and schedule execution.
@@ -479,6 +587,7 @@ class RiskRunWorker:
                     continue
                 with self._portfolios_lock:
                     self._portfolios[run.id] = portfolio.model_copy(deep=True)
+                    self._completed_portfolios[run.id] = portfolio.model_copy(deep=True)
             with self._futures_lock:
                 existing = self._futures.get(run.id)
                 if existing is not None and not existing.done():
@@ -532,6 +641,10 @@ class RiskRunWorker:
                         )
                     )
                     return
+            with self._portfolios_lock:
+                self._completed_portfolios[run_id] = portfolio.model_copy(deep=True)
+                if market is not None:
+                    self._completed_markets[run_id] = market.model_copy(deep=True)
             run_service = portfolio_service_for_spec(
                 self._portfolio_service, spec, market=market
             )

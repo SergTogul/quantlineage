@@ -372,6 +372,12 @@ def test_attribution_routes_refused_when_external_worker(
                 },
             )
         )
+        _assert_refused_inline(
+            client.post(
+                "/api/v1/risk/runs/compare",
+                json={"t0_run_id": "run-t0", "t1_run_id": "run-t1", "metric": "var_99"},
+            )
+        )
 
 
 def test_stress_attr_limits_refused_when_heavy_inline_disabled(

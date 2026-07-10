@@ -45,6 +45,7 @@ _CRITICAL_PATHS = (
     ("POST", "/risk/limits/drilldown"),
     ("POST", "/risk/runs"),
     ("GET", "/risk/runs/{run_id}"),
+    ("POST", "/risk/runs/compare"),
     ("POST", "/api/v1/risk/runs"),
     ("GET", "/api/v1/health"),
     ("GET", "/api/v1/portfolio"),

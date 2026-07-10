@@ -705,6 +705,35 @@ export function riskChangeAttributionSummary(report) {
   }
 }
 
+/**
+ * Display parse for flagship RiskChangeReport. Passes backend fields through —
+ * no client-side VaR / residual math.
+ */
+export function riskChangeReportSummary(report) {
+  if (!report) return null
+  return {
+    t0_run_id: report.t0_run_id,
+    t1_run_id: report.t1_run_id,
+    metric: report.metric,
+    unit: report.unit,
+    sign_convention: report.sign_convention,
+    currency_convention: report.currency_convention,
+    previous_risk: report.previous_risk,
+    current_risk: report.current_risk,
+    total_change: report.total_change,
+    portfolio_trade_change: report.portfolio_trade_change,
+    market_change: report.market_change,
+    explained_change: report.explained_change,
+    residual: report.residual,
+    residual_name: report.residual_name || 'residual / interactions',
+    disclosed_changes: report.disclosed_changes || [],
+    identity: report.identity || null,
+    factor_contributors: report.factor_contributors || [],
+    hierarchy_contributors: report.hierarchy_contributors || [],
+    items: report.items || [],
+  }
+}
+
 /** ES contribution dimension keys on ESContributionReport. */
 export const ES_CONTRIBUTION_DIMENSIONS = [
   'by_position',

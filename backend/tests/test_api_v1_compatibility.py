@@ -29,6 +29,7 @@ _DUAL_MOUNTED_PATHS = (
     ("POST", "/risk/limits/drilldown"),
     ("POST", "/risk/runs"),
     ("GET", "/risk/runs/{run_id}"),
+    ("POST", "/risk/runs/compare"),
 )
 
 _API_V1 = "/api/v1"

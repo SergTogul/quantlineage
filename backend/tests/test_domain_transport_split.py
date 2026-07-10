@@ -33,6 +33,7 @@ HTTP_TRANSPORT_NAMES = frozenset(
         "EsRiskRunRequest",
         "VarCompareRiskRunRequest",
         "AttributionDemoRiskRunRequest",
+        "RiskRunCompareRequest",
         "RiskRunCreateRequest",
         "RiskRunResultView",
         "RiskRunView",

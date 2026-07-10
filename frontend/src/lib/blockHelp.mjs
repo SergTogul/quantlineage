@@ -43,7 +43,7 @@ const entries = {
   },
   'risk-change-attribution': {
     body:
-      'Waterfall of Δ(VaR or ES) between previous and current books. Drivers are position/market deltas from the change-attribution engine; residual = total − explained (not P&L Explain).',
+      'Waterfall or two-RiskRun explain of Δ(VaR/ES/DV01/Vega/stress). Drivers, residual, and identity come from the backend payload; the UI does not compute risk.',
   },
   'stress-pnl-heatmap': {
     body:

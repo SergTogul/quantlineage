@@ -279,6 +279,23 @@ def dump_risk_run_request(body: RiskRunRequestBody) -> dict[str, Any]:
     return body.model_dump(mode="json", exclude_none=True)
 
 
+class RiskRunCompareRequest(FiniteInputMixin):
+    """POST /risk/runs/compare — flagship two-RiskRun explain (Stage 10.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    t0_run_id: str = Field(min_length=1)
+    t1_run_id: str = Field(min_length=1)
+    metric: Literal[
+        "var_99",
+        "var_95",
+        "expected_shortfall_99",
+        "dv01",
+        "vega",
+        "stress",
+    ] = "var_99"
+
+
 class RiskRunCreateRequest(FiniteInputMixin):
     """POST /risk/runs body (M5.4). Mounted under ``/risk`` until M7.2 ``/api/v1``."""
 

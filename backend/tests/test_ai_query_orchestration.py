@@ -96,6 +96,26 @@ class _FixtureService:
             )
         ]
 
+    def explain_risk_change(
+        self,
+        t0_run_id: str,
+        t1_run_id: str,
+        metric: str = "var_99",
+    ) -> _FixturePayload:
+        self.calls.append("explain_risk_change")
+        return _FixturePayload(
+            {
+                "t0_run_id": t0_run_id,
+                "t1_run_id": t1_run_id,
+                "metric": metric,
+                "previous_risk": 100.0,
+                "current_risk": 140.0,
+                "total_change": 40.0,
+                "residual": 1.0,
+                "explained_change": 39.0,
+            }
+        )
+
 
 class _ScriptedModel:
     def __init__(self, response: RiskAssistantModelResponse) -> None:
@@ -418,3 +438,65 @@ def test_rf019_model_refusal_cannot_smuggle_invented_numbers() -> None:
     assert response.tool_name is None
     assert "999" not in response.answer
     assert not any(ch.isdigit() for ch in response.answer)
+
+
+def test_explain_risk_change_is_allowlisted_and_validates_run_ids() -> None:
+    assert RiskToolName.EXPLAIN_RISK_CHANGE.value == "explain_risk_change"
+    contracts = {item["name"]: item for item in tool_contract_schemas()}
+    assert "explain_risk_change" in contracts
+    assert "deterministic" in contracts["explain_risk_change"]["numeric_source"]
+    schemas = tool_json_schemas()
+    required = set(schemas["explain_risk_change"].get("required") or [])
+    assert {"t0_run_id", "t1_run_id"} <= required
+
+    missing = validate_tool_call("explain_risk_change", {})
+    assert not missing.allowed
+    ok = validate_tool_call(
+        "explain_risk_change",
+        {"t0_run_id": "run-t0", "t1_run_id": "run-t1", "metric": "var_99"},
+    )
+    assert ok.allowed
+    assert ok.tool_name == RiskToolName.EXPLAIN_RISK_CHANGE
+    extra = validate_tool_call(
+        "explain_risk_change",
+        {"t0_run_id": "run-t0", "t1_run_id": "run-t1", "invented_var": 999},
+    )
+    assert not extra.allowed
+
+
+def test_why_did_var_increase_routes_to_explain_or_clarification() -> None:
+    engine = RiskQueryEngine()
+    service = _FixtureService()
+    plan = engine.route("Why did VaR increase?")
+    assert plan.tool_name == RiskToolName.EXPLAIN_RISK_CHANGE
+    assert plan.needs_clarification
+
+    response = engine.answer("Why did VaR increase?", SAMPLE_PORTFOLIO, service)
+    assert service.calls == []
+    assert response.tool_name is None or response.requires_clarification
+    assert response.requires_clarification
+    assert response.data["tool_result"] is None
+    assert not any(ch.isdigit() for ch in response.answer)
+    assert "var" in response.answer.lower() or "risk run" in response.answer.lower()
+
+
+def test_explain_risk_change_model_loop_summarizes_payload_only() -> None:
+    engine = RiskQueryEngine()
+    service = _FixtureService()
+    model = _ScriptedModel(
+        RiskAssistantModelResponse(
+            tool_name=RiskToolName.EXPLAIN_RISK_CHANGE,
+            tool_args={"t0_run_id": "run-t0", "t1_run_id": "run-t1", "metric": "var_99"},
+            intent="explain_risk_change",
+        )
+    )
+    response = engine.answer_with_model(
+        "Why did VaR increase?", SAMPLE_PORTFOLIO, service, model
+    )
+    assert service.calls == ["explain_risk_change"]
+    payload = response.data["tool_result"]
+    assert payload["total_change"] == 40.0
+    assert payload["residual"] == 1.0
+    assert "40" in response.answer
+    assert "1" in response.answer
+    assert response.tool_name == "explain_risk_change"

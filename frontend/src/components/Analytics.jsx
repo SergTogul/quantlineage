@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react'
 import {
-  changeAttribution, compareVarMethodologies, createRiskRun, esContributions, explainPnL,
-  explainPnLDemo, getRiskRun,
+  changeAttribution, compareRiskRuns, compareVarMethodologies, createRiskRun, esContributions, explainPnL,
+  explainPnLDemo, getRiskRun, API_V1,
 } from '../api'
 import BlockHelp from './BlockHelp'
 import {
   money, topFactors, varMethod, hierarchySummary, hierarchyNodeAtPath, hierarchyChildRows,
   hierarchyNodeMetrics, attributionSummary,
   isRiskRunTerminal, riskRunStatus, riskRunStatusClass, riskRunSummary, RISK_RUN_POLL_MS,
-  demoChangeAttributionRequest, riskChangeAttributionSummary, demoPnLAttributionRequest,
+  demoChangeAttributionRequest, riskChangeAttributionSummary, riskChangeReportSummary, demoPnLAttributionRequest,
+  spyScaledPortfolio,
   esContributionSummary, ES_CONTRIBUTION_DIMENSIONS, varCompareSummary,
 } from '../lib/risk.mjs'
 
 const RISK_RUN_TYPES = ['summary', 'var', 'stress', 'factors', 'limits', 'hierarchy', 'contributors']
 const VAR_METHODS = ['LINEAR', 'DELTA_GAMMA', 'FULL_REVALUATION']
-const CHANGE_ATTR_METRICS = ['var_99', 'var_95', 'expected_shortfall_99']
+const WATERFALL_METRICS = ['var_99', 'var_95', 'expected_shortfall_99']
+const CHANGE_ATTR_METRICS = ['var_99', 'var_95', 'expected_shortfall_99', 'dv01', 'vega', 'stress']
 const PNL_MODES = [
   { id: 'position', label: 'SPY×1.5 position change (/attribution)' },
   { id: 'market_demo', label: 'Illustrative market move (/attribution/demo)' },
@@ -415,31 +417,70 @@ export function RiskRuns({ portfolio }) {
 }
 
 /**
- * M8.10: risk-metric change waterfall. Displays RiskChangeAttributionReport from API only.
- * Demo: previous book → current with SPY equity ×1.5.
+ * Stage 10.2: Why Did My Risk Change. Displays backend payloads only — no client-side risk math.
+ * Demo: SPY×1.5 waterfall (legacy) or one-click T0/T1 RiskRun pair.
  */
 export function RiskChangeAttribution({ portfolio }) {
   const [metric, setMetric] = useState('var_99')
   const [methodology, setMethodology] = useState('DELTA_GAMMA')
   const [summary, setSummary] = useState(null)
+  const [flagship, setFlagship] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function run() {
+  async function runWaterfall() {
     if (!portfolio) return
     setLoading(true)
     setError('')
     try {
       const request = demoChangeAttributionRequest(portfolio, { metric, methodology })
       const report = await changeAttribution(request)
+      setFlagship(null)
       setSummary(riskChangeAttributionSummary(report))
     } catch (e) {
       setError(e.message || 'Change attribution failed')
       setSummary(null)
+      setFlagship(null)
     } finally {
       setLoading(false)
     }
   }
+
+  async function runT0T1() {
+    if (!portfolio) return
+    setLoading(true)
+    setError('')
+    try {
+      const t0 = await createRiskRun(portfolio, { run_type: 'summary', request: { methodology } })
+      const t1Book = spyScaledPortfolio(portfolio, 1.5)
+      const t1 = await createRiskRun(t1Book, { run_type: 'summary', request: { methodology } })
+      let left = t0
+      let right = t1
+      while (!isRiskRunTerminal(left) || !isRiskRunTerminal(right)) {
+        await new Promise((resolve) => setTimeout(resolve, RISK_RUN_POLL_MS))
+        if (!isRiskRunTerminal(left)) left = await getRiskRun(left.id)
+        if (!isRiskRunTerminal(right)) right = await getRiskRun(right.id)
+      }
+      if (left.status !== 'COMPLETED' || right.status !== 'COMPLETED') {
+        throw new Error(left.error_message || right.error_message || 'Risk run failed')
+      }
+      const report = await compareRiskRuns({
+        t0_run_id: left.id,
+        t1_run_id: right.id,
+        metric,
+      })
+      setSummary(null)
+      setFlagship(riskChangeReportSummary(report))
+    } catch (e) {
+      setError(e.message || 'Risk-run compare failed')
+      setSummary(null)
+      setFlagship(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const waterfallDisabled = loading || !WATERFALL_METRICS.includes(metric)
 
   return (
     <div className="card">
@@ -448,7 +489,8 @@ export function RiskChangeAttribution({ portfolio }) {
         <BlockHelp id="risk-change-attribution" />
       </div>
       <div className="muted">
-        VaR/ES waterfall after SPY×1.5 — POST /api/v1/risk/change-attribution (not P&amp;L Explain)
+        Why did risk change — two COMPLETED RiskRuns (POST /api/v1/risk/runs/compare) or SPY×1.5 waterfall.
+        UI displays the backend payload only.
       </div>
       <div className="inline-form risk-run-form">
         <select
@@ -467,12 +509,16 @@ export function RiskChangeAttribution({ portfolio }) {
         >
           {VAR_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
-        <button type="button" onClick={run} disabled={!portfolio || loading}>
+        <button type="button" onClick={runWaterfall} disabled={!portfolio || waterfallDisabled}>
           {loading ? 'Attributing…' : 'Run attribution'}
+        </button>
+        <button type="button" onClick={runT0T1} disabled={!portfolio || loading}>
+          {loading ? 'Comparing…' : 'Compare T0/T1'}
         </button>
       </div>
       {error && <div className="error risk-run-error">{error}</div>}
-      {!summary && !error && <div className="muted foot">No attribution run yet</div>}
+      {!summary && !flagship && !error && <div className="muted foot">No attribution run yet</div>}
+      {flagship && <RiskChangeFlagshipPanel report={flagship} />}
       {summary && (
         <div className="risk-panel-result">
           <div className="muted foot">{summary.metric}</div>
@@ -507,6 +553,102 @@ export function RiskChangeAttribution({ portfolio }) {
       )}
     </div>
   )
+}
+
+function RiskChangeFlagshipPanel({ report }) {
+  const [path, setPath] = useState(null)
+  const tree = report.hierarchy_contributors || []
+  const node = hierarchyNodeAtPathFromContributors(tree, path) || tree[0]
+  const children = node?.children || []
+
+  return (
+    <div className="risk-panel-result">
+      <div className="muted foot">
+        {report.metric} · {report.unit}
+      </div>
+      <div className="muted foot">{report.sign_convention}</div>
+      <div className="muted foot">
+        <a href={`${API_V1}/risk/runs/${encodeURIComponent(report.t0_run_id)}`}>{report.t0_run_id}</a>
+        {' → '}
+        <a href={`${API_V1}/risk/runs/${encodeURIComponent(report.t1_run_id)}`}>{report.t1_run_id}</a>
+      </div>
+      {(report.disclosed_changes || []).length > 0 && (
+        <div className="muted foot">Changed inputs: {(report.disclosed_changes || []).join(', ')}</div>
+      )}
+      <div className="attribution-total">
+        <span>
+          {money(report.previous_risk ?? 0)} → {money(report.current_risk ?? 0)}
+          {' '}(<strong className={(report.total_change ?? 0) < 0 ? 'negative' : 'positive'}>
+            {money(report.total_change ?? 0)}
+          </strong>)
+        </span>
+        <span>Trade {money(report.portfolio_trade_change ?? 0)}</span>
+        <span>Market {money(report.market_change ?? 0)}</span>
+        <span className={`attribution-residual ${(report.residual ?? 0) < 0 ? 'negative' : 'positive'}`}>
+          {report.residual_name || 'residual / interactions'}{' '}
+          <strong>{money(report.residual ?? 0)}</strong>
+        </span>
+      </div>
+      {(report.factor_contributors || []).length > 0 && (
+        <table>
+          <thead><tr><th>Factor</th><th>Δ Risk</th></tr></thead>
+          <tbody>{report.factor_contributors.map((x) => (
+            <tr key={x.factor_id}>
+              <td>{x.factor_id}</td>
+              <td className={(x.delta_risk ?? 0) < 0 ? 'negative' : 'positive'}>
+                {money(x.delta_risk ?? 0)}
+              </td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+      {node && (
+        <div>
+          <div className="muted foot">
+            Drilldown {node.level}: {node.path || node.name}
+            {path && (
+              <button type="button" className="linkish" onClick={() => setPath(parentContributorPath(path))}>
+                Up
+              </button>
+            )}
+          </div>
+          {children.length > 0 && (
+            <table>
+              <thead><tr><th>Node</th><th>Δ Risk</th></tr></thead>
+              <tbody>{children.map((child) => (
+                <tr key={child.path}>
+                  <td>
+                    <button type="button" className="linkish" onClick={() => setPath(child.path)}>
+                      {child.level} {child.name}
+                    </button>
+                  </td>
+                  <td className={(child.delta_risk ?? 0) < 0 ? 'negative' : 'positive'}>
+                    {money(child.delta_risk ?? 0)}
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function hierarchyNodeAtPathFromContributors(nodes, path) {
+  if (!path) return nodes?.[0] || null
+  const stack = [...(nodes || [])]
+  while (stack.length) {
+    const node = stack.shift()
+    if (node.path === path) return node
+    for (const child of node.children || []) stack.push(child)
+  }
+  return nodes?.[0] || null
+}
+
+function parentContributorPath(path) {
+  if (!path || !path.includes('/')) return null
+  return path.split('/').slice(0, -1).join('/') || null
 }
 
 /**
