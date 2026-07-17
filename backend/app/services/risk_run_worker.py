@@ -470,6 +470,11 @@ class RiskRunWorker:
         loaded = self._load_portfolio(run.portfolio_id)
         if loaded is None:
             raise ValueError(f"portfolio payload missing for completed run {run.id}")
+        if run.portfolio_version is None or loaded.version != run.portfolio_version:
+            raise ValueError(
+                f"cannot bind run {run.id}: live book version {loaded.version!r} "
+                f"does not match run portfolio_version {run.portfolio_version!r}"
+            )
         return loaded
 
     def _bound_market(self, run: RiskRun, portfolio: Portfolio) -> MarketSnapshot:

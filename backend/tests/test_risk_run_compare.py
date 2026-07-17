@@ -14,10 +14,12 @@ Quant contract:
 """
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.market_fixtures import FixedMarketProvider, equity_spots_market
 
 from app.domain.models import (
     EquityPosition,
@@ -29,6 +31,7 @@ from app.domain.models import (
     RiskRunStatus,
     VaRMethodology,
 )
+from app.persistence.memory_repos import InMemoryRiskRunRepository
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.risk_run_compare import (
@@ -36,6 +39,8 @@ from app.risk.risk_run_compare import (
     assert_risk_change_reconciles,
     explain_risk_runs,
 )
+from app.services.portfolio_service import PortfolioService
+from app.services.risk_run_worker import RiskRunWorker
 
 _ABS_TOL = 1e-06
 _REL_TOL = 1e-08
@@ -357,8 +362,6 @@ def test_compare_api_contract_and_fail_closed() -> None:
 
 
 def _wait_terminal(client: TestClient, run_id: str, *, timeout_s: float = 30.0):
-    import time
-
     deadline = time.time() + timeout_s
     last = None
     while time.time() < deadline:
@@ -369,3 +372,104 @@ def _wait_terminal(client: TestClient, run_id: str, *, timeout_s: float = 30.0):
             return last
         time.sleep(0.05)
     raise AssertionError(f"run {run_id} did not finish; last={last}")
+
+
+def _summary_payload(portfolio_id: str) -> dict:
+    return {
+        "portfolio_id": portfolio_id,
+        "market_value": 1.0,
+        "delta": 0.0,
+        "gamma": 0.0,
+        "vega": 0.0,
+        "dv01": 0.0,
+        "fx_delta": 0.0,
+        "var_95": 10.0,
+        "var_99": 12.0,
+        "expected_shortfall_99": 14.0,
+        "methodology": "DELTA_GAMMA",
+    }
+
+
+def _worker_for_bind() -> RiskRunWorker:
+    svc = PortfolioService(
+        BuiltinPricingEngine(),
+        HistoricalRiskEngine(seed=1, observations=8),
+        market_data=FixedMarketProvider(
+            equity_spots_market({"SPY": 500.0, "NVDA": 120.0}, vols={"SPY": 0.16, "NVDA": 0.35})
+        ),
+    )
+    return RiskRunWorker(svc, repo=InMemoryRiskRunRepository(), max_workers=1)
+
+
+def _finish(worker: RiskRunWorker, run_id: str) -> None:
+    worker._with_service(lambda svc: svc.start(run_id))
+    worker._with_service(
+        lambda svc: svc.complete(
+            run_id,
+            result_type="summary",
+            payload=_summary_payload("cmp-book"),
+        )
+    )
+
+
+def _drop_bound_cache(worker: RiskRunWorker) -> None:
+    with worker._portfolios_lock:
+        worker._completed_portfolios.clear()
+        worker._portfolios.clear()
+
+
+def test_compare_does_not_attribute_mutated_live_book_on_cache_miss() -> None:
+    """Cache miss + version mismatch must fail closed, not explain vs the current book.
+
+    After a worker restart the submit-time cache is empty. Loading the mutated
+    live book for both T0 and T1 would drop T0's version and attribute ~zero
+    trade change even though the run identities differ.
+    """
+    worker = _worker_for_bind()
+    t0_book = _tiny_book(spy_qty=100.0)
+    t1_book = _tiny_book(spy_qty=150.0)
+    try:
+        t0 = worker.submit(portfolio=t0_book, run_type="summary", execute=False)
+        t1 = worker.submit(portfolio=t1_book, run_type="summary", execute=False)
+        assert t0.portfolio_version == 1
+        assert t1.portfolio_version == 1
+        _finish(worker, t0.id)
+        _finish(worker, t1.id)
+
+        live = _tiny_book(spy_qty=999.0).model_copy(update={"version": 2})
+        worker._load_portfolio = lambda _pid: live  # type: ignore[method-assign]
+        _drop_bound_cache(worker)
+
+        with pytest.raises(ValueError, match="portfolio_version"):
+            worker.compare_runs(t0.id, t1.id)
+    finally:
+        worker.shutdown(wait=False)
+
+
+def test_bound_portfolio_uses_live_book_when_versions_match() -> None:
+    worker = _worker_for_bind()
+    book = _tiny_book(spy_qty=100.0)
+    try:
+        view = worker.submit(portfolio=book, run_type="summary", execute=False)
+        run = worker._with_service(lambda svc: svc.get(view.id))
+        live = _tiny_book(spy_qty=100.0)
+        assert live.version == run.portfolio_version == 1
+        worker._load_portfolio = lambda _pid: live  # type: ignore[method-assign]
+        _drop_bound_cache(worker)
+        bound = worker._bound_portfolio(run)
+        assert bound.version == 1
+        assert bound.positions[0].quantity == 100.0
+    finally:
+        worker.shutdown(wait=False)
+
+
+def test_bound_portfolio_fails_closed_when_run_version_missing() -> None:
+    worker = _worker_for_bind()
+    try:
+        run = _completed_run("legacy-unversioned", _tiny_book(), _market())
+        run = run.model_copy(update={"portfolio_version": None})
+        worker._load_portfolio = lambda _pid: _tiny_book()  # type: ignore[method-assign]
+        with pytest.raises(ValueError, match="portfolio_version"):
+            worker._bound_portfolio(run)
+    finally:
+        worker.shutdown(wait=False)
