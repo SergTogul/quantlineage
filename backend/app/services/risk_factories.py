@@ -29,6 +29,7 @@ from app.domain.models import (
     RiskRunCalculationConfig,
     as_of_wire,
 )
+from app.interfaces.pricing import PricingEngine
 from app.market.snapshot import FixedMarketDataProvider
 from app.pricing.factory import create_pricing_engine
 from app.risk.factor_panel import factor_panel_from_dataset, truncate_factor_panel
@@ -307,6 +308,33 @@ def resize_historical_risk_engine(
         dataset=dataset,
         factor_panel=new_panel,
     )
+
+
+def bind_pricing_engine(
+    pricing_engine_version: str | None,
+    *,
+    fallback: PricingEngine | None = None,
+) -> PricingEngine:
+    """Bind a pricing adapter from a run's ``pricing_engine_version``.
+
+    Unset versions use ``fallback`` (the process engine that execute used).
+    Unknown versions fail closed — they are never silently ignored.
+    """
+    raw = (pricing_engine_version or "").strip()
+    if not raw:
+        if fallback is None:
+            raise ValueError("pricing_engine_version missing; cannot bind pricing")
+        return fallback
+    key = raw.lower()
+    if key.startswith("builtin"):
+        from app.pricing.builtin import BuiltinPricingEngine
+
+        return BuiltinPricingEngine()
+    if key.startswith("quantlib"):
+        from app.pricing.quantlib import QuantLibPricingEngine
+
+        return QuantLibPricingEngine()
+    raise ValueError(f"cannot bind pricing engine version {pricing_engine_version!r}")
 
 
 def build_historical_risk_engine_for_spec(

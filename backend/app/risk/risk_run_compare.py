@@ -21,8 +21,9 @@ DV01 / Vega
     identity is unchanged.
 
 Stress
-    Scenario P&L diffs (not loss). Sign is P&L; the report unit/sign fields
-    label that explicitly.
+    Scenario P&L diffs (not loss) for each run's declared ``scenario_set``
+    (fail closed if empty or unknown). Sign is P&L; the report unit/sign
+    fields label that explicitly.
 
 Quant contract
 --------------
@@ -30,7 +31,8 @@ Quant contract
 - Sensitivity unit: VaR/ES currency loss; DV01 currency per 1bp; Vega engine units;
   stress scenario P&L.
 - Sign: positive ``delta_risk`` / ``total_change`` means the selected metric
-  increased (more loss-risk for VaR/ES). Stress keeps P&L sign.
+  increased (more loss-risk for VaR/ES). DV01/Vega are the metric increase
+  in their native units. Stress keeps P&L sign.
 - Currency/notional: T0/T1 portfolio currencies; no FX conversion here.
 - Base market: T0 run's bound snapshot / as_of / dataset. T1 is comparison.
 - Reconciliation: ``portfolio_trade_change + market_change + residual ==
@@ -71,7 +73,8 @@ from app.risk.factor_types import (
     factor_column_id,
 )
 from app.risk.historical import HistoricalRiskEngine
-from app.risk.stress import StressEngine, default_scenarios
+from app.risk.scenario_model import BroadcastScenarioDefinition, expand_broadcast_definition
+from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS, StressEngine
 
 _ABS_TOL = 1e-06
 _REL_TOL = 1e-08
@@ -171,11 +174,39 @@ def _unit(metric: str) -> str:
 def _sign_convention(metric: str) -> str:
     if metric == "stress":
         return "positive total_change means scenario P&L increased (P&L sign, not loss)"
+    if metric == "dv01":
+        return "positive total_change means DV01 increased (currency per 1bp)"
+    if metric == "vega":
+        return "positive total_change means vega increased (engine vega units)"
     return "positive total_change means the selected metric increased (more loss-risk for VaR/ES)"
 
 
 def _methodology(run: RiskRun) -> VaRMethodology:
     return run.methodology or VaRMethodology.DELTA_GAMMA
+
+
+def _scenario_library() -> dict[str, BroadcastScenarioDefinition]:
+    out: dict[str, BroadcastScenarioDefinition] = {}
+    for item in (*DEFAULT_SCENARIOS, *THREAT_SCENARIOS):
+        if item.id:
+            out[item.id] = item
+    return out
+
+
+def _resolve_stress_scenarios(run: RiskRun, market: MarketSnapshot) -> list:
+    ids = list(run.scenario_set)
+    if not ids:
+        raise ValueError(f"run {run.id} has empty scenario_set; cannot compute stress")
+    library = _scenario_library()
+    resolved = []
+    for sid in ids:
+        defn = library.get(sid)
+        if defn is None:
+            raise ValueError(f"unknown scenario {sid!r} in run {run.id} scenario_set")
+        resolved.append(expand_broadcast_definition(defn, market))
+    if not resolved:
+        raise ValueError(f"run {run.id} scenario_set resolved empty")
+    return resolved
 
 
 def _metric_value(
@@ -186,11 +217,14 @@ def _metric_value(
     market: MarketSnapshot,
     methodology: VaRMethodology,
     metric: str,
+    run: RiskRun,
 ) -> float:
     if metric == "stress":
-        scenarios = default_scenarios(market)[:1]
+        scenarios = _resolve_stress_scenarios(run, market)
         rows = StressEngine().run(portfolio, pricing, scenarios, market=market)
-        return float(rows[0].pnl) if rows else 0.0
+        if not rows:
+            raise ValueError(f"run {run.id} stress produced no scenario P&L")
+        return float(rows[0].pnl)
     summary = engine.calculate(portfolio, pricing, methodology=methodology, market=market)
     return float(getattr(summary, metric))
 
@@ -312,13 +346,15 @@ def _align_factor(running: MarketSnapshot, target: MarketSnapshot, factor: RiskF
         return running.model_copy(update={"fx_vols": vols, "id": f"{running.id}:{factor.key}"})
     if isinstance(factor, RateZero):
         if factor.tenor in {"PARALLEL", "ALL"}:
-            base = running.rates.get(factor.currency)
-            nxt = target.rates.get(factor.currency)
-            if base is not None and nxt is not None:
-                return running.bump(factor, float(nxt) - float(base))
+            # Copy scalar rates only. MarketSnapshot.bump(PARALLEL) also shifts
+            # every key_rates[ccy] tenor; that would leak a spurious key-rate
+            # shock into this isolated factor step.
             rates = dict(running.rates)
+            nxt = target.rates.get(factor.currency)
             if nxt is not None:
                 rates[factor.currency] = float(nxt)
+            elif factor.currency in rates:
+                del rates[factor.currency]
             return running.model_copy(update={"rates": rates, "id": f"{running.id}:{factor.key}"})
         base = (running.key_rates.get(factor.currency) or {}).get(factor.tenor)
         nxt = (target.key_rates.get(factor.currency) or {}).get(factor.tenor)
@@ -424,11 +460,14 @@ def explain_risk_runs(
     pricing: PricingEngine,
     risk_engine: HistoricalRiskEngine | None = None,
     t1_risk_engine: HistoricalRiskEngine | None = None,
+    t1_pricing: PricingEngine | None = None,
 ) -> RiskChangeReport:
     """Compare two COMPLETED RiskRuns; fail closed otherwise."""
 
     if t0.run.status != RiskRunStatus.COMPLETED or t1.run.status != RiskRunStatus.COMPLETED:
         raise ValueError("both RiskRuns must be COMPLETED")
+    if risk_engine is None:
+        raise ValueError("risk_engine is required; refuse bare HistoricalRiskEngine() default")
     metric_name: str = str(metric)
     if metric_name not in {
         "var_99",
@@ -440,23 +479,40 @@ def explain_risk_runs(
     }:
         raise ValueError(f"unsupported metric: {metric_name}")
 
-    engine_t0 = risk_engine or HistoricalRiskEngine()
+    engine_t0 = risk_engine
     engine_t1 = t1_risk_engine or engine_t0
+    pricing_t1 = t1_pricing or pricing
     meth_t0 = _methodology(t0.run)
     meth_t1 = _methodology(t1.run)
 
-    def value(portfolio: Portfolio, market: MarketSnapshot, *, engine=engine_t0, methodology=meth_t0) -> float:
+    def value(
+        portfolio: Portfolio,
+        market: MarketSnapshot,
+        *,
+        engine=engine_t0,
+        methodology=meth_t0,
+        pricing_engine=pricing,
+        run: RiskRun = t0.run,
+    ) -> float:
         return _metric_value(
             engine=engine,
-            pricing=pricing,
+            pricing=pricing_engine,
             portfolio=portfolio,
             market=market,
             methodology=methodology,
             metric=metric_name,
+            run=run,
         )
 
     computed_prev = value(t0.portfolio, t0.market)
-    computed_curr = value(t1.portfolio, t1.market, engine=engine_t1, methodology=meth_t1)
+    computed_curr = value(
+        t1.portfolio,
+        t1.market,
+        engine=engine_t1,
+        methodology=meth_t1,
+        pricing_engine=pricing_t1,
+        run=t1.run,
+    )
     previous_risk = _headline(t0, metric_name, computed_prev)
     current_risk = _headline(t1, metric_name, computed_curr)
     total_change = current_risk - previous_risk

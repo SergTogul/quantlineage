@@ -22,7 +22,9 @@ from fastapi.testclient import TestClient
 from tests.market_fixtures import FixedMarketProvider, equity_spots_market
 
 from app.domain.models import (
+    BondPosition,
     EquityPosition,
+    EuropeanOptionPosition,
     MarketSnapshot,
     Portfolio,
     RiskChangeReport,
@@ -39,7 +41,13 @@ from app.risk.risk_run_compare import (
     assert_risk_change_reconciles,
     explain_risk_runs,
 )
+from app.risk.scenario_model import expand_broadcast_definition
+from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.services.portfolio_service import PortfolioService
+from app.services.risk_factories import (
+    build_historical_risk_engine_for_spec,
+    resolve_execute_spec,
+)
 from app.services.risk_run_worker import RiskRunWorker
 
 _ABS_TOL = 1e-06
@@ -85,6 +93,7 @@ def _market(*, snap_id: str = "snap-t0", spy: float = 500.0, nvda: float = 120.0
         equity_vols={"SPY": 0.16, "NVDA": 0.35},
         rates={"USD": 0.04},
         key_rates={"USD": {"2Y": 0.04, "10Y": 0.04}},
+        dividend_yields={"SPY": 0.0, "NVDA": 0.0},
     )
 
 
@@ -301,7 +310,9 @@ def test_prefers_persisted_headline_metrics() -> None:
 def test_stress_metric_labeled_as_pnl() -> None:
     book = _tiny_book()
     market = _market()
-    report = _explain(_bound("r0", book, market), _bound("r1", _tiny_book(spy_qty=180.0), market), metric="stress")
+    t0 = _bound("r0", book, market, scenario_set=["eq_down_10"])
+    t1 = _bound("r1", _tiny_book(spy_qty=180.0), market, scenario_set=["eq_down_10"])
+    report = _explain(t0, t1, metric="stress")
     assert "p&l" in report.unit.lower() or "pnl" in report.unit.lower()
     assert "loss-risk" not in report.sign_convention.lower() or "p&l" in report.sign_convention.lower()
     assert_risk_change_reconciles(report)
@@ -415,7 +426,17 @@ def _finish(worker: RiskRunWorker, run_id: str) -> None:
 def _drop_bound_cache(worker: RiskRunWorker) -> None:
     with worker._portfolios_lock:
         worker._completed_portfolios.clear()
+        worker._completed_markets.clear()
         worker._portfolios.clear()
+
+
+def _clone_snap(market: MarketSnapshot) -> MarketSnapshot:
+    return MarketSnapshot.model_validate(market.model_dump(mode="json"))
+
+
+def _stash_market(worker: RiskRunWorker, run_id: str, market: MarketSnapshot) -> None:
+    with worker._portfolios_lock:
+        worker._completed_markets[run_id] = _clone_snap(market)
 
 
 def test_compare_does_not_attribute_mutated_live_book_on_cache_miss() -> None:
@@ -473,3 +494,280 @@ def test_bound_portfolio_fails_closed_when_run_version_missing() -> None:
             worker._bound_portfolio(run)
     finally:
         worker.shutdown(wait=False)
+
+
+def test_explain_risk_runs_requires_risk_engine() -> None:
+    book = _tiny_book()
+    market = _market()
+    with pytest.raises(ValueError, match="risk_engine"):
+        explain_risk_runs(
+            _bound("r0", book, market),
+            _bound("r1", book, market),
+            pricing=BuiltinPricingEngine(),
+            risk_engine=None,
+        )
+
+
+def test_compare_waterfall_uses_run_declared_dataset_not_process_engine() -> None:
+    """Waterfall must rebuild from each run's spec, not the process HistoricalRiskEngine."""
+    process_engine = HistoricalRiskEngine(seed=99, observations=8)
+    svc = PortfolioService(
+        BuiltinPricingEngine(),
+        process_engine,
+        market_data=FixedMarketProvider(
+            equity_spots_market({"SPY": 500.0, "NVDA": 120.0}, vols={"SPY": 0.16, "NVDA": 0.35})
+        ),
+    )
+    worker = RiskRunWorker(svc, repo=InMemoryRiskRunRepository(), max_workers=1)
+    book = _tiny_book()
+    t0_mkt = _market(snap_id="snap-t0", spy=500.0)
+    t1_mkt = _market(snap_id="snap-t1", spy=400.0)
+    request = {
+        "historical_dataset_id": "demo-multi-factor-history",
+        "calculation_config": {"observations": 40, "seed": 1},
+    }
+    try:
+        t0 = worker.submit(portfolio=book, run_type="summary", request=request, execute=False)
+        t1 = worker.submit(portfolio=book, run_type="summary", request=request, execute=False)
+        _stash_market(worker, t0.id, t0_mkt)
+        _stash_market(worker, t1.id, t1_mkt)
+        _finish(worker, t0.id)
+        _finish(worker, t1.id)
+
+        report = worker.compare_runs(t0.id, t1.id)
+        header0 = worker._with_service(lambda svc: svc.get(t0.id))
+        spec0 = resolve_execute_spec(header0, risk_engine=process_engine)
+        spec_engine = build_historical_risk_engine_for_spec(spec0)
+        pricing = BuiltinPricingEngine()
+        spec_delta = float(
+            spec_engine.calculate(book, pricing, market=t1_mkt).var_99
+            - spec_engine.calculate(book, pricing, market=t0_mkt).var_99
+        )
+        process_delta = float(
+            process_engine.calculate(book, pricing, market=t1_mkt).var_99
+            - process_engine.calculate(book, pricing, market=t0_mkt).var_99
+        )
+        assert abs(spec_delta - process_delta) > 1.0
+        assert report.market_change == pytest.approx(spec_delta, abs=_ABS_TOL, rel=_REL_TOL)
+        assert report.market_change != pytest.approx(process_delta, abs=_ABS_TOL, rel=_REL_TOL)
+    finally:
+        worker.shutdown(wait=False)
+
+
+def test_compare_fails_closed_when_pricing_engine_version_cannot_bind() -> None:
+    worker = _worker_for_bind()
+    book = _tiny_book()
+    market = _market()
+    try:
+        t0 = worker.submit(portfolio=book, run_type="summary", execute=False)
+        t1 = worker.submit(portfolio=book, run_type="summary", execute=False)
+        _stash_market(worker, t0.id, market)
+        _stash_market(worker, t1.id, market)
+        _finish(worker, t0.id)
+        _finish(worker, t1.id)
+        for rid in (t0.id, t1.id):
+            run = worker._memory_repo.get(rid)
+            worker._memory_repo._runs[rid] = run.model_copy(
+                update={"pricing_engine_version": "vendor-feed-99"}
+            )
+        with pytest.raises(ValueError, match="pricing"):
+            worker.compare_runs(t0.id, t1.id)
+    finally:
+        worker.shutdown(wait=False)
+
+
+def test_execute_caches_the_snapshot_actually_used() -> None:
+    worker = _worker_for_bind()
+    book = _tiny_book()
+    try:
+        view = worker.submit(portfolio=book, run_type="summary", execute=False)
+        worker._execute(view.id)
+        with worker._portfolios_lock:
+            cached = worker._completed_markets.get(view.id)
+        assert cached is not None
+        assert cached.equity_spots["SPY"] == pytest.approx(500.0)
+        worker._portfolio_service.market_data = FixedMarketProvider(
+            equity_spots_market({"SPY": 1.0, "NVDA": 1.0}, vols={"SPY": 0.16, "NVDA": 0.35})
+        )
+        run = worker._with_service(lambda svc: svc.get(view.id))
+        bound = worker._bound_market(run, book)
+        assert bound.equity_spots["SPY"] == pytest.approx(500.0)
+    finally:
+        worker.shutdown(wait=False)
+
+
+def test_bound_market_fails_closed_on_cache_miss_without_snapshot_id() -> None:
+    worker = _worker_for_bind()
+    t0_book = _tiny_book()
+    try:
+        t0 = worker.submit(portfolio=t0_book, run_type="summary", execute=False)
+        t1 = worker.submit(portfolio=t0_book, run_type="summary", execute=False)
+        worker._execute(t0.id)
+        worker._portfolio_service.market_data = FixedMarketProvider(
+            equity_spots_market({"SPY": 400.0, "NVDA": 120.0}, vols={"SPY": 0.16, "NVDA": 0.35})
+        )
+        worker._execute(t1.id)
+        worker._portfolio_service.market_data = FixedMarketProvider(
+            equity_spots_market({"SPY": 1.0, "NVDA": 1.0}, vols={"SPY": 0.16, "NVDA": 0.35})
+        )
+        with worker._portfolios_lock:
+            worker._completed_markets.clear()
+        with pytest.raises(ValueError, match="market"):
+            worker.compare_runs(t0.id, t1.id)
+    finally:
+        worker.shutdown(wait=False)
+
+
+def test_bound_market_fails_closed_when_snapshot_id_mismatches_cache() -> None:
+    worker = _worker_for_bind()
+    book = _tiny_book()
+    try:
+        run = _completed_run("m-mismatch", book, _market(snap_id="snap-t0"))
+        _stash_market(worker, run.id, _market(snap_id="live-other", spy=1.0))
+        with pytest.raises(ValueError, match="market"):
+            worker._bound_market(run, book)
+    finally:
+        worker.shutdown(wait=False)
+
+
+def _stress_pnl(portfolio: Portfolio, market: MarketSnapshot, scenario_id: str) -> float:
+    library = {row.id: row for row in DEFAULT_SCENARIOS}
+    scenario = expand_broadcast_definition(library[scenario_id], market)
+    rows = StressEngine().run(portfolio, BuiltinPricingEngine(), [scenario], market=market)
+    return float(rows[0].pnl)
+
+
+def test_stress_uses_run_scenario_set_not_default_library_first() -> None:
+    book = _option_book(qty=10.0)
+    t1_book = _option_book(qty=20.0)
+    market = _market()
+    t0 = _bound("r0", book, market, scenario_set=["vol_up_25"])
+    t1 = _bound("r1", t1_book, market, scenario_set=["vol_up_25"])
+    report = _explain(t0, t1, metric="stress")
+    expected = _stress_pnl(t1_book, market, "vol_up_25") - _stress_pnl(book, market, "vol_up_25")
+    default_delta = _stress_pnl(t1_book, market, "eq_down_10") - _stress_pnl(
+        book, market, "eq_down_10"
+    )
+    assert abs(expected - default_delta) > 1.0
+    assert report.total_change == pytest.approx(expected, abs=_ABS_TOL, rel=_REL_TOL)
+    assert_risk_change_reconciles(report)
+
+
+def test_stress_empty_or_unknown_scenario_set_fails_closed() -> None:
+    book = _tiny_book()
+    market = _market()
+    empty = _bound("r0", book, market, scenario_set=[])
+    known = _bound("r1", book, market, scenario_set=["eq_down_10"])
+    with pytest.raises(ValueError, match="scenario_set"):
+        _explain(empty, known, metric="stress")
+    unknown = _bound("r2", book, market, scenario_set=["not-a-library-scenario"])
+    with pytest.raises(ValueError, match="scenario"):
+        _explain(known, unknown, metric="stress")
+
+
+def _rates_book(*, qty: float = 1.0) -> Portfolio:
+    return Portfolio(
+        id="cmp-rates",
+        name="Rates Book",
+        firm="RiskForge",
+        desk="Rates",
+        strategy="Rates",
+        positions=[
+            BondPosition(
+                type="bond",
+                id="ust10",
+                issuer="UST",
+                face_value=1_000_000.0,
+                quantity=qty,
+                maturity_years=10.0,
+                duration=8.0,
+                book="Rates",
+            )
+        ],
+    )
+
+
+def _option_book(*, qty: float = 10.0) -> Portfolio:
+    return Portfolio(
+        id="cmp-opt",
+        name="Option Book",
+        firm="RiskForge",
+        desk="Global Macro",
+        strategy="Vol",
+        positions=[
+            EuropeanOptionPosition(
+                type="european_option",
+                id="spy-call",
+                symbol="SPY",
+                quantity=qty,
+                strike=500.0,
+                maturity_years=0.5,
+                option_type="call",
+                book="Equity Derivatives",
+            )
+        ],
+    )
+
+
+def test_scalar_rate_change_does_not_attribute_key_rate_tenors() -> None:
+    book = _rates_book()
+    t0_mkt = _market(snap_id="snap-t0")
+    t1_mkt = t0_mkt.model_copy(
+        update={"id": "snap-t1", "rates": {"USD": 0.06}, "key_rates": {"USD": {"2Y": 0.04, "10Y": 0.04}}}
+    )
+    assert t0_mkt.rates["USD"] != t1_mkt.rates["USD"]
+    assert t0_mkt.key_rates["USD"] == t1_mkt.key_rates["USD"]
+    report = _explain(_bound("r0", book, t0_mkt), _bound("r1", book, t1_mkt), metric="dv01")
+    tenor_ids = [c.factor_id for c in report.factor_contributors if ":2Y" in c.factor_id or ":10Y" in c.factor_id]
+    assert tenor_ids == []
+    assert any(c.factor_id == "RateZero:USD:PARALLEL" for c in report.factor_contributors)
+    assert abs(report.residual) <= max(_ABS_TOL, _REL_TOL * abs(report.total_change))
+    assert_risk_change_reconciles(report)
+
+
+def test_identical_runs_zero_change_dv01_and_vega() -> None:
+    rates = _rates_book()
+    opts = _option_book()
+    market = _market()
+    dv01 = _explain(_bound("r0", rates, market), _bound("r1", rates, market), metric="dv01")
+    assert dv01.unit == "currency per 1bp"
+    assert "loss-risk" not in dv01.sign_convention.lower()
+    assert "1bp" in dv01.sign_convention.lower() or "dv01" in dv01.sign_convention.lower()
+    assert abs(dv01.total_change) < _ABS_TOL
+    assert abs(dv01.residual) < _ABS_TOL
+    assert_risk_change_reconciles(dv01)
+
+    vega = _explain(_bound("r0", opts, market), _bound("r1", opts, market), metric="vega")
+    assert vega.unit == "engine vega units"
+    assert "loss-risk" not in vega.sign_convention.lower()
+    assert "vega" in vega.sign_convention.lower()
+    assert abs(vega.total_change) < _ABS_TOL
+    assert abs(vega.residual) < _ABS_TOL
+    assert_risk_change_reconciles(vega)
+
+
+def test_trade_only_dv01_and_vega_residual_near_zero() -> None:
+    market = _market()
+    dv01 = _explain(
+        _bound("r0", _rates_book(qty=1.0), market),
+        _bound("r1", _rates_book(qty=2.0), market),
+        metric="dv01",
+    )
+    assert abs(dv01.portfolio_trade_change) > _ABS_TOL
+    assert abs(dv01.market_change) < _ABS_TOL
+    assert abs(dv01.residual) <= max(_ABS_TOL, _REL_TOL * abs(dv01.total_change))
+    assert dv01.unit == "currency per 1bp"
+    assert "loss-risk" not in dv01.sign_convention.lower()
+    assert_risk_change_reconciles(dv01)
+
+    vega = _explain(
+        _bound("r0", _option_book(qty=10.0), market),
+        _bound("r1", _option_book(qty=20.0), market),
+        metric="vega",
+    )
+    assert abs(vega.portfolio_trade_change) > _ABS_TOL
+    assert abs(vega.market_change) < _ABS_TOL
+    assert abs(vega.residual) <= max(_ABS_TOL, _REL_TOL * abs(vega.total_change))
+    assert vega.unit == "engine vega units"
+    assert "loss-risk" not in vega.sign_convention.lower()
+    assert_risk_change_reconciles(vega)
