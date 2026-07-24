@@ -57,6 +57,7 @@ from app.risk.historical import HistoricalRiskEngine
 from app.risk.risk_run_compare import BoundRiskRun, explain_risk_runs
 from app.services.portfolio_service import PortfolioService
 from app.services.risk_factories import (
+    bind_pricing_engine,
     build_historical_risk_engine_for_spec,
     portfolio_service_for_spec,
     request_blob_for_execute,
@@ -94,6 +95,11 @@ SUPPORTED_RUN_TYPES = frozenset(
         "var_compare",
     }
 )
+
+
+def _clone_snapshot(snapshot: MarketSnapshot) -> MarketSnapshot:
+    """JSON round-trip copy so frozen mappingproxy maps stay pickle-safe."""
+    return MarketSnapshot.model_validate(snapshot.model_dump(mode="json"))
 
 
 def _serialize_result(value: Any) -> dict[str, Any]:
@@ -481,19 +487,32 @@ class RiskRunWorker:
         with self._portfolios_lock:
             cached = self._completed_markets.get(run.id)
         if cached is not None:
-            return cached.model_copy(deep=True)
+            if run.market_snapshot_id and cached.id != run.market_snapshot_id:
+                raise ValueError(
+                    f"cannot bind run {run.id}: cached market {cached.id!r} "
+                    f"does not match run market_snapshot_id {run.market_snapshot_id!r}"
+                )
+            return _clone_snapshot(cached)
         if run.market_snapshot_id:
             market = self._load_market_snapshot(run.market_snapshot_id)
             if market is None:
                 raise ValueError(f"market snapshot {run.market_snapshot_id!r} not found")
             return market
-        return self._portfolio_service.market_snapshot(portfolio)
+        raise ValueError(
+            f"cannot bind run {run.id}: market snapshot missing "
+            "(no execute-time cache and no market_snapshot_id)"
+        )
 
     @staticmethod
-    def _persisted_metrics(payloads: dict[str, dict[str, Any]] | None) -> dict[str, float]:
+    def _persisted_metrics(
+        payloads: dict[str, dict[str, Any]] | None,
+        *,
+        scenario_set: list[str] | None = None,
+    ) -> dict[str, float]:
         out: dict[str, float] = {}
         if not payloads:
             return out
+        wanted = list(scenario_set or [])
         for payload in payloads.values():
             if not isinstance(payload, dict):
                 continue
@@ -502,10 +521,27 @@ class RiskRunWorker:
                 if isinstance(raw, int | float):
                     out[key] = float(raw)
             items = payload.get("items")
-            if isinstance(items, list) and items:
-                first = items[0]
-                if isinstance(first, dict) and isinstance(first.get("pnl"), int | float):
-                    out.setdefault("stress", float(first["pnl"]))
+            if not isinstance(items, list) or not items:
+                continue
+            chosen = None
+            if wanted:
+                from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
+
+                labels = set(wanted)
+                for defn in (*DEFAULT_SCENARIOS, *THREAT_SCENARIOS):
+                    if defn.id in wanted:
+                        labels.add(defn.name)
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    label = item.get("scenario") or item.get("id") or item.get("scenario_id")
+                    if label in labels:
+                        chosen = item
+                        break
+            elif isinstance(items[0], dict):
+                chosen = items[0]
+            if chosen is not None and isinstance(chosen.get("pnl"), int | float):
+                out.setdefault("stress", float(chosen["pnl"]))
         return out
 
     def compare_runs(
@@ -530,43 +566,48 @@ class RiskRunWorker:
         m1 = self._bound_market(t1, p1)
         payloads0 = self._with_service(lambda svc: svc.get_result_payloads(t0.id))
         payloads1 = self._with_service(lambda svc: svc.get_result_payloads(t1.id))
-        engine = getattr(self._portfolio_service, "risk", None)
-        spec0 = resolve_execute_spec(
-            t0, risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None
-        )
-        spec1 = resolve_execute_spec(
-            t1, risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None
-        )
-        engine_t0 = (
-            engine
-            if isinstance(engine, HistoricalRiskEngine)
-            else build_historical_risk_engine_for_spec(spec0)
-        )
+        spec0 = resolve_execute_spec(t0)
+        spec1 = resolve_execute_spec(t1)
+        engine_t0 = build_historical_risk_engine_for_spec(spec0)
+        engine_t1: HistoricalRiskEngine | None = None
         if (
             spec0.historical_dataset_id != spec1.historical_dataset_id
             or spec0.historical_dataset_version != spec1.historical_dataset_version
             or spec0.calculation_config != spec1.calculation_config
         ):
-            engine_t1: HistoricalRiskEngine | None = build_historical_risk_engine_for_spec(spec1)
-        else:
-            engine_t1 = None
+            engine_t1 = build_historical_risk_engine_for_spec(spec1)
+        pricing = bind_pricing_engine(
+            t0.pricing_engine_version,
+            fallback=self._portfolio_service.pricing,
+        )
+        t1_pricing = None
+        if t0.pricing_engine_version != t1.pricing_engine_version:
+            t1_pricing = bind_pricing_engine(
+                t1.pricing_engine_version,
+                fallback=self._portfolio_service.pricing,
+            )
         return explain_risk_runs(
             BoundRiskRun(
                 run=t0,
                 portfolio=p0,
                 market=m0,
-                persisted_metrics=self._persisted_metrics(payloads0),
+                persisted_metrics=self._persisted_metrics(
+                    payloads0, scenario_set=list(t0.scenario_set)
+                ),
             ),
             BoundRiskRun(
                 run=t1,
                 portfolio=p1,
                 market=m1,
-                persisted_metrics=self._persisted_metrics(payloads1),
+                persisted_metrics=self._persisted_metrics(
+                    payloads1, scenario_set=list(t1.scenario_set)
+                ),
             ),
             metric=metric,
-            pricing=self._portfolio_service.pricing,
-            risk_engine=engine_t0 if isinstance(engine_t0, HistoricalRiskEngine) else None,
+            pricing=pricing,
+            risk_engine=engine_t0,
             t1_risk_engine=engine_t1,
+            t1_pricing=t1_pricing,
         )
 
     def poll_once(self, *, limit: int = 10) -> int:
@@ -646,10 +687,11 @@ class RiskRunWorker:
                         )
                     )
                     return
+            else:
+                market = self._portfolio_service.market_snapshot(portfolio)
             with self._portfolios_lock:
                 self._completed_portfolios[run_id] = portfolio.model_copy(deep=True)
-                if market is not None:
-                    self._completed_markets[run_id] = market.model_copy(deep=True)
+                self._completed_markets[run_id] = _clone_snapshot(market)
             run_service = portfolio_service_for_spec(
                 self._portfolio_service, spec, market=market
             )
