@@ -545,7 +545,59 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Emit only the reconstruction matrix (used by the N=100 nightly job).",
     )
+    parser.add_argument(
+        "--stage103",
+        action="store_true",
+        help="Stage 10.3 multi-asset FULL_REVALUATION matrix (not an HTTP/kernel SLA).",
+    )
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="With --stage103: CI-safe 4×8 smoke instead of the full matrix.",
+    )
+    parser.add_argument(
+        "--csv",
+        type=Path,
+        default=None,
+        help="With --stage103: write a CSV table to this path.",
+    )
+    parser.add_argument(
+        "--markdown",
+        type=Path,
+        default=None,
+        help="With --stage103: write a Markdown report to this path.",
+    )
+    parser.add_argument(
+        "--max-cell-wall-s",
+        type=float,
+        default=180.0,
+        help="With --stage103 matrix: record cells that exceed this wall (seconds). Not an SLA.",
+    )
+    parser.add_argument(
+        "--skip-quantlib",
+        action="store_true",
+        help="With --stage103: do not attempt QuantLib cells.",
+    )
     args = parser.parse_args(argv)
+    if args.smoke and not args.stage103:
+        raise SystemExit("--smoke requires --stage103")
+    if (args.csv is not None or args.markdown is not None) and not args.stage103:
+        raise SystemExit("--csv / --markdown require --stage103")
+    if args.stage103:
+        bench_dir = str(Path(__file__).resolve().parent)
+        if bench_dir not in sys.path:
+            sys.path.insert(0, bench_dir)
+        from full_reval_stage103 import cli_stage103
+
+        cli_stage103(
+            smoke=bool(args.smoke),
+            emit_json=bool(args.json),
+            csv_path=args.csv,
+            markdown_path=args.markdown,
+            max_cell_wall_s=None if args.max_cell_wall_s <= 0 else float(args.max_cell_wall_s),
+            skip_quantlib=bool(args.skip_quantlib),
+        )
+        return 0
     if args.acceptance_n < 1 or args.acceptance_s < 1:
         raise SystemExit("acceptance N and S must be positive")
     if args.reconstruction_n < 1 or args.reconstruction_s < 1:
