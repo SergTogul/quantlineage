@@ -171,3 +171,39 @@ PYTHONPATH=backend backend/.venv/bin/python benchmarks/run_full_reval_bench.py -
 python3 -m pytest backend/tests/test_full_reval_bench.py -q
 RISKFORGE_NIGHTLY=1 python3 -m pytest backend/tests/test_nightly_full_reval_n100.py -q
 ```
+
+## Stage 10.3 FULL_REVALUATION matrix (not an HTTP / kernel SLA)
+
+`run_full_reval_bench.py --stage103` runs a seeded multi-asset book (cash equities
++ European options so FULL ≠ LINEAR) through the product
+`full_revaluation_pnl_from_panel` / `approximate_pnl_from_panel` paths. R0.6
+identity benches above are unchanged. Default `--json` without `--stage103` still
+emits only the R0.6 payload.
+
+Attempted cells (record honestly if a cell exceeds `--max-cell-wall-s`):
+
+- 100 × 250 FULL_REVALUATION (builtin + QuantLib)
+- 100 × 1000 FULL_REVALUATION
+- 1000 × 250 FULL_REVALUATION
+- 1000 × 1000 FULL_REVALUATION if it finishes in budget
+- 10000 × 1000 LINEAR and DELTA_GAMMA
+
+Host observations are written with `--markdown` / `--csv` (typically
+`benchmarks/FULL_REVAL_RESULTS.md`). This is **not** an HTTP SLA, **not**
+multi-tenant capacity, and **does not** change labeled-runner SLA-K1/K2
+(post-R0). Do not invoke `check_m6_sla.py`.
+
+```bash
+# CI-safe 4×8 smoke (JSON + CSV + Markdown)
+PYTHONPATH=backend backend/.venv/bin/python benchmarks/run_full_reval_bench.py \
+  --stage103 --smoke --json --csv /tmp/stage103.csv --markdown /tmp/stage103.md
+
+# Operator matrix (isolated RSS per cell; abort cells over 240s wall)
+PYTHONPATH=backend backend/.venv/bin/python benchmarks/run_full_reval_bench.py \
+  --stage103 --json --max-cell-wall-s 240 \
+  --csv benchmarks/full_reval_stage103.csv \
+  --markdown benchmarks/FULL_REVAL_RESULTS.md
+
+cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests/test_stage103_full_reval_bench.py -q
+```
+
