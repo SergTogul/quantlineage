@@ -20,7 +20,12 @@ from app.api.openapi_examples import (
     RISK_RUN_COMPARE_BODY_EXAMPLES,
     RISK_RUN_CREATE_BODY_EXAMPLES,
 )
-from app.api.schemas import RiskRunCompareRequest, RiskRunCreateRequest, RiskRunView
+from app.api.schemas import (
+    RiskRunCompareRequest,
+    RiskRunCreateRequest,
+    RiskRunProvenance,
+    RiskRunView,
+)
 from app.domain.models import RiskChangeReport
 from app.services.risk_run_service import RiskRunNotFound
 from app.services.risk_run_worker import RiskRunWorker
@@ -120,3 +125,32 @@ def get_risk_run(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"risk run not found: {run_id}",
         ) from exc
+
+
+@router.get(
+    "/runs/{run_id}/provenance",
+    response_model=RiskRunProvenance,
+    summary="Get persisted RiskRun calculation lineage",
+    responses=RESP_RISK_RUN_GET,
+)
+def get_risk_run_provenance(
+    run_id: str,
+    request: Request,
+    worker: RiskRunWorker = Depends(get_risk_run_worker),
+) -> RiskRunProvenance:
+    """Stable lineage payload. Displayed fields equal the stored run; no secrets."""
+    try:
+        view = worker.get(run_id, principal=request_principal(request))
+    except PortfolioAccessDenied as exc:
+        raise http_forbidden() from exc
+    except RiskRunNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"risk run not found: {run_id}",
+        ) from exc
+    if view.provenance is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"risk run provenance not found: {run_id}",
+        )
+    return view.provenance
