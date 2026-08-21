@@ -377,7 +377,12 @@ class RiskRunWorker:
         if view.duration_seconds is None:
             live = elapsed_seconds(run)
             if live is not None:
-                view = view.model_copy(update={"duration_seconds": live})
+                updates: dict[str, Any] = {"duration_seconds": live}
+                if view.provenance is not None:
+                    updates["provenance"] = view.provenance.model_copy(
+                        update={"duration_seconds": live}
+                    )
+                view = view.model_copy(update=updates)
         return view
 
     def _schedule(self, run_id: str) -> None:

@@ -20,6 +20,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.domain.models import MarketSnapshot, Portfolio
+from app.market.curves import CurveNode, YieldCurve, tenor_to_years
 from app.market.vol_surfaces import VolSurface
 
 DemoTheme = Literal["equity_vol", "rates_macro", "cross_asset"]
@@ -317,7 +318,8 @@ _DEMO_DESCRIPTIONS: dict[str, str] = {
     ),
     "rates-macro": (
         "Treasury, IRS, and STIR-future book — "
-        "illustrates rates DV01 / curve risk without equity or FX."
+        "illustrates rates DV01 / key-rate DV01 on demo SOFR/OIS-style zeros "
+        "(not a production multi-curve framework)."
     ),
     "global-macro": (
         "Cross-asset multi-asset macro book (equity, vol, rates, FX) — "
@@ -369,6 +371,56 @@ _PANEL_USD_KEY_RATES: dict[str, float] = {
     "10Y": 0.0415,
 }
 
+_RATES_MACRO_USD_KEY_RATES: dict[str, float] = {
+    **_PANEL_USD_KEY_RATES,
+    "0.25Y": 0.0425,
+    "1.9Y": 0.043 * ((694.0 / 365.0) / 1.9),
+    "9.5Y": 0.041 * ((3468.0 / 365.0) / 9.5),
+}
+
+_RATES_CURVE_LIMITATIONS = (
+    "Demo SOFR/OIS-style zeros; not a production multi-curve framework."
+)
+
+
+def _usd_curve_payload(
+    name: str,
+    curve_type: Literal["discount", "projection"],
+    zeros: dict[str, float],
+) -> dict:
+    """Named snapshot curve payload. Extra keys are display-only limitations."""
+    nodes = tuple(
+        CurveNode(tenor=tenor, years=tenor_to_years(tenor), zero_rate=float(rate))
+        for tenor, rate in sorted(zeros.items(), key=lambda item: tenor_to_years(item[0]))
+    )
+    payload = YieldCurve(
+        currency="USD",
+        curve_type=curve_type,
+        name=name,
+        nodes=nodes,
+    ).to_dict()
+    payload["limitations"] = _RATES_CURVE_LIMITATIONS
+    return payload
+
+
+def _rates_macro_curves() -> dict[str, dict]:
+    """Deterministic USD OIS discount + SOFR-style projection for the rates demo.
+
+    2Y/5Y/10Y are the showcase nodes. Extra OIS pillars keep bond maturities on
+    the same zeros as the existing key_rates map. This is not dual-curve
+    production calibration.
+    """
+    ois_zeros = {
+        tenor: rate
+        for tenor, rate in _RATES_MACRO_USD_KEY_RATES.items()
+        if tenor != "0Y"
+    }
+    sofr_zeros = {tenor: 0.0425 for tenor in ("2Y", "5Y", "10Y")}
+    return {
+        "USD_OIS": _usd_curve_payload("USD_OIS", "discount", ois_zeros),
+        "USD_SOFR": _usd_curve_payload("USD_SOFR", "projection", sofr_zeros),
+    }
+
 _PANEL_EQUITY_SPOTS: dict[str, float] = {
     "AAPL": 185.00,
     "MSFT": 415.00,
@@ -404,17 +456,11 @@ _DEMO_MARKETS: dict[str, MarketSnapshot] = {
         fx_spots=dict(_PANEL_FX_SPOTS),
         fx_vols=dict(_PANEL_FX_VOLS),
         rates={"USD": 0.04},
-        key_rates={
-            "USD": {
-                **_PANEL_USD_KEY_RATES,
-                "0.25Y": 0.0425,
-                "1.9Y": 0.043 * ((694.0 / 365.0) / 1.9),
-                "9.5Y": 0.041 * ((3468.0 / 365.0) / 9.5),
-            }
-        },
+        key_rates={"USD": dict(_RATES_MACRO_USD_KEY_RATES)},
         dividend_yields=dict(_PANEL_DIVIDEND_YIELDS),
         projection_rates={"USD": 0.0425},
         ir_future_quotes={"USD": 0.042},
+        curves=_rates_macro_curves(),
     ),
     "global-macro": MarketSnapshot(
         id="demo:global-macro",

@@ -337,6 +337,89 @@ class RiskRunCreateRequest(FiniteInputMixin):
         return self
 
 
+class RiskRunProvenance(BaseModel):
+    """Stable calculation-lineage payload for one RiskRun (Stage 10.5).
+
+    Fields are copied from the persisted run. ``release_sha`` is omitted when
+    unknown (None) rather than faked. No secrets.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    risk_run_id: str
+    portfolio_id: str
+    portfolio_version: int | None = None
+    market_snapshot_id: str | None = None
+    as_of: str | None = None
+    historical_dataset_id: str | None = None
+    historical_dataset_version: str | None = None
+    pricing_engine_version: str | None = None
+    methodology: str | None = None
+    scenario_set: list[str] = Field(default_factory=list)
+    scenario_set_version: str | None = None
+    calculation_config: RiskRunCalculationConfig | None = None
+    duration_seconds: float | None = None
+    status: RiskRunStatus
+    release_sha: str | None = None
+
+    @classmethod
+    def from_risk_run(
+        cls,
+        run: RiskRun,
+        *,
+        duration_seconds: float | None = None,
+    ) -> RiskRunProvenance:
+        from app.api.provenance import provenance_from_risk_run
+
+        return cls.model_validate(
+            provenance_from_risk_run(run, duration_seconds=duration_seconds)
+        )
+
+
+class CurveNodeView(BaseModel):
+    """One showcase curve pillar (display; zeros come from the snapshot)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenor: str
+    years: float
+    zero_rate: float
+
+
+class RatesCurveView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    currency: str
+    curve_type: str
+    nodes: list[CurveNodeView] = Field(default_factory=list)
+    limitations: str
+
+
+class KeyRateDv01View(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenor: str
+    factor: str
+    value: float
+    unit: str
+    method: str
+
+
+class RatesShowcaseView(BaseModel):
+    """GET /market/rates-showcase — curve nodes + KR-DV01 from SensitivityEngine."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    portfolio_id: str
+    market_snapshot_id: str
+    conventions: dict[str, str]
+    discount_curve: RatesCurveView
+    projection_curve: RatesCurveView | None = None
+    parallel_dv01: float
+    key_rate_dv01: list[KeyRateDv01View] = Field(default_factory=list)
+
+
 class RiskRunResultView(BaseModel):
     """Named result payload attached to a risk run."""
 
@@ -406,6 +489,7 @@ class RiskRunView(BaseModel):
     finished_at: str | None = None
     duration_seconds: float | None = None
     results: list[RiskRunResultView] = Field(default_factory=list)
+    provenance: RiskRunProvenance | None = None
 
     @classmethod
     def from_risk_run(
@@ -449,4 +533,5 @@ class RiskRunView(BaseModel):
             finished_at=run.completed_at.isoformat() if run.completed_at else None,
             duration_seconds=run.duration,
             results=results,
+            provenance=RiskRunProvenance.from_risk_run(run),
         )
