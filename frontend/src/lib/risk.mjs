@@ -659,6 +659,48 @@ export function riskRunSummary(run) {
 }
 
 /**
+ * Display parse for GET /market/rates-showcase. Passes API fields through — no risk math.
+ */
+export function ratesShowcaseSummary(payload) {
+  if (!payload) return null
+  const discount = payload.discount_curve || {}
+  return {
+    portfolio_id: payload.portfolio_id,
+    market_snapshot_id: payload.market_snapshot_id,
+    conventions: payload.conventions || {},
+    discount_curve: discount,
+    projection_curve: payload.projection_curve ?? null,
+    nodes: [...(discount.nodes || [])],
+    parallel_dv01: payload.parallel_dv01,
+    key_rate_dv01: [...(payload.key_rate_dv01 || [])],
+  }
+}
+
+/**
+ * Display parse for RiskRun provenance. Copies backend fields only — never invents SHA.
+ */
+export function runProvenanceSummary(payload) {
+  if (!payload) return null
+  return {
+    risk_run_id: payload.risk_run_id,
+    portfolio_id: payload.portfolio_id,
+    portfolio_version: payload.portfolio_version ?? null,
+    market_snapshot_id: payload.market_snapshot_id ?? null,
+    as_of: payload.as_of ?? null,
+    historical_dataset_id: payload.historical_dataset_id ?? null,
+    historical_dataset_version: payload.historical_dataset_version ?? null,
+    pricing_engine_version: payload.pricing_engine_version ?? null,
+    methodology: payload.methodology ?? null,
+    scenario_set: [...(payload.scenario_set || [])],
+    scenario_set_version: payload.scenario_set_version ?? null,
+    calculation_config: payload.calculation_config ?? null,
+    duration_seconds: payload.duration_seconds ?? null,
+    status: payload.status,
+    release_sha: payload.release_sha ?? null,
+  }
+}
+
+/**
  * Request helper: scale SPY equity quantity for change-attribution demo.
  * Does not compute risk — only builds current_portfolio body.
  */

@@ -21,6 +21,14 @@ const entries = {
     body:
       'Factor exposures from RiskFactorEngine: per position QuantLib valuation, then sum Δ (equity), vega (vol), DV01 (rates), FX Δ by typed factor key. Table ranks absolute exposure.',
   },
+  'rates-showcase': {
+    body:
+      'Demo USD OIS/SOFR-style curve nodes and 2Y/5Y/10Y key-rate DV01 from SensitivityEngine. Values are API fields (currency P&L per +1bp); not a production multi-curve framework.',
+  },
+  'run-provenance': {
+    body:
+      'Calculation lineage for one RiskRun: book, snapshot, dataset, engine, methodology, scenario set, config, duration, and optional release SHA from the backend payload only.',
+  },
   'factor-exposure-heatmap': {
     body:
       'Factor × bucket matrix of the same RiskFactorEngine exposures (Δ / vega / DV01 / FX Δ aggregates). Cell color scales |exposure| for display only.',
@@ -43,7 +51,7 @@ const entries = {
   },
   'risk-change-attribution': {
     body:
-      'Waterfall or two-RiskRun explain of Δ(VaR/ES/DV01/Vega/stress). Drivers, residual, and identity come from the backend payload; the UI does not compute risk.',
+      'Why did risk change: two COMPLETED RiskRuns (POST /risk/runs/compare) or SPY×1.5 waterfall. Drivers, residual, and identity are the backend payload; the UI does not compute risk. Demo history is packaged synthetic replay, not observed data.',
   },
   'stress-pnl-heatmap': {
     body:
@@ -75,7 +83,7 @@ const entries = {
   },
   'risk-query': {
     body:
-      'NL question routed to deterministic risk tools (summary, stress, contributors, etc.). Answer text is assembled from API results — no LLM-invented risk numbers.',
+      'NL question routed to deterministic tools (summary, stress, contributors, explain_risk_change). Answers come from API payloads only — no LLM-invented VaR. Risk-change questions need two completed RiskRun ids.',
   },
   'pnl-explain': {
     body:
@@ -91,7 +99,7 @@ const entries = {
   },
   'risk-runs': {
     body:
-      'Async RiskRun lifecycle: enqueue a run_type (e.g. var), worker computes and persists result refs, UI polls status QUEUED→RUNNING→COMPLETED/FAILED. No risk math in the client.',
+      'Async RiskRun lifecycle: enqueue a run_type, worker persists result refs, UI polls QUEUED→RUNNING→COMPLETED/FAILED. GET fields carry lineage (dataset, snapshot, as_of, engine). No risk math in the client.',
   },
 }
 

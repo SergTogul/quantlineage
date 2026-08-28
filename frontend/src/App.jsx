@@ -4,7 +4,7 @@ import AppNav from './components/AppNav'
 import Overview from './components/Overview'
 import { Contributors, Limits, Stress, ThreatScenarios } from './components/RiskTable'
 import {
-  Attribution, ESContributions, Hierarchy, RiskChangeAttribution, RiskFactors, RiskRuns,
+  Attribution, ESContributions, Hierarchy, RatesShowcase, RiskChangeAttribution, RiskFactors, RiskRuns,
   VaRAnalytics, VaRCompare,
 } from './components/Analytics'
 import {
@@ -119,6 +119,7 @@ export default function App() {
           <div className="grid">
             <RiskFactors items={factors} />
             <FactorExposureHeatmap items={factors} />
+            <RatesShowcase />
           </div>
         </SectionFrame>
       )

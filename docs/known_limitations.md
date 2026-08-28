@@ -20,6 +20,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - Curve support includes deterministic offline helpers and scoped bootstrap inputs.
 - The current bootstrap is not a production multi-curve framework.
+- The Stage 10.5 rates-macro showcase attaches deterministic USD OIS-style discount zeros and a SOFR-style projection map (2Y/5Y/10Y nodes) for demo KR-DV01. That is not production dual-curve calibration, futures convexity, or live quote bootstrapping.
 - Futures convexity, rich calendar/stub logic, collateral/discounting policy, basis curves, and live quote calibration are not claimed.
 
 ## Volatility Surfaces
@@ -62,6 +63,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 - Postgres-backed risk-run claim safety uses `SELECT ... FOR UPDATE SKIP LOCKED` when configured.
 - Compose ships one worker for the demo. Additional Postgres-backed replicas should not double-claim the same row, but broader operations concerns such as fairness, retries across hosts, observability, and queue management are not a full production job platform.
 - Redis/RQ is explicitly deferred and should not be described as implemented.
+- RiskRun provenance (`GET /api/v1/risk/runs/{id}/provenance` and the nested GET-run object) copies persisted run identity fields plus an optional `RISKFORGE_RELEASE_SHA` / git describe. It does not expose secrets and does not invent a SHA when none is available.
 
 ## API And Compatibility
 
