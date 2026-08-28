@@ -8,6 +8,7 @@ import {
   attributionSummary, breachedLimits, limitDrilldownSummary, limitStatusCounts,
   spyFlatHedgePortfolio, defaultHedgeScenarios, stressFactorKeysFromPortfolio,
   riskRunStatus, riskRunStatusClass, isRiskRunTerminal, riskRunSummary, RISK_RUN_POLL_MS,
+  ratesShowcaseSummary, runProvenanceSummary,
   spyScaledPortfolio, demoChangeAttributionRequest, riskChangeAttributionSummary,
   riskChangeReportSummary,
   demoPnLAttributionRequest, overviewKpis, overviewCollage,
@@ -413,6 +414,75 @@ test('riskRunSummary passes RiskRunView fields through (no risk math)', () => {
   assert.equal(riskRunSummary(null), null)
   assert.equal(riskRunSummary({ id: 'x', status: 'FAILED', run_type: 'var', error_message: 'boom', results: [] }).error_message, 'boom')
   assert.equal(riskRunSummary({ id: 'x', status: 'QUEUED', run_type: 'var' }).result_count, 0)
+})
+
+test('ratesShowcaseSummary passes API curve nodes and KR-DV01 (no risk math)', () => {
+  const payload = {
+    portfolio_id: 'rates-macro',
+    market_snapshot_id: 'demo:rates-macro',
+    conventions: {
+      shock_unit: '1bp = 1e-4 decimal',
+      sensitivity_unit: 'currency P&L per +1bp',
+      limitations: 'Demo OIS/SOFR-style zeros; not a production multi-curve framework.',
+    },
+    discount_curve: {
+      name: 'USD_OIS',
+      currency: 'USD',
+      curve_type: 'discount',
+      nodes: [
+        { tenor: '2Y', years: 2, zero_rate: 0.043 },
+        { tenor: '5Y', years: 5, zero_rate: 0.041 },
+        { tenor: '10Y', years: 10, zero_rate: 0.0415 },
+      ],
+    },
+    parallel_dv01: -1200.5,
+    key_rate_dv01: [
+      { tenor: '2Y', value: -200, unit: 'per_bp' },
+      { tenor: '5Y', value: -400, unit: 'per_bp' },
+      { tenor: '10Y', value: -500, unit: 'per_bp' },
+    ],
+  }
+  const s = ratesShowcaseSummary(payload)
+  assert.equal(s.portfolio_id, 'rates-macro')
+  assert.equal(s.market_snapshot_id, 'demo:rates-macro')
+  assert.deepEqual(s.nodes.map((n) => n.tenor), ['2Y', '5Y', '10Y'])
+  assert.equal(s.nodes[0].zero_rate, 0.043)
+  assert.equal(s.parallel_dv01, -1200.5)
+  assert.equal(s.key_rate_dv01[0].value, -200)
+  assert.equal(s.conventions.shock_unit, '1bp = 1e-4 decimal')
+  assert.equal(ratesShowcaseSummary(null), null)
+})
+
+test('runProvenanceSummary displays backend lineage fields only (no invented SHA)', () => {
+  const payload = {
+    risk_run_id: 'run-9',
+    portfolio_id: 'rates-macro',
+    portfolio_version: 1,
+    market_snapshot_id: 'demo:rates-macro',
+    as_of: 'current',
+    historical_dataset_id: 'demo-multi-factor-history',
+    historical_dataset_version: 'v1',
+    pricing_engine_version: 'builtin-0.3.0',
+    methodology: 'DELTA_GAMMA',
+    scenario_set: ['rates-steepener'],
+    calculation_config: { observations: 50, seed: 7 },
+    duration_seconds: 1.5,
+    status: 'COMPLETED',
+  }
+  const s = runProvenanceSummary(payload)
+  assert.equal(s.risk_run_id, 'run-9')
+  assert.equal(s.portfolio_id, 'rates-macro')
+  assert.equal(s.portfolio_version, 1)
+  assert.equal(s.historical_dataset_id, 'demo-multi-factor-history')
+  assert.equal(s.historical_dataset_version, 'v1')
+  assert.equal(s.pricing_engine_version, 'builtin-0.3.0')
+  assert.equal(s.methodology, 'DELTA_GAMMA')
+  assert.deepEqual(s.scenario_set, ['rates-steepener'])
+  assert.equal(s.duration_seconds, 1.5)
+  assert.equal(s.status, 'COMPLETED')
+  assert.equal(s.release_sha, null)
+  assert.equal(runProvenanceSummary({ ...payload, release_sha: 'abc123' }).release_sha, 'abc123')
+  assert.equal(runProvenanceSummary(null), null)
 })
 
 test('spyScaledPortfolio scales SPY equity qty only (request helper)', () => {

@@ -288,6 +288,16 @@ export function getRiskRun(runId) {
   return json(`${API_V1}/risk/runs/${encodeURIComponent(runId)}`)
 }
 
+/** GET persisted RiskRun lineage → RiskRunProvenance. Display only. */
+export function getRiskRunProvenance(runId) {
+  return json(`${API_V1}/risk/runs/${encodeURIComponent(runId)}/provenance`)
+}
+
+/** GET USD rates-macro curve nodes + KR-DV01 from SensitivityEngine. */
+export function getRatesShowcase() {
+  return json(`${API_V1}/market/rates-showcase`)
+}
+
 /**
  * Flagship two-RiskRun explain → RiskChangeReport (Stage 10.2).
  * Body: { t0_run_id, t1_run_id, metric }. Display only — no client-side risk math.

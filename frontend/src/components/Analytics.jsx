@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   changeAttribution, compareRiskRuns, compareVarMethodologies, createRiskRun, esContributions, explainPnL,
-  explainPnLDemo, getRiskRun, API_V1,
+  explainPnLDemo, getRatesShowcase, getRiskRun, getRiskRunProvenance, API_V1,
 } from '../api'
 import BlockHelp from './BlockHelp'
 import {
@@ -11,6 +11,7 @@ import {
   demoChangeAttributionRequest, riskChangeAttributionSummary, riskChangeReportSummary, demoPnLAttributionRequest,
   spyScaledPortfolio,
   esContributionSummary, ES_CONTRIBUTION_DIMENSIONS, varCompareSummary,
+  ratesShowcaseSummary, runProvenanceSummary,
 } from '../lib/risk.mjs'
 
 const RISK_RUN_TYPES = ['summary', 'var', 'stress', 'factors', 'limits', 'hierarchy', 'contributors']
@@ -53,11 +54,151 @@ export function RiskFactors({ items }) {
   )
 }
 
+/**
+ * Stage 10.5: USD OIS/SOFR-style curve nodes + 2Y/5Y/10Y KR-DV01 from the API.
+ * Display only — no client-side DV01 math.
+ */
+export function RatesShowcase() {
+  const [payload, setPayload] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    getRatesShowcase()
+      .then((body) => {
+        if (!cancelled) {
+          setPayload(body)
+          setError('')
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || 'Failed to load rates showcase')
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  const s = ratesShowcaseSummary(payload)
+
+  return (
+    <div className="card">
+      <div className="block-title">
+        <h3>Rates curve / KR-DV01</h3>
+        <BlockHelp id="rates-showcase" />
+      </div>
+      <div className="muted">USD OIS/SOFR-style demo zeros and SensitivityEngine KR-DV01 — API fields only</div>
+      {error && <div className="error">{error}</div>}
+      {!s && !error && <div className="muted foot">Loading rates showcase…</div>}
+      {s && (
+        <>
+          <div className="muted foot">
+            <strong>{s.discount_curve?.name}</strong>
+            {s.market_snapshot_id ? ` · ${s.market_snapshot_id}` : ''}
+            {s.conventions.shock_unit ? ` · ${s.conventions.shock_unit}` : ''}
+          </div>
+          <table>
+            <thead><tr><th>Tenor</th><th>Zero</th><th>KR-DV01</th></tr></thead>
+            <tbody>
+              {s.nodes.map((node) => {
+                const kr = (s.key_rate_dv01 || []).find((row) => row.tenor === node.tenor)
+                return (
+                  <tr key={node.tenor}>
+                    <td>{node.tenor}</td>
+                    <td>{node.zero_rate}</td>
+                    <td>{kr ? money(kr.value) : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <div className="muted foot">
+            Parallel DV01 {money(s.parallel_dv01 ?? 0)}
+            {s.conventions.sensitivity_unit ? ` · ${s.conventions.sensitivity_unit}` : ''}
+          </div>
+          {s.conventions.limitations && (
+            <div className="muted foot">{s.conventions.limitations}</div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Stage 10.5: calculation lineage from GET /risk/runs/{id}/provenance.
+ * Copies backend fields only — never invents a release SHA.
+ */
+export function RunProvenance({ runId, embedded }) {
+  const [payload, setPayload] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!runId) {
+      setPayload(null)
+      return undefined
+    }
+    let cancelled = false
+    getRiskRunProvenance(runId)
+      .then((body) => {
+        if (!cancelled) {
+          setPayload(body)
+          setError('')
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || 'Failed to load provenance')
+      })
+    return () => { cancelled = true }
+  }, [runId])
+
+  const s = runProvenanceSummary(payload)
+  const rows = s
+    ? [
+        ['RiskRun', s.risk_run_id],
+        ['Portfolio', s.portfolio_id],
+        ['Portfolio version', s.portfolio_version],
+        ['Market snapshot', s.market_snapshot_id],
+        ['As of', s.as_of],
+        ['Dataset', s.historical_dataset_id],
+        ['Dataset version', s.historical_dataset_version],
+        ['Pricing engine', s.pricing_engine_version],
+        ['Methodology', s.methodology],
+        ['Scenario set', (s.scenario_set || []).join(', ')],
+        ['Duration (s)', s.duration_seconds],
+        ['Status', s.status],
+        ['Release SHA', s.release_sha],
+      ].filter(([, value]) => value != null && value !== '')
+    : []
+
+  return (
+    <div className={embedded ? 'risk-run-status' : 'card'} data-testid="golden-demo-provenance">
+      <div className="block-title">
+        <h3>Calculation provenance</h3>
+        <BlockHelp id="run-provenance" />
+      </div>
+      <div className="muted">Persisted RiskRun lineage — displayed fields equal the backend payload</div>
+      {!runId && <div className="muted foot">Start a risk run to load lineage</div>}
+      {error && <div className="error">{error}</div>}
+      {s && (
+        <table>
+          <tbody>
+            {rows.map(([label, value]) => (
+              <tr key={label}>
+                <td>{label}</td>
+                <td>{String(value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
 export function VaRAnalytics({ report }) {
   const h = varMethod(report, 'historical')
   const p = varMethod(report, 'parametric')
   return (
-    <div className="card">
+    <div className="card" data-testid="golden-demo-var-es">
       <div className="block-title">
         <h3>VaR / Expected Shortfall</h3>
         <BlockHelp id="var-es" />
@@ -92,7 +233,7 @@ export function Hierarchy({ node }) {
 
   if (!node || !resolved) {
     return (
-      <div className="card wide">
+      <div className="card wide" data-testid="golden-demo-hierarchy">
         <div className="block-title">
           <h3>Portfolio Hierarchy</h3>
           <BlockHelp id="portfolio-hierarchy" />
@@ -103,7 +244,7 @@ export function Hierarchy({ node }) {
   }
 
   return (
-    <div className="card wide">
+    <div className="card wide" data-testid="golden-demo-hierarchy">
       <div className="block-title">
         <h3>Portfolio Hierarchy</h3>
         <BlockHelp id="portfolio-hierarchy" />
@@ -366,7 +507,7 @@ export function RiskRuns({ portfolio }) {
   const polling = s && !isRiskRunTerminal(s)
 
   return (
-    <div className="card">
+    <div className="card" data-testid="golden-demo-risk-runs">
       <div className="block-title">
         <h3>Risk Runs</h3>
         <BlockHelp id="risk-runs" />
@@ -410,6 +551,7 @@ export function RiskRuns({ portfolio }) {
                 </div>
               )
           )}
+          <RunProvenance runId={s.id} embedded />
         </div>
       )}
     </div>
@@ -483,14 +625,15 @@ export function RiskChangeAttribution({ portfolio }) {
   const waterfallDisabled = loading || !WATERFALL_METRICS.includes(metric)
 
   return (
-    <div className="card">
+    <div className="card" data-testid="golden-demo-risk-change">
       <div className="block-title">
         <h3>Risk Change Attribution</h3>
         <BlockHelp id="risk-change-attribution" />
       </div>
       <div className="muted">
-        Why did risk change — two COMPLETED RiskRuns (POST /api/v1/risk/runs/compare) or SPY×1.5 waterfall.
-        UI displays the backend payload only.
+        Why did my risk change? Compare two COMPLETED RiskRuns (POST /api/v1/risk/runs/compare)
+        or the SPY×1.5 waterfall. UI displays the backend payload only — demo books use
+        packaged synthetic history, not observed market data.
       </div>
       <div className="inline-form risk-run-form">
         <select
@@ -562,7 +705,7 @@ function RiskChangeFlagshipPanel({ report }) {
   const children = node?.children || []
 
   return (
-    <div className="risk-panel-result">
+    <div className="risk-panel-result" data-testid="golden-demo-risk-change-result">
       <div className="muted foot">
         {report.metric} · {report.unit}
       </div>
