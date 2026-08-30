@@ -1,6 +1,6 @@
 # Final Portfolio Demo
 
-This runbook is the deterministic 3-5 minute demo path for a clean checkout. It reuses the demo portfolios and `run_demo_risk` artifact generator. Risk numbers must come from generated API/script artifacts only; do not copy or invent values in the narrative.
+This runbook is the deterministic 3-5 minute **artifact** path for a clean checkout. It reuses the demo portfolios and `run_demo_risk` artifact generator. Risk numbers must come from generated API/script artifacts only; do not copy or invent values in the narrative. The Stage 10.4 5–8 minute institutional UI story (Compare T0/T1, hedge, provenance, limitations) is [`../demo_script.md`](../demo_script.md) and [`golden_demo.md`](golden_demo.md).
 
 ## Scope
 
