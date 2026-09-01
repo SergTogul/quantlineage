@@ -346,7 +346,7 @@ export function RiskQuery({ portfolio }) {
   const [q, setQ] = useState('What is the worst stress scenario?')
   const [r, setR] = useState(null)
   return (
-    <div className="card">
+    <div className="card" data-testid="golden-demo-risk-query">
       <div className="block-title">
         <h3>Risk Query</h3>
         <BlockHelp id="risk-query" />
@@ -356,7 +356,10 @@ export function RiskQuery({ portfolio }) {
         <button type="button" onClick={async () => setR(await askRisk(portfolio, q))}>Ask</button>
       </div>
       {r && <p className="query-answer">{r.answer}</p>}
-      <div className="muted">Deterministic routing to risk APIs; ready for an LLM tool layer later.</div>
+      <div className="muted">
+        Deterministic routing; “Why did my risk change?” needs two completed RiskRun ids
+        and never invents VaR.
+      </div>
     </div>
   )
 }
@@ -388,7 +391,7 @@ export function HedgeCompare({ portfolio }) {
   }
 
   return (
-    <div className="card wide">
+    <div className="card wide" data-testid="golden-demo-hedge">
       <div className="block-title">
         <h3>Hedge Compare</h3>
         <BlockHelp id="hedge-compare" />
@@ -412,7 +415,7 @@ export function HedgeCompare({ portfolio }) {
       {error && <div className="error risk-run-error">{error}</div>}
       {!summary && !error && <div className="muted foot">No comparison run yet</div>}
       {summary && (
-        <div className="hedge-compare-result">
+        <div className="hedge-compare-result" data-testid="golden-demo-hedge-result">
           <div className="attribution-total">
             <span>Hedge cost <strong>{money(summary.hedge_cost ?? 0)}</strong></span>
             <span>

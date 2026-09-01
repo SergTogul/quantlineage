@@ -20,7 +20,7 @@ export default function Overview({
 
   return (
     <>
-      <section className="metrics" aria-label="Key risk metrics">
+      <section className="metrics" aria-label="Key risk metrics" data-testid="golden-demo-metrics">
         <MetricCard label="Market Value" value={money(kpis.market_value ?? 0)} />
         <MetricCard label="99% VaR" value={money(kpis.var_99 ?? 0)} />
         <MetricCard label="99% Expected Shortfall" value={money(kpis.expected_shortfall_99 ?? 0)} />
