@@ -8,7 +8,7 @@ import {
 
 export function Contributors({ items }) {
   return (
-    <div className="card">
+    <div className="card" data-testid="golden-demo-contributors">
       <div className="block-title">
         <h3>Component VaR Contributors</h3>
         <BlockHelp id="component-var" />
@@ -179,7 +179,7 @@ export function Limits({ items, portfolio }) {
 
 export function Stress({ items }) {
   return (
-    <div className="card wide">
+    <div className="card wide" data-testid="golden-demo-stress">
       <div className="block-title">
         <h3>Stress Tests</h3>
         <BlockHelp id="stress-tests" />

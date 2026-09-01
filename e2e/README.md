@@ -23,3 +23,6 @@ Optional: `PLAYWRIGHT_USE_CHROMIUM=1` forces bundled Chromium instead of the Chr
 ## CI (GitHub Actions)
 
 Job `e2e-playwright` in `.github/workflows/ci.yml` sets `CI=true`, installs Chromium via `npm run install:browsers:ci`, and runs the same suite against builtin pricing.
+
+Stage 10.4 golden demo journey: `e2e/tests/golden-demo.spec.ts` (script: `docs/demo_script.md`).
+
