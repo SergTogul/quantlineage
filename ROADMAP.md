@@ -11,11 +11,11 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 2 — VaR, ES & Portfolio Risk | **COMPLETE** (2026-09-02) |
 | Milestone 3 — Stress & Threat Engine V3 | **COMPLETE** (2026-09-02) |
 | Milestone 4 — Hierarchy, Attribution & Limits | **COMPLETE** (2026-09-02 Lead Architect formal acceptance) |
-| Milestone 5 — Persistence & Risk-Run Platform | **IN PROGRESS** (2026-09-02: M5.6/M5.7/M5.9 DONE; M5.1 blocked on M9.9 GHA green; M5.5 non-blocking polish — not COMPLETE) |
+| Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA `postgres-persistence-smoke` green; M5.5 non-blocking polish remains) |
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | NOT STARTED (`/api/v1` mostly open; risk-runs alias only) |
 | Milestone 8 — Risk Terminal UI | PARTIAL (firm-root hierarchy; thin hedge/multi/risk-run helpers; risk-run poll card; no change-attr/ES panels) |
-| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 authored; M9.9 blocked — no origin remote / no GHA runs yet) |
+| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE — full CI green on GHA; M9.1–M9.5/M9.7/M9.10 still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
 | Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
@@ -58,11 +58,11 @@ Trade (domain/models.py)
 ### Highest-risk gaps (post–M1–M5 progress)
 
 1. Caps/floors/swaptions still deferred; EquityVol/FXVol bumps do not rewrite surface grids; QL uses `BlackConstantVol` at point σ (not full surface engine); Builtin vs QL bond day-count gap
-2. M5 still **IN PROGRESS**: M5.6/M5.7/M5.9 **DONE**; M5.5 valuation LRU only (curve/scenario memo open); Postgres smoke **green locally** (Compose) but **M9.9** still open — no GitHub-hosted runner evidence yet
+2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 valuation LRU only (curve/scenario memo open — non-blocking polish)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. `/api/v1` versioning still mostly open (M7); formal `Scenario` not yet the stress HTTP wire type
 5. UI is one scroll dashboard: nav, heatmaps, hedge-compare page, risk-change attribution, ES contributions still missing (risk-run start/poll card landed M8.9)
-6. CI not validated on GitHub runners (M9.9 blocked: no origin/`gh`); static analysis (Ruff/mypy/ESLint) not started; E2E lags new endpoints
+6. M9.9 **DONE** — full CI green on GHA runners (run 33673245125); static analysis (Ruff/mypy/ESLint) not started; E2E lags new endpoints
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
@@ -72,7 +72,7 @@ Trade (domain/models.py)
 | Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **426 passed**, 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
 | Frontend `npm test` | **26 passed**, 0 failed |
 | Frontend `npm run build` | **OK** (vite; 22 modules) |
-| M5 milestone | **IN PROGRESS** — not COMPLETE (blocking: M5.1/M9.9 GHA `postgres-smoke` green; M5.5 non-blocking polish) |
+| M5 milestone | **COMPLETE** — M5.1/M9.9 GHA green (run 33673245125); M5.5 remains non-blocking polish |
 | M5.6 / M5.7 / M5.9 | **DONE** (DI; Postgres `SKIP LOCKED` claim + Compose worker; stress scenario_definitions HTTP) |
 | M5.5 | **PARTIAL** (valuation LRU; curve/scenario memo open) |
 | M6.1–M6.7 | **DONE** (harness, baseline, risk-path wire, parallel pool, ABI+Historical parity, QL concurrency ADR) |
@@ -384,18 +384,18 @@ Firm→trade hierarchy with additive MV/Greek/stress reconciliation; P&L Explain
 
 ## Milestone 5 — Persistence & Risk-Run Platform
 
-Status: **IN PROGRESS** — Lead Architect formal acceptance **did not** mark COMPLETE (2026-09-02); suite verify same day reaffirms IN PROGRESS
+Status: **COMPLETE** (2026-09-02 DevOps) — GHA `postgres-persistence-smoke` + full CI green; M5.5 remains non-blocking polish
 
-Task rollup: M5.2–M5.4 / M5.6 / M5.7 / M5.9 **DONE**; M5.1 / M5.5 **PARTIAL** (blocking gaps below).
+Task rollup: M5.1–M5.4 / M5.6 / M5.7 / M5.9 **DONE**; M5.5 **PARTIAL** (non-blocking polish only).
 
 ### Tasks
 
-- [x] M5.1 PostgreSQL persistence (SQLAlchemy + Alembic) — PARTIAL
+- [x] M5.1 PostgreSQL persistence (SQLAlchemy + Alembic) — DONE
   - New package `backend/app/persistence/` (config, session, ORM models, repository ABCs + SQLAlchemy repos)
   - Tables: portfolios, trades, market_snapshots (meta + JSON data), scenario_definitions, risk_runs, risk_results, limit_definitions
   - Alembic initial revision `001_initial_persistence` under `backend/migrations/` (not `alembic/`, to avoid package shadowing); SQLite-capable unit tests (no live Postgres required in unit suite)
   - Compose `postgres` service + `RISKFORGE_DATABASE_URL` (psycopg3); ADR 005
-  - Postgres CI: `postgres-smoke` job in `.github/workflows/ci.yml` + `scripts/smoke_postgres.sh` (wait-for-pg → Alembic `backend/migrations/` upgrade head → seed wiring). **Local Compose smoke green** (2026-09-02 DevOps). **Not yet validated green on GitHub-hosted runners** → residual with **M9.9**
+  - Postgres CI: `postgres-persistence-smoke` job in `.github/workflows/ci.yml` + `scripts/smoke_postgres.sh` (wait-for-pg → Alembic `backend/migrations/` upgrade head → seed wiring). **Local Compose smoke green** (2026-09-02 DevOps). **GHA green** (2026-09-02): https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176) — M9.9 residual **CLOSED**
 - [x] M5.2 RiskRun domain model — DONE
   - Domain DTOs: `RiskRunStatus`, `RiskResultRef`, `RiskRun` in `domain/models.py`
   - Lifecycle validation (QUEUED/RUNNING/COMPLETED/FAILED), computed `duration`
@@ -435,13 +435,13 @@ Task rollup: M5.2–M5.4 / M5.6 / M5.7 / M5.9 **DONE**; M5.1 / M5.5 **PARTIAL** 
   - Repo `claim_queued` (memory + SQLAlchemy): QUEUED→RUNNING; **Postgres** uses `SELECT … FOR UPDATE SKIP LOCKED` so concurrent workers do not double-claim; SQLite/unit path is FIFO without skip-locked (documented)
   - Compose ships one worker by default (demo); Redis/RQ **not** required for claim safety
   - Evidence: `tests/test_durable_worker.py` (poll + memory exclusive claim + SQLite claim + mocked postgres `skip_locked`)
-  - Residual: live multi-worker Postgres integration on GHA runners still **M9.9**
+  - Residual: multi-worker live stress beyond claim-unit tests optional; GHA Postgres path proven via `postgres-persistence-smoke` (M9.9 **DONE**)
 
 ### Acceptance Criteria (milestone bar)
 
-Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRun domain/lifecycle, async run APIs, FastAPI DI for persistence-backed services, compose/process worker with Postgres claim safety (`FOR UPDATE SKIP LOCKED`), and caching with invalidation tests. Postgres path must be exercised beyond SQLite-only unit tests (CI or documented smoke). Unvalidated Postgres CI / cache-scope gaps keep the milestone **IN PROGRESS**.
+Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRun domain/lifecycle, async run APIs, FastAPI DI for persistence-backed services, compose/process worker with Postgres claim safety (`FOR UPDATE SKIP LOCKED`), and caching with invalidation tests. Postgres path exercised beyond SQLite (local Compose smoke + GHA `postgres-persistence-smoke`). Milestone **COMPLETE**; M5.5 curve/scenario memo remains non-blocking polish.
 
-### Formal acceptance decision (2026-09-02) — **IN PROGRESS (not COMPLETE)**
+### Formal acceptance decision (2026-09-02) — **COMPLETE** (cleared after M9.9 GHA green)
 
 **Verdict (initial):** Do **not** rubber-stamp COMPLETE. Tests were green and the risk-run spine (M5.2–M5.4) was done, but DI for snapshots/scenarios/limits and Postgres CI proof were open.
 
@@ -452,6 +452,8 @@ Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRu
 **Update same day (Backend/API M5.7 claim safety):** M5.7 multi-worker claim blocker is **CLOSED** via Postgres `FOR UPDATE SKIP LOCKED` on `claim_queued` (Compose single-worker demo unchanged; SQLite fallback documented). Remaining milestone blocker: **M5.1 / M9.9** Postgres runner green. M5.5 remains non-blocking polish.
 
 **Update same day (DevOps M9.9 attempt):** Local `scripts/smoke_postgres.sh` against Compose `postgres:16-alpine` **passed** (Alembic 001→002 + seed portfolio/snapshot/scenarios/limits). CI workflow hardened (psycopg wait + version print). **M9.9 still NOT DONE** — this checkout has **no `git remote` / no `gh` CLI**, so no GitHub Actions run history and no push to obtain runner evidence. Do **not** mark Milestone 5 COMPLETE until a green `postgres-smoke` (and ideally full CI) GHA URL is recorded. M5.5 alone remains non-blocking polish.
+
+**Update same day (DevOps M9.9 close):** Origin https://github.com/SergTogul/riskforge-mvp ; push `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — jobs `postgres-persistence-smoke`, `backend-pytest`, `frontend-test-build` all green. **M9.9 DONE**; **M5.1 residual CLOSED**; Milestone 5 marked **COMPLETE**. M5.5 stays non-blocking polish.
 
 | Check (initial formal pass) | Result |
 |-------|--------|
@@ -470,7 +472,7 @@ Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRu
 | Check | Result |
 |-------|--------|
 | M5.6 | **DONE** — FastAPI DI + seeding for portfolios, risk_runs, market_snapshots, scenario_definitions, limit_definitions |
-| M5.1 Postgres CI | **PARTIAL→authored+local-green** — `postgres-smoke` + `scripts/smoke_postgres.sh` green on Compose; GHA runner green still **M9.9** |
+| M5.1 Postgres CI | **DONE** — Compose local green + GHA `postgres-persistence-smoke` success (run 33673245125) |
 | Backend pytest (builtin, this change) | **410 passed** at formal pass; ~7 native/C++ failures on Apple clang 14 (`std::jthread` / missing `-I include`) were **pre-existing**, unrelated to DI — **resolved** by M6.4 portable stdlib thread pool (`__cpp_lib_jthread` fallback to `std::thread`+join) + compile flags with `-I native/include` |
 | Evidence | `tests/test_persistence_di.py`; ADR 005 |
 
@@ -482,10 +484,10 @@ Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRu
 | SQLite / unit | FIFO claim without skip-locked (documented); mocked postgresql dialect asserts `skip_locked=True` |
 | Evidence | `tests/test_durable_worker.py`; ADR 005; README / Compose comments |
 
-### Remaining items to reach COMPLETE
+### Remaining items after COMPLETE
 
-1. **M5.1 / M9.9 (blocking):** Confirm `postgres-smoke` job green on GitHub-hosted runners (psycopg path beyond SQLite). Local Compose smoke is green; needs origin remote + push + recorded GHA URL.
-2. **M5.5 (non-blocking polish):** Curve-construction cache and/or scenario-engine memo — Lead accepts valuation LRU as sufficient for COMPLETE once (1) lands; do not block COMPLETE on M5.5 alone.
+1. ~~**M5.1 / M9.9 (blocking):**~~ **CLOSED 2026-09-02** — GHA run https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 (`postgres-persistence-smoke` green).
+2. **M5.5 (non-blocking polish):** Curve-construction cache and/or scenario-engine memo — optional; does not reopen Milestone 5 COMPLETE.
 
 ~~**M5.6 (blocking):** Wire market_snapshots / scenario_definitions / limit_definitions repositories into FastAPI DI~~ **CLOSED 2026-09-02.**
 
@@ -606,7 +608,7 @@ Status: PARTIAL (prototype SPA; firm-root hierarchy card + thin compare/multi AP
 
 ## Milestone 9 — Testing, CI & Engineering Quality
 
-Status: PARTIAL (M9.6 workflow authored; M9.9 blocked — no GHA runner evidence yet)
+Status: PARTIAL (M9.6 + M9.9 DONE; other M9 tasks still open)
 
 ### Tasks
 
@@ -619,11 +621,11 @@ Status: PARTIAL (M9.6 workflow authored; M9.9 blocked — no GHA runner evidence
 - [ ] M9.7 Static analysis (Ruff/mypy/ESLint) — NOT STARTED
   - [ ] M9.8 Containers — PARTIAL (compose: `postgres` + `backend` + `worker` + `frontend`; worker claims via Postgres `SKIP LOCKED` — see M5.7; Redis/RQ optional)
 
-- [ ] M9.9 Validate CI on GitHub-hosted runners (fix workflow green; document QuantLib install path) — **BLOCKED (not DONE)**
+- [x] M9.9 Validate CI on GitHub-hosted runners (fix workflow green; document QuantLib install path) — **DONE** (2026-09-02)
   - Local evidence (2026-09-02, DevOps): `docker compose up -d postgres` + `RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge ./scripts/smoke_postgres.sh` → **exit 0** (`postgres smoke OK`; Alembic head `002_risk_run_domain_fields`). Idempotent re-run OK. See `BUILD_NOTES.md`.
   - CI hardening: smoke waits up to 60s for psycopg `SELECT 1`; job prints sqlalchemy/alembic/psycopg versions; QuantLib optional for `postgres-smoke` (full `requirements.txt` preferred; strip QuantLib on wheel failure). Main `backend` job still prefers QuantLib wheel on `ubuntu-latest`, falls back to builtin.
-  - GHA blocker: checkout has **no `git remote`**, **`gh` not installed**, and DevOps was not asked to push — `gh run list` impossible. **No Actions URL / conclusion to record.** Next owner: add `origin`, push workflow, confirm green `postgres-smoke` (ideally full `CI`) and paste run URL here before checking this box.
-  - Do **not** mark M9.9 or Milestone 5 COMPLETE without that GHA green evidence.
+  - GHA evidence: repo https://github.com/SergTogul/riskforge-mvp ; push SHA `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — `postgres-persistence-smoke` https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176 ; also `backend-pytest` + `frontend-test-build` green. QuantLib path: backend job prefers wheel on ubuntu-latest with builtin fallback (see workflow).
+  - Milestone 5 COMPLETE cleared on this evidence; M5.5 polish remains optional.
 - [ ] M9.10 E2E coverage for post-M2/M3/M4/M5 endpoints — PARTIAL
   - Why/evidence: Playwright has dashboard / scenario-builder / reverse-stress / risk-query / **risk-runs poll** (`e2e/tests/risk-runs.spec.ts`); still missing ES, change-attribution, reverse multi, hedge-compare object shape
 
