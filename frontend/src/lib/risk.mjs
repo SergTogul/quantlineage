@@ -228,3 +228,101 @@ export function riskRunSummary(run) {
     result_types: results.map((r) => r.result_type),
   }
 }
+
+/**
+ * Request helper: scale SPY equity quantity for change-attribution demo.
+ * Does not compute risk — only builds current_portfolio body.
+ */
+export function spyScaledPortfolio(portfolio, scale = 1.5) {
+  if (!portfolio) return null
+  const positions = (portfolio.positions || []).map((p) => {
+    if (p?.symbol === 'SPY' && p?.type === 'equity') {
+      return { ...p, quantity: Number(p.quantity) * scale }
+    }
+    return { ...p }
+  })
+  return { ...portfolio, positions }
+}
+
+/**
+ * Demo RiskChangeAttributionRequest: previous = book, current = SPY×scale.
+ * Markets omitted so the API builds snapshots (OpenAPI quantity_increase pattern).
+ */
+export function demoChangeAttributionRequest(portfolio, options = {}) {
+  if (!portfolio) return null
+  return {
+    previous_portfolio: portfolio,
+    current_portfolio: spyScaledPortfolio(portfolio, options.scale ?? 1.5),
+    metric: options.metric ?? 'var_99',
+    methodology: options.methodology ?? 'DELTA_GAMMA',
+  }
+}
+
+/**
+ * Display parse for RiskChangeAttributionReport (M8.10). Driver labels / delta_risk
+ * from API only — no client-side risk math.
+ */
+export function riskChangeAttributionSummary(report) {
+  if (!report) return null
+  return {
+    metric: report.metric,
+    previous_risk: report.previous_risk,
+    current_risk: report.current_risk,
+    total_change: report.total_change,
+    explained_change: report.explained_change,
+    residual: report.residual,
+    items: report.items || [],
+    drivers: (report.items || []).map((x) => x.driver),
+  }
+}
+
+/** ES contribution dimension keys on ESContributionReport. */
+export const ES_CONTRIBUTION_DIMENSIONS = [
+  'by_position',
+  'by_book',
+  'by_strategy',
+  'by_desk',
+  'by_risk_factor',
+]
+
+const ES_RECON_KEY = {
+  by_position: 'reconciliation_error_position',
+  by_book: 'reconciliation_error_book',
+  by_strategy: 'reconciliation_error_strategy',
+  by_desk: 'reconciliation_error_desk',
+  by_risk_factor: 'reconciliation_error_risk_factor',
+}
+
+/**
+ * Display parse for ESContributionReport (M8.11). Slices one dimension for the table;
+ * contribution_pct is already percent units from the API.
+ */
+export function esContributionSummary(report, dimension = 'by_position', topN = 8) {
+  if (!report) return null
+  const dim = ES_CONTRIBUTION_DIMENSIONS.includes(dimension) ? dimension : 'by_position'
+  const items = report[dim] || []
+  const reconKey = ES_RECON_KEY[dim]
+  return {
+    portfolio_id: report.portfolio_id,
+    methodology: report.methodology ?? null,
+    confidence: report.confidence,
+    portfolio_var: report.portfolio_var,
+    portfolio_es: report.portfolio_es,
+    dimension: dim,
+    items: items.slice(0, topN),
+    item_count: items.length,
+    reconciliation_error: report[reconKey] ?? 0,
+  }
+}
+
+/**
+ * Display parse for VaRMethodologyComparison (M8.12). Passes API rows through.
+ */
+export function varCompareSummary(report) {
+  if (!report) return null
+  return {
+    portfolio_id: report.portfolio_id,
+    observations: report.observations,
+    results: report.results || [],
+  }
+}
