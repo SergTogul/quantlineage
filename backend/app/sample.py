@@ -1,6 +1,5 @@
 from app.domain.models import Portfolio
 
-
 SAMPLE_PORTFOLIO = Portfolio.model_validate({
     "id": "global-macro",
     "name": "Global Macro Demo",

@@ -330,9 +330,10 @@ class RiskRunWorker:
             logger.exception("risk run disappeared during execution: %s", run_id)
         except Exception as exc:  # noqa: BLE001 — surface as FAILED status
             logger.exception("risk run failed: %s", run_id)
+            err_msg = str(exc) or type(exc).__name__
             try:
                 self._with_service(
-                    lambda svc: svc.fail(run_id, str(exc) or type(exc).__name__)
+                    lambda svc, msg=err_msg: svc.fail(run_id, msg)
                 )
             except Exception:  # noqa: BLE001
                 logger.exception("could not mark risk run FAILED: %s", run_id)

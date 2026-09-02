@@ -15,8 +15,13 @@ import pytest
 
 from app.domain.models import MarketSnapshot, ScenarioKind
 from app.market.snapshot import shock_snapshot
+from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero
-from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries, SyntheticHistoricalDataset
+from app.risk.historical_data import (
+    ArrayHistoricalDataset,
+    FactorObservationSeries,
+    SyntheticHistoricalDataset,
+)
 from app.risk.scenarios import (
     AggregateFactorChange,
     apply_market_scenario,
@@ -29,7 +34,6 @@ from app.risk.scenarios import (
     to_stress_scenario,
 )
 from app.risk.var import VaRAnalytics
-from app.pricing.builtin import BuiltinPricingEngine
 from app.sample import SAMPLE_PORTFOLIO
 
 

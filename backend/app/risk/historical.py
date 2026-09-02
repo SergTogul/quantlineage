@@ -3,14 +3,12 @@ from __future__ import annotations
 import numpy as np
 
 from app.compute.kernel import (
-    KERNEL_PNL_ABS_TOL,
-    KERNEL_PNL_REL_TOL,
     Exposure,
     ScenarioKernel,
     Shock,
     get_scenario_kernel,
 )
-from app.domain.models import MarketSnapshot, Portfolio, VaRMethodology, Valuation
+from app.domain.models import MarketSnapshot, Portfolio, Valuation, VaRMethodology
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.market.snapshot import PositionMarketDataProvider

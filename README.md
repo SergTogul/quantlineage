@@ -139,8 +139,14 @@ npm run dev
 cd backend
 PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin pytest -q
 
+# M9.7 static analysis (also CI job lint-static-analysis)
+pip install -r requirements-dev.txt   # includes ruff + mypy
+ruff check app tests
+mypy app
+
 cd ../frontend
 npm test
+npm run lint   # eslint src --max-warnings 0
 
 cd ../e2e
 npm install && npm run install:browsers

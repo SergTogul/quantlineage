@@ -1,9 +1,19 @@
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
+
 from app.domain.models import (
-    BondPosition, EquityFuturePosition, EquityPosition, EuropeanOptionPosition,
-    FXForwardPosition, FXOptionPosition, InterestRateFuturePosition, MarketSnapshot,
-    Portfolio, StressScenario, SwapPosition,
+    BondPosition,
+    EquityFuturePosition,
+    EquityPosition,
+    EuropeanOptionPosition,
+    FXForwardPosition,
+    FXOptionPosition,
+    InterestRateFuturePosition,
+    MarketSnapshot,
+    Portfolio,
+    StressScenario,
+    SwapPosition,
 )
 
 

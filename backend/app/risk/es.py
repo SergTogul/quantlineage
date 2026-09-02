@@ -25,8 +25,8 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.market.snapshot import PositionMarketDataProvider
-from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
+from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.scenarios import (
     AggregateFactorChange,
     apply_market_scenario,

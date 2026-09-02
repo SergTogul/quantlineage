@@ -1,0 +1,85 @@
+# RiskForge backend tooling (M9.7). Runtime deps stay in requirements.txt.
+[project]
+name = "riskforge-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+description = "RiskForge portfolio risk backend"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["app", "tests"]
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+# Staged gate (M9.7): catch real defects first; style/typing modernization gradual.
+# Ignored below are documented debt — not silent disables of the whole tool.
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "SIM", # simplify
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501",   # line length — large existing surface; revisit with formatter
+    "E701",   # multiple statements on one line (colon) — gradual
+    "E702",   # multiple statements on one line (semicolon) — gradual
+    "E402",   # import not at top — tests/native conditional imports
+    "E741",   # ambiguous variable name (l) — rare; gradual
+    "B008",   # function call in default — FastAPI Depends() pattern
+    "B017",   # assertRaises(Exception) — tests; gradual
+    "B007",   # unused loop control variable — gradual
+    "B905",   # zip(..., strict=) — gradual (Py3.10+)
+    "UP007",  # X | Y vs Optional — gradual with mypy
+    "UP035",  # deprecated typing imports — gradual
+    "UP037",  # quoted annotations — gradual
+    "UP042",  # str enum modernization — gradual (domain enums)
+    "UP045",  # Optional[X] → X | None — gradual
+    "SIM102", # collapsible if — gradual
+    "SIM103", # needless bool — gradual
+    "SIM108", # ternary vs if/else — gradual
+    "SIM110", # any()/all() rewrite — gradual
+    "RUF001", # ambiguous unicode in strings — finance γ/Δ notation intentional
+    "RUF002", # ambiguous unicode in docstrings — same
+    "RUF003", # ambiguous unicode in comments — same
+    "RUF005", # collection concat — gradual
+    "RUF007", # zip → pairwise — gradual
+    "RUF022", # unsorted __all__ — gradual
+    "RUF043", # pytest.raises pattern — gradual
+    "RUF046", # unnecessary int() — gradual
+    "RUF100", # unused noqa — clean up with rule expansion
+    "C408",   # unnecessary dict() — gradual
+    "DTZ011", # date.today() — gradual
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["app"]
+ignore_missing_imports = true
+warn_unused_ignores = false  # true once disable_error_code list is emptied
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = false
+# Staged (M9.7): suppress the known debt codes so CI stays green while still
+# running mypy for other checks (name-defined, return-value, attr-defined, …).
+# Pay down and remove codes from this list; do not treat empty success as "fully typed".
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "var-annotated",
+    "no-redef",
+    "misc",
+]
+
+[[tool.mypy.overrides]]
+module = "QuantLib.*"
+ignore_missing_imports = true

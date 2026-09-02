@@ -11,7 +11,7 @@ here so ORM / repository imports stay stable.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Optional
 
 from sqlalchemy import (
@@ -44,7 +44,7 @@ __all__ = [
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class PortfolioRow(Base):

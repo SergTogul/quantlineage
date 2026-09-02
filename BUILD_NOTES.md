@@ -12,6 +12,13 @@ Final verification in the execution sandbox:
 - Service was stopped after smoke testing; port 8000 is not left listening.
 - `npm run build`: blocked because Vite is not installed locally and external npm registry access is unavailable in this sandbox. `npm test` succeeds because the unit suite uses Node's built-in test runner.
 
+## M9.7 Static analysis CI (2026-09-02, DevOps)
+
+- Backend: `pip install -r requirements-dev.txt` then `ruff check app tests` and `mypy app` (config in `backend/pyproject.toml`).
+- Frontend: `npm run lint` (`eslint.config.js`; `--max-warnings 0`).
+- CI: `.github/workflows/ci.yml` job `lint-static-analysis`.
+- Staged: not full-strict — see ROADMAP M9.7 for ignored Ruff rules and mypy `disable_error_code` debt list.
+
 ## M9.9 / M5.1 Postgres CI smoke (2026-09-02, DevOps)
 
 ### Local Compose (green)

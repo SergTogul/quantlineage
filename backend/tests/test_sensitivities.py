@@ -26,7 +26,6 @@ from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, RateZero
 from app.risk.sensitivities import FUTURE_MEASURES, SensitivityEngine
 from app.sample import SAMPLE_PORTFOLIO
 
-
 pricing = BuiltinPricingEngine()
 
 
