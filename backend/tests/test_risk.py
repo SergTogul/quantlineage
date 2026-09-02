@@ -1,5 +1,6 @@
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
+from app.risk.limits import DEFAULT_LIMITS
 from app.risk.stress import StressEngine, DEFAULT_SCENARIOS
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
@@ -32,10 +33,35 @@ def test_contributors_sum_to_100():
     assert abs(sum(x.contribution_pct for x in items) - 100) < 1e-9
 
 
+def test_contributors_use_distinct_trade_labels():
+    svc = PortfolioService(BuiltinPricingEngine(), HistoricalRiskEngine())
+    items = svc.contributors(SAMPLE_PORTFOLIO)
+    labels = [x.label for x in items]
+    assert "SPY equity" in labels
+    assert "SPY future" in labels
+    assert "SPY put" in labels
+    assert "EURUSD fwd" in labels
+    assert "EURUSD call" in labels
+    assert len(labels) == len(set(labels))
+
+
 def test_limits_return_expected_metrics():
     svc = PortfolioService(BuiltinPricingEngine(), HistoricalRiskEngine())
-    metrics = {x.metric for x in svc.limits(SAMPLE_PORTFOLIO)}
-    assert metrics == {"var_99", "dv01", "vega", "single_position_pct"}
+    rows = svc.limits(SAMPLE_PORTFOLIO)
+    metrics = {x.metric for x in rows}
+    assert metrics == {lim.metric for lim in DEFAULT_LIMITS}
+    assert metrics == {
+        "var_99",
+        "expected_shortfall_99",
+        "dv01",
+        "key_rate_dv01",
+        "vega",
+        "fx_delta",
+        "single_position_pct",
+        "stress_loss",
+    }
+    assert all(x.status in {"OK", "WARNING", "BREACH"} for x in rows)
+    assert all(x.breached == (x.status == "BREACH") for x in rows)
 
 
 def test_threat_evaluation_ranks_worst_loss_first():

@@ -50,8 +50,10 @@ def test_reverse_stress_finds_equity_loss_threshold():
 
 def test_hierarchy_drills_to_trade_level():
     root=svc.hierarchy(SAMPLE_PORTFOLIO)
-    assert root.level=="portfolio"
-    desk=root.children[0]; strategy=desk.children[0]
+    assert root.level=="firm"
+    portfolio=root.children[0]
+    assert portfolio.level=="portfolio"
+    desk=portfolio.children[0]; strategy=desk.children[0]
     assert desk.level=="desk" and strategy.level=="strategy"
     assert any(t.level=="trade" for b in strategy.children for t in b.children)
 
@@ -68,7 +70,7 @@ def test_attribution_explains_position_change():
     report=svc.attribution(AttributionRequest(previous_portfolio=SAMPLE_PORTFOLIO,current_portfolio=current))
     assert report.total_change != 0
     assert abs(report.residual) < 1e-6
-    assert next(x for x in report.items if x.driver=="Position changes").pnl != 0
+    assert next(x for x in report.items if x.driver=="New trades").pnl != 0
 
 
 def test_deterministic_query_routes_to_risk_tools():
@@ -95,9 +97,10 @@ def test_scenario_comparison_measures_hedge_improvement():
     # Reduce long SPY exposure; comparison should at least return aligned scenario results.
     hedge.positions[1].quantity = 0
     scenarios=[StressScenario(name="Crash",equity_shock=-0.2)]
-    x=svc.compare_scenarios(SAMPLE_PORTFOLIO,hedge,scenarios)
-    assert len(x)==1 and x[0].scenario=="Crash"
-    assert x[0].improvement != 0
+    report=svc.compare_scenarios(SAMPLE_PORTFOLIO,hedge,scenarios)
+    assert len(report.scenarios)==1 and report.scenarios[0].scenario=="Crash"
+    assert report.scenarios[0].improvement != 0
+    assert report.hedge_cost == report.hedged_market_value - report.base_market_value
 
 
 def test_market_and_demo_attribution_api():

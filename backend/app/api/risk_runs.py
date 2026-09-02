@@ -1,0 +1,62 @@
+"""Async risk-run HTTP routes (M5.4).
+
+Mounted at ``/risk/runs`` until M7.2 moves the surface under ``/api/v1/risk/runs``.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.api.deps import get_risk_run_worker
+from app.domain.models import RiskRunCreateRequest, RiskRunView
+from app.services.risk_run_service import RiskRunNotFound
+from app.services.risk_run_worker import RiskRunWorker
+
+router = APIRouter(tags=["risk-runs"])
+
+
+@router.post(
+    "/runs",
+    response_model=RiskRunView,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Enqueue an async risk computation",
+    response_description="Run accepted; poll GET /risk/runs/{id} for status/results.",
+)
+def create_risk_run(
+    body: RiskRunCreateRequest,
+    worker: RiskRunWorker = Depends(get_risk_run_worker),
+) -> RiskRunView:
+    """Create a QUEUED risk run and execute it on an in-process worker thread.
+
+    Routes remain under ``/risk/*`` until M7.2 API versioning (``/api/v1``).
+    Persistence: in-memory by default; SQLAlchemy when RISKFORGE_DATABASE_URL
+    is set at app lifespan (M5.6). When RISKFORGE_EXTERNAL_WORKER=1 (Compose
+    backend), the run stays QUEUED until ``python -m app.worker`` polls it (M5.7).
+    """
+    try:
+        return worker.submit(
+            portfolio=body.portfolio,
+            run_type=body.run_type,
+            request=body.request,
+            market_snapshot_id=body.market_snapshot_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get(
+    "/runs/{run_id}",
+    response_model=RiskRunView,
+    summary="Get risk-run status and results",
+)
+def get_risk_run(
+    run_id: str,
+    worker: RiskRunWorker = Depends(get_risk_run_worker),
+) -> RiskRunView:
+    try:
+        return worker.get(run_id)
+    except RiskRunNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"risk run not found: {run_id}",
+        ) from exc

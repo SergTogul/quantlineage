@@ -1,14 +1,55 @@
+"""Stress evaluation, reverse stress, and hedge comparison.
+
+Multi-factor snapshot shocks (equity / rates / FX / vol) live in
+``app.risk.scenario_engine`` (M3.2). Named historical crises live in
+``app.risk.crisis_library`` (M3.3) as formal HISTORICAL_APPROXIMATION scenarios.
+Single-factor reverse stress lives in ``app.risk.reverse_stress`` (M3.5).
+Multi-factor reverse stress lives in ``app.risk.reverse_stress_multi`` (M3.6).
+``PricingEngine.shocked_value`` applies scenarios via ``shock_snapshot`` →
+``apply_scenario``.
+"""
+
+from __future__ import annotations
+
 from app.domain.models import (
+    FactorExposureChange,
+    HedgeComparisonReport,
     Portfolio,
     PositionStressContribution,
+    RiskFactorExposure,
+    RiskSummary,
+    ScenarioComparison,
+    ScenarioContributionBreakdown,
     ScenarioEvaluationReport,
     ScenarioKind,
     StressEvaluation,
     StressResult,
     StressScenario,
+    VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
+from app.interfaces.risk import RiskEngine
 from app.market.snapshot import PositionMarketDataProvider
+from app.risk.crisis_library import CRISIS_STRESS_SCENARIOS
+from app.risk.factors import RiskFactorEngine
+from app.risk.historical import HistoricalRiskEngine
+from app.risk.reverse_stress import ReverseStressEngine
+from app.risk.reverse_stress_multi import MultiFactorReverseStressEngine
+from app.risk.scenario_attribution import ScenarioAttributionEngine, ScenarioLike
+from app.risk.scenario_engine import ScenarioEngine, apply_scenario
+
+__all__ = [
+    "DEFAULT_SCENARIOS",
+    "THREAT_SCENARIOS",
+    "HYPOTHETICAL_THREAT_SCENARIOS",
+    "StressEngine",
+    "ReverseStressEngine",
+    "MultiFactorReverseStressEngine",
+    "ScenarioComparisonEngine",
+    "ScenarioAttributionEngine",
+    "ScenarioEngine",
+    "apply_scenario",
+]
 
 
 DEFAULT_SCENARIOS = [
@@ -48,7 +89,10 @@ DEFAULT_SCENARIOS = [
     StressScenario(
         id="combined_crisis",
         name="Combined Crisis",
-        description="Equity crash, volatility spike and higher rates occurring together.",
+        description=(
+            "Hypothetical multi-factor crisis (not a named historical episode): "
+            "equity crash, volatility spike and higher rates occurring together."
+        ),
         kind=ScenarioKind.MACRO,
         equity_shock=-0.20,
         vol_shock=0.50,
@@ -58,66 +102,24 @@ DEFAULT_SCENARIOS = [
 ]
 
 
-THREAT_SCENARIOS = [
-    StressScenario(
-        id="gfc_style",
-        name="Global Financial Crisis-style",
-        description="Historical-style severe risk-off shock; illustrative, not a replay of observed 2008 paths.",
-        kind=ScenarioKind.HISTORICAL_STYLE,
-        equity_shock=-0.35,
-        vol_shock=1.00,
-        rates_shift_bps=-100,
-        max_loss_pct=0.15,
-    ),
-    StressScenario(
-        id="covid_style",
-        name="COVID Crash-style",
-        description="Fast equity drawdown with an extreme volatility expansion; illustrative historical-style scenario.",
-        kind=ScenarioKind.HISTORICAL_STYLE,
-        equity_shock=-0.30,
-        vol_shock=1.50,
-        rates_shift_bps=-75,
-        max_loss_pct=0.15,
-    ),
+# Non-historical hypothetical / factor threats (kept separate from crisis library).
+HYPOTHETICAL_THREAT_SCENARIOS = [
     StressScenario(
         id="stagflation",
         name="Stagflation Shock",
-        description="Equities fall while rates and volatility rise together.",
+        description="Hypothetical: equities fall while rates and volatility rise together.",
         kind=ScenarioKind.MACRO,
         equity_shock=-0.20,
         vol_shock=0.60,
         rates_shift_bps=200,
         max_loss_pct=0.12,
     ),
-    StressScenario(
-        id="tech_crash",
-        name="Equity / Tech Crash Proxy",
-        description="Large equity shock with elevated volatility, useful for equity-option heavy books.",
-        kind=ScenarioKind.MACRO,
-        equity_shock=-0.40,
-        vol_shock=0.80,
-        rates_shift_bps=-50,
-        max_loss_pct=0.18,
-    ),
-    StressScenario(
-        id="rate_shock",
-        name="Rates Regime Break",
-        description="Abrupt 300bp parallel rate increase with moderate volatility expansion.",
-        kind=ScenarioKind.MACRO,
-        equity_shock=-0.10,
-        vol_shock=0.30,
-        rates_shift_bps=300,
-        max_loss_pct=0.12,
-    ),
-    StressScenario(
-        id="vol_dislocation",
-        name="Volatility Dislocation",
-        description="Implied volatility doubles while spot and rates are initially unchanged.",
-        kind=ScenarioKind.FACTOR,
-        vol_shock=1.00,
-        max_loss_pct=0.08,
-    ),
 ]
+
+# Crisis library first (HISTORICAL_APPROXIMATION via formal Scenario), then hypotheticals.
+# Wire shape remains StressScenario (kind=HISTORICAL_STYLE); honest labeling lives in
+# crisis_library descriptions / formal Scenario.category when expanded.
+THREAT_SCENARIOS = list(CRISIS_STRESS_SCENARIOS) + list(HYPOTHETICAL_THREAT_SCENARIOS)
 
 
 def _threat_level(loss_pct_nav: float) -> str:
@@ -131,7 +133,9 @@ def _threat_level(loss_pct_nav: float) -> str:
 
 
 class StressEngine:
-    def __init__(self): self.market_data = PositionMarketDataProvider()
+    def __init__(self):
+        self.market_data = PositionMarketDataProvider()
+        self.attribution = ScenarioAttributionEngine()
 
     def run(self, portfolio: Portfolio, pricing_engine: PricingEngine, scenarios: list[StressScenario]) -> list[StressResult]:
         market = self.market_data.snapshot(portfolio)
@@ -148,6 +152,24 @@ class StressEngine:
                 by_position=by_position,
             ))
         return output
+
+    def contributions(
+        self,
+        portfolio: Portfolio,
+        pricing_engine: PricingEngine,
+        scenario: ScenarioLike,
+        *,
+        market=None,
+        by_trade_pnl: dict[str, float] | None = None,
+    ) -> ScenarioContributionBreakdown:
+        """Hierarchy + risk-factor stress P&L decomposition for one scenario (M3.4)."""
+        return self.attribution.decompose(
+            portfolio,
+            pricing_engine,
+            scenario,
+            market=market if market is not None else self.market_data.snapshot(portfolio),
+            by_trade_pnl=by_trade_pnl,
+        )
 
     def evaluate(
         self,
@@ -184,6 +206,13 @@ class StressEngine:
                 key=lambda x: x.pnl,
             )[:5]
             threshold = scenario.max_loss_pct
+            breakdown = self.contributions(
+                portfolio,
+                pricing_engine,
+                scenario,
+                market=market,
+                by_trade_pnl=by_position,
+            )
             evaluations.append(
                 StressEvaluation(
                     scenario_id=scenario.id or f"scenario_{index + 1}",
@@ -200,6 +229,7 @@ class StressEngine:
                     max_loss_pct=threshold,
                     by_position=by_position,
                     top_loss_contributors=contributors,
+                    contributions=breakdown,
                 )
             )
 
@@ -216,40 +246,106 @@ class StressEngine:
         )
 
 
-class ReverseStressEngine:
-    """Finds the smallest one-factor shock that reaches a requested loss percentage."""
-    def __init__(self): self.engine = StressEngine()
+def _diff_factor_exposures(
+    before: list[RiskFactorExposure],
+    after: list[RiskFactorExposure],
+) -> list[FactorExposureChange]:
+    bmap = {x.factor: x for x in before}
+    amap = {x.factor: x for x in after}
+    out: list[FactorExposureChange] = []
+    for key in sorted(set(bmap) | set(amap)):
+        b = bmap.get(key)
+        a = amap.get(key)
+        b_exp = b.exposure if b else 0.0
+        a_exp = a.exposure if a else 0.0
+        delta = a_exp - b_exp
+        if delta == 0.0:
+            continue
+        meta = a or b
+        assert meta is not None
+        out.append(
+            FactorExposureChange(
+                factor=key,
+                factor_type=meta.factor_type,
+                bucket=meta.bucket,
+                before=b_exp,
+                after=a_exp,
+                delta=delta,
+            )
+        )
+    out.sort(key=lambda x: abs(x.delta), reverse=True)
+    return out
 
-    def solve(self, portfolio, pricing_engine, target_loss_pct: float, factor: str, max_shock: float = 0.80):
-        from app.domain.models import ReverseStressResult, StressScenario, ScenarioKind
-        base = sum(pricing_engine.value(p).market_value for p in portfolio.positions)
-        denom = abs(base) or 1.0
-        def scenario(x):
-            kwargs={"id":"reverse","name":f"Reverse {factor}","kind":ScenarioKind.REVERSE}
-            if factor=="equity": kwargs["equity_shock"]=-x
-            elif factor=="vol": kwargs["vol_shock"]=x
-            elif factor=="fx": kwargs["fx_shock"]=-x
-            elif factor=="rates": kwargs["rates_shift_bps"]=x*1000.0
-            return StressScenario(**kwargs)
-        def loss_pct(x):
-            r=self.engine.run(portfolio,pricing_engine,[scenario(x)])[0]
-            return max(0.0,-r.pnl)/denom
-        hi_loss=loss_pct(max_shock)
-        if hi_loss < target_loss_pct:
-            return ReverseStressResult(factor=factor,target_loss_pct=target_loss_pct,required_shock=None,achieved_loss_pct=hi_loss,converged=False)
-        lo,hi=0.0,max_shock
-        for _ in range(40):
-            mid=(lo+hi)/2
-            if loss_pct(mid)>=target_loss_pct: hi=mid
-            else: lo=mid
-        achieved=loss_pct(hi)
-        required=hi*1000 if factor=="rates" else hi
-        return ReverseStressResult(factor=factor,target_loss_pct=target_loss_pct,required_shock=required,achieved_loss_pct=achieved,converged=True)
+
+def _risk_summary(
+    portfolio: Portfolio,
+    pricing_engine: PricingEngine,
+    risk_engine: RiskEngine,
+    methodology: VaRMethodology,
+) -> RiskSummary:
+    if isinstance(risk_engine, HistoricalRiskEngine):
+        raw = risk_engine.calculate(portfolio, pricing_engine, methodology=methodology)
+    else:
+        raw = risk_engine.calculate(portfolio, pricing_engine)
+        raw = {**raw, "methodology": methodology.value}
+    return RiskSummary(portfolio_id=portfolio.id, **raw)
 
 
 class ScenarioComparisonEngine:
-    def __init__(self): self.engine=StressEngine()
-    def compare(self, base_portfolio, hedged_portfolio, pricing_engine, scenarios):
-        from app.domain.models import ScenarioComparison
-        a=self.engine.run(base_portfolio,pricing_engine,scenarios); b=self.engine.run(hedged_portfolio,pricing_engine,scenarios)
-        return [ScenarioComparison(scenario=x.scenario,base_pnl=x.pnl,hedged_pnl=y.pnl,improvement=y.pnl-x.pnl) for x,y in zip(a,b)]
+    """Before/after hedge comparison: scenarios, VaR/ES, cost, factor exposures (M3.7)."""
+
+    def __init__(
+        self,
+        risk_engine: RiskEngine | None = None,
+        factor_engine: RiskFactorEngine | None = None,
+    ):
+        self.engine = StressEngine()
+        self.risk_engine = risk_engine or HistoricalRiskEngine()
+        self.factor_engine = factor_engine or RiskFactorEngine()
+
+    def compare(
+        self,
+        base_portfolio: Portfolio,
+        hedged_portfolio: Portfolio,
+        pricing_engine: PricingEngine,
+        scenarios: list[StressScenario],
+        *,
+        methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
+    ) -> HedgeComparisonReport:
+        base_stress = self.engine.run(base_portfolio, pricing_engine, scenarios)
+        hedged_stress = self.engine.run(hedged_portfolio, pricing_engine, scenarios)
+        scenario_rows: list[ScenarioComparison] = []
+        for x, y in zip(base_stress, hedged_stress):
+            base_loss = max(0.0, -x.pnl)
+            hedged_loss = max(0.0, -y.pnl)
+            scenario_rows.append(
+                ScenarioComparison(
+                    scenario=x.scenario,
+                    base_pnl=x.pnl,
+                    hedged_pnl=y.pnl,
+                    improvement=y.pnl - x.pnl,
+                    base_loss=base_loss,
+                    hedged_loss=hedged_loss,
+                    loss_improvement=base_loss - hedged_loss,
+                )
+            )
+
+        base_risk = _risk_summary(base_portfolio, pricing_engine, self.risk_engine, methodology)
+        hedged_risk = _risk_summary(hedged_portfolio, pricing_engine, self.risk_engine, methodology)
+        base_fx = self.factor_engine.calculate(base_portfolio, pricing_engine)
+        hedged_fx = self.factor_engine.calculate(hedged_portfolio, pricing_engine)
+
+        return HedgeComparisonReport(
+            hedge_cost=hedged_risk.market_value - base_risk.market_value,
+            base_market_value=base_risk.market_value,
+            hedged_market_value=hedged_risk.market_value,
+            base_var_99=base_risk.var_99,
+            hedged_var_99=hedged_risk.var_99,
+            base_expected_shortfall_99=base_risk.expected_shortfall_99,
+            hedged_expected_shortfall_99=hedged_risk.expected_shortfall_99,
+            var_improvement=base_risk.var_99 - hedged_risk.var_99,
+            es_improvement=base_risk.expected_shortfall_99 - hedged_risk.expected_shortfall_99,
+            methodology=methodology,
+            factor_exposure_changes=_diff_factor_exposures(base_fx, hedged_fx),
+            scenarios=scenario_rows,
+        )
