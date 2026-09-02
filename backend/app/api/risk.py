@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from app.api.deps import get_portfolio_service
+from app.api.openapi_examples import (
+    PORTFOLIO_BODY_EXAMPLES,
+    RESP_ES,
+    RESP_VAR,
+    RESP_WHAT_IF,
+    WHAT_IF_BODY_EXAMPLES,
+)
 from app.domain.models import Portfolio, RiskQueryRequest, VaRMethodology, WhatIfRequest
 from app.services.portfolio_service import PortfolioService
 
@@ -28,18 +37,32 @@ def risk_factors(
     return service.factors(portfolio)
 
 
-@router.post("/var")
+@router.post(
+    "/var",
+    summary="Historical / parametric VaR report",
+    responses=RESP_VAR,
+)
 def risk_var(
-    portfolio: Portfolio,
+    portfolio: Annotated[
+        Portfolio,
+        Body(openapi_examples=PORTFOLIO_BODY_EXAMPLES),
+    ],
     methodology: VaRMethodology = Query(default=VaRMethodology.DELTA_GAMMA),
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     return service.var_report(portfolio, methodology=methodology)
 
 
-@router.post("/es")
+@router.post(
+    "/es",
+    summary="Expected Shortfall contributions",
+    responses=RESP_ES,
+)
 def risk_es(
-    portfolio: Portfolio,
+    portfolio: Annotated[
+        Portfolio,
+        Body(openapi_examples=PORTFOLIO_BODY_EXAMPLES),
+    ],
     methodology: VaRMethodology = Query(default=VaRMethodology.DELTA_GAMMA),
     service: PortfolioService = Depends(get_portfolio_service),
 ):
@@ -57,9 +80,16 @@ def risk_var_compare(
     return service.compare_var_methodologies(portfolio, observations=observations)
 
 
-@router.post("/what-if")
+@router.post(
+    "/what-if",
+    summary="Hypothetical trade what-if / incremental risk",
+    responses=RESP_WHAT_IF,
+)
 def risk_what_if(
-    request: WhatIfRequest,
+    request: Annotated[
+        WhatIfRequest,
+        Body(openapi_examples=WHAT_IF_BODY_EXAMPLES),
+    ],
     methodology: VaRMethodology | None = Query(
         default=None,
         description="Optional override; defaults to request.methodology (DELTA_GAMMA).",
@@ -68,7 +98,7 @@ def risk_what_if(
 ):
     """Hypothetical add/remove/modify without mutating persisted portfolio (M2.9).
 
-    Mounted at ``/risk/what-if`` until M7.2 API versioning moves routes under ``/api/v1``.
+    Mounted at ``/risk/what-if`` and ``/api/v1/risk/what-if`` (M7.2 dual-mount).
     """
     try:
         return service.what_if(request, methodology=methodology)

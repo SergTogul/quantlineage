@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from typing import Annotated
+
+from fastapi import APIRouter, Body, Depends
 
 from app.api.deps import get_portfolio_service
+from app.api.openapi_examples import CHANGE_ATTR_BODY_EXAMPLES, RESP_CHANGE_ATTR
 from app.domain.models import AttributionRequest, Portfolio, RiskChangeAttributionRequest
 from app.services.portfolio_service import PortfolioService
 
@@ -27,9 +30,16 @@ def risk_attribution_demo(
     return service.demo_attribution(portfolio)
 
 
-@router.post("/change-attribution")
+@router.post(
+    "/change-attribution",
+    summary="Risk-metric change waterfall",
+    responses=RESP_CHANGE_ATTR,
+)
 def risk_change_attribution(
-    request: RiskChangeAttributionRequest,
+    request: Annotated[
+        RiskChangeAttributionRequest,
+        Body(openapi_examples=CHANGE_ATTR_BODY_EXAMPLES),
+    ],
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     """Risk-metric change waterfall (VaR/ES drivers) — separate from P&L Explain (M4.4)."""
