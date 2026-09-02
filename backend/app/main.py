@@ -1,4 +1,4 @@
-"""RiskForge FastAPI application — wiring only (M7.1 router decomposition)."""
+"""RiskForge FastAPI application — wiring only (M7.1 routers; M7.2 /api/v1 dual-mount)."""
 
 from contextlib import asynccontextmanager
 
@@ -23,6 +23,20 @@ risk_run_worker = RiskRunWorker(portfolio_service)
 
 # Backward-compatible alias for tests/tools that import ``app.main.service``.
 service = portfolio_service
+
+API_V1_PREFIX = "/api/v1"
+
+# Domain routers that already carry their path prefixes (e.g. /risk, /market).
+# Dual-mounted at legacy root and under /api/v1 (M7.2).
+_DOMAIN_ROUTERS = (
+    health_router,
+    portfolio_router,
+    market_router,
+    risk_router,
+    stress_router,
+    attribution_router,
+    limits_router,
+)
 
 
 @asynccontextmanager
@@ -62,15 +76,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# M7.1: domain routers (paths unchanged; M7.2 versions under /api/v1).
-app.include_router(health_router)
-app.include_router(portfolio_router)
-app.include_router(market_router)
-app.include_router(risk_router)
-app.include_router(stress_router)
-app.include_router(attribution_router)
-app.include_router(limits_router)
-# M5.4 async runs under /risk until M7.2 moves routes to /api/v1.
+# M7.1/M7.2: same handlers at legacy paths and /api/v1/... (UI may keep legacy).
+for _router in _DOMAIN_ROUTERS:
+    app.include_router(_router)
+    app.include_router(_router, prefix=API_V1_PREFIX)
+
+# risk_runs router paths are /runs, /runs/{id} — mount once under /risk and /api/v1/risk.
 app.include_router(risk_runs_router, prefix="/risk")
-# Forward-compatible alias (same handlers); prefer /api/v1 after M7.2.
-app.include_router(risk_runs_router, prefix="/api/v1/risk")
+app.include_router(risk_runs_router, prefix=f"{API_V1_PREFIX}/risk")
