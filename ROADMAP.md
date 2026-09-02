@@ -14,7 +14,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA `postgres-persistence-smoke` green; M5.5 non-blocking polish remains) |
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
-| Milestone 8 — Risk Terminal UI | PARTIAL (firm-root hierarchy; thin hedge/multi/risk-run helpers; risk-run poll card; no change-attr/ES panels) |
+| Milestone 8 — Risk Terminal UI | PARTIAL (SPA on `/api/v1`; hedge-compare card; firm-root hierarchy; risk-run poll; no change-attr/ES/VaR-compare panels) |
 | Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE — full CI green on GHA; M9.1–M9.5/M9.7/M9.10 still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
@@ -61,7 +61,7 @@ Trade (domain/models.py)
 2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 valuation LRU only (curve/scenario memo open — non-blocking polish)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
-5. UI is one scroll dashboard: nav, heatmaps, hedge-compare page, risk-change attribution, ES contributions still missing (risk-run start/poll card landed M8.9)
+5. UI is one scroll dashboard: nav, heatmaps, risk-change attribution, ES contributions, VaR methodology compare still missing (hedge-compare card + risk-run poll landed)
 6. M9.9 **DONE** — full CI green on GHA runners (run 33673245125); static analysis (Ruff/mypy/ESLint) not started; E2E lags new endpoints
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
 
@@ -307,7 +307,7 @@ Flagship stress with typed multi-factor shocks, honest crisis labeling, reconcil
 | Frontend `npm run build` | **OK** |
 | Breaking API shape | `POST /risk/stress/compare` returns `HedgeComparisonReport` object (not bare `ScenarioComparison[]`); legacy per-scenario fields live under `scenarios[]` |
 | Multi-factor reverse limitations | Adverse orthant only; monotonicity assumed not proven; ray + coordinate descent is not a certified global optimum; assumptions echoed on result |
-| Known residual | Hedge-compare UI still absent (M8.5); dual-mount + M7.6 sunset DONE (legacy still served); formal `Scenario` not yet stress HTTP wire type (M3.8) |
+| Known residual | Hedge-compare UI landed M8.5; dual-mount + M7.6 sunset DONE (legacy still served); formal `Scenario` not yet stress HTTP wire type (M3.8) |
 | Hierarchy | Left untouched in M3 acceptance — M4.2 later fixed hierarchy↔stress via lazy import (no residual circular-import gap) |
 
 ### Follow-on tasks (discovered during M1–M5)
@@ -598,7 +598,7 @@ Status: **COMPLETE** (2026-09-02 — M7.1–M7.6 DONE; legacy unversioned paths 
 - [x] M7.6 Complete `/api/v1` migration for all risk routes (beyond dual-mount) — DONE (2026-09-02, Backend/API)
   - `/api/v1` documented as canonical (README + `docs/api/v1_canonical_and_legacy_sunset.md` + ADR 008)
   - Dual-mount kept (non-breaking); legacy responses add `Deprecation` / `Sunset` / `Link` (successor-version)
-  - SPA still on unversioned paths by design — Frontend (08) migrates `api.js` as M8 follow-up
+  - SPA migrated to `/api/v1` (M8 Frontend follow-up DONE 2026-09-02)
   - Planned earliest legacy removal: **2027-03-02**, gated on UI migration + Lead Architect approval
   - Evidence: `tests/test_api_legacy_deprecation.py`; dual-mount parity still covered by M7.2 tests
 
@@ -637,11 +637,11 @@ Status: **COMPLETE** (2026-09-02 — M7.1–M7.6 DONE; legacy unversioned paths 
 
 ## Milestone 8 — Risk Terminal UI
 
-Status: PARTIAL (prototype SPA; firm-root hierarchy card + thin compare/multi API client helpers)
+Status: PARTIAL (SPA on `/api/v1`; hedge-compare card; firm-root hierarchy + thin helpers; risk-run poll)
 
 ### Follow-up from M7.6 (Backend → Frontend)
 
-- Migrate `frontend/src/api.js` from unversioned paths to `/api/v1/...` (low risk; bodies unchanged).
+- [x] Migrate `frontend/src/api.js` from unversioned paths to `/api/v1/...` (DONE 2026-09-02; bodies unchanged; `API_V1` constant).
 - Keep E2E / helper tests green; ignore legacy Deprecation headers after cut-over.
 
 ### Tasks
@@ -650,12 +650,15 @@ Status: PARTIAL (prototype SPA; firm-root hierarchy card + thin compare/multi AP
 - [ ] M8.2 Overview dashboard — PARTIAL
 - [ ] M8.3 Risk heatmaps — NOT STARTED
 - [ ] M8.4 Scenario Builder — PARTIAL
-- [ ] M8.5 Before/after hedge workflow — PARTIAL (`compareHedge` / `hedgeComparisonSummary` for `HedgeComparisonReport` object shape; **no full UI page** yet; breaking API shape vs legacy list)
+- [x] M8.5 Before/after hedge workflow — DONE (2026-09-02)
+  - `compareHedge` → `POST /api/v1/risk/stress/compare`; `hedgeComparisonSummary` / `spyFlatHedgePortfolio` / `defaultHedgeScenarios`
+  - Dashboard `HedgeCompare` card: methodology select, SPY-flat demo hedge, VaR/ES before→after, scenario table, factor exposure deltas (API display only)
+  - Evidence: `frontend/src/lib/risk.test.mjs`
 - [ ] M8.6 Risk drill-down — PARTIAL (Hierarchy card walks Firm→Portfolio; counts desks/strategies/books/trades; displays root NAV/VaR/ES/Greeks from API)
 - [ ] M8.7 P&L Explain UI — PARTIAL (demo only)
 - [ ] M8.8 Limits UI — PARTIAL (`limitStatus` prefers API `WARNING`/`OK`/`BREACH` — **done** in `risk.mjs`; full limits/drill-down UX still open)
 - [x] M8.9 Risk-run UI — DONE (start)
-  - Thin `createRiskRun` / `getRiskRun` in `api.js` (`POST/GET /risk/runs`)
+  - Thin `createRiskRun` / `getRiskRun` in `api.js` (`POST/GET /api/v1/risk/runs`)
   - Dashboard `RiskRuns` card: run_type select, start, poll QUEUED→RUNNING→COMPLETED/FAILED
   - Display helpers: `riskRunStatus` / `riskRunStatusClass` / `isRiskRunTerminal` / `riskRunSummary` (no client risk math)
   - Evidence: `frontend/src/lib/risk.test.mjs`
@@ -689,7 +692,7 @@ Status: PARTIAL (M9.6 + M9.9 DONE; other M9 tasks still open)
   - GHA evidence: repo https://github.com/SergTogul/riskforge-mvp ; push SHA `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — `postgres-persistence-smoke` https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176 ; also `backend-pytest` + `frontend-test-build` green. QuantLib path: backend job prefers wheel on ubuntu-latest with builtin fallback (see workflow).
   - Milestone 5 COMPLETE cleared on this evidence; M5.5 polish remains optional.
 - [ ] M9.10 E2E coverage for post-M2/M3/M4/M5 endpoints — PARTIAL
-  - Why/evidence: Playwright has dashboard / scenario-builder / reverse-stress / risk-query / **risk-runs poll** (`e2e/tests/risk-runs.spec.ts`); still missing ES, change-attribution, reverse multi, hedge-compare object shape
+  - Why/evidence: Playwright has dashboard / scenario-builder / reverse-stress / risk-query / **risk-runs poll** (`e2e/tests/risk-runs.spec.ts`); still missing ES, change-attribution, reverse multi, hedge-compare E2E
 
 ---
 
