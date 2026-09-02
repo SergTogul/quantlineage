@@ -18,6 +18,13 @@ Final verification in the execution sandbox:
 - Frontend: `npm run lint` (`eslint.config.js`; `--max-warnings 0`).
 - CI: `.github/workflows/ci.yml` job `lint-static-analysis`.
 - Staged: not full-strict — see ROADMAP M9.7 for ignored Ruff rules and mypy `disable_error_code` debt list.
+- Follow-up `8d7a6f2`: lint CI installs numpy (mypy `numpy.typing`); Historical VaR kernel tests keep absolute `TOL` / `assert_allclose` imports.
+
+## M9.2 / M9.10 Playwright E2E CI (2026-09-02, DevOps/QA)
+
+- Local: `cd e2e && npm install && npm run install:browsers && npm test` (Chrome channel; `backend/.venv`).
+- CI: `.github/workflows/ci.yml` job `e2e-playwright` — backend pip (QuantLib optional), frontend + e2e `npm ci`, `npm run install:browsers:ci`, `CI=true npm test`.
+- Config: when `CI` is set, use Playwright Chromium + `python -m uvicorn` if `.venv` is absent.
 
 ## M9.9 / M5.1 Postgres CI smoke (2026-09-02, DevOps)
 

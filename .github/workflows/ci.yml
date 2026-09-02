@@ -1,6 +1,7 @@
 # RiskForge CI — honest gates matching README / BUILD_NOTES commands.
 #
-# Jobs: backend-pytest, postgres-smoke, frontend-test-build, lint (M9.7).
+# Jobs: backend-pytest, postgres-smoke, frontend-test-build, lint (M9.7),
+# e2e-playwright (M9.2 / M9.10 CI gate).
 name: CI
 
 on:
@@ -201,3 +202,58 @@ jobs:
       - name: ESLint (frontend)
         working-directory: frontend
         run: npm run lint
+
+  # M9.2 / M9.10: Playwright critical-path E2E on GHA (builtin pricing + Vite).
+  # Specs live under e2e/; config prefers Playwright Chromium when CI=true.
+  e2e:
+    name: e2e-playwright
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          # E2E uses RISKFORGE_PRICING_ENGINE=builtin; QuantLib optional.
+          if pip install -r requirements.txt; then
+            echo "Installed backend/requirements.txt"
+          else
+            echo "::warning::Full requirements install failed; retrying without QuantLib"
+            grep -Eiv '^[[:space:]]*QuantLib' requirements.txt > /tmp/requirements-no-ql.txt
+            pip install -r /tmp/requirements-no-ql.txt
+          fi
+          python -c "import uvicorn; print('uvicorn', uvicorn.__version__)"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install e2e dependencies and Chromium
+        working-directory: e2e
+        run: |
+          npm ci
+          npm run install:browsers:ci
+
+      - name: Run Playwright E2E
+        working-directory: e2e
+        env:
+          CI: true
+        run: npm test

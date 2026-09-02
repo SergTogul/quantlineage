@@ -151,9 +151,10 @@ npm run lint   # eslint src --max-warnings 0
 cd ../e2e
 npm install && npm run install:browsers
 npm test
+# CI job e2e-playwright runs the same suite with Chromium (see e2e/README.md)
 ```
 
-Playwright boots the builtin-engine API and Vite app, then covers dashboard smoke, Scenario Builder, Reverse Stress, and Risk Query. See `e2e/README.md`.
+Playwright boots the builtin-engine API and Vite app, then covers dashboard smoke, Scenario Builder, Reverse Stress, Risk Query, and M8 panels. See `e2e/README.md`.
 
 The backend native-kernel tests compile and execute C++20 with `g++` when a compiler is available. QuantLib runtime tests skip only when the QuantLib wheel is absent.
 
