@@ -13,7 +13,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 4 — Hierarchy, Attribution & Limits | **COMPLETE** (2026-09-02 Lead Architect formal acceptance) |
 | Milestone 5 — Persistence & Risk-Run Platform | **COMPLETE** (2026-09-02: M5.1/M9.9 GHA `postgres-persistence-smoke` green; M5.5 non-blocking polish remains) |
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
-| Milestone 7 — API Productionization | **PARTIAL** (M7.1–M7.2, M7.4–M7.5 DONE — dual-mount + OpenAPI examples + error model; M7.3/M7.6 open) |
+| Milestone 7 — API Productionization | **PARTIAL** (M7.1–M7.5 DONE — dual-mount + typed models + OpenAPI examples + error model; M7.6 legacy sunset open) |
 | Milestone 8 — Risk Terminal UI | PARTIAL (firm-root hierarchy; thin hedge/multi/risk-run helpers; risk-run poll card; no change-attr/ES panels) |
 | Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.6 + M9.9 DONE — full CI green on GHA; M9.1–M9.5/M9.7/M9.10 still open) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
@@ -60,7 +60,7 @@ Trade (domain/models.py)
 1. Caps/floors/swaptions still deferred; EquityVol/FXVol bumps do not rewrite surface grids; QL uses `BlackConstantVol` at point σ (not full surface engine); Builtin vs QL bond day-count gap
 2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 valuation LRU only (curve/scenario memo open — non-blocking polish)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
-4. M7.1–M7.2 + M7.4–M7.5 DONE (router split + dual-mount `/api/v1` + OpenAPI examples + `{code,message,details}` errors); M7.3/M7.6 still open; formal `Scenario` not yet the stress HTTP wire type
+4. M7.1–M7.5 DONE (router split + dual-mount `/api/v1` + typed response models + OpenAPI examples + `{code,message,details}` errors); M7.6 legacy sunset still open; formal `Scenario` not yet the stress HTTP wire type
 5. UI is one scroll dashboard: nav, heatmaps, hedge-compare page, risk-change attribution, ES contributions still missing (risk-run start/poll card landed M8.9)
 6. M9.9 **DONE** — full CI green on GHA runners (run 33673245125); static analysis (Ruff/mypy/ESLint) not started; E2E lags new endpoints
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
@@ -69,7 +69,7 @@ Trade (domain/models.py)
 
 | Check | Result |
 |-------|--------|
-| Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **465 passed** (2026-09-02 M7.5), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
+| Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **513 passed** (2026-09-02 M7.3), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
 | Frontend `npm test` | **26 passed**, 0 failed |
 | Frontend `npm run build` | **OK** (vite; 22 modules) |
 | M5 milestone | **COMPLETE** — M5.1/M9.9 GHA green (run 33673245125); M5.5 remains non-blocking polish |
@@ -563,7 +563,7 @@ Lead Architect suite verify 2026-09-02: native path covered by green full backen
 
 ## Milestone 7 — API Productionization
 
-Status: **PARTIAL** (M7.1–M7.2 + M7.4–M7.5 DONE 2026-09-02; M7.3/M7.6 still open — do not claim COMPLETE)
+Status: **PARTIAL** (M7.1–M7.5 DONE 2026-09-02; M7.6 legacy sunset still open — do not claim COMPLETE)
 
 ### Tasks
 
@@ -578,7 +578,13 @@ Status: **PARTIAL** (M7.1–M7.2 + M7.4–M7.5 DONE 2026-09-02; M7.3/M7.6 still 
   - `risk_runs` unified as `/risk/runs` + `/api/v1/risk/runs` only (no triple/nested prefix)
   - Legacy clients unchanged; UI may keep unversioned paths
   - Evidence: `tests/test_api_v1_compatibility.py`; OpenAPI + smoke parity on critical GETs/POSTs; full suite **453 passed**
-- [ ] M7.3 Typed request/response models — PARTIAL
+- [x] M7.3 Typed request/response models — DONE (2026-09-02, Backend/API)
+  - Wired `response_model=` on critical risk paths using existing domain types (no formula duplication):
+    VaRReport, ESContributionReport, WhatIfReport, list[StressResult], ReverseStressResult,
+    MultiFactorReverseStressResult, HedgeComparisonReport, RiskChangeAttributionReport,
+    LimitDrilldownReport (risk-runs already RiskRunView)
+  - Request bodies already domain-typed; dual-mount unchanged; PricingEngine seams preserved
+  - Evidence: `tests/test_api_typed_models.py` (OpenAPI $ref + live response validation)
 - [x] M7.4 OpenAPI examples — DONE (2026-09-02, Backend/API)
   - Critical paths: VaR/ES, what-if, stress/reverse/multi, hedge-compare (`HedgeComparisonReport`), change-attribution, limits drill-down, risk-runs
   - Centralized illustrative payloads in `app/api/openapi_examples.py`; wired via `Body(openapi_examples=...)` + `responses` (incl. M7.5 `{code,message,details}` where documented)
@@ -610,6 +616,11 @@ Status: **PARTIAL** (M7.1–M7.2 + M7.4–M7.5 DONE 2026-09-02; M7.3/M7.6 still 
 
 - Added OpenAPI request/response/error examples for critical risk endpoints (illustrative numbers only).
 - Milestone 7 remains **PARTIAL** — M7.3 typed models and M7.6 legacy sunset still open.
+
+### Progress update (2026-09-02, Backend/API — M7.3)
+
+- Wired domain `response_model=` on critical VaR/ES/what-if/stress/reverse/multi/hedge/change-attr/limits-drilldown routes.
+- Milestone 7 remains **PARTIAL** — M7.6 `/api/v1` canonical + legacy sunset still open.
 
 ---
 

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from app.api.deps import get_portfolio_service
 from app.api.openapi_examples import LIMITS_DRILLDOWN_BODY_EXAMPLES, RESP_LIMITS_DRILLDOWN
-from app.domain.models import LimitDrilldownRequest, Portfolio
+from app.domain.models import LimitDrilldownReport, LimitDrilldownRequest, Portfolio
 from app.services.portfolio_service import PortfolioService
 
 router = APIRouter(prefix="/risk", tags=["limits"])
@@ -24,6 +24,7 @@ def risk_limits(
 
 @router.post(
     "/limits/drilldown",
+    response_model=LimitDrilldownReport,
     summary="Limit breach drill-down",
     responses=RESP_LIMITS_DRILLDOWN,
 )
@@ -33,7 +34,7 @@ def risk_limits_drilldown(
         Body(openapi_examples=LIMITS_DRILLDOWN_BODY_EXAMPLES),
     ],
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> LimitDrilldownReport:
     """Limit breach drill-down: hierarchy node, metric, utilization, top contributors (M4.6)."""
     try:
         return service.limit_drilldown(request)
