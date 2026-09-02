@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('Scenario Builder', () => {
   test('runs a custom scenario and shows loss result', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/#scenario-builder')
     await expect(page.getByRole('heading', { name: 'Global Macro Demo' })).toBeVisible()
 
     const card = page.locator('.card', { has: page.getByRole('heading', { name: 'Scenario Builder' }) })
