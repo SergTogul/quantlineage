@@ -717,7 +717,8 @@ Status: PARTIAL (M9.6 + M9.7 + M9.9 DONE; M9.10 breadth improved; M9.1–M9.5 op
   - CI job `lint-static-analysis` runs `ruff check app tests`, `mypy app`, and `npm run lint` (`eslint src --max-warnings 0`).
   - Config: `backend/pyproject.toml`, `backend/requirements-dev.txt`, `frontend/eslint.config.js`.
   - **Honest staging (not full-strict):** Ruff selects E/F/I/B/UP/SIM/RUF with documented ignores (E501 line length, B008 FastAPI `Depends`, pyupgrade/SIM/RUF style debt, finance γ/Δ unicode). mypy runs with `disable_error_code` for known debt (`arg-type`, `assignment`, `var-annotated`, `no-redef`, `misc`) — still catches other errors; pay down by removing codes. ESLint: recommended + react/hooks; `prop-types` off (no TS yet).
-  - Trivial fixes: Ruff autofix (imports/unused), F821 lambda closure in `risk_run_worker.py`, Analytics `useEffect` deps for exhaustive-deps.
+  - Trivial fixes: Ruff autofix (imports/unused), F821 lambda closure in `risk_run_worker.py`, Analytics `useEffect` deps for exhaustive-deps; kernel P&L tol imports moved to `app.compute.kernel` in tests.
+  - GHA evidence: push SHA `8d7a6f2`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 — includes green `lint-static-analysis`.
   - Follow-up (non-blocking for M9.7): enable ignored Ruff rules gradually; clear mypy `disable_error_code`; add Vitest/TS when M9.1 advances.
   - [ ] M9.8 Containers — PARTIAL (compose: `postgres` + `backend` + `worker` + `frontend`; worker claims via Postgres `SKIP LOCKED` — see M5.7; Redis/RQ optional)
 
@@ -741,7 +742,7 @@ Status: PARTIAL (M9.6 + M9.7 + M9.9 DONE; M9.10 breadth improved; M9.1–M9.5 op
 ### Progress update (2026-09-02, DevOps — M9.7 static analysis)
 
 - Owner: DevOps / Platform
-- Landed CI `lint-static-analysis` (Ruff + mypy + ESLint) with staged configs; local `ruff`/`mypy`/`npm run lint` green before push
+- Landed CI `lint-static-analysis` (Ruff + mypy + ESLint) with staged configs; GHA green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 (SHA `8d7a6f2`)
 - Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.1–M9.5, Playwright-in-CI, reverse-multi E2E still open)
 
 ---
