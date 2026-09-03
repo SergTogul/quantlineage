@@ -17,8 +17,8 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
 | Milestone 9 — Testing, CI & Engineering Quality | **COMPLETE** (2026-09-02 Lead Architect: M9.1–M9.10; M9.8 containers DONE; Redis/RQ **deferred** residual — not claimed done) |
 | Milestone 10 — Demo Data & Reproducibility | **COMPLETE** (2026-09-02 — M10.1–M10.3) |
-| Milestone 11 — AI Risk Assistant | NOT STARTED |
-| Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
+| Milestone 11 — AI Risk Assistant | **POSTPONED** (product decision 2026-09-02 — do not start until Lead/user unblocks) |
+| Milestone 12 — Documentation & Portfolio Presentation | **POSTPONED** (product decision 2026-09-02 — do not start until Lead/user unblocks; M3.9 methodology doc landed ahead of M12.4) |
 | Milestone 13 — Final Portfolio Demo | NOT STARTED |
 
 ### Baseline verification (2026-09-02, local macOS — Lead Architect acceptance)
@@ -63,7 +63,7 @@ Trade (domain/models.py)
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); **M3.8 formal Scenario HTTP wire DONE** (legacy StressScenario endpoints retained)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
 6. M9 **COMPLETE** (2026-09-02): M9.1–M9.10; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / M5.7). **M9.11:** transient GHA `e2e-playwright` failure on multi-factor reverse UI land must stay fixed (testid + exact heading) — see M9.11 below
-7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum); M3.9 methodology docs still open
+7. Multi-factor reverse stress = ray + coordinate descent (**not** a certified global optimum); M3.9 methodology doc published at `docs/methodology/multi_factor_reverse_stress.md`. **M11 / M12 POSTPONED** — do not implement until Lead/user unblocks
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
 
@@ -318,8 +318,10 @@ Flagship stress with typed multi-factor shocks, honest crisis labeling, reconcil
   - Adapters → `StressScenario` for `StressEngine` (no VaR/pricing math change); legacy `StressScenario` endpoints unchanged
   - Evidence: `backend/tests/test_scenario_wire_api.py`; ADR 004 consequences updated
   - Residual: hedge-compare / what-if still accept `StressScenario` only; Frontend ScenarioBuilder may keep legacy shape until a UI follow-on
-- [ ] M3.9 Publish multi-factor reverse-stress limitations in methodology docs (not a fake “complete optimizer”)
-  - Why/evidence: M3.6 acceptance + `reverse_stress_multi.py` — ray search + coordinate descent, adverse orthant, monotonicity assumed; **not** a certified global optimum. Keep M3.6 `[x]`; document for users/interviewers (pairs with M12.4 / M12.6)
+- [x] M3.9 Publish multi-factor reverse-stress limitations in methodology docs (not a fake “complete optimizer”) — **DONE** (2026-09-02)
+  - Doc: `docs/methodology/multi_factor_reverse_stress.md` — adverse orthant, L2 box objective, ray + coordinate descent, monotonicity assumed not proven, **not** a certified global optimum
+  - Evidence: `backend/tests/test_m39_methodology_docs.py` (doc exists; covers `ASSUMPTIONS`; rejects over-claim language)
+  - Keep M3.6 `[x]`; full recruiter methodology pack remains under **postponed** M12.4 / M12.6
 
 ---
 
@@ -885,7 +887,7 @@ Status: **COMPLETE** (2026-09-02 — M10.1–M10.3 DONE)
 - Owner: Backend/API (+ Lead Architect coordination); no Frontend / Market Data changes
 - Deterministic offline demo harness; no live vendors; PricingEngine seams untouched
 - **Milestone 10 COMPLETE** — M10.1–M10.3 all DONE per checklist above
-- Next residuals (ROADMAP): M11 AI / M6 SLA / M3.9 methodology docs
+- Next residuals (ROADMAP): **M6 SLA** (accepted PARTIAL until product VaR wall-time SLA); M11/M12 **POSTPONED** — do not start; M3.9 methodology doc DONE
 
 ### Progress update (2026-09-02, Market Data — M10.2)
 
@@ -904,7 +906,7 @@ Status: **COMPLETE** (2026-09-02 — M10.1–M10.3 DONE)
 
 ## Milestone 11 — AI Risk Assistant
 
-Status: NOT STARTED
+Status: **POSTPONED** (product decision 2026-09-02 — deferred; **do not start** until Lead/user explicitly unblocks). Not COMPLETE. Task list retained for when work resumes.
 
 ### Tasks
 
@@ -917,7 +919,9 @@ Status: NOT STARTED
 
 ## Milestone 12 — Documentation & Portfolio Presentation
 
-Status: NOT STARTED
+Status: **POSTPONED** (product decision 2026-09-02 — deferred; **do not start** until Lead/user explicitly unblocks). Not COMPLETE. Task list retained for when work resumes.
+
+Note: M3.9 published `docs/methodology/multi_factor_reverse_stress.md` ahead of this milestone; M12.4 / M12.6 still own the broader recruiter methodology / limitations pack when unblocked.
 
 ### Tasks
 
@@ -927,7 +931,7 @@ Status: NOT STARTED
   - Landed (2026-09-02, evidence-backed only): `001`–`006` plus `007-quantlib-concurrency.md` (M6.6) and `008-api-v1-canonical-and-legacy-sunset.md` (M7.6)
   - Not written yet (insufficient decided evidence / still open): e.g. RiskRun domain/API lifecycle (M5.2+), VaR methodology modes, caching — do not invent ADRs ahead of code
   - Native kernel risk-path wiring (M6.3) documented via env flag + native/README; no separate ADR unless Lead requests
-- [ ] M12.4 Methodology documentation — NOT STARTED
+- [ ] M12.4 Methodology documentation — NOT STARTED (partial input: M3.9 multi-factor reverse doc exists; VaR modes pack still open)
   - Must include honest multi-factor reverse-stress assumptions (M3.9) and VaR methodology modes
 - [ ] M12.5 Performance report — PARTIAL (`BUILD_NOTES.md` caveated microbench)
 - [ ] M12.6 Known engine / pricing limitations catalog (recruiter-facing)

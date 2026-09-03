@@ -52,6 +52,8 @@ QuantLib currently handles the original equity option/bond/swap path. New produc
 **Canonical prefix:** `/api/v1` (M7.6). Legacy unversioned paths remain dual-mounted
 and deprecated until the published sunset — see
 [`docs/api/v1_canonical_and_legacy_sunset.md`](docs/api/v1_canonical_and_legacy_sunset.md).
+Multi-factor reverse-stress limitations (M3.9):
+[`docs/methodology/multi_factor_reverse_stress.md`](docs/methodology/multi_factor_reverse_stress.md).
 
 ```text
 GET  /api/v1/health
