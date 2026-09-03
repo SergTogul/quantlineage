@@ -768,7 +768,7 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.
   - Fix (already on master via M9.10 close, hardened here): `exact: true` heading match + durable `data-testid="reverse-stress"` on single-factor card; multi keeps `data-testid="reverse-stress-multi"`.
   - Older historical failure (M9.7 land): https://github.com/SergTogul/riskforge-mvp/actions/runs/33680821074 (`backend-pytest` + `lint-static-analysis`) — subsequently fixed; not reopened.
   - Local evidence (this triage): backend `pytest -q` **571 passed** (QuantLib); frontend `npm test` **61+9 passed**; `ruff`/`mypy`/`eslint` OK; native kernel compile OK.
-  - HEAD at triage start: SHA `f74b528` — full CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33701266538 (all five jobs green). Follow-up push records testid hardening + this ROADMAP item.
+  - HEAD at triage start: SHA `f74b528` — full CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33701266538 (all five jobs green). Hardening push SHA `16c91cc` — CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33703670779 (all five jobs green, including `e2e-playwright`).
 
 ### Progress update (2026-09-02, Lead Architect — M9.8 disposition + Milestone 9 COMPLETE)
 
