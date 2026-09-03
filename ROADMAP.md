@@ -57,7 +57,7 @@ Trade (domain/models.py)
 
 ### Highest-risk gaps (post–M1–M5 progress)
 
-1. Caps/floors/swaptions still deferred; EquityVol/FXVol bumps do not rewrite surface grids; QL uses `BlackConstantVol` at point σ (not full surface engine); Builtin vs QL bond day-count gap
+1. Caps/floors/swaptions still deferred; EquityVol/FXVol bumps do not rewrite surface grids; QL uses `BlackConstantVol` at point σ (not full surface engine)
 2. M5 **COMPLETE** (2026-09-02): M5.1/M9.9 GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); M5.5 caching polish **DONE** (valuation LRU + curve-construction + scenario memo)
 3. M6 **COMPLETE** (2026-09-02 Lead Architect + C++ Performance): M6.1–M6.7 DONE; formal **scenario-kernel SLA** SLA-K1 ≥50× / SLA-K2 ≥1.3× on `10k_x_1k` (reference host; `benchmarks/RESULTS.md` + `benchmarks/check_m6_sla.py`); FULL_REVALUATION stays Python; **not** an HTTP end-to-end VaR latency claim
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); **M3.8 formal Scenario HTTP wire DONE** (legacy StressScenario endpoints retained)
