@@ -1,4 +1,11 @@
-"""Out-of-process risk-run worker entrypoint (M5.7).
+"""Out-of-process risk-run worker entrypoint (M5.7 / R0.3.5).
+
+This module is a **distinct OS process** from the FastAPI app
+(``app.main`` / Compose ``backend``). Each process owns its own QuantLib
+globals (``Settings``, ``IndexManager``). In-process QuantLib calls are still
+serialized by ``_QL_PROCESS_LOCK``; parallel full revaluation is process
+partitioned — scale by running more of this entrypoint, not by a QuantLib
+thread pool.
 
 Runs the same ``RiskRunWorker`` + SQLAlchemy session factory as the API
 lifespan, claiming ``QUEUED`` rows from shared Postgres via
@@ -9,14 +16,15 @@ Usage (Compose)::
     python -m app.worker
 
 Requires ``RISKFORGE_DATABASE_URL``. Pair with ``RISKFORGE_EXTERNAL_WORKER=1``
-on the API so HTTP only enqueues. Apply migrations first::
+on the API so HTTP only enqueues (the API process must not execute those runs
+in-thread against the same QuantLib state). Apply migrations first::
 
     alembic upgrade head
 
 Compose ships one ``worker`` by default (demo). Additional worker replicas are
 safe against double-claim on Postgres thanks to ``SKIP LOCKED``; Redis/RQ is
 not required for claim safety. SQLite unit tests use a non-skip-locked
-fallback (single-writer).
+fallback (single-writer). This is not a job platform.
 """
 
 from __future__ import annotations
