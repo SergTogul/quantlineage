@@ -33,6 +33,9 @@ from app.services.portfolio_service import PortfolioService
 
 DEMO_ARTIFACT_SCHEMA_VERSION = 1
 DEMO_ARTIFACT_ID = "demo-risk-artifact"
+# Round PnL/risk floats so macOS vs Linux ULP noise does not break golden JSON.
+# 8 dp absorbs ~1e-11 platform drift seen on GHA while keeping sub-cent demo precision.
+DEMO_ARTIFACT_FLOAT_DECIMALS = 8
 
 
 def _repo_root() -> Path:
@@ -152,9 +155,25 @@ def build_demo_risk_artifact(
     }
 
 
+def _stabilize_floats(value: Any, *, ndigits: int = DEMO_ARTIFACT_FLOAT_DECIMALS) -> Any:
+    """Round floats for cross-platform dump parity; leave structure/types otherwise."""
+    if isinstance(value, float):
+        return round(value, ndigits)
+    if isinstance(value, dict):
+        return {k: _stabilize_floats(v, ndigits=ndigits) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_stabilize_floats(v, ndigits=ndigits) for v in value]
+    return value
+
+
 def dumps_demo_artifact(artifact: dict[str, Any]) -> str:
-    """Stable JSON text (sorted keys, trailing newline) for byte-identical re-runs."""
-    return json.dumps(artifact, sort_keys=True, indent=2, allow_nan=False) + "\n"
+    """Stable JSON text (sorted keys, rounded floats, trailing newline).
+
+    Float rounding absorbs sub-1e-8 platform ULP drift so committed golden
+    artifacts match across macOS/Linux for the same builtin + Python kernel.
+    """
+    stable = _stabilize_floats(artifact)
+    return json.dumps(stable, sort_keys=True, indent=2, allow_nan=False) + "\n"
 
 
 def run_demo_risk(

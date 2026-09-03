@@ -12,53 +12,53 @@
       "strategy": "Vol Trading",
       "stress": [
         {
-          "pnl": -72441.17243726872,
+          "pnl": -72441.17243727,
           "scenario": "Equities -10%"
         },
         {
-          "pnl": 576.5882545618301,
+          "pnl": 576.58825456,
           "scenario": "Rates +100bp"
         },
         {
-          "pnl": 685.9591866221317,
+          "pnl": 685.95918662,
           "scenario": "Vol +25%"
         },
         {
-          "pnl": -105124.53610504631,
+          "pnl": -105124.53610505,
           "scenario": "Equities -15% / Vol +40%"
         },
         {
-          "pnl": -138805.83542679407,
+          "pnl": -138805.83542679,
           "scenario": "Combined Crisis"
         }
       ],
       "summary": {
-        "delta": 728417.0334120863,
-        "dv01": 10.700218957547905,
-        "expected_shortfall_99": 25445.915370566276,
+        "delta": 728417.03341209,
+        "dv01": 10.70021896,
+        "expected_shortfall_99": 25445.91537057,
         "fx_delta": 0.0,
-        "gamma": -27101.174608468267,
-        "market_value": 863917.5171898163,
+        "gamma": -27101.17460847,
+        "market_value": 863917.51718982,
         "methodology": "DELTA_GAMMA",
         "portfolio_id": "equity-vol",
-        "var_95": 15846.974567208112,
-        "var_99": 22035.900945819303,
-        "vega": 270.92394445932007
+        "var_95": 15846.97456721,
+        "var_99": 22035.90094582,
+        "vega": 270.92394446
       },
       "var_report": {
         "methodology": "DELTA_GAMMA",
         "methods": [
           {
             "confidence": 0.99,
-            "expected_shortfall": 25445.915370566276,
+            "expected_shortfall": 25445.91537057,
             "method": "historical",
-            "var": 22035.900945819303
+            "var": 22035.90094582
           },
           {
             "confidence": 0.99,
-            "expected_shortfall": 24338.08195826909,
+            "expected_shortfall": 24338.08195827,
             "method": "parametric",
-            "var": 21243.63767446238
+            "var": 21243.63767446
           }
         ],
         "portfolio_id": "equity-vol"
@@ -76,7 +76,7 @@
           "scenario": "Equities -10%"
         },
         {
-          "pnl": -90169.10124911396,
+          "pnl": -90169.10124911,
           "scenario": "Rates +100bp"
         },
         {
@@ -88,21 +88,21 @@
           "scenario": "Equities -15% / Vol +40%"
         },
         {
-          "pnl": -110802.40445013397,
+          "pnl": -110802.40445013,
           "scenario": "Combined Crisis"
         }
       ],
       "summary": {
         "delta": 0.0,
-        "dv01": -738.106837012276,
-        "expected_shortfall_99": 13082.05288407282,
+        "dv01": -738.10683701,
+        "expected_shortfall_99": 13082.05288407,
         "fx_delta": 0.0,
         "gamma": 0.0,
-        "market_value": 4123297.187371605,
+        "market_value": 4123297.18737161,
         "methodology": "DELTA_GAMMA",
         "portfolio_id": "rates-macro",
-        "var_95": 9001.080025561409,
-        "var_99": 11585.162762233294,
+        "var_95": 9001.08002556,
+        "var_99": 11585.16276223,
         "vega": 0.0
       },
       "var_report": {
@@ -110,15 +110,15 @@
         "methods": [
           {
             "confidence": 0.99,
-            "expected_shortfall": 13082.052884072822,
+            "expected_shortfall": 13082.05288407,
             "method": "historical",
-            "var": 11585.162762233293
+            "var": 11585.16276223
           },
           {
             "confidence": 0.99,
-            "expected_shortfall": 13894.603277537632,
+            "expected_shortfall": 13894.60327754,
             "method": "parametric",
-            "var": 12127.986016503633
+            "var": 12127.9860165
           }
         ],
         "portfolio_id": "rates-macro"
@@ -132,53 +132,53 @@
       "strategy": "Multi-Asset",
       "stress": [
         {
-          "pnl": -108304.87579587853,
+          "pnl": -108304.87579588,
           "scenario": "Equities -10%"
         },
         {
-          "pnl": 91908.5562689641,
+          "pnl": 91908.55626896,
           "scenario": "Rates +100bp"
         },
         {
-          "pnl": 4861.095921907533,
+          "pnl": 4861.09592191,
           "scenario": "Vol +25%"
         },
         {
-          "pnl": -152384.52095555476,
+          "pnl": -152384.52095555,
           "scenario": "Equities -15% / Vol +40%"
         },
         {
-          "pnl": -85855.66340861516,
+          "pnl": -85855.66340862,
           "scenario": "Combined Crisis"
         }
       ],
       "summary": {
-        "delta": 1115725.9434260472,
-        "dv01": 1107.5893472960267,
-        "expected_shortfall_99": 51875.2699995103,
-        "fx_delta": 1220007.6409398438,
-        "gamma": 1993122.8571268907,
-        "market_value": 2632439.4231622545,
+        "delta": 1115725.94342605,
+        "dv01": 1107.5893473,
+        "expected_shortfall_99": 51875.26999951,
+        "fx_delta": 1220007.64093984,
+        "gamma": 1993122.85712689,
+        "market_value": 2632439.42316225,
         "methodology": "DELTA_GAMMA",
         "portfolio_id": "global-macro",
-        "var_95": 32502.225840677384,
-        "var_99": 44073.37356088511,
-        "vega": 1285.7258366709439
+        "var_95": 32502.22584068,
+        "var_99": 44073.37356089,
+        "vega": 1285.72583667
       },
       "var_report": {
         "methodology": "DELTA_GAMMA",
         "methods": [
           {
             "confidence": 0.99,
-            "expected_shortfall": 51875.26999951029,
+            "expected_shortfall": 51875.26999951,
             "method": "historical",
-            "var": 44073.37356088511
+            "var": 44073.37356089
           },
           {
             "confidence": 0.99,
-            "expected_shortfall": 51558.83165212899,
+            "expected_shortfall": 51558.83165213,
             "method": "parametric",
-            "var": 45003.42879995495
+            "var": 45003.42879995
           }
         ],
         "portfolio_id": "global-macro"
