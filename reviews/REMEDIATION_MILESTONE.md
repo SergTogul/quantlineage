@@ -843,7 +843,7 @@ Capture/assert request units where percent/bp conversion matters.
 - native benchmark SLA;
 - scenario-application benchmark;
 - hierarchy benchmark;
-- optional QuantLib E2E.
+- optional QuantLib E2E — COMPLETE (`reviews/r0.12-ql-e2e-independent-review.md`; nightly job only).
 
 ## R0.12.5 Native ABI safety
 

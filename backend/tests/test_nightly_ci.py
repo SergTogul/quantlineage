@@ -16,6 +16,14 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_YML = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 NIGHTLY_YML = REPO_ROOT / ".github" / "workflows" / "nightly.yml"
+PLAYWRIGHT_CONFIG = REPO_ROOT / "e2e" / "playwright.config.js"
+
+NIGHTLY_JOB_IDS = (
+    "native-benchmark",
+    "postgres-two-worker",
+    "full-reval-sample",
+    "quantlib-e2e",
+)
 
 
 def _text(path: Path) -> str:
@@ -37,7 +45,7 @@ def _needs_ids(block: str) -> set[str]:
             for part in inline.group(1).split(",")
             if part.strip()
         }
-    listed = re.search(r"(?ms)^    needs:\n((?:      - .+\n?)+)", block)
+    listed = re.search(r"(?m)^    needs:\n((?:      - \S+\n)+)", block)
     if listed:
         return set(re.findall(r"^      - (\S+)", listed.group(1), re.M))
     raise AssertionError("PR-FULL job must declare needs:")
@@ -65,6 +73,9 @@ def test_pr_full_needs_does_not_include_nightly():
     needed = _needs_ids(block)
     leaked = [job_id for job_id in needed if "nightly" in job_id.lower()]
     assert not leaked, f"PR-FULL needs: must not include nightly jobs; found {leaked}"
+    leaked_ids = [job_id for job_id in NIGHTLY_JOB_IDS if job_id in needed]
+    assert not leaked_ids, f"PR-FULL needs: must not include nightly job ids; found {leaked_ids}"
+    assert "quantlib-e2e" not in needed
     assert not re.search(r"(?im)^      - \S*nightly", block), (
         "PR-FULL needs: list must not name a nightly job id"
     )
@@ -122,3 +133,61 @@ def test_two_worker_skips_locally_when_dsn_unreachable(monkeypatch):
     )
     with pytest.raises(pytest.skip.Exception):
         require_live_postgres()
+
+
+def test_nightly_runs_quantlib_critical_e2e():
+    text = _text(NIGHTLY_YML)
+    block = _job_block(text, "quantlib-e2e")
+    assert "r0-critical-journey.spec.ts" in block
+    assert "playwright" in block
+    assert "RISKFORGE_PRICING_ENGINE: quantlib" in block
+    assert "RISKFORGE_REQUIRE_QUANTLIB" in block
+    assert "RISKFORGE_NIGHTLY" in block
+    assert "pip install -r requirements.txt" in block
+    assert "import QuantLib" in block
+    assert "requirements-no-ql" not in block
+    assert "continue-on-error" not in block
+    assert "echo-only" not in block.lower()
+    assert "check_m6_sla.py" not in block
+
+
+def test_playwright_config_honors_pricing_engine_env():
+    text = PLAYWRIGHT_CONFIG.read_text(encoding="utf-8")
+    assert "process.env.RISKFORGE_PRICING_ENGINE" in text
+    assert re.search(
+        r"process\.env\.RISKFORGE_PRICING_ENGINE\s*\|\|\s*'builtin'",
+        text,
+    ), "PR e2e must default to builtin; nightly may override to quantlib"
+    assert not re.search(
+        r"RISKFORGE_PRICING_ENGINE:\s*'builtin'",
+        text,
+    ), "must not unconditionally overwrite RISKFORGE_PRICING_ENGINE to builtin"
+
+
+def test_require_quantlib_fails_when_nightly_and_missing(monkeypatch):
+    """RISKFORGE_NIGHTLY=1 + missing QuantLib must fail, not skip-green."""
+    from tests.quantlib_gate import require_quantlib_for_nightly
+
+    monkeypatch.setenv("RISKFORGE_NIGHTLY", "1")
+    monkeypatch.delenv("RISKFORGE_REQUIRE_QUANTLIB", raising=False)
+
+    def _missing():
+        raise ImportError("simulated missing QuantLib")
+
+    with pytest.raises(pytest.fail.Exception):
+        require_quantlib_for_nightly(_importer=_missing)
+
+
+def test_require_quantlib_skips_locally_when_missing(monkeypatch):
+    """Local-optional skip when RISKFORGE_NIGHTLY and REQUIRE_QUANTLIB are unset."""
+    from tests.quantlib_gate import require_quantlib_for_nightly
+
+    monkeypatch.delenv("RISKFORGE_NIGHTLY", raising=False)
+    monkeypatch.delenv("RISKFORGE_REQUIRE_QUANTLIB", raising=False)
+    monkeypatch.delenv("CI", raising=False)
+
+    def _missing():
+        raise ImportError("simulated missing QuantLib")
+
+    with pytest.raises(pytest.skip.Exception):
+        require_quantlib_for_nightly(_importer=_missing)

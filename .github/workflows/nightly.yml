@@ -15,6 +15,11 @@
 # Native job is compile + 10k×1k checksum/impl identity. Do not run
 # benchmarks/check_m6_sla.py on ubuntu-latest (host-specific SLA-K1/K2 floors
 # flake). Labeled-runner SLA remains an RF-016 leftover.
+#
+# QuantLib E2E (quantlib-e2e) is nightly-only. Do not add it to PR-FULL needs
+# or to pull_request. If QuantLib cannot be installed, the job fails
+# (RISKFORGE_NIGHTLY=1; no skip-green / no-ql fallback). Hierarchy bench
+# remains an RF-016 leftover.
 name: Nightly
 
 on:
@@ -176,3 +181,63 @@ jobs:
           RISKFORGE_PRICING_ENGINE: builtin
           RISKFORGE_NIGHTLY: "1"
         run: pytest -q --tb=short tests/test_nightly_full_reval_sample.py
+
+  # RF-016 leftover: optional QuantLib-priced critical E2E. Sibling nightly only.
+  # Mandatory QuantLib install + import. No requirements-no-ql fallback.
+  quantlib-e2e:
+    name: nightly-quantlib-e2e
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install backend dependencies (QuantLib required)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: QuantLib import is mandatory
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          RISKFORGE_NIGHTLY: "1"
+          RISKFORGE_REQUIRE_QUANTLIB: "1"
+        run: |
+          python -c "import QuantLib as ql; print('QuantLib', ql.__version__)"
+          python -c "from tests.quantlib_gate import require_quantlib_for_nightly; require_quantlib_for_nightly()"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install e2e dependencies and Chromium
+        working-directory: e2e
+        run: |
+          npm ci
+          npm run install:browsers:ci
+
+      - name: Run Playwright critical journey (QuantLib)
+        working-directory: e2e
+        env:
+          CI: true
+          RISKFORGE_NIGHTLY: "1"
+          RISKFORGE_PRICING_ENGINE: quantlib
+          RISKFORGE_REQUIRE_QUANTLIB: "1"
+        run: npx playwright test tests/r0-critical-journey.spec.ts
