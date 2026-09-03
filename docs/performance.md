@@ -62,6 +62,16 @@ backend/.venv/bin/python benchmarks/check_m6_sla.py
 - C++ builds require a C++20-capable `g++` and include paths documented in [`backend/native/README.md`](../backend/native/README.md).
 - Benchmark scripts live under [`benchmarks/`](../benchmarks/), separate from product unit tests.
 
+## Stage 10.3 FULL_REVALUATION (recorded, not an SLA)
+
+Stage 10.3 measures the product `FULL_REVALUATION` path (and LINEAR / DELTA_GAMMA
+at 10k×1k) on a seeded multi-asset fixture. Evidence lives in
+[`benchmarks/FULL_REVAL_RESULTS.md`](../benchmarks/FULL_REVAL_RESULTS.md).
+
+That report is a **host observation**. It is not an HTTP risk-run SLA, not
+multi-tenant capacity, and not a QuantLib pricing speedup claim. Labeled-runner
+SLA-K1/K2 above are **unchanged / post-R0**.
+
 ## Related Evidence
 
 - Benchmark operator guide: [`benchmarks/README.md`](../benchmarks/README.md)
