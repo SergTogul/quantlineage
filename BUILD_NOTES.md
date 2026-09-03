@@ -20,6 +20,12 @@ Final verification in the execution sandbox:
 - Staged: not full-strict — see ROADMAP M9.7 for ignored Ruff rules and mypy `disable_error_code` debt list.
 - Follow-up `8d7a6f2`: lint CI installs numpy (mypy `numpy.typing`); Historical VaR kernel tests keep absolute `TOL` / `assert_allclose` imports.
 
+## M9.1 Frontend Vitest / RTL / MSW (2026-09-02, QA)
+
+- Dual-run: `cd frontend && npm test` → `test:node` (lib helpers) + `test:vitest` (components).
+- Harness: `vite.config.js` `test` block; `src/test/setup.js` (jest-dom + MSW lifecycle); `src/test/mswServer.js` (fixed API fixtures).
+- Watch: `npm run test:watch`. Lib `*.test.mjs` remain on node:test until migrated.
+
 ## M9.2 / M9.10 Playwright E2E CI (2026-09-02, DevOps/QA)
 
 - Local: `cd e2e && npm install && npm run install:browsers && npm test` (Chrome channel; `backend/.venv`).
