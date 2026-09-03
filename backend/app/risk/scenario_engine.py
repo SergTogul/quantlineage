@@ -113,18 +113,13 @@ def _scenario_tag(scenario: ScenarioInput, scenario_id: str | None) -> str | Non
     return None
 
 
-def apply_scenario(
+def _apply_scenario_uncached(
     base: MarketSnapshot,
     scenario: ScenarioInput,
     *,
     scenario_id: str | None = None,
 ) -> MarketSnapshot:
-    """Apply one multi-factor scenario to ``base``.
-
-    Formal ``Scenario`` and adapted ``StressScenario`` / ``MarketScenario``
-    paths share ``scenario_model.apply_scenario``. Explicit shock lists apply
-    non-zero amounts in caller order via ``MarketSnapshot.apply``.
-    """
+    """Apply one multi-factor scenario without memoization."""
     if isinstance(scenario, Scenario):
         out = apply_formal_scenario(base, scenario)
         if scenario_id is None or scenario_id == scenario.id:
@@ -171,6 +166,42 @@ def apply_scenario(
     if out.id == new_id:
         return out
     return out.model_copy(update={"id": new_id})
+
+
+def apply_scenario(
+    base: MarketSnapshot,
+    scenario: ScenarioInput,
+    *,
+    scenario_id: str | None = None,
+) -> MarketSnapshot:
+    """Apply one multi-factor scenario to ``base``.
+
+    Formal ``Scenario`` and adapted ``StressScenario`` / ``MarketScenario``
+    paths share ``scenario_model.apply_scenario``. Explicit shock lists apply
+    non-zero amounts in caller order via ``MarketSnapshot.apply``.
+
+    When ``RISKFORGE_SCENARIO_CACHE`` is enabled (default), results are memoized
+    by base id + content hash + expanded shock fingerprint + scenario id tag.
+    """
+    from app.risk.scenario_memo import (
+        get_scenario_result_memo,
+        scenario_memo_enabled,
+        scenario_memo_key,
+    )
+
+    if not scenario_memo_enabled():
+        return _apply_scenario_uncached(base, scenario, scenario_id=scenario_id)
+
+    shocks = expand_scenario(base, scenario)
+    tag = _scenario_tag(scenario, scenario_id)
+    key = scenario_memo_key(base, shocks, id_tag=tag)
+    memo = get_scenario_result_memo()
+    hit = memo.get(key)
+    if hit is not None:
+        return hit
+
+    out = _apply_scenario_uncached(base, scenario, scenario_id=scenario_id)
+    return memo.put(key, out)
 
 
 def shocked_snapshots(
