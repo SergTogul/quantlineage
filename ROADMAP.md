@@ -15,7 +15,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 6 — C++ Performance Engine | **PARTIAL** (M6.1–M6.7 DONE; no risk-path speed SLA) |
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
-| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.1–M9.7 + M9.9 DONE; M9.8 Redis optional + M9.10 reverse-multi E2E still open — UI landed) |
+| Milestone 9 — Testing, CI & Engineering Quality | PARTIAL (M9.1–M9.7 + M9.9–M9.10 DONE; M9.8 Redis/RQ optional still open — do **not** mark COMPLETE) |
 | Milestone 10 — Demo Data & Reproducibility | NOT STARTED |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
 | Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
@@ -62,7 +62,7 @@ Trade (domain/models.py)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); formal `Scenario` not yet the stress HTTP wire type (M3.8)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
-6. M9.7 **DONE** (staged); M9.2 Playwright **DONE**; **M9.1 Vitest/RTL/MSW DONE** (`bd46a1a`); **M9.3/M9.5 Hypothesis DONE**; **M9.4 QuantLib golden expand DONE** (`test_quantlib_golden.py`); multi-factor reverse **UI landed** (Frontend); M9.8 Redis optional + M9.10 reverse-multi E2E still open for QA close
+6. M9.7 **DONE** (staged); M9.2 Playwright **DONE**; **M9.1 Vitest/RTL/MSW DONE** (`bd46a1a`); **M9.3/M9.5 Hypothesis DONE**; **M9.4 QuantLib golden expand DONE**; **M9.10 reverse-multi E2E DONE** (QA); M9.8 Redis/RQ optional still open — Milestone 9 stays **PARTIAL**
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum)
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
@@ -697,13 +697,13 @@ Status: **COMPLETE** (2026-09-02 Frontend/Risk UX — remaining PARTIAL items cl
 
 - Frontend `npm test` **56 passed**; `npm run build` OK (2026-09-02 M8 close pass).
 - No client risk math; all panels display API payloads.
-- Residual (non-blocking for M8): formal `Scenario` HTTP wire still M3.8; multi-factor reverse UI now in Stress section (`ReverseStressMulti` → `/api/v1/risk/stress/reverse/multi`); P&L illustrative market path still uses `/attribution/demo` (position-change path uses real `/attribution`); residual reverse-multi E2E close still M9.10.
+- Residual (non-blocking for M8): formal `Scenario` HTTP wire still M3.8; multi-factor reverse UI in Stress section (`ReverseStressMulti` → `/api/v1/risk/stress/reverse/multi`); P&L illustrative market path still uses `/attribution/demo` (position-change path uses real `/attribution`); reverse-multi E2E closed under M9.10.
 
 ---
 
 ## Milestone 9 — Testing, CI & Engineering Quality
 
-Status: PARTIAL (M9.1–M9.7 + M9.9 DONE; M9.10 breadth improved + reverse-multi UI landed; M9.8 Redis optional + reverse-multi E2E QA close still open — do **not** mark COMPLETE)
+Status: PARTIAL (M9.1–M9.7 + M9.9–M9.10 DONE; M9.8 Redis/RQ optional still open — do **not** mark COMPLETE)
 
 ### Tasks
 
@@ -746,12 +746,13 @@ Status: PARTIAL (M9.1–M9.7 + M9.9 DONE; M9.10 breadth improved + reverse-multi
   - CI hardening: smoke waits up to 60s for psycopg `SELECT 1`; job prints sqlalchemy/alembic/psycopg versions; QuantLib optional for `postgres-smoke` (full `requirements.txt` preferred; strip QuantLib on wheel failure). Main `backend` job still prefers QuantLib wheel on `ubuntu-latest`, falls back to builtin.
   - GHA evidence: repo https://github.com/SergTogul/riskforge-mvp ; push SHA `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — `postgres-persistence-smoke` https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176 ; also `backend-pytest` + `frontend-test-build` green. QuantLib path: backend job prefers wheel on ubuntu-latest with builtin fallback (see workflow).
   - Milestone 5 COMPLETE cleared on this evidence; M5.5 polish remains optional.
-- [ ] M9.10 E2E coverage for post-M2/M3/M4/M5 endpoints — PARTIAL (2026-09-02 QA breadth + Frontend reverse-multi UI)
+- [x] M9.10 E2E coverage for post-M2/M3/M4/M5 endpoints — **DONE** (2026-09-02 QA reverse-multi close)
   - Done: ES contributions (`POST /risk/es`), change-attribution waterfall, VaR methodology compare, hedge-compare (`POST /risk/stress/compare`), overview collage → VaR & ES nav; risk-runs hash fix (`/#risk-runs`) after M8 sectioning
-  - Frontend (2026-09-02): Stress-section **Multi-Factor Reverse Stress** panel → `POST /api/v1/risk/stress/reverse/multi`; helpers + Vitest/RTL/MSW; structural Playwright in `e2e/tests/reverse-stress.spec.ts` (labels/status — no invented numbers)
-  - Evidence: `e2e/tests/m8-panels.spec.ts` + updated `e2e/tests/risk-runs.spec.ts`; local `cd e2e && npm test` → **10 passed** (2026-09-02 QA breadth); reverse-multi structural spec added with UI land
-  - CI: `.github/workflows/ci.yml` job `e2e-playwright` — **GHA green** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499); M9.2 CI gate closed
-  - Still open: QA close of reverse-multi E2E (UI now present; confirm live suite green + any residual breadth) — do **not** mark M9.10 or Milestone 9 COMPLETE on Frontend land alone
+  - Frontend UI: Stress-section **Multi-Factor Reverse Stress** → `POST /api/v1/risk/stress/reverse/multi` (helpers + Vitest/RTL/MSW)
+  - QA E2E close: `e2e/tests/reverse-stress.spec.ts` — navigate `#stress`, fill target/max-shock/weights + factor toggles, assert Status Converged/Not converged + factor table rows; client validation for fewer than two factors; **no invented PnL/shock numbers**
+  - Local evidence: `cd e2e && npm test` → **12 passed** (2026-09-02 QA); Chrome channel locally; CI stays Chromium via `CI=true` (`e2e/playwright.config.js`)
+  - CI: `.github/workflows/ci.yml` job `e2e-playwright` — prior GHA green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499); M9.2 gate unchanged (channel vs ubuntu preserved)
+  - Milestone 9 remains **PARTIAL** solely on **M9.8** (Redis/RQ optional; compose stack already has postgres/backend/worker/frontend)
 
 ### Progress update (2026-09-02, QA — M9.10 E2E breadth)
 
@@ -811,7 +812,14 @@ Status: PARTIAL (M9.1–M9.7 + M9.9 DONE; M9.10 breadth improved + reverse-multi
 - Landed Stress-section `ReverseStressMulti` wired to existing `POST /api/v1/risk/stress/reverse/multi` (`reverseStressMulti` client). Display-only: status, target/achieved, P&L, shock table, method/assumptions from API — no client search/optimization.
 - Helpers: `defaultReverseMultiForm`, `validateReverseMultiForm`, `reverseMultiRequestBody`, `formatFactorShock`, expanded `reverseStressMultiSummary`.
 - Tests: `risk.test.mjs` request/display helpers; Vitest/RTL/MSW `ReverseStressMulti.test.jsx`; structural Playwright `e2e/tests/reverse-stress.spec.ts` (labels/Converged status).
-- Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.8 Redis optional; M9.10 reverse-multi E2E still open for QA close after UI land).
+- Milestone 9 remained **PARTIAL** after UI land (M9.8 Redis optional; M9.10 QA E2E close pending).
+
+### Progress update (2026-09-02, QA — M9.10 reverse-multi E2E close)
+
+- Owner: QA & Quant Validation
+- Closed reverse-multi live E2E gap: fill controls (target loss %, max shock %, weights, factor checkboxes), assert Status Converged/Not converged + shock table factor rows; validation path for fewer than two factors; fixed single-factor card selector (`exact: true`) after Multi-Factor heading collision.
+- Local: `cd e2e && npm test` → **12 passed** (no unexpected skips). Spec/selectors only — no UI product changes.
+- **M9.10 DONE**. Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE (M9.8 Redis/RQ optional still open). Next: Lead Architect decide M9.8 deferral vs implement; then M3.8 / M6 SLA / M10.
 
 ---
 
