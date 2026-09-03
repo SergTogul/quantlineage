@@ -1,4 +1,4 @@
-"""Equivalence tests for the optional C++ scenario kernel (M6.4/M6.5).
+"""Equivalence tests for the optional C++ scenario kernel (M6.4/M6.5 / R0.12.5).
 
 Coverage
 - Pure-Python ABI math sanity
@@ -6,6 +6,7 @@ Coverage
 - Native ctypes ↔ PythonScenarioKernel (serial)
 - Parallel ↔ serial (stdlib thread pool)
 - Edge cases: empty exposures/shocks, single shock, zeros, NaN propagation
+- R0.12.5 ABI version, error codes, length mismatch, wrap/tight-buffer, null/empty policy
 
 Tolerances (M6.5)
 - ABI (this module): ``KERNEL_ABI_ABS_TOL`` / ``KERNEL_ABI_REL_TOL`` = 1e-12
@@ -16,10 +17,20 @@ Tolerances (M6.5)
 NaN / Inf policy
 - Kernel does not sanitize; IEEE float ops propagate. Callers must supply
   finite exposures/shocks. Parity requires both backends to propagate equally.
+
+Null / empty policy (C ABI)
+- Count == 0: pointer may be NULL; no dereference.
+- ``n_shocks == 0``: success, no writes (``out`` may be NULL).
+- ``n_exposures == 0`` and ``n_shocks > 0``: write 0.0 per shock.
+- Count > 0 and pointer is NULL: ``KERNEL_ERR_NULL`` (out buffer unchanged).
+- Length mismatch vs stride / ``n_out``: ``KERNEL_ERR_LENGTH`` (no overrun).
+- Wrap-sized ``n_exposures`` / ``n_shocks`` (``SIZE_MAX/stride+1``): ``KERNEL_ERR_LENGTH``.
+- Tight-buffer mismatch: skipped length predicate is an overrun under ASan.
 """
 
 from __future__ import annotations
 
+import ctypes
 import math
 import os
 import shutil
@@ -31,7 +42,13 @@ import pytest
 from app.compute.kernel import (
     KERNEL_ABI_ABS_TOL,
     KERNEL_ABI_REL_TOL,
+    KERNEL_ABI_VERSION,
+    KERNEL_ERR_ABI,
+    KERNEL_ERR_LENGTH,
+    KERNEL_ERR_NULL,
+    KERNEL_OK,
     Exposure,
+    NativeKernelError,
     NativeScenarioKernel,
     PythonScenarioKernel,
     Shock,
@@ -65,6 +82,7 @@ def test_cpp_kernel_compiles_and_executes(tmp_path):
             "-I",
             str(root / "include"),
             str(root / "tests/kernel_test.cpp"),
+            str(root / "src/risk_kernel_capi.cpp"),
             "-o",
             str(exe),
         ],
@@ -208,3 +226,153 @@ def test_native_multi_exposure_matrix_matches_python(tmp_path, monkeypatch):
     expected = PythonScenarioKernel().pnl(exposures, shocks)
     actual = NativeScenarioKernel(lib).pnl(exposures, shocks)
     assert _approx(actual, expected)
+
+
+def test_native_abi_version_readable(tmp_path):
+    """R0.12.5: Python bridge can read the exported ABI version."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    lib = _build_native_lib(tmp_path)
+    native = NativeScenarioKernel(lib)
+    assert KERNEL_ABI_VERSION == 1
+    assert native.abi_version == KERNEL_ABI_VERSION
+    raw = ctypes.CDLL(str(lib))
+    raw.riskforge_kernel_abi_version.argtypes = []
+    raw.riskforge_kernel_abi_version.restype = ctypes.c_int
+    assert raw.riskforge_kernel_abi_version() == KERNEL_ABI_VERSION
+
+
+def test_native_constructor_rejects_abi_mismatch(tmp_path, monkeypatch):
+    """R0.12.5: a stale Python ABI expectation must fail closed at load."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    lib = _build_native_lib(tmp_path)
+    monkeypatch.setattr("app.compute.kernel.KERNEL_ABI_VERSION", 99)
+    with pytest.raises(NativeKernelError) as exc:
+        NativeScenarioKernel(lib)
+    assert exc.value.code == KERNEL_ERR_ABI
+
+
+def test_native_wrong_abi_arg_fails_closed(tmp_path, monkeypatch):
+    """R0.12.5: compute entry rejects a mismatched ABI argument and does not write."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
+    s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
+    out = (ctypes.c_double * 1)(99.0)
+    rc = native.fn(0, e, 1, 5, s, 1, 4, out, 1)
+    assert rc == KERNEL_ERR_ABI
+    assert out[0] == 99.0
+
+
+def test_native_length_mismatch_fails_closed(tmp_path, monkeypatch):
+    """R0.12.5: mismatched exposure/shock/out lengths return an error, no overrun."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
+    s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
+    out = (ctypes.c_double * 1)(99.0)
+
+    rc = native.fn(KERNEL_ABI_VERSION, e, 1, 4, s, 1, 4, out, 1)
+    assert rc == KERNEL_ERR_LENGTH
+    assert out[0] == 99.0
+
+    rc = native.fn(KERNEL_ABI_VERSION, e, 1, 5, s, 1, 3, out, 1)
+    assert rc == KERNEL_ERR_LENGTH
+    assert out[0] == 99.0
+
+    rc = native.fn(KERNEL_ABI_VERSION, e, 1, 5, s, 1, 4, out, 0)
+    assert rc == KERNEL_ERR_LENGTH
+    assert out[0] == 99.0
+
+
+def _size_max() -> int:
+    return (1 << (ctypes.sizeof(ctypes.c_size_t) * 8)) - 1
+
+
+def test_native_wrap_sized_counts_fail_closed(tmp_path, monkeypatch):
+    """R0.12.5: wrap-sized n_exposures/n_shocks must ERR_LENGTH without a huge alloc.
+
+    SIZE_MAX/5+1 makes *5 wrap to 4; SIZE_MAX/4+1 makes *4 wrap to 0. Passing
+    those wrapped products as n_*_doubles (and n_out == wrap n_shocks) means a
+    deleted overflow guard would treat lengths as matching and walk huge n_*.
+    """
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
+    s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
+    out = (ctypes.c_double * 1)(99.0)
+    size_max = _size_max()
+    wrap_exposures = size_max // 5 + 1
+    wrap_shocks = size_max // 4 + 1
+
+    rc = native.fn(KERNEL_ABI_VERSION, e, wrap_exposures, 4, s, 1, 4, out, 1)
+    assert rc == KERNEL_ERR_LENGTH
+    assert out[0] == 99.0
+
+    rc = native.fn(KERNEL_ABI_VERSION, e, 1, 5, s, wrap_shocks, 0, out, wrap_shocks)
+    assert rc == KERNEL_ERR_LENGTH
+    assert out[0] == 99.0
+
+
+def test_native_tight_buffer_mismatch_fails_closed(tmp_path, monkeypatch):
+    """R0.12.5: tight out/exposure buffers so a skipped predicate is an ASan overrun."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
+    two_s = (ctypes.c_double * 8)(-0.1, 5.0, 20.0, -0.02, 0.03, -2.0, -10.0, 0.01)
+    out = (ctypes.c_double * 1)(99.0)
+
+    rc = native.fn(KERNEL_ABI_VERSION, e, 1, 5, two_s, 2, 8, out, 1)
+    assert rc == KERNEL_ERR_LENGTH
+    assert out[0] == 99.0
+
+    rc = native.fn(KERNEL_ABI_VERSION, e, 2, 5, two_s, 1, 4, out, 1)
+    assert rc == KERNEL_ERR_LENGTH
+    assert out[0] == 99.0
+
+
+def test_native_null_pointer_nonzero_count_fails_closed(tmp_path, monkeypatch):
+    """R0.12.5: NULL + count > 0 is an error; out is not written."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
+    out = (ctypes.c_double * 1)(99.0)
+    rc = native.fn(KERNEL_ABI_VERSION, None, 1, 5, s, 1, 4, out, 1)
+    assert rc == KERNEL_ERR_NULL
+    assert out[0] == 99.0
+
+    e = (ctypes.c_double * 5)(1.0, 0.0, 0.0, 0.0, 0.0)
+    rc = native.fn(KERNEL_ABI_VERSION, e, 1, 5, None, 1, 4, out, 1)
+    assert rc == KERNEL_ERR_NULL
+    assert out[0] == 99.0
+
+    rc = native.fn(KERNEL_ABI_VERSION, e, 1, 5, s, 1, 4, None, 1)
+    assert rc == KERNEL_ERR_NULL
+
+
+def test_native_empty_null_pointers_ok(tmp_path, monkeypatch):
+    """R0.12.5: count == 0 may pass NULL; empty book writes zeros per shock."""
+    if not shutil.which("g++"):
+        pytest.skip("g++ unavailable")
+    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    rc = native.fn(KERNEL_ABI_VERSION, None, 0, 0, None, 0, 0, None, 0)
+    assert rc == KERNEL_OK
+
+    s = (ctypes.c_double * 4)(0.01, 1.0, 2.0, -0.01)
+    out = (ctypes.c_double * 1)(99.0)
+    rc = native.fn(KERNEL_ABI_VERSION, None, 0, 0, s, 1, 4, out, 1)
+    assert rc == KERNEL_OK
+    assert out[0] == 0.0
+

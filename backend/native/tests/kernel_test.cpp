@@ -1,8 +1,10 @@
 #include "risk_kernel.hpp"
+#include "risk_kernel_capi.h"
 
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <vector>
 
 int main() {
@@ -63,6 +65,101 @@ int main() {
     assert(std::abs(flat_serial[j] - serial[j]) < 1e-12);
     assert(std::abs(flat_par[j] - serial[j]) < 1e-12);
   }
+
+  // R0.12.5: C ABI version, length, and null/empty policy (fail closed).
+  assert(RISKFORGE_KERNEL_ABI == 1);
+  assert(riskforge_kernel_abi_version() == RISKFORGE_KERNEL_ABI);
+
+  double one_e[] = {1000.0, 200.0, 30.0, -10.0, 500.0};
+  double one_s[] = {-0.1, 5.0, 20.0, -0.02};
+  double abi_out = 99.0;
+  int rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, 1, 5, one_s, 1, 4,
+                                         &abi_out, 1);
+  assert(rc == RISKFORGE_KERNEL_OK);
+  assert(std::abs(abi_out - expected) < 1e-12);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(/*abi=*/0, one_e, 1, 5, one_s, 1, 4, &abi_out, 1);
+  assert(rc == RISKFORGE_KERNEL_ERR_ABI);
+  assert(abi_out == 99.0);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, 1, /*n_exposure_doubles=*/4,
+                                     one_s, 1, 4, &abi_out, 1);
+  assert(rc == RISKFORGE_KERNEL_ERR_LENGTH);
+  assert(abi_out == 99.0);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, 1, 5, one_s, 1,
+                                     /*n_shock_doubles=*/3, &abi_out, 1);
+  assert(rc == RISKFORGE_KERNEL_ERR_LENGTH);
+  assert(abi_out == 99.0);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, 1, 5, one_s, 1, 4, &abi_out,
+                                     /*n_out=*/0);
+  assert(rc == RISKFORGE_KERNEL_ERR_LENGTH);
+  assert(abi_out == 99.0);
+
+  // Wrap-sized counts: *5 / *4 would wrap if the overflow guard is deleted.
+  // Do not allocate wrap-sized buffers; pass the wrapped product as n_*_doubles
+  // so a missing guard would treat the length as matching and walk huge n_*.
+  const std::size_t wrap_exposures =
+      std::numeric_limits<std::size_t>::max() / RISKFORGE_KERNEL_EXPOSURE_STRIDE + 1;
+  const std::size_t wrap_shocks =
+      std::numeric_limits<std::size_t>::max() / RISKFORGE_KERNEL_SHOCK_STRIDE + 1;
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, wrap_exposures,
+                                     /*n_exposure_doubles=*/4, one_s, 1, 4, &abi_out, 1);
+  assert(rc == RISKFORGE_KERNEL_ERR_LENGTH);
+  assert(abi_out == 99.0);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, 1, 5, one_s, wrap_shocks,
+                                     /*n_shock_doubles=*/0, &abi_out, wrap_shocks);
+  assert(rc == RISKFORGE_KERNEL_ERR_LENGTH);
+  assert(abi_out == 99.0);
+
+  // Tight buffers: a skipped length predicate overruns under ASan, not only rc.
+  double two_s[] = {-0.1, 5.0, 20.0, -0.02, 0.03, -2.0, -10.0, 0.01};
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, 1, 5, two_s, /*n_shocks=*/2, 8,
+                                     &abi_out, /*n_out=*/1);
+  assert(rc == RISKFORGE_KERNEL_ERR_LENGTH);
+  assert(abi_out == 99.0);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, /*n_exposures=*/2, 5, one_s, 1,
+                                     4, &abi_out, 1);
+  assert(rc == RISKFORGE_KERNEL_ERR_LENGTH);
+  assert(abi_out == 99.0);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, nullptr, 1, 5, one_s, 1, 4, &abi_out,
+                                     1);
+  assert(rc == RISKFORGE_KERNEL_ERR_NULL);
+  assert(abi_out == 99.0);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, 1, 5, nullptr, 1, 4, &abi_out,
+                                     1);
+  assert(rc == RISKFORGE_KERNEL_ERR_NULL);
+  assert(abi_out == 99.0);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, one_e, 1, 5, one_s, 1, 4, nullptr, 1);
+  assert(rc == RISKFORGE_KERNEL_ERR_NULL);
+  assert(abi_out == 99.0);
+
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, nullptr, 0, 0, nullptr, 0, 0, nullptr,
+                                     0);
+  assert(rc == RISKFORGE_KERNEL_OK);
+
+  abi_out = 99.0;
+  rc = riskforge_portfolio_scenarios(RISKFORGE_KERNEL_ABI, nullptr, 0, 0, one_s, 1, 4, &abi_out,
+                                     1);
+  assert(rc == RISKFORGE_KERNEL_OK);
+  assert(abi_out == 0.0);
 
   std::cout << "risk_kernel_ok\n";
 }
