@@ -15,10 +15,10 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Workstream 6 — C++ Performance Engine | **COMPLETE** (2026-09-02 — + formal scenario-kernel SLA-K1/K2) |
 | Workstream 7 — API Productionization | **COMPLETE** (2026-09-02 — dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Workstream 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
-| Workstream 9 — Testing, CI & Engineering Quality | **COMPLETE** (2026-09-02 Lead Architect: ; containers DONE; Redis/RQ **deferred** residual — not claimed done) |
+| Workstream 9 — Testing, CI & Engineering Quality | **COMPLETE** (2026-09-03 — containers DONE; Redis/RQ residual resolved as accepted deferral with queue-contract tests) |
 | Workstream 10 — Demo Data & Reproducibility | **COMPLETE** (2026-09-02 — ) |
-| Workstream 11 — AI Risk Assistant | **POSTPONED** (product decision 2026-09-02 — do not start until Lead/user unblocks) |
-| Workstream 12 — Documentation & Portfolio Presentation | **POSTPONED** (product decision 2026-09-02 — do not start until Lead/user unblocks; methodology doc landed ahead of ) |
+| Workstream 11 — AI Risk Assistant | **COMPLETE** (2026-09-03 — deterministic tools plus provider-agnostic model/tool loop) |
+| Workstream 12 — Documentation & Portfolio Presentation | **COMPLETE** (2026-09-03 — recruiter docs, architecture, methodology, performance, and limitations package) |
 | Workstream 13 — Final Portfolio Demo | **COMPLETE** (2026-09-03 — ) |
 
 ### Baseline verification (2026-09-02, local macOS — Lead Architect acceptance)
@@ -153,8 +153,8 @@ Critical review items closed with code evidence:
 - Vol surfaces are scaffolding grids (no SABR/local-vol)
 - QuantLib IR future remains algebraic STIR (not full FRA/futures engine)
 - Without attached curves/key_rates, key-rate DV01 correctly falls back to parallel and tags the method
-- `MarketSnapshot.bump(EquityVol|FXVol)` updates scalar vols only — attached `vol_surfaces` grids are unchanged (pricing still reads grid when present)
-- QuantLib options use `BlackConstantVol` at surface-lookup σ, not a QL surface/interpolation engine
+- `MarketSnapshot.bump` / `apply` rewrites attached `vol_surfaces` grids for typed EquityVol / FXVol shocks
+- QuantLib equity/FX options consume attached grids via `BlackVarianceSurface`; richer calibrated SABR/local-vol remains out of scope
 - Builtin ZC bond uses simple compound `(1+y)^T`; QL uses continuous/`Actual365Fixed` — golden tests allow ~5% relative band
 
 ### Follow-on tasks (discovered during ; do not reopen acceptance)
@@ -167,14 +167,18 @@ Critical review items closed with code evidence:
 - [x] Surface-aware EquityVol / FXVol bumps rewrite attached `vol_surfaces` grids — **DONE** (2026-09-03)
  - `MarketSnapshot.bump` / `apply` now rewrite matching attached `vol_surfaces` grids as well as scalar ATM marks for generic, expiry-bucket, skew, and term vol shocks
  - Evidence: `backend/tests/test_market_snapshot.py`, `backend/tests/test_surface_vol_pricing.py`; handoff `docs/agents/HANDOFF_VOL_SURFACE_BUMPS.md`
-- [ ] QuantLib full surface / smile engine (replace point `BlackConstantVol`)
- - Why/evidence: `quantlib.py` builds `BlackConstantVol` from `surface_vol.option_vol_from_snapshot` σ; not a QL `BlackVarianceSurface` (or equiv.)
+- [x] QuantLib full surface / smile engine (replace point `BlackConstantVol`) — **DONE** (2026-09-03)
+ - `QuantLibPricingEngine` now builds a `BlackVarianceSurface` from matching equity/FX `MarketSnapshot.vol_surfaces` grids and uses scalar `BlackConstantVol` only when no matching grid is attached
+ - Evidence: `backend/tests/test_quantlib_pricing.py`; handoff `docs/agents/HANDOFF_QUANTLIB_SURFACE_SMILE_M1_11.md`
 - [x] Align Builtin vs QuantLib ZC bond day-count / compounding conventions — **DONE** (2026-09-02)
  - Builtin scalar (no curve) now uses continuous compounding on Actual365Fixed year fraction ``max(1, round(T*365))/365``, matching QuantLib ``ZeroCouponBond`` + ``FlatForward(Continuous, Actual365Fixed)``.
  - Tight Builtin↔QL parity + continuous golden: **rel=1e-10** (`test_quantlib_golden.py`); curve-path still discounts at domain pillar ``maturity_years`` (`test_curve_pricing.py`).
  - Historical annual ``face/(1+y)^T`` retired as a reference (was **rel=5e-2** gap).
-- [ ] Curve bootstrap from market instruments (replace flat-zero scaffolds)
- - Why: accepted limitation; deposits/futures/swaps bootstrap still open
+- [x] Curve bootstrap from market instruments (replace flat-zero scaffolds) — **DONE** (2026-09-03 scoped minimal bootstrap)
+ - Structured `CurveBootstrapInstrument` inputs support deposits/simple annual rates and explicit continuous-zero instruments; `bootstrap_yield_curve` converts simple deposit DFs to continuous zeros, sorts nodes deterministically, and rejects duplicate/invalid tenors
+ - `attach_bootstrapped_curve` writes the curve payload to `MarketSnapshot.curves`, updates discount `key_rates`, and sets scalar rate/projection fallbacks; existing Builtin/QuantLib curve resolver can parse non-key tenors such as `6M`
+ - Evidence: `backend/tests/test_curves.py`, `backend/tests/test_curve_pricing.py`; handoff `docs/agents/HANDOFF_CURVE_BOOTSTRAP_M1_13.md`
+ - Residual limitations: deterministic offline single-curve helper only; no live vendor integration, futures convexity, swap-quote bootstrap, calendars/stubs, or production multi-curve calibration
 
 ---
 
@@ -758,7 +762,7 @@ Status: **COMPLETE** (2026-09-02 Frontend/Risk UX — remaining PARTIAL items cl
 
 ## Workstream 9 — Testing, CI & Engineering Quality
 
-Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — ; Redis/RQ deferred residual)
+Status: **COMPLETE** (2026-09-03 — Redis/RQ residual resolved as accepted deferral with queue-contract tests)
 
 ### Tasks
 
@@ -794,10 +798,10 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — ; Redis/RQ
  - Trivial fixes: Ruff autofix (imports/unused), F821 lambda closure in `risk_run_worker.py`, Analytics `useEffect` deps for exhaustive-deps; kernel P&L tol imports moved to `app.compute.kernel` in tests.
  - GHA evidence: push SHA `8d7a6f2`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 — includes green `lint-static-analysis`.
  - Follow-up (non-blocking for ): enable ignored Ruff rules gradually; clear mypy `disable_error_code`; add Vitest/TS when advances.
-- [x] Containers — **DONE** (2026-09-02 Lead Architect disposition)
+- [x] Containers — **DONE** (2026-09-02 Lead Architect disposition; queue residual clarified 2026-09-03)
  - **Acceptance (containers):** Compose ships `postgres` + `backend` + `worker` + `frontend` (`docker-compose.yml`); `backend` sets `RISKFORGE_EXTERNAL_WORKER=1`; `worker` runs `python -m app.worker` and claims via Postgres `FOR UPDATE SKIP LOCKED` ( / ADR 005). No VaR/pricing math changed.
- - **Redis/RQ — DEFERRED (accepted residual, not claimed `[x]`):** Fair scheduling / ops queue is **out of scope**. Claim safety does **not** require Redis/RQ (Compose comment + `app/worker.py` + README). Do **not** add a fake Redis service or RQ worker that does not change product semantics.
- - Follow-on (post-, optional ops): Redis/RQ or equivalent only if product needs cross-host fair scheduling beyond Postgres SKIP LOCKED — track outside Workstream 9.
+ - **Redis/RQ — RESOLVED AS ACCEPTED DEFERRAL (2026-09-03):** Fair scheduling / ops queue remains out of scope because current MVP semantics are covered by durable Postgres `risk_runs`, API enqueue-only mode, out-of-process `python -m app.worker`, FIFO bounded polling, and PostgreSQL `FOR UPDATE SKIP LOCKED`. No fake Redis service or RQ worker was added.
+ - Follow-on (optional ops): introduce Redis/RQ or equivalent only with testable new semantics such as priority classes, tenant fairness, retry/dead-letter policy, or queue observability.
 
 - [x] Validate CI on GitHub-hosted runners (fix workflow green; document QuantLib install path) — **DONE** (2026-09-02)
  - Local evidence (2026-09-02, DevOps): `docker compose up -d postgres` + `RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge ./scripts/smoke_postgres.sh` → **exit 0** (`postgres smoke OK`; Alembic head `002_risk_run_domain_fields`). Idempotent re-run OK. See `BUILD_NOTES.md`.
@@ -837,6 +841,14 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — ; Redis/RQ
 - ** DONE** (containers). Redis/RQ remains deferred outside .
 - **Workstream 9 COMPLETE** — every required checklist item is honestly DONE.
 - Next highest-value residual outside (started same session) / SLA / .
+
+### Progress update (2026-09-03, Backend/API + DevOps — queue residual close)
+
+- Owner: Backend/API + DevOps; no pricing/risk formulas, API DTOs, worker command, environment variables, dependencies, or containers changed.
+- Resolved Redis/RQ ambiguity as an accepted deferral backed by current Postgres queue semantics: durable rows, external worker mode, FIFO claim ordering, bounded poll batches, and `FOR UPDATE SKIP LOCKED` multi-worker claim safety.
+- Added queue-contract coverage for stable queued POST acceptance and poll batch limits; preserved `POST /risk/runs` acceptance and `GET /risk/runs/{id}` current-state semantics.
+- Local evidence: focused durable worker/risk-run API tests **20 passed** (1 existing Starlette/httpx warning); `ruff` passed for touched backend files; `mypy app` passed; full backend pytest **659 passed** (1 existing warning).
+- Handoff: `docs/agents/HANDOFF_QUEUE_RESIDUAL_M9.md`.
 
 ### Progress update (2026-09-02, Lead Architect + Backend — formal Scenario wire)
 
@@ -970,35 +982,69 @@ Status: **COMPLETE** (2026-09-02 — DONE)
 
 ## Workstream 11 — AI Risk Assistant
 
-Status: **POSTPONED** (product decision 2026-09-02 — deferred; **do not start** until Lead/user explicitly unblocks). Not COMPLETE. Task list retained for when work resumes.
+Status: **COMPLETE** (2026-09-03 — deterministic tools plus provider-agnostic model/tool loop)
 
 ### Tasks
 
-- [ ] Deterministic tool contracts — PARTIAL (keyword `RiskQueryEngine` + service methods)
-- [ ] LLM orchestration — NOT STARTED
-- [ ] Risk assistant evaluation suite — NOT STARTED
-- [ ] Guardrails — NOT STARTED
+- [x] Deterministic tool contracts — DONE for core query tools (2026-09-03)
+ - Contracts: `get_portfolio_summary`, `get_var_es`, `get_worst_stress`, `get_limits`, `get_contributors`
+ - Each contract declares the backing deterministic `PortfolioService` method, required inputs, return shape, and numeric source
+ - Evidence: `backend/app/risk/query.py` `RiskToolName` / `RiskToolContract` / `tool_contract_schemas`; `backend/tests/test_ai_query_orchestration.py`
+- [x] LLM orchestration — DONE (2026-09-03)
+ - Added provider-agnostic model/tool-loop contracts: `RiskAssistantModelRequest`, `RiskAssistantModelResponse`, `RiskAssistantModel`, `DeterministicRiskAssistantModel`, and `RiskQueryEngine.answer_with_model(...)`.
+ - A model adapter can request exactly one supported deterministic tool, ask for clarification, or refuse unsupported/advisory prompts; RiskForge executes known deterministic tools and ignores model-proposed answer text until tool payloads return.
+ - No live provider adapter or credentials are required for local tests; network-backed provider wiring remains future product scope.
+- [x] Risk assistant evaluation suite — DONE for current M11 scope (2026-09-03)
+ - Expanded eval coverage for deterministic tool selection, grounded answer behavior, model/tool-loop execution, clarification, refusal, and malicious/model-invented numeric text suppression.
+ - Broader future-charter tools such as hedge compare, P&L explain, factor risk, and risk-run lookup remain future scope, not blockers for this workstream.
+- [x] Guardrails — DONE for deterministic query router and model/tool-loop slices (2026-09-03)
+ - Unsupported advisory prompts refuse without calling risk tools
+ - Ambiguous prompts ask for clarification without returning numerical risk data
+ - Numeric answer text is formatted only from the selected tool payload, with the raw `tool_result` included in response data for audit
+
+### Progress update (2026-09-03, AI Orchestration — deterministic tools)
+
+- Owner: AI Orchestration Engineer; consumed existing Backend/API service boundary only
+- Formalized deterministic tool contracts and routing around existing `PortfolioService` calls; no pricing/risk methodology or UI changes
+- Public compatibility: legacy query `intent="var"` preserved; new `tool_name` / `requires_clarification` metadata added to `RiskQueryResponse`
+- Local evidence: focused AI/query/API tests **38 passed**; full backend pytest **653 passed**; repo-wide `ruff check app tests` and `mypy app` passed after integration verification
+
+### Progress update (2026-09-03, AI Orchestration — model/tool loop close)
+
+- Owner: AI Orchestration Engineer; consumed existing deterministic `PortfolioService` tool boundary only.
+- Completed provider-agnostic one-turn model/tool orchestration over existing RiskForge tools; no pricing, VaR/ES, stress, market-data, or UI formulas changed.
+- Guardrails: model-selected tools must be known `RiskToolName` values; clarification/refusal responses do not call numerical tools; final numeric answers are grounded only in deterministic `tool_result` payloads.
+- Local evidence: focused `tests/test_ai_query_orchestration.py` **10 passed**; scoped Ruff passed; `mypy app` passed; full backend pytest **659 passed** (1 existing Starlette/httpx warning).
+- Handoff: `docs/agents/HANDOFF_AI_ORCHESTRATION_M11.md`.
 
 ---
 
 ## Workstream 12 — Documentation & Portfolio Presentation
 
-Status: **POSTPONED** (product decision 2026-09-02 — deferred; **do not start** until Lead/user explicitly unblocks). Not COMPLETE. Task list retained for when work resumes.
+Status: **COMPLETE** (2026-09-03 — recruiter docs, architecture, methodology, performance, and limitations package)
 
-Note: published `docs/methodology/multi_factor_reverse_stress.md` ahead of this workstream; still own the broader recruiter methodology / limitations pack when unblocked.
+Note: user explicitly unblocked remaining roadmap work on 2026-09-03. Workstream 12 was completed as documentation-only work; no pricing/risk/API behavior changed.
 
 ### Tasks
 
-- [ ] Recruiter/interviewer README — PARTIAL (current README is MVP-oriented)
-- [ ] Architecture documentation — PARTIAL (agent docs; no system diagrams package)
-- [ ] ADRs under `docs/adr/` — PARTIAL
- - Landed (2026-09-02, evidence-backed only): `001`–`006` plus `007-quantlib-concurrency.md` and `008-api-v1-canonical-and-legacy-sunset.md` - Not written yet (insufficient decided evidence / still open): e.g. RiskRun domain/API lifecycle (+), VaR methodology modes, caching — do not invent ADRs ahead of code
- - Native kernel risk-path wiring documented via env flag + native/README; no separate ADR unless Lead requests
-- [ ] Methodology documentation — NOT STARTED (partial input: multi-factor reverse doc exists; VaR modes pack still open)
- - Must include honest multi-factor reverse-stress assumptions and VaR methodology modes
-- [ ] Performance report — PARTIAL (`BUILD_NOTES.md` caveated microbench)
-- [ ] Known engine / pricing limitations catalog (recruiter-facing)
- - Why: surface bump vs grid , BlackConstantVol , multi-factor reverse — prevent over-claiming completeness
+- [x] Recruiter/interviewer README — DONE (2026-09-03)
+ - `README.md` now frames mission, architecture, deterministic demo path, methodology, performance scope, and limitations.
+- [x] Architecture documentation — DONE (2026-09-03)
+ - Added `docs/architecture.md` with system boundaries, dependency direction, and deterministic tool/pricing/risk ownership.
+- [x] ADRs under `docs/adr/` — DONE (2026-09-03)
+ - Added `docs/adr/README.md` index/status for evidence-backed ADRs; no invented future ADRs.
+- [x] Methodology documentation — DONE (2026-09-03)
+ - Added `docs/methodology/README.md`; cleaned/link-checked `docs/methodology/multi_factor_reverse_stress.md`.
+- [x] Performance report — DONE (2026-09-03)
+ - Added `docs/performance.md`; scoped claims to measured native scenario-kernel evidence and existing build notes.
+- [x] Known engine / pricing limitations catalog — DONE (2026-09-03)
+ - Added `docs/known_limitations.md` to prevent over-claiming surface calibration, QuantLib coverage, reverse-stress optimality, AI, live market data, and Redis/RQ.
+
+### Progress update (2026-09-03, Lead Architect / Documentation — close)
+
+- Owner: Lead Architect / Documentation; docs-only package, no backend/frontend behavior changes.
+- Evidence: `git diff --check` passed for W12 docs, manual local-link verifier checked 9 markdown files, `tests/test_m39_methodology_docs.py` **2 passed**, and `scripts/check_final_demo.py` returned `status: ok`.
+- Handoff: `docs/agents/HANDOFF_WORKSTREAM_12_DOCS.md`.
 
 ---
 

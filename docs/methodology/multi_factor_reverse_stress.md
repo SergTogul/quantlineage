@@ -1,6 +1,10 @@
-# Multi-factor reverse stress — methodology & limitations **Status:** Published for users and interviewers. Implements ROADMAP .
+# Multi-factor reverse stress
+
+Status: Published for users and interviewers.
+
 **Code:** `backend/app/risk/reverse_stress_multi.py` (`MultiFactorReverseStressEngine`)
-**API:** `POST /risk/stress/reverse/multi` (and `/api/v1/...`)
+
+**API:** `POST /risk/stress/reverse/multi` and `POST /api/v1/risk/stress/reverse/multi`
 
 This document states what the solver **does** and what it **is not**. Do not describe the result as a certified global optimum or a complete risk optimizer.
 
@@ -59,4 +63,7 @@ Assumptions echoed on every result payload (`assumptions: string[]`) match the `
 
 ## Related
 
-- Single-factor reverse: `backend/app/risk/reverse_stress.py` - Formal scenario shocks: `backend/app/risk/scenario_model.py` - ROADMAP residual pairing: full methodology pack / limitations catalog tracked under postponed Workstream 12 ; this file closes specifically
+- Single-factor reverse stress: `backend/app/risk/reverse_stress.py`
+- Formal scenario shocks: `backend/app/risk/scenario_model.py`
+- Broader methodology package: [`README.md`](README.md)
+- Known limitations catalog: [`../known_limitations.md`](../known_limitations.md)

@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Literal, Mapping
 
 CurveType = Literal["discount", "projection"]
+BootstrapInstrumentKind = Literal["deposit", "simple", "zero"]
 
 KEY_TENORS: tuple[str, ...] = ("1Y", "2Y", "5Y", "7Y", "10Y", "20Y", "30Y")
 TENOR_YEARS: dict[str, float] = {
@@ -31,11 +32,76 @@ TENOR_YEARS: dict[str, float] = {
 }
 
 
+def tenor_to_years(tenor: str) -> float:
+    """Parse simple tenor strings into Actual/365-style year fractions."""
+    key = tenor.strip().upper()
+    if key in TENOR_YEARS:
+        return TENOR_YEARS[key]
+    if len(key) < 2:
+        raise ValueError(f"unsupported tenor: {tenor!r}")
+    try:
+        amount = float(key[:-1])
+    except ValueError as exc:
+        raise ValueError(f"unsupported tenor: {tenor!r}") from exc
+    unit = key[-1]
+    if unit == "D":
+        years = amount / 365.0
+    elif unit == "W":
+        years = amount * 7.0 / 365.0
+    elif unit == "M":
+        years = amount / 12.0
+    elif unit == "Y":
+        years = amount
+    else:
+        raise ValueError(f"unsupported tenor: {tenor!r}")
+    if years <= 0.0:
+        raise ValueError(f"tenor must be positive: {tenor!r}")
+    return years
+
+
 @dataclass(frozen=True, slots=True)
 class CurveNode:
     tenor: str
     years: float
     zero_rate: float
+
+
+@dataclass(frozen=True, slots=True)
+class CurveBootstrapInstrument:
+    """Minimal deterministic market instrument for curve bootstrapping.
+
+    ``deposit`` / ``simple`` rates are annualized simple rates converted to
+    continuous zero rates via ``df = 1 / (1 + rT)``. ``zero`` rates are already
+    continuous zeros.
+    """
+
+    kind: BootstrapInstrumentKind
+    tenor: str
+    rate: float
+
+    def __post_init__(self) -> None:
+        if self.kind not in {"deposit", "simple", "zero"}:
+            raise ValueError(f"unsupported bootstrap instrument kind: {self.kind!r}")
+        object.__setattr__(self, "tenor", self.tenor.strip().upper())
+        tenor_to_years(self.tenor)
+        object.__setattr__(self, "rate", float(self.rate))
+
+    @property
+    def years(self) -> float:
+        return tenor_to_years(self.tenor)
+
+    def zero_rate(self) -> float:
+        if self.kind == "zero":
+            return float(self.rate)
+        denominator = 1.0 + float(self.rate) * self.years
+        if denominator <= 0.0:
+            raise ValueError(
+                f"simple-rate bootstrap instrument {self.tenor} implies non-positive discount factor"
+            )
+        return math.log(denominator) / self.years
+
+    def to_dict(self) -> dict:
+        return {"kind": self.kind, "tenor": self.tenor, "rate": self.rate}
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,6 +215,85 @@ def build_flat_curve(
     return YieldCurve.from_zero_dict(currency, curve_type, name, zeros)
 
 
+def bootstrap_yield_curve(
+    currency: str,
+    curve_type: CurveType,
+    name: str,
+    instruments: tuple[CurveBootstrapInstrument, ...] | list[CurveBootstrapInstrument],
+) -> YieldCurve:
+    """Build a deterministic zero curve from explicit market instruments.
+
+    This is intentionally a scoped single-curve bootstrap: no calendars,
+    futures convexity, swaps, stubs, turn-of-year effects, or multi-curve
+    calibration. Instruments are sorted by maturity so equal inputs produce
+    byte-stable curve payloads independent of caller order.
+    """
+    if not instruments:
+        raise ValueError("bootstrap requires at least one instrument")
+
+    ordered = tuple(sorted(instruments, key=lambda inst: (inst.years, inst.tenor, inst.kind)))
+    seen: set[str] = set()
+    nodes: list[CurveNode] = []
+    for instrument in ordered:
+        if instrument.tenor in seen:
+            raise ValueError(f"duplicate bootstrap tenor: {instrument.tenor}")
+        seen.add(instrument.tenor)
+        nodes.append(
+            CurveNode(
+                tenor=instrument.tenor,
+                years=instrument.years,
+                zero_rate=instrument.zero_rate(),
+            )
+        )
+    return YieldCurve(currency=currency.upper(), curve_type=curve_type, name=name, nodes=tuple(nodes))
+
+
+def attach_bootstrapped_curve(
+    snapshot,
+    *,
+    currency: str,
+    curve_type: CurveType,
+    name: str,
+    instruments: tuple[CurveBootstrapInstrument, ...] | list[CurveBootstrapInstrument],
+):
+    """Attach a bootstrapped curve payload and scalar/key-rate views to a snapshot."""
+    curve = bootstrap_yield_curve(currency, curve_type, name, instruments)
+    ordered_instruments = tuple(sorted(instruments, key=lambda inst: (inst.years, inst.tenor, inst.kind)))
+    from app.domain.models import _deep_unfreeze
+
+    payload = curve.to_dict()
+    payload["bootstrap"] = {
+        "method": "simple_deposit_zero",
+        "instruments": [inst.to_dict() for inst in ordered_instruments],
+        "limitations": "single-curve deterministic bootstrap; no live data or production multi-curve calibration",
+    }
+
+    ccy = curve.currency
+    curves = _deep_unfreeze(snapshot.curves)
+    curves[curve.name] = payload
+    key_rates = _deep_unfreeze(snapshot.key_rates)
+    if curve.curve_type == "discount":
+        key_rates[ccy] = {node.tenor: node.zero_rate for node in curve.nodes}
+
+    rates = dict(snapshot.rates)
+    projection = dict(snapshot.projection_rates)
+    first_zero = float(curve.nodes[0].zero_rate)
+    if curve.curve_type == "projection":
+        projection[ccy] = first_zero
+    else:
+        rates[ccy] = first_zero
+
+    return snapshot.model_copy(
+        update={
+            "id": f"{snapshot.id}:bootstrapped:{curve.name}",
+            "curves": curves,
+            "key_rates": key_rates,
+            "rates": rates,
+            "projection_rates": projection,
+        }
+    )
+
+
 def build_usd_ois_discount(base_rate: float = 0.04) -> YieldCurve:
     return build_flat_curve("USD", "discount", "USD_OIS", base_rate)
 
@@ -192,12 +337,17 @@ def attach_standard_usd_curves(
 
 
 __all__ = [
+    "BootstrapInstrumentKind",
     "KEY_TENORS",
     "TENOR_YEARS",
+    "CurveBootstrapInstrument",
     "CurveNode",
     "YieldCurve",
+    "attach_bootstrapped_curve",
+    "bootstrap_yield_curve",
     "build_flat_curve",
     "build_usd_ois_discount",
     "build_usd_sofr_projection",
     "attach_standard_usd_curves",
+    "tenor_to_years",
 ]

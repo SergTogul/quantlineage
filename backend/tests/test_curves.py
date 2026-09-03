@@ -9,7 +9,10 @@ import pytest
 from app.market.curves import (
     KEY_TENORS,
     TENOR_YEARS,
+    CurveBootstrapInstrument,
     YieldCurve,
+    attach_bootstrapped_curve,
+    bootstrap_yield_curve,
     build_flat_curve,
     build_usd_ois_discount,
     build_usd_sofr_projection,
@@ -92,3 +95,70 @@ def test_eur_gbp_flat_builders_exist_for_architecture():
     gbp = build_flat_curve("GBP", "discount", "GBP_SONIA", 0.03)
     assert eur.currency == "EUR"
     assert gbp.currency == "GBP"
+
+
+def test_bootstrap_deposit_and_zero_instruments_sort_nodes_and_convert_rates():
+    curve = bootstrap_yield_curve(
+        "USD",
+        "discount",
+        "USD_BOOT",
+        [
+            CurveBootstrapInstrument(kind="zero", tenor="2Y", rate=0.042),
+            CurveBootstrapInstrument(kind="deposit", tenor="6M", rate=0.04),
+            CurveBootstrapInstrument(kind="zero", tenor="1Y", rate=0.041),
+        ],
+    )
+
+    assert tuple(node.tenor for node in curve.nodes) == ("6M", "1Y", "2Y")
+    assert tuple(node.years for node in curve.nodes) == pytest.approx((0.5, 1.0, 2.0))
+    assert curve.zero(0.5) == pytest.approx(math.log(1.0 + 0.04 * 0.5) / 0.5)
+    assert curve.zero(1.0) == pytest.approx(0.041)
+    assert curve.zero(2.0) == pytest.approx(0.042)
+
+
+def test_bootstrap_rejects_duplicate_tenors_and_non_positive_maturities():
+    with pytest.raises(ValueError, match="duplicate"):
+        bootstrap_yield_curve(
+            "USD",
+            "discount",
+            "USD_BOOT",
+            [
+                CurveBootstrapInstrument(kind="deposit", tenor="1Y", rate=0.04),
+                CurveBootstrapInstrument(kind="zero", tenor="1Y", rate=0.041),
+            ],
+        )
+
+    with pytest.raises(ValueError, match="tenor"):
+        CurveBootstrapInstrument(kind="deposit", tenor="0D", rate=0.04)
+
+
+def test_attach_bootstrapped_curve_is_deterministic_and_updates_key_rates():
+    from app.domain.models import MarketSnapshot
+
+    instruments_a = [
+        CurveBootstrapInstrument(kind="zero", tenor="2Y", rate=0.042),
+        CurveBootstrapInstrument(kind="deposit", tenor="6M", rate=0.04),
+        CurveBootstrapInstrument(kind="zero", tenor="1Y", rate=0.041),
+    ]
+    instruments_b = tuple(reversed(instruments_a))
+
+    snap_a = attach_bootstrapped_curve(
+        MarketSnapshot(id="a", rates={"USD": 0.01}),
+        currency="USD",
+        curve_type="discount",
+        name="USD_BOOT",
+        instruments=instruments_a,
+    )
+    snap_b = attach_bootstrapped_curve(
+        MarketSnapshot(id="b", rates={"USD": 0.99}),
+        currency="USD",
+        curve_type="discount",
+        name="USD_BOOT",
+        instruments=instruments_b,
+    )
+
+    assert snap_a.content_hash() == snap_b.content_hash()
+    assert "USD_BOOT" in snap_a.curves
+    assert snap_a.curves["USD_BOOT"]["bootstrap"]["instruments"][0]["tenor"] == "6M"
+    assert snap_a.key_rates["USD"]["6M"] == pytest.approx(snap_a.curves["USD_BOOT"]["zeros"]["6M"])
+    assert snap_a.rates["USD"] == pytest.approx(snap_a.curves["USD_BOOT"]["zeros"]["6M"])
