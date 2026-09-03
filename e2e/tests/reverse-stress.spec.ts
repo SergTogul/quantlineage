@@ -5,11 +5,10 @@ test.describe('Reverse Stress', () => {
     await page.goto('/#stress')
     await expect(page.getByRole('heading', { name: 'Global Macro Demo' })).toBeVisible()
 
-    // exact: avoid matching "Multi-Factor Reverse Stress"
-    const card = page.locator('.card', {
-      has: page.getByRole('heading', { name: 'Reverse Stress', exact: true }),
-    })
+    // testid: multi-factor card title also contains "Reverse Stress"
+    const card = page.getByTestId('reverse-stress')
     await expect(card).toBeVisible()
+    await expect(card.getByRole('heading', { name: 'Reverse Stress', exact: true })).toBeVisible()
 
     await card.locator('select').selectOption('equity')
     await card.locator('input[type="number"]').fill('5')

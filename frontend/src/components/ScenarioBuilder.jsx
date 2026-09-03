@@ -132,7 +132,7 @@ export function ReverseStress({ portfolio }) {
   const [target, setTarget] = useState(5)
   const [result, setResult] = useState(null)
   return (
-    <div className="card">
+    <div className="card" data-testid="reverse-stress">
       <h3>Reverse Stress</h3>
       <div className="inline-form">
         <select value={factor} onChange={(e) => setFactor(e.target.value)}>

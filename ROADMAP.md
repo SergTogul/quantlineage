@@ -62,7 +62,7 @@ Trade (domain/models.py)
 3. M6 native kernel wired for LINEAR/DELTA_GAMMA via `RISKFORGE_SCENARIO_KERNEL` (M6.3–M6.7 DONE incl. parity + QL concurrency ADR); FULL_REVALUATION stays Python; **no product risk-path speed SLA claimed**
 4. M7 **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); **M3.8 formal Scenario HTTP wire DONE** (legacy StressScenario endpoints retained)
 5. M8 **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
-6. M9 **COMPLETE** (2026-09-02): M9.1–M9.10; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / M5.7)
+6. M9 **COMPLETE** (2026-09-02): M9.1–M9.10; compose containers DONE; Redis/RQ explicitly **deferred** (Postgres `SKIP LOCKED` claim path — ADR 005 / M5.7). **M9.11:** transient GHA `e2e-playwright` failure on multi-factor reverse UI land must stay fixed (testid + exact heading) — see M9.11 below
 7. Multi-factor reverse stress = ray + coordinate descent (documented; not a certified global optimum); M3.9 methodology docs still open
 
 ### Suite verification (2026-09-02, Lead Architect — local macOS)
@@ -761,6 +761,14 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.
   - CI close: push SHA `a61c29a` — run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 ; job `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 (also fixed Frontend `8409b7e` regression: single-factor heading strict-mode collision)
   - Prior M9.2 gate: https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499)
   - Prior note: Milestone 9 stayed PARTIAL until Lead Architect M9.8 disposition (below).
+
+- [x] M9.11 CI failure triage (e2e-playwright reverse-stress heading collision) — **DONE** (2026-09-02 DevOps/QA)
+  - **Do not hide:** GHA run **failure** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700340552 (SHA `8409b7e`, “Add multi-factor reverse-stress UI”) — job **`e2e-playwright` failed**; siblings green (`backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`).
+  - Root cause: single-factor locator `.card` + heading `Reverse Stress` also matched **Multi-Factor Reverse Stress** card (`strict mode violation` → 2 elements).
+  - Fix (already on master via M9.10 close, hardened here): `exact: true` heading match + durable `data-testid="reverse-stress"` on single-factor card; multi keeps `data-testid="reverse-stress-multi"`.
+  - Older historical failure (M9.7 land): https://github.com/SergTogul/riskforge-mvp/actions/runs/33680821074 (`backend-pytest` + `lint-static-analysis`) — subsequently fixed; not reopened.
+  - Local evidence (this triage): backend `pytest -q` **571 passed** (QuantLib); frontend `npm test` **61+9 passed**; `ruff`/`mypy`/`eslint` OK; native kernel compile OK.
+  - HEAD at triage start: SHA `f74b528` — full CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33701266538 (all five jobs green). Follow-up push records testid hardening + this ROADMAP item.
 
 ### Progress update (2026-09-02, Lead Architect — M9.8 disposition + Milestone 9 COMPLETE)
 
