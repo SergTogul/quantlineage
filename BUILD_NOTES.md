@@ -121,6 +121,15 @@ export RISKFORGE_API_TOKEN='replace-me'
 # curl -H "Authorization: Bearer $RISKFORGE_API_TOKEN" http://127.0.0.1:8000/api/v1/portfolio
 ```
 
+## Interactive vs heavy endpoints (R0.10.1)
+
+Classification contract only (`backend/app/api/execution_class.py`). No job platform, no numerical-method change, no extra auth.
+
+- **Interactive:** completed-run `GET /risk/runs/{run_id}`, lightweight `POST /risk/summary` (default LINEAR / DELTA_GAMMA), small `POST /risk/factors` and `POST /risk/limits/drilldown`, health / portfolio catalog, scenario-definition GETs, `POST /market/snapshot`.
+- **Heavy (not interactive-only):** FULL_REVALUATION-bearing compute (`POST /risk/var`, `/es`, `/var/compare`), `POST /risk/hierarchy`, `POST /risk/stress/reverse/multi`, `POST /risk/what-if`, large scenario eval (`/stress/evaluate` and custom/formal variants), contribution (`/contributors`, `/change-attribution`, `/es`). Other synchronous compute POSTs (stress, attribution, limits, query, `POST /risk/runs` enqueue) are also HEAVY in the map.
+- `methodology=FULL_REVALUATION` upgrades methodology-bearing routes (including summary) to HEAVY.
+- Dual-mount `/api/v1` shares the same class. This map does not enqueue or reject requests; R0.10.2/R0.10.3 own batching and backpressure.
+
 ## Performance reporting
 
 The current performance report is intentionally scoped:
