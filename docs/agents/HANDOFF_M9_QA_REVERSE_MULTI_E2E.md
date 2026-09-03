@@ -49,7 +49,7 @@ cd e2e && npm test
 ## Known limitations / risks
 - Multi-factor solve may return **Not converged** (e.g. target unreachable within max shock); E2E accepts Converged|Not converged structurally.
 - Local macOS uses Chrome channel; GHA `e2e-playwright` uses Chromium when `CI=true` — config unchanged.
-- Post-push: SHA `ca50a28` on `origin/master`. Prior e2e-playwright green remains https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857; confirm this commit's job if CI still running.
+- Post-push: SHA `a61c29a` on `origin/master`. GHA **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 ; `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 (clears `8409b7e` heading collision).
 
 ## Follow-up / next owner
 - Owner: Lead Architect / Orchestrator
