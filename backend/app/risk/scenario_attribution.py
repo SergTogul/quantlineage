@@ -25,6 +25,7 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
+from app.risk.historical import require_explicit_market
 from app.risk.scenario_model import (
     FactorShock,
     Scenario,
@@ -182,13 +183,16 @@ class ScenarioAttributionEngine:
     ) -> ScenarioContributionBreakdown:
         """Attribute one scenario's stress P&L across hierarchy and factors.
 
+        ``market`` must be an explicit ``MarketSnapshot``. Omitted or ``None``
+        raises the same ``ValueError`` as VaR / hierarchy (no demo inference).
+
         Parameters
         ----------
         by_trade_pnl:
             Optional precomputed position P&L under the full scenario (avoids
             a second full revaluation when called from ``StressEngine.evaluate``).
         """
-        base_market = market if market is not None else self.market_data.snapshot(portfolio)
+        base_market = require_explicit_market(market)
         formal = _to_formal(scenario, base_market)
         stress = _to_stress(scenario, base_market)
         scenario_id = formal.id

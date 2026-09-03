@@ -17,6 +17,7 @@ from app.risk.hierarchy import HierarchyEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.reverse_stress import ReverseStressEngine
 from app.risk.reverse_stress_multi import MultiFactorReverseStressEngine
+from app.risk.scenario_attribution import ScenarioAttributionEngine
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.risk.var import VaRAnalytics
 from app.sample import demo_market_snapshot
@@ -140,6 +141,24 @@ def test_reverse_stress_multi_solve_omitted_market_raises() -> None:
         REVERSE_MULTI.solve(BOOK, PRICING, 0.01, factors=["equity"])
 
 
+def test_scenario_attribution_decompose_omitted_market_raises() -> None:
+    with pytest.raises(ValueError, match="explicit MarketSnapshot"):
+        ScenarioAttributionEngine().decompose(BOOK, PRICING, DEFAULT_SCENARIOS[0])
+
+
+def test_scenario_attribution_decompose_market_none_raises() -> None:
+    with pytest.raises(ValueError, match="explicit MarketSnapshot"):
+        ScenarioAttributionEngine().decompose(
+            BOOK, PRICING, DEFAULT_SCENARIOS[0], market=None
+        )
+
+
+def test_scenario_attribution_decompose_empty_book_omitted_market_raises() -> None:
+    empty = Portfolio(id="empty", name="Empty", positions=[])
+    with pytest.raises(ValueError, match="explicit MarketSnapshot"):
+        ScenarioAttributionEngine().decompose(empty, PRICING, DEFAULT_SCENARIOS[0])
+
+
 def test_hierarchy_stress_reverse_explicit_market_still_values() -> None:
     market = demo_market_snapshot(BOOK)
     root = HIERARCHY.build(BOOK, PRICING, market=market)
@@ -154,3 +173,7 @@ def test_hierarchy_stress_reverse_explicit_market_still_values() -> None:
     assert solved.base_market_value == pytest.approx(1.0)
     multi = REVERSE_MULTI.solve(BOOK, PRICING, 0.01, factors=["equity"], market=market)
     assert multi.base_market_value == pytest.approx(1.0)
+    breakdown = ScenarioAttributionEngine().decompose(
+        BOOK, PRICING, DEFAULT_SCENARIOS[0], market=market
+    )
+    assert breakdown.scenario_id == DEFAULT_SCENARIOS[0].id

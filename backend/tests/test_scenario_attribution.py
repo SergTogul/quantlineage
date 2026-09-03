@@ -133,7 +133,9 @@ def test_trade_book_desk_strategy_portfolio_reconcile():
         kind=ScenarioKind.FACTOR,
         equity_shock=-0.10,
     )
-    report = ScenarioAttributionEngine().decompose(book, pricing, scenario)
+    report = ScenarioAttributionEngine().decompose(
+        book, pricing, scenario, market=demo_market_snapshot(book)
+    )
 
     assert math.isclose(report.portfolio_pnl, sum(c.pnl for c in report.by_trade), abs_tol=1e-9)
     _assert_reconciles(report.by_trade, report.portfolio_pnl)
@@ -167,7 +169,9 @@ def test_multi_desk_strategy_placement_attribution():
         kind=ScenarioKind.FACTOR,
         equity_shock=-0.10,
     )
-    report = ScenarioAttributionEngine().decompose(book, pricing, scenario)
+    report = ScenarioAttributionEngine().decompose(
+        book, pricing, scenario, market=demo_market_snapshot(book)
+    )
 
     assert {c.key for c in report.by_desk} == {"Rates Desk", "Equity Desk", "Default Desk"}
     assert {c.key for c in report.by_strategy} == {"Carry", "Momentum", "Default Strat"}
@@ -198,7 +202,9 @@ def test_risk_factor_contributions_reconcile_with_interaction():
         vol_shock=0.40,
         rates_shift_bps=100,
     )
-    report = ScenarioAttributionEngine().decompose(SAMPLE_PORTFOLIO, pricing, scenario)
+    report = ScenarioAttributionEngine().decompose(
+        SAMPLE_PORTFOLIO, pricing, scenario, market=SAMPLE_MARKET
+    )
 
     assert report.by_risk_factor
     keys = {c.key for c in report.by_risk_factor}
@@ -222,7 +228,9 @@ def test_formal_scenario_decomposition():
         ),
         threshold=ScenarioThreshold(max_loss_pct=0.10),
     )
-    report = ScenarioAttributionEngine().decompose(SAMPLE_PORTFOLIO, pricing, formal)
+    report = ScenarioAttributionEngine().decompose(
+        SAMPLE_PORTFOLIO, pricing, formal, market=SAMPLE_MARKET
+    )
     assert report.scenario_id == "typed_eq_vol"
     _assert_reconciles(report.by_trade, report.portfolio_pnl)
     _assert_reconciles(report.by_risk_factor, report.portfolio_pnl)
@@ -236,7 +244,9 @@ def test_formal_scenario_decomposition():
 def test_empty_scenario_zero_pnl():
     pricing = BuiltinPricingEngine()
     zero = StressScenario(id="flat", name="Flat", kind=ScenarioKind.FACTOR)
-    report = ScenarioAttributionEngine().decompose(SAMPLE_PORTFOLIO, pricing, zero)
+    report = ScenarioAttributionEngine().decompose(
+        SAMPLE_PORTFOLIO, pricing, zero, market=SAMPLE_MARKET
+    )
     assert report.portfolio_pnl == 0.0
     assert all(c.pnl == 0.0 for c in report.by_trade)
     assert report.by_risk_factor == []
@@ -247,7 +257,9 @@ def test_empty_portfolio_yields_empty_contributions():
     pricing = BuiltinPricingEngine()
     empty = Portfolio(id="empty", name="Empty", positions=[])
     scenario = StressScenario(id="eq", name="Eq", equity_shock=-0.1)
-    report = ScenarioAttributionEngine().decompose(empty, pricing, scenario)
+    report = ScenarioAttributionEngine().decompose(
+        empty, pricing, scenario, market=demo_market_snapshot(empty)
+    )
     assert report.portfolio_pnl == 0.0
     assert report.by_trade == []
     assert report.by_book == []
@@ -285,7 +297,9 @@ def test_single_factor_interaction_near_zero():
             EquityPosition(type="equity", id="eq1", symbol="SPY", quantity=10, price=100.0),
         ],
     )
-    report = ScenarioAttributionEngine().decompose(book, pricing, scenario)
+    report = ScenarioAttributionEngine().decompose(
+        book, pricing, scenario, market=demo_market_snapshot(book)
+    )
     interaction = next(c for c in report.by_risk_factor if c.key == "interaction")
     assert abs(interaction.pnl) < 1e-9
     _assert_reconciles(report.by_risk_factor, report.portfolio_pnl)
@@ -294,6 +308,10 @@ def test_single_factor_interaction_near_zero():
 def test_deterministic_decomposition():
     pricing = BuiltinPricingEngine()
     scenario = DEFAULT_SCENARIOS[3]  # eq_down_vol_up
-    a = ScenarioAttributionEngine().decompose(SAMPLE_PORTFOLIO, pricing, scenario)
-    b = ScenarioAttributionEngine().decompose(SAMPLE_PORTFOLIO, pricing, scenario)
+    a = ScenarioAttributionEngine().decompose(
+        SAMPLE_PORTFOLIO, pricing, scenario, market=SAMPLE_MARKET
+    )
+    b = ScenarioAttributionEngine().decompose(
+        SAMPLE_PORTFOLIO, pricing, scenario, market=SAMPLE_MARKET
+    )
     assert a.model_dump() == b.model_dump()
