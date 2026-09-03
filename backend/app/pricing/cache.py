@@ -1,7 +1,7 @@
 """Valuation cache wrapping any ``PricingEngine`` without leaking QuantLib.
 
 Cache keys bind:
-- contractual trade economics (equity-family projection; legacy payload elsewhere),
+- contractual trade economics (family terms projection; unknown families fail closed),
 - required market snapshot content hash,
 - parseable snapshot ``as_of`` (ISO ``YYYY-MM-DD`` or ``date``; labels omitted),
 - pricing configuration (engine identity + evaluation date + extras).
@@ -22,11 +22,18 @@ from datetime import date
 from typing import Any
 
 from app.domain.models import (
+    BondPosition,
+    CapFloorPosition,
     EquityFuturePosition,
     EquityPosition,
     EuropeanOptionPosition,
+    FXForwardPosition,
+    FXOptionPosition,
+    InterestRateFuturePosition,
     MarketSnapshot,
     Position,
+    SwapPosition,
+    SwaptionPosition,
     Valuation,
 )
 from app.interfaces.pricing import PricingEngine
@@ -82,7 +89,7 @@ class PricingConfiguration:
 
 
 def trade_cache_key(position: Position) -> str:
-    """Versioned economics hash; equity-family observable marks are excluded."""
+    """Versioned economics hash; snapshot marks and derived duration are excluded."""
     payload = position.model_dump(mode="json")
     if isinstance(position, EquityPosition):
         observable_fields = {"price"}
@@ -98,9 +105,31 @@ def trade_cache_key(position: Position) -> str:
             "dividend_yield",
         }
         schema = "equity_option_terms_v1"
+    elif isinstance(position, BondPosition):
+        observable_fields = {"yield_rate", "duration"}
+        schema = "bond_terms_v1"
+    elif isinstance(position, SwapPosition):
+        observable_fields = {"market_swap_rate", "duration"}
+        schema = "swap_terms_v1"
+    elif isinstance(position, FXForwardPosition):
+        observable_fields = {"spot", "domestic_rate", "foreign_rate"}
+        schema = "fx_forward_terms_v1"
+    elif isinstance(position, FXOptionPosition):
+        observable_fields = {"spot", "volatility", "domestic_rate", "foreign_rate"}
+        schema = "fx_option_terms_v1"
+    elif isinstance(position, InterestRateFuturePosition):
+        observable_fields = {"quoted_rate", "forward_rate"}
+        schema = "ir_future_terms_v1"
+    elif isinstance(position, CapFloorPosition):
+        observable_fields = {"volatility", "forward_rate", "discount_rate"}
+        schema = "cap_floor_terms_v1"
+    elif isinstance(position, SwaptionPosition):
+        observable_fields = {"volatility", "forward_swap_rate", "discount_rate"}
+        schema = "swaption_terms_v1"
     else:
-        observable_fields = set()
-        schema = "legacy_position_v1"
+        raise TypeError(
+            f"trade_cache_key has no terms projection for {type(position).__name__}"
+        )
     economics = {
         key: value for key, value in payload.items() if key not in observable_fields
     }
