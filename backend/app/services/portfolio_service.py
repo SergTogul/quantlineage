@@ -85,20 +85,38 @@ class PortfolioService:
         self.reverse_stress_engine = ReverseStressEngine()
         self.multi_reverse_stress_engine = MultiFactorReverseStressEngine()
         self.limit_engine = LimitEngine()
-        self.var_engine = VaRAnalytics()
+        # Share historical factor source with HistoricalRiskEngine when injected (M10.2).
+        shared_dataset = risk.dataset if isinstance(risk, HistoricalRiskEngine) else None
+        hist_kwargs: dict = {}
+        if shared_dataset is not None:
+            hist_kwargs = {
+                "seed": risk.seed,
+                "observations": risk.observations,
+                "dataset": shared_dataset,
+            }
+        self.var_engine = VaRAnalytics(**hist_kwargs) if hist_kwargs else VaRAnalytics()
         self.limit_drilldown_engine = LimitDrilldownEngine(
             risk, limit_engine=self.limit_engine, var_engine=self.var_engine
         )
         self.factor_engine = RiskFactorEngine(self.market_data)
+        hist_risk = (
+            risk
+            if isinstance(risk, HistoricalRiskEngine)
+            else HistoricalRiskEngine(**hist_kwargs)
+            if hist_kwargs
+            else HistoricalRiskEngine()
+        )
         self.scenario_comparison_engine = ScenarioComparisonEngine(
-            risk_engine=risk if isinstance(risk, HistoricalRiskEngine) else HistoricalRiskEngine(),
+            risk_engine=hist_risk,
             factor_engine=self.factor_engine,
         )
-        self.es_engine = ESContributionAnalytics()
+        self.es_engine = (
+            ESContributionAnalytics(**hist_kwargs) if hist_kwargs else ESContributionAnalytics()
+        )
         self.hierarchy_engine = HierarchyEngine(risk)
         self.attribution_engine = AttributionEngine(self.market_data)
         self.risk_change_engine = RiskChangeAttributionEngine(
-            risk_engine=risk if isinstance(risk, HistoricalRiskEngine) else HistoricalRiskEngine(),
+            risk_engine=hist_risk,
             market_data=self.market_data,
         )
         self.query_engine = RiskQueryEngine()
