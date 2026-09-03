@@ -85,3 +85,33 @@ def required_fx_option_vol(
         return market.fx_vols[name]
     except KeyError:
         raise MissingMarketDataError(f"fx_vols[{name}]") from None
+
+
+def required_ir_option_vol(
+    market,
+    *,
+    name: str,
+    maturity_years: float,
+    strike: float,
+    forward: float,
+) -> float:
+    """Surface vol if usable; else ``ir_vols[name]``; else ``MissingMarketDataError``.
+
+    Does not fall back to a trade-local mark. Callers keep ``position.volatility``
+    only when ``market is None``.
+    """
+    surfaces = getattr(market, "vol_surfaces", None) or {}
+    raw = surfaces.get(name)
+    if raw is not None and forward > 0:
+        return option_vol_from_snapshot(
+            market,
+            name=name,
+            maturity_years=maturity_years,
+            strike=strike,
+            spot=forward,
+            fallback=0.0,
+        )
+    try:
+        return market.ir_vols[name]
+    except KeyError:
+        raise MissingMarketDataError(f"ir_vols[{name}]") from None

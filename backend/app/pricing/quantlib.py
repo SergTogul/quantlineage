@@ -24,8 +24,18 @@ from app.domain.models import (
 from app.interfaces.pricing import PricingEngine
 from app.market.demo_snapshot import MissingMarketDataError
 from app.market.vol_surfaces import vol_surface_from_dict
-from app.pricing.curve_rates import continuous_zero, has_curve_or_key_rates, select_yield_curve
-from app.pricing.surface_vol import required_equity_option_vol, required_fx_option_vol
+from app.pricing.curve_rates import (
+    continuous_zero,
+    has_curve_or_key_rates,
+    required_continuous_zero,
+    required_ir_future_quote,
+    select_yield_curve,
+)
+from app.pricing.surface_vol import (
+    required_equity_option_vol,
+    required_fx_option_vol,
+    required_ir_option_vol,
+)
 
 try:
     import QuantLib as ql
@@ -188,57 +198,69 @@ class QuantLibPricingEngine(PricingEngine):
                     "dividend_yield": _required_dividend_yield(market, position.symbol),
                 }
             elif isinstance(position, BondPosition):
-                updates["yield_rate"] = continuous_zero(
+                updates["yield_rate"] = required_continuous_zero(
                     market,
                     position.currency,
                     position.maturity_years,
-                    fallback=position.yield_rate,
                 )
             elif isinstance(position, SwapPosition):
-                updates["market_swap_rate"] = continuous_zero(
+                updates["market_swap_rate"] = required_continuous_zero(
                     market,
                     position.currency,
                     position.maturity_years,
-                    fallback=position.market_swap_rate,
                 )
             elif isinstance(position, InterestRateFuturePosition):
-                updates["forward_rate"] = continuous_zero(
+                updates = {
+                    "forward_rate": required_continuous_zero(
+                        market,
+                        position.currency,
+                        position.maturity_years,
+                        prefer_projection=True,
+                    ),
+                    "quoted_rate": required_ir_future_quote(market, position.currency),
+                }
+            elif isinstance(position, CapFloorPosition):
+                forward = required_continuous_zero(
                     market,
                     position.currency,
                     position.maturity_years,
-                    fallback=position.forward_rate,
                     prefer_projection=True,
                 )
-            elif isinstance(position, CapFloorPosition):
                 updates = {
-                    "forward_rate": continuous_zero(
+                    "forward_rate": forward,
+                    "discount_rate": required_continuous_zero(
                         market,
                         position.currency,
                         position.maturity_years,
-                        fallback=position.forward_rate,
-                        prefer_projection=True,
                     ),
-                    "discount_rate": continuous_zero(
+                    "volatility": required_ir_option_vol(
                         market,
-                        position.currency,
-                        position.maturity_years,
-                        fallback=position.discount_rate,
+                        name=position.currency,
+                        maturity_years=position.maturity_years,
+                        strike=position.strike,
+                        forward=forward,
                     ),
                 }
             elif isinstance(position, SwaptionPosition):
+                forward = required_continuous_zero(
+                    market,
+                    position.currency,
+                    position.option_maturity_years,
+                    prefer_projection=True,
+                )
                 updates = {
-                    "forward_swap_rate": continuous_zero(
-                        market,
-                        position.currency,
-                        position.option_maturity_years,
-                        fallback=position.forward_swap_rate,
-                        prefer_projection=True,
-                    ),
-                    "discount_rate": continuous_zero(
+                    "forward_swap_rate": forward,
+                    "discount_rate": required_continuous_zero(
                         market,
                         position.currency,
                         position.option_maturity_years + position.swap_tenor_years,
-                        fallback=position.discount_rate,
+                    ),
+                    "volatility": required_ir_option_vol(
+                        market,
+                        name=position.currency,
+                        maturity_years=position.option_maturity_years,
+                        strike=position.strike,
+                        forward=forward,
                     ),
                 }
             elif isinstance(position, FXForwardPosition):

@@ -176,14 +176,19 @@ def test_builtin_cap_floor_rate_and_vol_monotonicity():
     cap = _cap(forward_rate=0.04)
     floor = _cap(id="usd-floor", option_type="floor", forward_rate=0.04)
 
-    higher_rate_market = MarketSnapshot(rates={"USD": 0.045}, projection_rates={"USD": 0.045})
-    higher_vol_market = MarketSnapshot(rates={"USD": 0.04}, projection_rates={"USD": 0.04})
+    higher_rate_market = MarketSnapshot(
+        rates={"USD": 0.045}, projection_rates={"USD": 0.045}, ir_vols={"USD": 0.20}
+    )
+    base_vol_market = MarketSnapshot(
+        rates={"USD": 0.04}, projection_rates={"USD": 0.04}, ir_vols={"USD": 0.20}
+    )
+    higher_vol_market = MarketSnapshot(
+        rates={"USD": 0.04}, projection_rates={"USD": 0.04}, ir_vols={"USD": 0.25}
+    )
 
     assert engine.value(cap, higher_rate_market).market_value > engine.value(cap).market_value
     assert engine.value(floor, higher_rate_market).market_value < engine.value(floor).market_value
-    assert engine.value(cap.model_copy(update={"volatility": 0.25}), higher_vol_market).market_value > (
-        engine.value(cap, higher_vol_market).market_value
-    )
+    assert engine.value(cap, higher_vol_market).market_value > engine.value(cap, base_vol_market).market_value
 
 
 def test_builtin_swaption_rate_and_vol_monotonicity():
@@ -191,20 +196,25 @@ def test_builtin_swaption_rate_and_vol_monotonicity():
     payer = _swaption(forward_swap_rate=0.04)
     receiver = _swaption(id="usd-receiver-swaption", option_type="receiver", forward_swap_rate=0.04)
 
-    higher_rate_market = MarketSnapshot(rates={"USD": 0.04}, projection_rates={"USD": 0.045})
-    higher_vol_market = MarketSnapshot(rates={"USD": 0.04}, projection_rates={"USD": 0.04})
+    higher_rate_market = MarketSnapshot(
+        rates={"USD": 0.04}, projection_rates={"USD": 0.045}, ir_vols={"USD": 0.20}
+    )
+    base_vol_market = MarketSnapshot(
+        rates={"USD": 0.04}, projection_rates={"USD": 0.04}, ir_vols={"USD": 0.20}
+    )
+    higher_vol_market = MarketSnapshot(
+        rates={"USD": 0.04}, projection_rates={"USD": 0.04}, ir_vols={"USD": 0.25}
+    )
 
     assert engine.value(payer, higher_rate_market).market_value > engine.value(payer).market_value
     assert engine.value(receiver, higher_rate_market).market_value < engine.value(receiver).market_value
-    assert engine.value(
-        payer.model_copy(update={"volatility": 0.25}), higher_vol_market
-    ).market_value > engine.value(payer, higher_vol_market).market_value
+    assert engine.value(payer, higher_vol_market).market_value > engine.value(payer, base_vol_market).market_value
 
 
 def test_builtin_cap_floor_respects_snapshot_rate_inputs():
     engine = BuiltinPricingEngine()
     cap = _cap(forward_rate=0.04, discount_rate=0.03)
-    market = MarketSnapshot(rates={"USD": 0.03}, projection_rates={"USD": 0.05})
+    market = MarketSnapshot(rates={"USD": 0.03}, projection_rates={"USD": 0.05}, ir_vols={"USD": 0.20})
 
     base = engine.value(cap).market_value
     shocked = engine.value(cap, market).market_value
@@ -215,7 +225,7 @@ def test_builtin_cap_floor_respects_snapshot_rate_inputs():
 def test_builtin_swaption_respects_snapshot_rate_inputs():
     engine = BuiltinPricingEngine()
     payer = _swaption(forward_swap_rate=0.04, discount_rate=0.03)
-    market = MarketSnapshot(rates={"USD": 0.03}, projection_rates={"USD": 0.05})
+    market = MarketSnapshot(rates={"USD": 0.03}, projection_rates={"USD": 0.05}, ir_vols={"USD": 0.20})
 
     base = engine.value(payer).market_value
     shocked = engine.value(payer, market).market_value
@@ -231,6 +241,7 @@ def test_position_market_snapshot_preserves_cap_floor_forward_and_discount_marks
 
     assert market.rates["USD"] == pytest.approx(0.03)
     assert market.projection_rates["USD"] == pytest.approx(0.05)
+    assert market.ir_vols["USD"] == pytest.approx(0.20)
 
 
 def test_position_market_snapshot_preserves_swaption_forward_and_discount_marks():
@@ -241,3 +252,4 @@ def test_position_market_snapshot_preserves_swaption_forward_and_discount_marks(
 
     assert market.rates["USD"] == pytest.approx(0.03)
     assert market.projection_rates["USD"] == pytest.approx(0.05)
+    assert market.ir_vols["USD"] == pytest.approx(0.20)
