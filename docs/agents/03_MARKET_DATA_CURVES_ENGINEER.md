@@ -23,14 +23,14 @@ Make market state a first-class, immutable, reproducible input to every valuatio
 
 ```text
 MarketSnapshot
-  EquityMarket
-  RateMarket
-    DiscountCurve
-    ProjectionCurve
-  VolMarket
-    EquityVolSurface
-    FxVolSurface
-  FxMarket
+ EquityMarket
+ RateMarket
+ DiscountCurve
+ ProjectionCurve
+ VolMarket
+ EquityVolSurface
+ FxVolSurface
+ FxMarket
 ```
 
 ## Core APIs

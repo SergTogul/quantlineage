@@ -12,7 +12,7 @@ Critical-path UI tests against a live FastAPI backend (`builtin` pricing) and Vi
 ```bash
 cd e2e
 npm install
-npm run install:browsers   # Google Chrome channel (needed on macOS 13+)
+npm run install:browsers # Google Chrome channel (needed on macOS 13+)
 npm test
 ```
 

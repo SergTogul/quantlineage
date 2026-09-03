@@ -10,7 +10,7 @@ Backend/API + QA (DevOps for push/watch)
 - CI run: https://github.com/SergTogul/riskforge-mvp/actions/runs/33708507094
 - Job: `backend-pytest` / Run pytest
 - Test: `tests/test_demo_scripts.py::test_committed_artifact_matches_rebuild`
-- Cause: exact JSON equality between committed `data/demo_risk_artifact.json` (macOS rebuild after M1.12) and Linux GHA rebuild differed by ~1e-11–1e-14 ULP on stress PnLs (e.g. `4861.095921907545` vs `4861.095921907533`). Other jobs (lint, frontend, e2e, postgres) were green.
+- Cause: exact JSON equality between committed `data/demo_risk_artifact.json` (macOS rebuild after ) and Linux GHA rebuild differed by ~1e-11–1e-14 ULP on stress PnLs (e.g. `4861.095921907545` vs `4861.095921907533`). Other jobs (lint, frontend, e2e, postgres) were green.
 
 ## Fix
 Round floats to 8 decimal places in `dumps_demo_artifact` via `_stabilize_floats` so golden dumps are cross-platform stable; regenerate committed artifact; add ULP-pair regression test.
@@ -31,12 +31,12 @@ Round floats to 8 decimal places in `dumps_demo_artifact` via `_stabilize_floats
 
 ## Commands executed
 ```bash
-gh run list -L 5   # worked after sibling re-auth
+gh run list -L 5 # worked after sibling re-auth
 gh run view 33708507094 --log-failed
 
 cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_PRICING_CACHE=0 \
-  RISKFORGE_CURVE_CACHE=0 RISKFORGE_SCENARIO_CACHE=0 RISKFORGE_SCENARIO_KERNEL=python \
-  .venv/bin/python -m app.demo.run_demo_risk --check -o ../data/demo_risk_artifact.json
+ RISKFORGE_CURVE_CACHE=0 RISKFORGE_SCENARIO_CACHE=0 RISKFORGE_SCENARIO_KERNEL=python \
+ .venv/bin/python -m app.demo.run_demo_risk --check -o ../data/demo_risk_artifact.json
 
 cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line
 cd backend && .venv/bin/ruff check app tests && .venv/bin/mypy app

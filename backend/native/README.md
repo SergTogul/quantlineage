@@ -1,17 +1,17 @@
 # Native scenario kernel
 
-Build the optional shared library (C++20; `-pthread` for the M6.4 stdlib thread
+Build the optional shared library (C++20; `-pthread` for the stdlib thread
 pool; **`-I include` is required** — the header lives under `native/include/`):
 
 ```bash
 g++ -std=c++20 -O3 -shared -fPIC -pthread -I include \
-  src/risk_kernel_capi.cpp -o libriskkernel.so
+ src/risk_kernel_capi.cpp -o libriskkernel.so
 # macOS: prefer -o libriskkernel.dylib
 ```
 
 `app.compute.kernel.NativeScenarioKernel` loads it with Python `ctypes`; no pybind11 dependency is required.
 
-## Parallel strategy (M6.4) — one approach only
+## Parallel strategy — one approach only
 
 **Choice: C++20 standard-library thread pool over contiguous shock partitions.**
 
@@ -29,9 +29,9 @@ Thread count:
 
 | Env / API | Effect |
 |---|---|
-| `RISKFORGE_KERNEL_THREADS=1` | Serial nested loops (parity / M6.2 baseline) |
+| `RISKFORGE_KERNEL_THREADS=1` | Serial nested loops (parity / baseline) |
 | `RISKFORGE_KERNEL_THREADS=N` (`N>1`) | Up to `N` workers (capped by `n_shocks`) |
-| unset | `std::thread::hardware_concurrency()` (min 1) |
+| unset | `std::thread::hardware_concurrency` (min 1) |
 | C++ CLI `--threads T` | Same resolution (`0` = auto via env/hw) |
 
 Inner exposure reduction order for each shock matches the serial loop → numerical
@@ -41,9 +41,7 @@ parity with single-thread (see `tests/kernel_test.cpp`,
 **Do not add OpenMP or a second pool.** Product risk path still selects Python vs
 native via `RISKFORGE_SCENARIO_KERNEL` only; parallelism is internal to the .so.
 
-## Risk-path wiring (M6.3)
-
-Historical VaR / scenario P&L for **LINEAR** and **DELTA_GAMMA** may evaluate the
+## Risk-path wiring Historical VaR / scenario P&L for **LINEAR** and **DELTA_GAMMA** may evaluate the
 linear Δ-Γ kernel via:
 
 | Env | Effect |
@@ -62,9 +60,7 @@ in Python (`app.risk.historical`). Business logic is not moved into C++.
 approximation). Setting `RISKFORGE_SCENARIO_KERNEL=native` does **not** accelerate
 or alter full revaluation.
 
-## Parity & tolerances (M6.5 / M6.7)
-
-| Layer | Tests | Abs / rel |
+## Parity & tolerances | Layer | Tests | Abs / rel |
 |---|---|---|
 | ABI: Python ↔ native ↔ C++ serial/parallel | `tests/test_native_kernel.py`, `native/tests/kernel_test.cpp` | `KERNEL_ABI_*` = **1e-12** (`app.compute.kernel`) |
 | Risk path: NumPy ↔ native on LINEAR/Δ-Γ P&L and VaR/ES | `tests/test_historical_scenario_kernel.py` | `KERNEL_PNL_ABS_TOL` = **1e-9**, `KERNEL_PNL_REL_TOL` = **1e-12** |
@@ -84,9 +80,9 @@ Prefer the repo-root harness for Python / NumPy / ctypes / C++ comparison:
 # from repo root — serial baseline
 RISKFORGE_KERNEL_THREADS=1 python3 benchmarks/run_scenario_bench.py --workload 1k_x_1k
 
-# M6.4 parallel vs serial (same host)
+# parallel vs serial (same host)
 python3 benchmarks/run_scenario_bench.py --workload 10k_x_1k \
-  --threads 4 --parallel-compare
+ --threads 4 --parallel-compare
 ```
 
 See `benchmarks/README.md` and `benchmarks/RESULTS.md` for workloads, identical I/O

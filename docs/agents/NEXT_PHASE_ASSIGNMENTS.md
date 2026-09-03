@@ -1,6 +1,6 @@
-# Recommended Next Milestone Assignments
+# Recommended Next Workstream Assignments
 
-## Milestone: Make the current prototype production-grade enough for serious portfolio demos
+## Workstream: Make the current prototype production-grade enough for serious portfolio demos
 
 ### Task 1 — Reproducible local/CI environment
 **Owner:** DevOps / Platform Engineer
@@ -96,12 +96,12 @@ Only after Tasks 7 and 9 stabilize:
 - grounded explanations;
 - eval suite.
 
-### Task 12 — Milestone integration
+### Task 12 — Workstream integration
 **Owner:** Lead Architect / Orchestrator
 
 - review handoffs;
 - resolve interface conflicts;
 - update ADRs;
 - run full verification;
-- close milestone only if Definition of Done passes.
+- close workstream only if Definition of Done passes.
 

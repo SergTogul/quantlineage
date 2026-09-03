@@ -1,7 +1,7 @@
-# Handoff — Multi-factor reverse stress UI → QA M9.10
+# Handoff — Multi-factor reverse stress UI → QA
 
 ## Task
-Multi-factor reverse-stress panel (Frontend) so QA can close remaining M9.10 reverse-multi E2E
+Multi-factor reverse-stress panel (Frontend) so QA can close remaining reverse-multi E2E
 
 ## Owner
 Frontend / Risk UX Engineer → next: QA & Quant Validation
@@ -10,7 +10,7 @@ Frontend / Risk UX Engineer → next: QA & Quant Validation
 - Added Stress-section **Multi-Factor Reverse Stress** panel (`ReverseStressMulti`) calling existing `POST /api/v1/risk/stress/reverse/multi` via `reverseStressMulti`.
 - UI displays API results only (converged status, target/achieved loss %, P&L, factor shocks, method, assumptions). No client-side search, optimization, or risk math.
 - Factor checkboxes (default equity+vol), target loss %, max shock %, optional weights; local validation requires ≥2 factors.
-- Structural Playwright coverage for labels/status; full M9.10 close remains QA.
+- Structural Playwright coverage for labels/status; full close remains QA.
 
 ## Files changed
 - `frontend/src/components/ScenarioBuilder.jsx` — `ReverseStressMulti` panel
@@ -23,13 +23,13 @@ Frontend / Risk UX Engineer → next: QA & Quant Validation
 - `e2e/tests/reverse-stress.spec.ts` — structural multi-factor E2E
 - `e2e/tests/m8-panels.spec.ts` — comment update
 - `ROADMAP.md` — honest PARTIAL updates
-- `docs/agents/HANDOFF_M9_FRONTEND_REVERSE_MULTI.md` (this file)
+- `docs/agents/HANDOFF_FRONTEND_REVERSE_MULTI.md` (this file)
 
 ## Public/interface changes
 - None on backend. Frontend consumes existing `MultiFactorReverseStressRequest` / `MultiFactorReverseStressResult`.
 
 ## Numerical conventions
-- Units: form uses display % for target loss and max shock; helpers convert to API fractions (`/100`). Rates shocks displayed as `bp` when `shock_unit === 'bp'` from API; relative factors via existing `percent()`.
+- Units: form uses display % for target loss and max shock; helpers convert to API fractions (`/100`). Rates shocks displayed as `bp` when `shock_unit === 'bp'` from API; relative factors via existing `percent`.
 - Sign convention: display API `required_shock` / `pnl` unchanged.
 - Day count/calendar: N/A
 - Tolerances/reference: N/A (no client risk math)
@@ -57,13 +57,13 @@ cd frontend && npm run lint
 - QuantLib: N/A
 - C++: N/A
 - Build: Vite `dist/` OK
-- Milestone 9: still PARTIAL (M9.8 + M9.10 QA close open)
+- Workstream 9: still PARTIAL ( + QA close open)
 ## Known limitations / risks
 - Solver is ray + coordinate descent (not a certified global optimum); UI surfaces API `assumptions` / `method` honestly.
-- Structural E2E asserts status labels, not shock magnitudes — QA should confirm live suite green and any residual M9.10 breadth.
-- Milestone 9 must stay **PARTIAL** (M9.8 Redis optional; M9.10 not CLOSED until QA signs off).
+- Structural E2E asserts status labels, not shock magnitudes — QA should confirm live suite green and any residual breadth.
+- Workstream 9 must stay **PARTIAL** ( Redis optional; not CLOSED until QA signs off).
 
 ## Follow-up / next owner
 - Owner: QA & Quant Validation
-- Requested action: Run / confirm Playwright reverse-multi E2E against live stack; update M9.10 checklist; do **not** invent Milestone 8/9 COMPLETE.
-- Blocking?: yes for honest M9.10 reverse-multi close (UI unblocked; E2E confirmation remaining)
+- Requested action: Run / confirm Playwright reverse-multi E2E against live stack; update checklist; do **not** invent Workstream 8/9 COMPLETE.
+- Blocking?: yes for honest reverse-multi close (UI unblocked; E2E confirmation remaining)

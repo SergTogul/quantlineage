@@ -1,21 +1,21 @@
-# Agent Handoff — M5.5 Caching polish
+# Agent Handoff — Caching polish
 
 ## Task
-M5.5 — close remaining cache polish (curve-construction + scenario memo)
+ — close remaining cache polish (curve-construction + scenario memo)
 
 ## Owner
 Quant Pricing Engineer (02); scenario memo touches Stress/Scenario surface in `scenario_engine` (minimal wiring only)
 
 ## Summary
-Closed M5.5 beyond the existing valuation LRU:
+Closed beyond the existing valuation LRU:
 
 1. **Curve-construction cache** (`backend/app/pricing/curve_cache.py`) — LRU for `select_yield_curve` keyed by currency-relevant market fingerprint (rates / key_rates / curves / projection). Equity/FX/vol bumps that leave rate marks unchanged hit; rate bumps miss.
 2. **Scenario-result memo** (`backend/app/risk/scenario_memo.py`) — LRU for `apply_scenario` keyed by `base.id` + `content_hash` + shock fingerprint + id tag. Defensive `model_copy` on get/put.
 3. Env flags mirror `RISKFORGE_PRICING_CACHE`:
-   - `RISKFORGE_CURVE_CACHE` / `RISKFORGE_CURVE_CACHE_SIZE` (default on / 256)
-   - `RISKFORGE_SCENARIO_CACHE` / `RISKFORGE_SCENARIO_CACHE_SIZE` (default on / 1024)
+ - `RISKFORGE_CURVE_CACHE` / `RISKFORGE_CURVE_CACHE_SIZE` (default on / 256)
+ - `RISKFORGE_SCENARIO_CACHE` / `RISKFORGE_SCENARIO_CACHE_SIZE` (default on / 1024)
 4. Process-wide caches reset in `tests/conftest.py`; demo artifact tests disable all three caches for determinism.
-5. ROADMAP M5.5 marked **DONE**. No numerical methodology change; `PricingEngine` seams preserved. No Market Data handoff (cache lives under `pricing/`, not `market/`).
+5. ROADMAP marked **DONE**. No numerical methodology change; `PricingEngine` seams preserved. No Market Data handoff (cache lives under `pricing/`, not `market/`).
 
 ## Files changed
 - `backend/app/pricing/curve_cache.py` (new)
@@ -26,7 +26,7 @@ Closed M5.5 beyond the existing valuation LRU:
 - `backend/tests/test_curve_cache.py` (new)
 - `backend/tests/test_scenario_memo.py` (new)
 - `backend/tests/test_demo_scripts.py`
-- `ROADMAP.md` (M5.5 lines only)
+- `ROADMAP.md` ( lines only)
 
 ## Public/interface changes
 - None to `PricingEngine`. Optional env flags only.
@@ -61,6 +61,6 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 - QL `ZeroCurve` handle construction inside the adapter is still per-call (YieldCurve construction is what is memoized).
 
 ## Follow-up / next owner
-- Owner: none required for M5.5
+- Owner: none required for
 - Optional later: QuantLib term-structure handle cache inside `QuantLibPricingEngine` (still no QuantLib leakage outside adapter)
 - Blocking?: no

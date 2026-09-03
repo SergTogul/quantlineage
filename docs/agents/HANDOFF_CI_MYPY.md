@@ -1,4 +1,4 @@
-# Agent Handoff — M9.12 CI mypy / lint regression
+# Agent Handoff — CI mypy / lint regression
 
 ## Task
 Fix CI lint failure (mypy on PortfolioService), run full affected suites, push, attempt `gh run watch`.
@@ -15,8 +15,8 @@ Fix: statement-level `isinstance(risk, HistoricalRiskEngine)` then build `hist_k
 
 ## Files changed
 - `backend/app/services/portfolio_service.py` — mypy narrowing fix
-- `ROADMAP.md` — M9.12 honest record
-- `docs/agents/HANDOFF_M912_CI_MYPY.md` — this handoff
+- `ROADMAP.md` — honest record
+- `docs/agents/HANDOFF_CI_MYPY.md` — this handoff
 
 ## Public/interface changes
 - None (internal type-narrowing only; PricingEngine / risk math untouched)
@@ -35,11 +35,11 @@ cd backend && ruff check app tests && mypy app
 # native g++ kernel_test + libriskkernel.so
 cd frontend && npm test && npm run lint && npm run build
 
-/usr/bin/git push origin HEAD   # 8d3d67a..11339c6
+/usr/bin/git push origin HEAD # 8d3d67a..11339c6
 
 # gh (failed — do not re-auth loop)
-gh auth status                  # token in keyring is invalid
-gh run list -L 8                # Forbidden
+gh auth status # token in keyring is invalid
+gh run list -L 8 # Forbidden
 ```
 
 ## Results
@@ -56,5 +56,5 @@ gh run list -L 8                # Forbidden
 
 ## Follow-up / next owner
 - Owner: whoever has a working `gh` session
-- Requested action: `gh run list -L 5`; `gh run watch` on the `11339c6` run; paste success URL into ROADMAP M9.12 and check the box
+- Requested action: `gh run list -L 5`; `gh run watch` on the `11339c6` run; paste success URL into ROADMAP and check the box
 - Blocking?: **partial** — code fix on master; GHA URL confirmation only

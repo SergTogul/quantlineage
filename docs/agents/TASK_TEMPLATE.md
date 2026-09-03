@@ -40,5 +40,5 @@
 ```
 
 ## Handoff requirements
-Use `HANDOFF_TEMPLATE.md` and include exact test results.
+Use `HANDOFF_TEMPLATE.md`. All applicable/affected suites required by the task must pass; include exact commands/results and explain any failure or skip. Required CI checks must be green before the push/handoff is declared complete or integration continues.
 

@@ -1,7 +1,7 @@
-# Agent Handoff — M4.7
+# Agent Handoff —
 
 ## Task
-M4.7 Key-rate DV01 limit drill-down contributors use tenor KR DV01 (not parallel `dv01`)
+ Key-rate DV01 limit drill-down contributors use tenor KR DV01 (not parallel `dv01`)
 
 ## Owner
 Portfolio Risk Engineer
@@ -12,8 +12,8 @@ Portfolio Risk Engineer
 ## Files changed
 - `backend/app/risk/limit_drilldown.py`
 - `backend/tests/test_limit_drilldown.py`
-- `ROADMAP.md` (M4.7 DONE; residual closed; M12.6 KR note removed — may already be on HEAD via prior commit)
-- `docs/agents/HANDOFF_M4_7.md`
+- `ROADMAP.md` ( DONE; residual closed; KR note removed — may already be on HEAD via prior commit)
+- `docs/agents/HANDOFF_KEY_RATE_LIMIT_DRILLDOWN.md`
 
 ## Public/interface changes
 - Optional `market: MarketSnapshot | None` on `contributors_for_metric` (defaults None; engine path unchanged).

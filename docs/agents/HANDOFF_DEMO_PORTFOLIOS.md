@@ -1,7 +1,7 @@
-# Handoff — M10.1 Demo portfolios
+# Handoff — Demo portfolios
 
 ## Task
-M10.1 — Demo portfolios (Equity Vol / Rates Macro / Cross-Asset)
+ — Demo portfolios (Equity Vol / Rates Macro / Cross-Asset)
 
 ## Owner
 Lead Architect / Orchestrator (+ Market Data for snapshot-from-positions seeding; no PricingEngine changes)
@@ -11,7 +11,7 @@ Lead Architect / Orchestrator (+ Market Data for snapshot-from-positions seeding
 - `SAMPLE_PORTFOLIO` remains the Cross-Asset book (`id=global-macro`, name `Global Macro Demo`) for DI / default `GET /portfolio` / E2E compatibility.
 - Catalog helpers + dual-mounted `GET /portfolios` and `GET /portfolios/{id}`; SQLAlchemy seed inserts all three demos when `RISKFORGE_DATABASE_URL` is set.
 - No live market vendor feeds. PricingEngine seams untouched.
-- Milestone 10 stays **PARTIAL** (M10.2 / M10.3 still open).
+- Workstream 10 stays **PARTIAL** ( still open).
 
 ## Files changed
 - `backend/app/sample.py` — three themed portfolios + catalog summaries
@@ -22,13 +22,13 @@ Lead Architect / Orchestrator (+ Market Data for snapshot-from-positions seeding
 - `backend/tests/test_api_router_decomposition.py` — critical paths
 - `backend/tests/test_api_v1_compatibility.py` — dual-mount paths
 - `backend/tests/test_api_legacy_deprecation.py` — `/portfolios` headers
-- `ROADMAP.md` — M10 PARTIAL; M10.1 DONE
-- `docs/agents/HANDOFF_M10_1_DEMO_PORTFOLIOS.md` — this file
+- `ROADMAP.md` — PARTIAL; DONE
+- `docs/agents/HANDOFF_DEMO_PORTFOLIOS.md` — this file
 
 ## Public/interface changes
 - **New** (dual-mount `/api/v1` + legacy):
-  - `GET /portfolios` → `list[DemoPortfolioSummary]`
-  - `GET /portfolios/{portfolio_id}` → `Portfolio` (404 `{code,message,details}` if unknown)
+ - `GET /portfolios` → `list[DemoPortfolioSummary]`
+ - `GET /portfolios/{portfolio_id}` → `Portfolio` (404 `{code,message,details}` if unknown)
 - Default `GET /portfolio` unchanged (still Cross-Asset sample)
 - Persistence: SQLAlchemy seed now upserts all three demo portfolio ids when missing
 
@@ -44,20 +44,20 @@ Lead Architect / Orchestrator (+ Market Data for snapshot-from-positions seeding
 ## Commands executed
 ```bash
 cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest \
-  tests/test_demo_portfolios.py tests/test_api_router_decomposition.py \
-  tests/test_api_v1_compatibility.py tests/test_api_legacy_deprecation.py \
-  tests/test_persistence_di.py -q --tb=short
+ tests/test_demo_portfolios.py tests/test_api_router_decomposition.py \
+ tests/test_api_v1_compatibility.py tests/test_api_legacy_deprecation.py \
+ tests/test_persistence_di.py -q --tb=short
 # → 46 passed, 1 Starlette/httpx warning
 
 cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest \
-  tests/test_demo_portfolios.py tests/test_next_phase.py tests/test_persistence_di.py \
-  tests/test_api.py tests/test_api_router_decomposition.py \
-  tests/test_api_v1_compatibility.py tests/test_api_legacy_deprecation.py \
-  tests/test_hierarchy.py -q --tb=line
+ tests/test_demo_portfolios.py tests/test_next_phase.py tests/test_persistence_di.py \
+ tests/test_api.py tests/test_api_router_decomposition.py \
+ tests/test_api_v1_compatibility.py tests/test_api_legacy_deprecation.py \
+ tests/test_hierarchy.py -q --tb=line
 # → 74 passed, 1 warning
 
 .venv/bin/ruff check app/sample.py app/api/portfolio.py app/api/legacy_deprecation.py \
-  app/persistence/wiring.py tests/test_demo_portfolios.py
+ app/persistence/wiring.py tests/test_demo_portfolios.py
 # → All checks passed
 ```
 
@@ -67,15 +67,15 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 - QuantLib: used for broader suite (`RISKFORGE_PRICING_ENGINE=quantlib`)
 - C++: N/A
 - Build: N/A
-- Milestone 10: **PARTIAL** (M10.1 DONE only)
+- Workstream 10: **PARTIAL** ( DONE only)
 - Push: SHA `1fd27b9` on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
 
 ## Known limitations / risks
 - UI still loads default Cross-Asset book only (no portfolio picker wired to `/portfolios`)
 - Default market snapshot seed still derived from Cross-Asset marks only (not per-theme snapshots)
-- M10.2 historical dataset and M10.3 deterministic scripts not started
+- historical dataset and deterministic scripts not started
 
 ## Follow-up / next owner
-- Owner: Market Data (+ Lead Architect) — **M10.2** demo historical market dataset (replace or wire `data/sample_portfolio.csv`)
+- Owner: Market Data (+ Lead Architect) — demo historical market dataset (replace or wire `data/sample_portfolio.csv`)
 - Requested action: reproducible factor-return / snapshot history for VaR replay demos; no live vendors
 - Blocking?: no

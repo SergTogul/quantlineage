@@ -8,11 +8,11 @@ When starting a subagent, give it the matching charter and a task created from `
 
 ## Lead-agent startup prompt
 
-> Read `AGENTS.md`, `README.md`, `TASKS.md`, `BUILD_NOTES.md`, `docs/agents/TEAM_STRUCTURE.md`, `docs/agents/WORKFLOW.md`, and `docs/agents/DEFINITION_OF_DONE.md`. You are the Lead Architect. Inspect the repository first. Break the requested milestone into small tasks, assign each to exactly one specialist agent, identify dependencies and interface contracts, and define acceptance criteria/tests. Parallelize only tasks with stable contracts. Do not let subagents make unrelated refactors.
+> Read `AGENTS.md`, `README.md`, `TASKS.md`, `BUILD_NOTES.md`, `docs/agents/TEAM_STRUCTURE.md`, `docs/agents/WORKFLOW.md`, and `docs/agents/DEFINITION_OF_DONE.md`. You are the Lead Architect. Inspect the repository first. Break the requested workstream into small tasks, assign each to exactly one specialist agent, identify dependencies and interface contracts, and define acceptance criteria/tests. Parallelize only tasks with stable contracts. Do not let subagents make unrelated refactors.
 
 ## Specialist-agent startup pattern
 
-> Read `AGENTS.md`, `docs/agents/<YOUR_CHARTER>.md`, `docs/agents/WORKFLOW.md`, `docs/agents/DEFINITION_OF_DONE.md`, and the assigned task. Inspect relevant code and tests before editing. Stay inside your ownership boundary. Add tests with every change and execute them. At completion, provide a handoff using `docs/agents/HANDOFF_TEMPLATE.md` with exact commands and results.
+> Read `AGENTS.md`, `docs/agents/<YOUR_CHARTER>.md`, `docs/agents/WORKFLOW.md`, `docs/agents/DEFINITION_OF_DONE.md`, and the assigned task. Inspect relevant code and tests before editing. Stay inside your ownership boundary. Add tests with every change and execute them. At completion, provide a handoff using `docs/agents/HANDOFF_TEMPLATE.md`; all applicable/affected suites required by the task must pass, with exact commands/results recorded and no unexplained failures or skips.
 
 ## Recommended orchestration loop
 
@@ -22,7 +22,7 @@ When starting a subagent, give it the matching charter and a task created from `
 4. QA validates quantitative/integration behavior.
 5. Lead integrates and resolves conflicts.
 6. DevOps runs reproducibility/build matrix if environment/config changed.
-7. Commit a milestone only after Definition of Done passes.
+7. Complete a push/handoff or continue integration only after Definition of Done passes and required CI checks are green; an initial branch push may be used to trigger CI after all applicable local checks pass.
 
 ## Good parallel batch example
 

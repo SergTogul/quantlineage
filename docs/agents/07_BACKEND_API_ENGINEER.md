@@ -24,14 +24,14 @@ Expose the quant platform through a clean, versioned, validated application/API 
 
 ```text
 /api/v1/
-  portfolio
-  market
-  pricing
-  risk
-  stress
-  attribution
-  limits
-  runs
+ portfolio
+ market
+ pricing
+ risk
+ stress
+ attribution
+ limits
+ runs
 ```
 
 ## Immediate backlog
