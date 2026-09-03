@@ -20,7 +20,7 @@ from app.risk.incremental_var import (
     apply_what_if_changes,
     incremental_var,
 )
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 
 _TOL = 1e-9
 _SEED = 7
@@ -83,16 +83,22 @@ def test_incremental_var_equals_after_minus_before():
     pricing = BuiltinPricingEngine()
     engine = _engine()
     trade = _new_equity()
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
     result = incremental_var(
         SAMPLE_PORTFOLIO,
         pricing,
         changes=[{"operation": "add", "position": trade}],
         risk_engine=engine,
         methodology=VaRMethodology.DELTA_GAMMA,
+        market=market,
     )
-    before = engine.calculate(SAMPLE_PORTFOLIO, pricing, methodology=VaRMethodology.DELTA_GAMMA)
+    before = engine.calculate(
+        SAMPLE_PORTFOLIO, pricing, methodology=VaRMethodology.DELTA_GAMMA, market=market
+    )
     after_pf = apply_what_if_changes(SAMPLE_PORTFOLIO, [{"operation": "add", "position": trade}])
-    after = engine.calculate(after_pf, pricing, methodology=VaRMethodology.DELTA_GAMMA)
+    after = engine.calculate(
+        after_pf, pricing, methodology=VaRMethodology.DELTA_GAMMA, market=market
+    )
 
     assert math.isclose(result.before.var_99, before["var_99"], abs_tol=_TOL)
     assert math.isclose(result.after.var_99, after["var_99"], abs_tol=_TOL)
@@ -122,6 +128,7 @@ def test_removing_all_risk_positions_reduces_var():
         pricing,
         changes=[{"operation": "remove", "position_id": "eq-nvda"}],
         risk_engine=engine,
+        market=demo_market_snapshot(SAMPLE_PORTFOLIO),
     )
     assert result.incremental.var_99 <= 0.0 + _TOL
 

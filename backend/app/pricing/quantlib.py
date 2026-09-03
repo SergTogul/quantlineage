@@ -25,6 +25,7 @@ from app.interfaces.pricing import PricingEngine
 from app.market.demo_snapshot import MissingMarketDataError
 from app.market.vol_surfaces import vol_surface_from_dict
 from app.pricing.curve_rates import continuous_zero, has_curve_or_key_rates, select_yield_curve
+from app.pricing.surface_vol import required_equity_option_vol
 
 try:
     import QuantLib as ql
@@ -99,10 +100,16 @@ class QuantLibPricingEngine(PricingEngine):
                     "risk_free_rate": market.rates.get("USD", position.risk_free_rate),
                 }
             elif isinstance(position, EuropeanOptionPosition):
-                fallback = market.equity_vols.get(position.symbol, position.volatility)
+                spot = _required_equity_spot(market, position.symbol)
                 updates = {
-                    "spot": _required_equity_spot(market, position.symbol),
-                    "volatility": fallback,
+                    "spot": spot,
+                    "volatility": required_equity_option_vol(
+                        market,
+                        name=position.symbol,
+                        maturity_years=position.maturity_years,
+                        strike=position.strike,
+                        spot=spot,
+                    ),
                     "risk_free_rate": market.rates.get("USD", position.risk_free_rate),
                 }
             elif isinstance(position, BondPosition):

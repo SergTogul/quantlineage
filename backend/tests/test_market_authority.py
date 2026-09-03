@@ -9,6 +9,7 @@ from app.domain.models import (
     MarketSnapshot,
     Portfolio,
     VaRMethodology,
+    WhatIfRequest,
 )
 from app.interfaces.pricing import LegacyDemoPricingAdapter
 from app.market.demo_snapshot import (
@@ -206,6 +207,37 @@ def test_portfolio_service_passes_resolved_snapshot_to_contributors_and_compare(
     assert all(market is snapshot for market in pricing.markets)
 
 
+def test_portfolio_service_what_if_uses_one_resolved_snapshot_before_and_after() -> None:
+    portfolio, _ = _equity_book()
+    snapshot = MarketSnapshot(id="service", equity_spots={"AUTH": 105.0})
+    pricing = _RecordingPricingEngine()
+    service = PortfolioService(
+        pricing,
+        HistoricalRiskEngine(seed=1, observations=8),
+    )
+    provider = _CountingMarketProvider(snapshot)
+    service.market_data = provider
+
+    added = EquityPosition(
+        type="equity",
+        id="eq-whatif",
+        symbol="AUTH",
+        quantity=5.0,
+        price=999.0,
+    )
+    service.what_if(
+        WhatIfRequest(
+            portfolio=portfolio,
+            changes=[{"operation": "add", "position": added}],
+            methodology=VaRMethodology.LINEAR,
+            scenarios=[],
+        )
+    )
+    assert provider.calls == 1
+    assert pricing.markets
+    assert all(market is snapshot for market in pricing.markets)
+
+
 def _future_book() -> tuple[Portfolio, EquityFuturePosition]:
     position = EquityFuturePosition(
         type="equity_future",
@@ -302,7 +334,11 @@ def test_supplied_snapshot_beats_trade_local_equity_future_spot() -> None:
 def test_supplied_snapshot_beats_trade_local_equity_option_spot() -> None:
     _, position = _option_book()
     original = position.model_dump(mode="json")
-    market = MarketSnapshot(id="authoritative", equity_spots={"AUTH": 101.0})
+    market = MarketSnapshot(
+        id="authoritative",
+        equity_spots={"AUTH": 101.0},
+        equity_vols={"AUTH": position.volatility},
+    )
 
     valuation = BuiltinPricingEngine().value(position, market)
     local = BuiltinPricingEngine().value(position)
@@ -333,11 +369,128 @@ def test_quantlib_supplied_snapshot_beats_trade_local_equity_option_spot() -> No
 
     _, position = _option_book()
     original = position.model_dump(mode="json")
-    market = MarketSnapshot(id="authoritative", equity_spots={"AUTH": 101.0})
+    market = MarketSnapshot(
+        id="authoritative",
+        equity_spots={"AUTH": 101.0},
+        equity_vols={"AUTH": position.volatility},
+    )
     engine = QuantLibPricingEngine()
 
     valuation = engine.value(position, market)
     local = engine.value(position)
+
+    assert valuation.market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+@pytest.mark.parametrize(
+    "market",
+    [
+        MarketSnapshot(id="spot-only", equity_spots={"AUTH": 101.0}),
+        MarketSnapshot(
+            id="spy-vol",
+            equity_spots={"AUTH": 101.0},
+            equity_vols={"SPY": 0.22},
+        ),
+    ],
+    ids=["spot-only", "spy-vol"],
+)
+def test_missing_equity_option_vol_raises_when_market_is_supplied(
+    market: MarketSnapshot,
+) -> None:
+    _, position = _option_book()
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        BuiltinPricingEngine().value(position, market)
+    assert raised.value.factor_key == f"equity_vols[{position.symbol}]"
+
+
+@pytest.mark.parametrize(
+    "market",
+    [
+        MarketSnapshot(id="spot-only", equity_spots={"AUTH": 101.0}),
+        MarketSnapshot(
+            id="spy-vol",
+            equity_spots={"AUTH": 101.0},
+            equity_vols={"SPY": 0.22},
+        ),
+    ],
+    ids=["spot-only", "spy-vol"],
+)
+def test_quantlib_missing_equity_option_vol_raises_when_market_is_supplied(
+    market: MarketSnapshot,
+) -> None:
+    import_quantlib()
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    _, position = _option_book()
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        QuantLibPricingEngine().value(position, market)
+    assert raised.value.factor_key == f"equity_vols[{position.symbol}]"
+
+
+def test_supplied_snapshot_equity_vols_price_without_mutating_trade() -> None:
+    _, position = _option_book()
+    original = position.model_dump(mode="json")
+    market = MarketSnapshot(
+        id="authoritative-vol",
+        equity_spots={"AUTH": 101.0},
+        equity_vols={"AUTH": 0.40},
+    )
+
+    valuation = BuiltinPricingEngine().value(position, market)
+    local = BuiltinPricingEngine().value(position)
+
+    assert valuation.market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+def test_quantlib_supplied_snapshot_equity_vols_price_without_mutating_trade() -> None:
+    import_quantlib()
+    from app.pricing.quantlib import QuantLibPricingEngine
+
+    _, position = _option_book()
+    original = position.model_dump(mode="json")
+    market = MarketSnapshot(
+        id="authoritative-vol",
+        equity_spots={"AUTH": 101.0},
+        equity_vols={"AUTH": 0.40},
+    )
+    engine = QuantLibPricingEngine()
+
+    valuation = engine.value(position, market)
+    local = engine.value(position)
+
+    assert valuation.market_value != local.market_value
+    assert position.model_dump(mode="json") == original
+
+
+def test_equity_option_uses_trade_local_vol_when_market_is_none() -> None:
+    _, position = _option_book()
+    original = position.model_dump(mode="json")
+
+    valuation = BuiltinPricingEngine().value(position)
+    richer = BuiltinPricingEngine().value(position.model_copy(update={"volatility": 0.40}))
+
+    assert richer.market_value > valuation.market_value
+    assert position.model_dump(mode="json") == original
+
+
+def test_option_surface_quote_satisfies_vol_without_equity_vols() -> None:
+    from app.market.vol_surfaces import build_equity_vol_surface
+
+    _, position = _option_book()
+    original = position.model_dump(mode="json")
+    surface = build_equity_vol_surface("AUTH", 0.40)
+    market = MarketSnapshot(
+        id="surface-only",
+        equity_spots={"AUTH": 101.0},
+        vol_surfaces={"AUTH": surface.to_dict()},
+    )
+
+    valuation = BuiltinPricingEngine().value(position, market)
+    local = BuiltinPricingEngine().value(position)
 
     assert valuation.market_value != local.market_value
     assert position.model_dump(mode="json") == original

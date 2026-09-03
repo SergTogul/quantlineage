@@ -112,7 +112,7 @@ Pricing tests are strong. VaR/ES tests are broad but do not yet pin exact quanti
 Priority: **P0**  
 Risk types: CORRECTNESS, ARCHITECTURE, MAINTAINABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.2-A APPROVE; equity cash/future/option spots fail closed on incomplete snapshots. Remaining: vols/rates/dividends, other families, terms split, no-market inference.)
+Status: **IN PROGRESS** (R0.2-A APPROVE; equity spots+option vol fail closed; what-if reuses one snapshot. Remaining: rates/dividends, other families, terms split, no-market inference.)
 
 Source findings:
 
