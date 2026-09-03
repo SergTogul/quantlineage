@@ -1,4 +1,4 @@
-import test from 'node:test'
+import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import {
   NAV_SECTIONS, DEFAULT_SECTION_ID, sectionFromHash, hashForSection, isNavSection, navSectionById,

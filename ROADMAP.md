@@ -740,12 +740,12 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.
 
 ### Tasks
 
-- [x] M9.1 Frontend testing stack (Vitest/RTL/MSW) — **DONE** (2026-09-02, staged)
+- [x] M9.1 Frontend testing stack (Vitest/RTL/MSW) — **DONE** (2026-09-02, staged; lib migrate closed same day)
   - Stack: Vitest 4 + jsdom + Testing Library + MSW 2; config in `frontend/vite.config.js` + `frontend/src/test/{setup,mswServer}.js`.
-  - Dual-run: `npm test` = `test:node` (existing `src/lib/*.test.mjs` via node:test) **and** `test:vitest` (component suite). Lib helpers not mass-migrated overnight.
+  - `npm test` = `vitest run` (single runner). Lib helpers migrated off node:test: `risk.test.js` / `nav.test.js` / `heatmap.test.js` (display/request helpers only — no client risk math). `test:node` alias → `vitest run src/lib` for backwards script name.
   - Representative RTL slice: `MetricCard`, `AppNav`, `ScenarioBuilder` (validation + MSW success/error for `POST .../stress/evaluate/custom`; fixtures only — no client risk math).
-  - Local evidence: `cd frontend && npm test` → **56** node:test + **6** Vitest passed; `npm run lint` OK; `npm run build` OK.
-  - Residual (non-blocking): migrate `risk.test.mjs` / `heatmap.test.mjs` / `nav.test.mjs` onto Vitest; broaden RTL/MSW to more panels.
+  - Local evidence (lib migrate): `cd frontend && npm test` → **70** Vitest passed; `npm run lint` OK; `npm run build` OK.
+  - Residual (non-blocking): broaden RTL/MSW to more panels (lib `*.mjs` node:test migrate **CLOSED** 2026-09-02).
 - [x] M9.2 E2E Playwright — **DONE** (2026-09-02)
   - Local: 10 Playwright specs (`cd e2e && npm test`); macOS uses Chrome channel.
   - CI: job `e2e-playwright` (Chromium on ubuntu-latest; builtin API + Vite `webServer`) landed SHA `7f01407`.
@@ -908,6 +908,13 @@ Status: **COMPLETE** (2026-09-02 — M10.1–M10.3 DONE)
   - Loads M10.1 portfolios + M10.2 demo factors; emits sorted-key VaR/stress JSON via `PortfolioService`
   - Defaults: builtin pricing + Python scenario kernel; `--check` asserts byte-identical re-runs
   - Frozen artifact: `data/demo_risk_artifact.json`; evidence `tests/test_demo_scripts.py`
+
+### Progress update (2026-09-02, QA / Frontend — M9.1 lib Vitest migrate)
+
+- Owner: QA & Quant Validation (+ Frontend harness)
+- Migrated leftover `src/lib/{risk,nav,heatmap}.test.mjs` (node:test) → Vitest `*.test.js`; removed vite exclude; `npm test` is Vitest-only.
+- Local: `cd frontend && npm test` → **70 passed**; lint + build OK. No client risk math; no M11/M12; backend untouched.
+- **M9.1 residual (lib migrate) CLOSED**. Remaining M9.1 residual: broaden RTL/MSW panels only. Milestone 9 stays **COMPLETE**.
 
 ### Progress update (2026-09-02, Lead Architect / Backend — M10.3)
 

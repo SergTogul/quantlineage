@@ -15,7 +15,7 @@ This note avoids editing `ROADMAP.md` (may be mid-edit by another agent). Treat 
 |----|------|------------|-------|
 | **M5.5** | Curve-construction cache and/or scenario-engine memo | Backend/API | Valuation LRU DONE; milestone COMPLETE; non-blocking |
 | **M4.7** | KR DV01 limit drill-down → tenor KR (not parallel `dv01`) | Portfolio Risk (+ Backend) | `limit_drilldown.py` maps `key_rate_dv01` → `dv01` |
-| M9 residual | Migrate leftover `*.mjs` Vitest; broaden RTL/MSW | Frontend / QA | Explicitly non-blocking for M9 COMPLETE |
+| M9 residual | ~~Migrate leftover `*.mjs` → Vitest~~ **CLOSED** 2026-09-02; broaden RTL/MSW | Frontend / QA | Lib migrate DONE (`risk`/`nav`/`heatmap.test.js`); RTL/MSW broaden still open; non-blocking for M9 COMPLETE |
 | M9 residual | Gradual Ruff/mypy enable | DevOps / Backend | Non-blocking staged gate follow-up |
 | M1.12 | Builtin vs QL ZC bond day-count / compounding | Quant Pricing | Close gap **or** tighten docs/tolerances |
 
@@ -59,7 +59,7 @@ Different owners / file sets; no M11/M12; no SLA invention:
 
 1. **M5.5** — Backend/API: curve and/or scenario memo + invalidation tests  
 2. **M4.7** — Portfolio Risk: tenor KR contributors in limit drill-down + tests  
-3. **M1.12** *or* M9 Vitest `*.mjs` migrate — Quant Pricing *or* Frontend/QA (pick one third lane)
+3. **M1.12** — Quant Pricing: Builtin vs QL ZC bond day-count / compounding (Frontend M9 Vitest lib migrate **closed**)
 
 **Do not parallel:** M1.10 + M1.11 (same market/pricing blast radius); M1.9 alone is a multi-session epic. M6 SLA disposed (accepted PARTIAL) — do not invent COMPLETE.
 

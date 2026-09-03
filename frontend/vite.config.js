@@ -7,8 +7,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
     include: ['src/**/*.{test,spec}.{js,jsx,mjs}'],
-    // Lib helpers remain on node:test (see package.json test:node) until migrated.
-    exclude: ['src/lib/**/*.test.mjs', 'node_modules/**', 'dist/**'],
+    // Lib helper suites (risk/nav/heatmap) migrated from node:test → Vitest (M9.1 residual).
+    exclude: ['node_modules/**', 'dist/**'],
     css: false,
   },
 })
