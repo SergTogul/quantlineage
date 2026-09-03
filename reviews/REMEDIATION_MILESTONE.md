@@ -2,7 +2,7 @@
 
 Status: **IN PROGRESS**
 
-Current phase: **A — Safety nets (R0.1)**  
+Current phase: **B — Market / pricing contracts (R0.2)**  
 Branch: `r0-core-remediation`  
 Date: 2026-09-03
 
