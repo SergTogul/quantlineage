@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
+
 import pytest
+from pydantic import ValidationError
 
 from app.domain.models import MarketSnapshot, StressScenario
 from app.market.curves import attach_standard_usd_curves
@@ -229,10 +232,62 @@ def test_diff_includes_key_rates_curves_vols_projection_dividends():
 
 def test_content_hash_stable_for_equal_marks():
     a = MarketSnapshot(id="a", as_of="t0", equity_spots={"SPY": 100.0}, rates={"USD": 0.04})
-    b = MarketSnapshot(id="b", as_of="t1", equity_spots={"SPY": 100.0}, rates={"USD": 0.04})
+    b = MarketSnapshot(id="b", as_of="current", equity_spots={"SPY": 100.0}, rates={"USD": 0.04})
     assert a.content_hash() == b.content_hash()
     c = a.bump(EquitySpot("SPY"), 0.01)
     assert c.content_hash() != a.content_hash()
+
+
+def test_as_of_iso_string_coerces_to_date():
+    snap = MarketSnapshot(as_of="2018-01-01", rates={"USD": 0.04})
+    assert snap.as_of == date(2018, 1, 1)
+    assert snap.as_of != date.today()
+
+
+def test_as_of_date_is_kept():
+    snap = MarketSnapshot(as_of=date(2024, 6, 14), rates={"USD": 0.04})
+    assert snap.as_of == date(2024, 6, 14)
+
+
+def test_as_of_engine_labels_are_not_wall_clock():
+    today = date.today()
+    current = MarketSnapshot(as_of="current", rates={"USD": 0.04})
+    t0 = MarketSnapshot(as_of="t0", rates={"USD": 0.04})
+    defaulted = MarketSnapshot(rates={"USD": 0.04})
+    assert current.as_of == "current"
+    assert t0.as_of == "t0"
+    assert defaulted.as_of == "current"
+    assert current.as_of != today
+    assert t0.as_of != today
+
+
+def test_as_of_rejects_unparseable_and_datetime():
+    with pytest.raises(ValidationError):
+        MarketSnapshot(as_of="later", rates={"USD": 0.04})
+    with pytest.raises(ValidationError):
+        MarketSnapshot(as_of="not-a-date", rates={"USD": 0.04})
+    with pytest.raises(ValidationError):
+        MarketSnapshot(as_of="2018-1-1", rates={"USD": 0.04})
+    with pytest.raises(ValidationError):
+        MarketSnapshot(as_of="", rates={"USD": 0.04})
+    with pytest.raises(ValidationError):
+        MarketSnapshot(as_of=datetime(2018, 1, 1, 12, 0), rates={"USD": 0.04})
+
+
+def test_as_of_json_round_trip_stays_string_on_the_wire():
+    snap = MarketSnapshot(id="s", as_of="2026-09-02", rates={"USD": 0.04})
+    dumped = snap.model_dump(mode="json")
+    assert dumped["as_of"] == "2026-09-02"
+    loaded = MarketSnapshot.model_validate(dumped)
+    assert loaded.as_of == date(2026, 9, 2)
+
+
+def test_as_of_model_copy_parses_iso_and_rejects_garbage():
+    base = MarketSnapshot(as_of="current", rates={"USD": 0.04})
+    copied = base.model_copy(update={"as_of": "2024-06-14"})
+    assert copied.as_of == date(2024, 6, 14)
+    with pytest.raises(ValidationError):
+        base.model_copy(update={"as_of": "illustrative_previous"})
 
 
 def test_shock_snapshot_matches_typed_apply():

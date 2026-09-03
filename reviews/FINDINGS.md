@@ -174,7 +174,7 @@ None. This is the primary architecture dependency for several other fixes.
 Priority: **P0**  
 Risk types: CORRECTNESS, CONCURRENCY, ARCHITECTURE  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.3.2–R0.3.4 process-owned session; R0.3.5 Compose worker process partition APPROVE. Remaining: typed `as_of` (R0.3.1).)
+Status: **CLOSED** (2026-09-04). R0.3.2–R0.3.5 process-owned session + Compose worker partition APPROVE. R0.3.1 typed `as_of` APPROVE: accepted type is `date | Literal["current", "t0"]`, not `date` only. ISO/`date` drives QuantLib `Settings.evaluationDate` and the valuation cache key; labels stay labels and are never rewritten to `date.today()`. Residual: omitted/`"current"`/`"t0"` still price at the engine constructor date (`date.today()` on the factory path). That is documented label semantics, not an open process-partition item. Do not reopen for the R0.3.5 detector-substring pin.
 
 Source findings:
 
@@ -198,7 +198,7 @@ Concurrent requests or worker activity can contaminate another valuation's evalu
 Create an explicit process-owned QuantLib valuation session:
 
 - one process-level lock/session boundary;
-- typed `MarketSnapshot.as_of: date`;
+- typed `MarketSnapshot.as_of: date | Literal["current", "t0"]`;
 - evaluation date driven from valuation context;
 - fixing history isolated/cleared or process-isolated;
 - process-level parallelism for independent QuantLib full-revaluation partitions.
@@ -216,13 +216,14 @@ The performance review described QuantLib as protected by an `RLock`; the archit
 - Repeated valuation leaves no fixing contamination.
 - Parallel full-revaluation design uses processes or another demonstrated-safe ownership model.
 
-Evidence so far (R0.3.2–R0.3.5; not CLOSED):
+Evidence (R0.3.1–R0.3.5 CLOSED):
 
 - Module-level `_QL_PROCESS_LOCK` is shared by every `QuantLibPricingEngine` instance (`backend/app/pricing/quantlib.py`).
 - `tests/test_quantlib_process_state.py` requires overlapping sessions to serialize; restoring per-instance locks fails Acc 5.
-- Parseable snapshot `as_of` (ISO `YYYY-MM-DD`) drives `Settings.evaluationDate`; labels such as `current` / `t0` keep the engine date.
+- `MarketSnapshot.as_of` is `date | Literal["current", "t0"]`. ISO/`date` drives `Settings.evaluationDate` and `market_cache_key` (`|as_of:YYYY-MM-DD`); labels stay labels.
 - Outermost session clears `IndexManager` histories so swap fixings do not leak.
-- Remaining: typed `MarketSnapshot.as_of: date` (R0.3.1). Process partition is the Compose `worker` OS process; in-process QuantLib stays serialized. Detector tests are not a closed contract against a later QL thread pool.
+- Process partition is the Compose `worker` OS process; in-process QuantLib stays serialized. Detector tests are not a closed contract against a later QL thread pool.
+- Residual (not a reopen): factory/`"current"` still prices at constructor `date.today()`. `scenario_memo_key` still ignores `as_of` when `id` and marks match.
 
 ---
 

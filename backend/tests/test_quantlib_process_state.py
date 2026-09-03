@@ -168,6 +168,26 @@ def test_unparseable_as_of_keeps_engine_evaluation_date():
     assert observed == [engine._ql_date(date(2020, 1, 2))]
 
 
+def test_typed_date_as_of_drives_quantlib_evaluation_date():
+    """R0.3.1: a domain ``date`` as_of drives Settings, not wall-clock."""
+    observed: list = []
+    engine = QuantLibPricingEngine()
+    wall_clock = engine._ql_date(date.today())
+    original_bond = engine._bond
+
+    def spy_bond(position, market=None):
+        observed.append(ql.Settings.instance().evaluationDate)
+        return original_bond(position, market)
+
+    engine._bond = spy_bond
+    engine.value(
+        _bond(),
+        MarketSnapshot(id="typed", as_of=date(2018, 1, 1), rates={"USD": 0.04}),
+    )
+    assert observed == [engine._ql_date(date(2018, 1, 1))]
+    assert observed[0] != wall_clock
+
+
 def test_default_evaluation_date_is_wall_clock_today():
     engine = QuantLibPricingEngine()
     assert engine.evaluation_date == date.today()

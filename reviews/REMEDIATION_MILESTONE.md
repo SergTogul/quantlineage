@@ -316,9 +316,9 @@ Related findings:
 - RF-002
 - RF-007
 
-## R0.3.1 Typed as-of date
+## R0.3.1 Typed as-of date — COMPLETE (2026-09-04)
 
-Replace unconstrained/current snapshot date semantics with a real typed `date`.
+Accepted type is `date | Literal["current", "t0"]`, not `date` only. ISO/`date` drives QuantLib evaluation date and the valuation cache key; labels stay labels and are never rewritten to `date.today()`. Persistence/API wire via `as_of_wire`. RF-002 CLOSED. Residual: factory/`"current"` still prices at constructor `date.today()`.
 
 ## R0.3.2 Process-owned QuantLib session
 
@@ -352,7 +352,7 @@ Document and implement:
 
 Two concurrent/request-equivalent valuation contexts cannot contaminate one another.
 
-R0.3.5 status: COMPLETE (independent review APPROVE, `reviews/r0.3.5-independent-review.md`). Parallel full reval is the Compose `worker` process. Remaining R0.3 work is typed `as_of` (R0.3.1).
+R0.3.5 status: COMPLETE (independent review APPROVE, `reviews/r0.3.5-independent-review.md`). Parallel full reval is the Compose `worker` process. R0.3.1 typed `as_of` COMPLETE; RF-002 CLOSED.
 
 ---
 

@@ -293,7 +293,7 @@ class PortfolioService:
         current=self.market_snapshot(portfolio)
         previous=current.model_copy(update={
             "id":"illustrative_previous",
-            "as_of":"illustrative_previous",
+            "as_of":"t0",
             "equity_spots":{k:v*.99 for k,v in current.equity_spots.items()},
             "equity_vols":{k:v*.95 for k,v in current.equity_vols.items()},
             "fx_spots":{k:v*.995 for k,v in current.fx_spots.items()},
