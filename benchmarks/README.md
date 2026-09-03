@@ -145,3 +145,15 @@ Owned by the C++ Performance Engineer (`docs/agents/06_CPP_PERFORMANCE_ENGINEER.
 Benchmark scripts stay separate from product unit tests; equivalence stays in
 `backend/tests/test_native_kernel.py` and Historical VaR parity in
 `backend/tests/test_historical_scenario_kernel.py`.
+
+## FULL_REVALUATION baseline (R0.6.1)
+
+`run_full_reval_bench.py` records a **checksum/impl identity** on the nightly
+120-obs unit-equity sample (shocked PV − base PV). `wall_ms` is printed for
+operators and is **not** a host SLA. Do not invoke `check_m6_sla.py`. Do not
+treat a positive throughput reading as a floor.
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python benchmarks/run_full_reval_bench.py --json
+python3 -m pytest backend/tests/test_full_reval_bench.py -q
+```
