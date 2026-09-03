@@ -438,3 +438,145 @@ def test_swaption_matches_builtin_without_fallback(engine, monkeypatch):
     assert ql_v.market_value == pytest.approx(builtin_v.market_value, rel=1e-12, abs=1e-8)
     assert ql_v.vega == pytest.approx(builtin_v.vega, rel=1e-12, abs=1e-8)
     assert ql_v.dv01 == pytest.approx(builtin_v.dv01, rel=1e-12, abs=1e-8)
+
+
+def _fx_forward_authority() -> FXForwardPosition:
+    return FXForwardPosition(
+        type="fx_forward",
+        id="fxf-auth",
+        pair="EURUSD",
+        notional_base=1_000_000.0,
+        spot=1.50,
+        strike=1.105,
+        maturity_years=0.5,
+        domestic_rate=0.10,
+        foreign_rate=0.01,
+    )
+
+
+def _fx_option_authority() -> FXOptionPosition:
+    return FXOptionPosition(
+        type="fx_option",
+        id="fxo-auth",
+        pair="EURUSD",
+        notional_base=250_000.0,
+        spot=1.50,
+        strike=1.12,
+        maturity_years=0.4,
+        volatility=0.50,
+        domestic_rate=0.10,
+        foreign_rate=0.01,
+        option_type="call",
+    )
+
+
+@pytest.mark.parametrize("book_factory", [_fx_forward_authority, _fx_option_authority], ids=["forward", "option"])
+@pytest.mark.parametrize(
+    "fx_spots",
+    [{}, {"GBPUSD": 1.25}],
+    ids=["empty-spots", "gbp-only"],
+)
+def test_quantlib_missing_fx_spot_raises_when_market_is_supplied(engine, book_factory, fx_spots):
+    from app.market.demo_snapshot import MissingMarketDataError
+
+    position = book_factory()
+    extra = {"fx_vols": {"EURUSD": 0.12}} if position.type == "fx_option" else {}
+    market = MarketSnapshot(
+        id="no-eurusd-spot",
+        fx_spots=fx_spots,
+        rates={"USD": 0.04, "EUR": 0.03},
+        **extra,
+    )
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        engine.value(position, market)
+    assert raised.value.factor_key == f"fx_spots[{position.pair}]"
+
+
+@pytest.mark.parametrize(
+    "fx_vols",
+    [{}, {"GBPUSD": 0.11}],
+    ids=["empty-vols", "gbp-vol"],
+)
+def test_quantlib_missing_fx_option_vol_raises_when_market_is_supplied(engine, fx_vols):
+    from app.market.demo_snapshot import MissingMarketDataError
+
+    position = _fx_option_authority()
+    market = MarketSnapshot(
+        id="no-eurusd-vol",
+        fx_spots={"EURUSD": 1.10},
+        fx_vols=fx_vols,
+        rates={"USD": 0.04, "EUR": 0.03},
+    )
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        engine.value(position, market)
+    assert raised.value.factor_key == f"fx_vols[{position.pair}]"
+
+
+@pytest.mark.parametrize("book_factory", [_fx_forward_authority, _fx_option_authority], ids=["forward", "option"])
+@pytest.mark.parametrize(
+    "rates",
+    [{}, {"EUR": 0.03}],
+    ids=["empty-rates", "eur-only"],
+)
+def test_quantlib_missing_fx_domestic_rate_raises_when_market_is_supplied(engine, book_factory, rates):
+    from app.market.demo_snapshot import MissingMarketDataError
+
+    position = book_factory()
+    extra = {"fx_vols": {"EURUSD": 0.12}} if position.type == "fx_option" else {}
+    market = MarketSnapshot(
+        id="no-usd-rate",
+        fx_spots={"EURUSD": 1.10},
+        rates=rates,
+        **extra,
+    )
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        engine.value(position, market)
+    assert raised.value.factor_key == "rates[USD]"
+
+
+@pytest.mark.parametrize("book_factory", [_fx_forward_authority, _fx_option_authority], ids=["forward", "option"])
+def test_quantlib_missing_fx_foreign_rate_raises_when_market_is_supplied(engine, book_factory):
+    from app.market.demo_snapshot import MissingMarketDataError
+
+    position = book_factory()
+    extra = {"fx_vols": {"EURUSD": 0.12}} if position.type == "fx_option" else {}
+    market = MarketSnapshot(
+        id="no-eur-rate",
+        fx_spots={"EURUSD": 1.10},
+        rates={"USD": 0.04},
+        **extra,
+    )
+
+    with pytest.raises(MissingMarketDataError) as raised:
+        engine.value(position, market)
+    assert raised.value.factor_key == "rates[EUR]"
+
+
+def test_quantlib_complete_snapshot_fx_prices_without_mutating_trade(engine):
+    forward = _fx_forward_authority()
+    option = _fx_option_authority()
+    original_fwd = forward.model_dump(mode="json")
+    original_opt = option.model_dump(mode="json")
+    market = MarketSnapshot(
+        fx_spots={"EURUSD": 1.10},
+        fx_vols={"EURUSD": 0.12},
+        rates={"USD": 0.04, "EUR": 0.03},
+    )
+    builtin = BuiltinPricingEngine()
+
+    ql_fwd = engine.value(forward, market)
+    ql_opt = engine.value(option, market)
+    assert ql_fwd.market_value == pytest.approx(
+        builtin.value(forward, market).market_value, rel=1e-12, abs=1e-9
+    )
+    assert ql_opt.market_value == pytest.approx(
+        builtin.value(option, market).market_value, rel=5e-3
+    )
+    assert ql_fwd.market_value != pytest.approx(engine.value(forward).market_value, abs=1.0)
+    assert ql_opt.market_value != pytest.approx(engine.value(option).market_value, abs=1.0)
+    assert forward.model_dump(mode="json") == original_fwd
+    assert option.model_dump(mode="json") == original_opt
+

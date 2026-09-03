@@ -21,7 +21,7 @@ from app.domain.models import (
 from app.interfaces.pricing import PricingEngine
 from app.market.demo_snapshot import MissingMarketDataError
 from app.pricing.curve_rates import continuous_zero, discount_factor
-from app.pricing.surface_vol import option_vol_from_snapshot, required_equity_option_vol
+from app.pricing.surface_vol import required_equity_option_vol, required_fx_option_vol
 
 _N = NormalDist()
 def _cdf(x: float) -> float: return _N.cdf(x)
@@ -52,6 +52,13 @@ def _required_dividend_yield(market: MarketSnapshot, symbol: str) -> float:
         return market.dividend_yields[symbol]
     except KeyError:
         raise MissingMarketDataError(f"dividend_yields[{symbol}]") from None
+
+
+def _required_fx_spot(market: MarketSnapshot, pair: str) -> float:
+    try:
+        return market.fx_spots[pair]
+    except KeyError:
+        raise MissingMarketDataError(f"fx_spots[{pair}]") from None
 
 
 def _act365_fixed_years(maturity_years: float) -> float:
@@ -103,9 +110,14 @@ class BuiltinPricingEngine(PricingEngine):
         if isinstance(position, SwapPosition):
             return self._swap(position, market)
         if isinstance(position, FXForwardPosition):
-            s = market.fx_spots.get(position.pair, position.spot) if market else position.spot
-            rd = market.rates.get(position.pair[-3:], position.domestic_rate) if market else position.domestic_rate
-            rf = market.rates.get(position.pair[:3], position.foreign_rate) if market else position.foreign_rate
+            if market is None:
+                s = position.spot
+                rd = position.domestic_rate
+                rf = position.foreign_rate
+            else:
+                s = _required_fx_spot(market, position.pair)
+                rd = _required_settlement_rate(market, position.pair[-3:])
+                rf = _required_settlement_rate(market, position.pair[:3])
             forward = s*math.exp((rd-rf)*position.maturity_years)
             pv = position.notional_base*(forward-position.strike)*math.exp(-rd*position.maturity_years)
             return Valuation(position_id=position.id, market_value=pv, fx_delta=position.notional_base*s)
@@ -176,22 +188,22 @@ class BuiltinPricingEngine(PricingEngine):
         return Valuation(position_id=p.id,market_value=p.quantity*price,delta=p.quantity*delta*s,gamma=p.quantity*gamma*s*s,vega=p.quantity*vega*0.01)
 
     def _fx_option(self, p: FXOptionPosition, market: MarketSnapshot | None) -> Valuation:
-        s = market.fx_spots.get(p.pair,p.spot) if market else p.spot
-        fallback = market.fx_vols.get(p.pair, p.volatility) if market else p.volatility
-        sigma = (
-            option_vol_from_snapshot(
+        if market is None:
+            s = p.spot
+            sigma = p.volatility
+            rd = p.domestic_rate
+            rf = p.foreign_rate
+        else:
+            s = _required_fx_spot(market, p.pair)
+            sigma = required_fx_option_vol(
                 market,
                 name=p.pair,
                 maturity_years=p.maturity_years,
                 strike=p.strike,
                 spot=s,
-                fallback=fallback,
             )
-            if market
-            else fallback
-        )
-        rd = market.rates.get(p.pair[-3:],p.domestic_rate) if market else p.domestic_rate
-        rf = market.rates.get(p.pair[:3],p.foreign_rate) if market else p.foreign_rate
+            rd = _required_settlement_rate(market, p.pair[-3:])
+            rf = _required_settlement_rate(market, p.pair[:3])
         t,k=p.maturity_years,p.strike; sqrt_t=math.sqrt(t)
         d1=(math.log(s/k)+(rd-rf+0.5*sigma*sigma)*t)/(sigma*sqrt_t); d2=d1-sigma*sqrt_t
         if p.option_type=="call": unit=s*math.exp(-rf*t)*_cdf(d1)-k*math.exp(-rd*t)*_cdf(d2); d=math.exp(-rf*t)*_cdf(d1)
