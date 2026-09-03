@@ -47,7 +47,7 @@ from app.risk.stress import (
     StressEngine,
 )
 from app.risk.var import VaRAnalytics
-from app.sample import DemoPortfolioMarketDataProvider, demo_aggregate_market_snapshot
+from app.sample import DemoPortfolioMarketDataProvider
 
 
 def position_label(position: Position) -> str:
@@ -142,13 +142,22 @@ class PortfolioService:
         return RiskSummary(portfolio_id=portfolio.id, **r)
 
     def stresses(self, portfolio: Portfolio, scenarios: list[StressScenario] | None = None) -> list[StressResult]:
-        return self.stress_engine.run(portfolio, self.pricing, scenarios or DEFAULT_SCENARIOS)
+        market = self.market_snapshot(portfolio)
+        return self.stress_engine.run(
+            portfolio, self.pricing, scenarios or DEFAULT_SCENARIOS, market=market
+        )
 
     def threat_evaluation(self, portfolio: Portfolio, scenarios: list[StressScenario] | None = None) -> ScenarioEvaluationReport:
-        return self.stress_engine.evaluate(portfolio, self.pricing, scenarios or THREAT_SCENARIOS)
+        market = self.market_snapshot(portfolio)
+        return self.stress_engine.evaluate(
+            portfolio, self.pricing, scenarios or THREAT_SCENARIOS, market=market
+        )
 
     def reverse_stress(self, portfolio, target_loss_pct, factor, max_shock=.80):
-        return self.reverse_stress_engine.solve(portfolio,self.pricing,target_loss_pct,factor,max_shock)
+        market = self.market_snapshot(portfolio)
+        return self.reverse_stress_engine.solve(
+            portfolio, self.pricing, target_loss_pct, factor, max_shock, market=market
+        )
 
     def reverse_stress_multi(
         self,
@@ -161,6 +170,7 @@ class PortfolioService:
         max_shocks=None,
     ):
         """Constrained multi-factor reverse stress (M3.6)."""
+        market = self.market_snapshot(portfolio)
         return self.multi_reverse_stress_engine.solve(
             portfolio,
             self.pricing,
@@ -169,12 +179,16 @@ class PortfolioService:
             weights=weights,
             max_shock=max_shock,
             max_shocks=max_shocks,
+            market=market,
         )
 
     def compare_scenarios(self, base, hedged, scenarios, methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA):
         """Hedge comparison with VaR/ES/cost/exposures (M3.7)."""
+        # Snapshot the base book once and reuse for the hedged book. Identity
+        # differences must not infer a second market from either book's trades.
+        market = self.market_snapshot(base)
         return self.scenario_comparison_engine.compare(
-            base, hedged, self.pricing, scenarios, methodology=methodology
+            base, hedged, self.pricing, scenarios, methodology=methodology, market=market
         )
 
     def factors(self, portfolio): return self.factor_engine.calculate(portfolio,self.pricing)
@@ -265,7 +279,10 @@ class PortfolioService:
             market=market,
         )
 
-    def hierarchy(self, portfolio): return self.hierarchy_engine.build(portfolio,self.pricing)
+    def hierarchy(self, portfolio):
+        return self.hierarchy_engine.build(
+            portfolio, self.pricing, market=self.market_snapshot(portfolio)
+        )
     def attribution(self, request): return self.attribution_engine.explain(request,self.pricing)
     def risk_change_attribution(
         self, request: RiskChangeAttributionRequest
@@ -273,7 +290,7 @@ class PortfolioService:
         return self.risk_change_engine.explain(request, self.pricing)
     def demo_attribution(self, portfolio):
         from app.domain.models import AttributionRequest
-        current=demo_aggregate_market_snapshot(portfolio)
+        current=self.market_snapshot(portfolio)
         previous=current.model_copy(update={
             "id":"illustrative_previous",
             "as_of":"illustrative_previous",
@@ -282,6 +299,11 @@ class PortfolioService:
             "fx_spots":{k:v*.995 for k,v in current.fx_spots.items()},
             "fx_vols":{k:v*.95 for k,v in current.fx_vols.items()},
             "rates":{k:v-.001 for k,v in current.rates.items()},
+            "key_rates":{
+                ccy:{tenor:val-0.001 for tenor,val in pillars.items()}
+                for ccy,pillars in current.key_rates.items()
+            },
+            "projection_rates":{k:v-.001 for k,v in current.projection_rates.items()},
         })
         # One business day of theta on options/futures with maturity.
         return self.attribution(AttributionRequest(
@@ -317,7 +339,9 @@ class PortfolioService:
             risk = self.risk.calculate(portfolio, self.pricing, market=market)
         else:
             risk = self.risk.calculate(portfolio, self.pricing)
-        stress = self.stress_engine.run(portfolio, self.pricing, DEFAULT_SCENARIOS)
+        stress = self.stress_engine.run(
+            portfolio, self.pricing, DEFAULT_SCENARIOS, market=market
+        )
         enriched = {
             **risk,
             "stress_loss": max(0.0, max((-float(s.pnl) for s in stress), default=0.0)),
@@ -351,6 +375,7 @@ class PortfolioService:
             breaches_only = request.breaches_only
         if portfolio is None:
             raise ValueError("portfolio is required")
+        market = self.market_snapshot(portfolio)
         return self.limit_drilldown_engine.report(
             portfolio,
             self.pricing,
@@ -360,4 +385,5 @@ class PortfolioService:
             top_n=top_n,
             breaches_only=breaches_only,
             label_fn=position_label,
+            market=market,
         )

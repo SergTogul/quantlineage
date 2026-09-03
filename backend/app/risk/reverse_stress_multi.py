@@ -34,6 +34,7 @@ from typing import Iterable, Mapping, Sequence
 
 from app.domain.models import (
     FactorShockSolution,
+    MarketSnapshot,
     MultiFactorReverseStressResult,
     Portfolio,
 )
@@ -185,6 +186,7 @@ class MultiFactorReverseStressEngine:
         max_iterations: int = DEFAULT_MAX_ITERATIONS,
         loss_tolerance: float = DEFAULT_LOSS_TOLERANCE,
         coordinate_passes: int = DEFAULT_COORDINATE_PASSES,
+        market: MarketSnapshot | None = None,
     ) -> MultiFactorReverseStressResult:
         if target_loss_pct <= 0:
             raise ValueError("target_loss_pct must be > 0")
@@ -204,7 +206,7 @@ class MultiFactorReverseStressEngine:
         w = _normalize_weights(selected, weights)
         bounds = _resolve_bounds(selected, max_shock, max_shocks)
 
-        base_market = self.market_data.snapshot(portfolio)
+        base_market = market if market is not None else self.market_data.snapshot(portfolio)
         base_mv = _portfolio_mv(pricing_engine, portfolio, base_market)
         denom = abs(base_mv) or 1.0
         target_loss = float(target_loss_pct) * denom

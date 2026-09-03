@@ -18,6 +18,8 @@ from app.domain.models import (
 from app.persistence.session import session_scope
 from app.persistence.sqlalchemy_repos import SqlAlchemyPortfolioRepository
 from app.pricing.builtin import BuiltinPricingEngine
+from app.market.demo_snapshot import MissingMarketDataError
+from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.sample import (
     CROSS_ASSET_PORTFOLIO,
     DEMO_PORTFOLIOS,
@@ -25,6 +27,8 @@ from app.sample import (
     EQUITY_VOL_PORTFOLIO,
     RATES_MACRO_PORTFOLIO,
     SAMPLE_PORTFOLIO,
+    _DEMO_AGGREGATE_MARKETS,
+    demo_aggregate_market_snapshot,
     demo_market_snapshot,
     demo_portfolio_summaries,
     get_demo_portfolio,
@@ -163,3 +167,70 @@ def test_sqlalchemy_seed_includes_all_demo_portfolios(monkeypatch, tmp_path, cle
 @pytest.fixture
 def clear_db_url(monkeypatch):
     monkeypatch.delenv("RISKFORGE_DATABASE_URL", raising=False)
+
+
+def test_aggregate_demo_snapshots_seed_required_equity_dividend_yields():
+    """Acc 5 lock: dropping SPY/NVDA dividend_yields from canned aggregates fails."""
+    for demo_id in ("global-macro", "equity-vol"):
+        seeded = _DEMO_AGGREGATE_MARKETS[demo_id]
+        assert seeded.dividend_yields["SPY"] == 0.0
+        assert seeded.dividend_yields["NVDA"] == 0.0
+        resolved = demo_aggregate_market_snapshot(DEMO_PORTFOLIOS_BY_ID[demo_id])
+        assert resolved.dividend_yields["SPY"] == 0.0
+        assert resolved.dividend_yields["NVDA"] == 0.0
+
+
+def test_dropping_aggregate_dividend_yields_fails_closed_on_sample_options():
+    market = demo_aggregate_market_snapshot(SAMPLE_PORTFOLIO)
+    stripped = market.model_copy(update={"dividend_yields": {}})
+    option = next(p for p in SAMPLE_PORTFOLIO.positions if p.id == "opt-spy-put")
+    with pytest.raises(MissingMarketDataError) as raised:
+        BuiltinPricingEngine().value(option, stripped)
+    assert raised.value.factor_key == "dividend_yields[SPY]"
+
+
+def test_aggregate_stress_engine_prices_sample_and_equity_vol_books():
+    """Goldens still resolve DemoAggregateMarketDataProvider when market is omitted."""
+    pricing = BuiltinPricingEngine()
+    engine = StressEngine()
+    for book in (SAMPLE_PORTFOLIO, EQUITY_VOL_PORTFOLIO):
+        results = engine.run(book, pricing, DEFAULT_SCENARIOS[:1])
+        assert len(results) == 1
+        assert len(results[0].by_position) == len(book.positions)
+
+
+_DASHBOARD_POSTS = (
+    "/api/v1/risk/stress",
+    "/api/v1/risk/stress/evaluate",
+    "/api/v1/risk/limits",
+    "/api/v1/risk/hierarchy",
+    "/api/v1/risk/attribution/demo",
+)
+
+
+def test_sample_portfolio_dashboard_posts_succeed(clear_db_url):
+    from app.main import app
+
+    with TestClient(app) as client:
+        portfolio = client.get("/api/v1/portfolio").json()
+        assert portfolio["id"] == SAMPLE_PORTFOLIO.id
+        for path in _DASHBOARD_POSTS:
+            resp = client.post(path, json=portfolio)
+            assert resp.status_code == 200, (path, resp.status_code, resp.text)
+
+
+def test_sample_portfolio_limits_drilldown_post_succeeds(clear_db_url):
+    """Dashboard limit drill-down must not 400 on CachedPricingEngine."""
+    from app.main import app
+
+    with TestClient(app) as client:
+        portfolio = client.get("/api/v1/portfolio").json()
+        assert portfolio["id"] == SAMPLE_PORTFOLIO.id
+        resp = client.post(
+            "/api/v1/risk/limits/drilldown",
+            json={"portfolio": portfolio, "breaches_only": False},
+        )
+        assert resp.status_code == 200, (resp.status_code, resp.text)
+        body = resp.json()
+        assert body["portfolio_id"] == SAMPLE_PORTFOLIO.id
+        assert body["items"]

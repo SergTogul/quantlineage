@@ -22,6 +22,7 @@ from app.domain.models import (
     HierarchyNode,
     HierarchyRef,
     LimitResult,
+    MarketSnapshot,
     Portfolio,
     StressResult,
     StressScenario,
@@ -34,6 +35,7 @@ from app.risk.hierarchy_placement import (
     resolve_desk,
     resolve_strategy,
 )
+from app.risk.historical import HistoricalRiskEngine
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.sample import demo_market_snapshot
@@ -85,17 +87,26 @@ class HierarchyEngine:
             stress_scenarios if stress_scenarios is not None else DEFAULT_SCENARIOS
         )
 
-    def _metrics(self, portfolio: Portfolio, pricing: PricingEngine) -> dict:
+    def _metrics(
+        self, portfolio: Portfolio, pricing: PricingEngine, market: MarketSnapshot
+    ) -> dict:
+        if isinstance(self.risk, HistoricalRiskEngine):
+            return self.risk.calculate(portfolio, pricing, market=market)
         return self.risk.calculate(portfolio, pricing)
 
-    def _stress(self, portfolio: Portfolio, pricing: PricingEngine) -> list[StressResult]:
-        return self.stress_engine.run(portfolio, pricing, self.stress_scenarios)
+    def _stress(
+        self, portfolio: Portfolio, pricing: PricingEngine, market: MarketSnapshot
+    ) -> list[StressResult]:
+        return self.stress_engine.run(
+            portfolio, pricing, self.stress_scenarios, market=market
+        )
 
     def _limits(
         self,
         portfolio: Portfolio,
         pricing: PricingEngine,
         risk: dict,
+        market: MarketSnapshot,
         stress: Sequence[StressResult] | None = None,
     ) -> list[LimitResult]:
         enriched = dict(risk)
@@ -108,7 +119,7 @@ class HierarchyEngine:
             pricing,
             enriched,
             DEFAULT_LIMITS,
-            market=demo_market_snapshot(portfolio),
+            market=market,
         )
 
     def _node(
@@ -118,10 +129,11 @@ class HierarchyEngine:
         path: str,
         portfolio: Portfolio,
         pricing: PricingEngine,
+        market: MarketSnapshot,
         children: Sequence[HierarchyNode] | None = None,
     ) -> HierarchyNode:
-        r = self._metrics(portfolio, pricing)
-        stress = self._stress(portfolio, pricing)
+        r = self._metrics(portfolio, pricing, market)
+        stress = self._stress(portfolio, pricing, market)
         return HierarchyNode(
             name=name,
             level=level,  # type: ignore[arg-type]
@@ -136,14 +148,19 @@ class HierarchyEngine:
             var_99=float(r["var_99"]),
             expected_shortfall_99=float(r.get("expected_shortfall_99", 0.0)),
             stress=stress,
-            limits=self._limits(portfolio, pricing, r, stress),
+            limits=self._limits(portfolio, pricing, r, market, stress),
             children=list(children or []),
         )
 
     def risk_at(
-        self, portfolio: Portfolio, pricing: PricingEngine, ref: HierarchyRef
+        self,
+        portfolio: Portfolio,
+        pricing: PricingEngine,
+        ref: HierarchyRef,
+        market: MarketSnapshot | None = None,
     ) -> HierarchyNode:
         """Full metrics for one hierarchy node (no children)."""
+        root_market = market if market is not None else demo_market_snapshot(portfolio)
         sub = portfolio_at(portfolio, ref)
         return self._node(
             sub.name,
@@ -151,10 +168,17 @@ class HierarchyEngine:
             _ref_path(portfolio, ref),
             sub,
             pricing,
+            root_market,
         )
 
-    def build(self, portfolio: Portfolio, pricing: PricingEngine) -> HierarchyNode:
+    def build(
+        self,
+        portfolio: Portfolio,
+        pricing: PricingEngine,
+        market: MarketSnapshot | None = None,
+    ) -> HierarchyNode:
         """Full Firm → … → Trade tree with NAV/Greeks/VaR/ES/stress/limits per node."""
+        root_market = market if market is not None else demo_market_snapshot(portfolio)
         # desk -> strategy -> book -> [positions]
         tree: dict[str, dict[str, dict[str, list]]] = defaultdict(
             lambda: defaultdict(lambda: defaultdict(list))
@@ -196,6 +220,7 @@ class HierarchyEngine:
                                 _path(book_path, p.id),
                                 trade_pf,
                                 pricing,
+                                root_market,
                             )
                         )
                     book_pf = Portfolio(
@@ -207,7 +232,15 @@ class HierarchyEngine:
                         strategy=strategy_name,
                     )
                     book_nodes.append(
-                        self._node(book_name, "book", book_path, book_pf, pricing, trade_nodes)
+                        self._node(
+                            book_name,
+                            "book",
+                            book_path,
+                            book_pf,
+                            pricing,
+                            root_market,
+                            trade_nodes,
+                        )
                     )
                 strategy_pf = Portfolio(
                     id=f"strategy:{desk_name}/{strategy_name}",
@@ -224,6 +257,7 @@ class HierarchyEngine:
                         strategy_path,
                         strategy_pf,
                         pricing,
+                        root_market,
                         book_nodes,
                     )
                 )
@@ -236,7 +270,15 @@ class HierarchyEngine:
                 strategy=portfolio.strategy,
             )
             desk_nodes.append(
-                self._node(desk_name, "desk", desk_path, desk_pf, pricing, strategy_nodes)
+                self._node(
+                    desk_name,
+                    "desk",
+                    desk_path,
+                    desk_pf,
+                    pricing,
+                    root_market,
+                    strategy_nodes,
+                )
             )
 
         portfolio_node = self._node(
@@ -245,6 +287,7 @@ class HierarchyEngine:
             portfolio_path,
             portfolio,
             pricing,
+            root_market,
             desk_nodes,
         )
         return self._node(
@@ -253,6 +296,7 @@ class HierarchyEngine:
             firm_path,
             portfolio,
             pricing,
+            root_market,
             [portfolio_node],
         )
 
