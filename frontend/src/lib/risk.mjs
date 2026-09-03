@@ -184,18 +184,100 @@ export function defaultHedgeScenarios() {
   return [{ name: 'Crash', equity_shock: -0.2 }]
 }
 
-/** Thin display parse for MultiFactorReverseStressResult. */
+/** Thin display parse for MultiFactorReverseStressResult (API fields only). */
 export function reverseStressMultiSummary(result) {
   if (!result) return null
   return {
     converged: !!result.converged,
     target_loss_pct: result.target_loss_pct,
+    target_loss: result.target_loss,
     achieved_loss_pct: result.achieved_loss_pct,
     pnl: result.pnl,
+    base_market_value: result.base_market_value,
+    objective_l2: result.objective_l2 ?? null,
     shocks: result.shocks || [],
     factors: result.factors || [],
+    method: result.method ?? null,
+    iterations: result.iterations ?? 0,
     message: result.message ?? null,
+    assumptions: result.assumptions || [],
   }
+}
+
+/** Factor families accepted by POST /risk/stress/reverse/multi. */
+export const REVERSE_MULTI_FACTORS = Object.freeze(['equity', 'rates', 'vol', 'fx'])
+
+/** Default multi-factor reverse form (display units: loss %, max shock %). */
+export function defaultReverseMultiForm() {
+  return {
+    target_loss_pct: 5,
+    max_shock: 80,
+    factors: { equity: true, rates: false, vol: true, fx: false },
+    weights: { equity: '', rates: '', vol: '', fx: '' },
+  }
+}
+
+/** Selected factor ids from the multi-factor reverse form. */
+export function selectedReverseMultiFactors(form) {
+  return REVERSE_MULTI_FACTORS.filter((f) => !!form?.factors?.[f])
+}
+
+/**
+ * Validate multi-factor reverse form before API call (display checks only).
+ * Requires ≥2 factors so the panel matches the multi-factor endpoint intent.
+ */
+export function validateReverseMultiForm(form) {
+  const factors = selectedReverseMultiFactors(form)
+  if (factors.length < 2) {
+    return { ok: false, error: 'Select at least two factors' }
+  }
+  const target = Number(form?.target_loss_pct)
+  if (!Number.isFinite(target) || target <= 0) {
+    return { ok: false, error: 'Target loss % must be > 0' }
+  }
+  const maxShock = Number(form?.max_shock)
+  if (!Number.isFinite(maxShock) || maxShock <= 0) {
+    return { ok: false, error: 'Max shock % must be > 0' }
+  }
+  const anyWeight = factors.some((f) => String(form?.weights?.[f] ?? '').trim() !== '')
+  if (anyWeight) {
+    for (const f of factors) {
+      const w = Number(form?.weights?.[f])
+      if (!Number.isFinite(w) || w <= 0) {
+        return { ok: false, error: `Weight for ${f} must be > 0` }
+      }
+    }
+  }
+  return { ok: true, error: null }
+}
+
+/**
+ * Build reverseStressMulti options from the form (request body helpers only).
+ * target_loss_pct is returned as a fraction for the API.
+ */
+export function reverseMultiRequestBody(form) {
+  const factors = selectedReverseMultiFactors(form)
+  const body = {
+    target_loss_pct: Number(form.target_loss_pct) / 100,
+    factors,
+    max_shock: Number(form.max_shock) / 100,
+  }
+  const anyWeight = factors.some((f) => String(form?.weights?.[f] ?? '').trim() !== '')
+  if (anyWeight) {
+    body.weights = Object.fromEntries(
+      factors.map((f) => [f, Number(form.weights[f])]),
+    )
+  }
+  return body
+}
+
+/** Format a FactorShockSolution for display (wire unit from API). */
+export function formatFactorShock(shock) {
+  if (!shock || shock.required_shock == null) return '—'
+  if (shock.shock_unit === 'bp') {
+    return `${Number(shock.required_shock).toFixed(0)} bp`
+  }
+  return percent(shock.required_shock)
 }
 
 /**

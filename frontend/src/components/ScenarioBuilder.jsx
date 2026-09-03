@@ -1,8 +1,12 @@
 import { useState } from 'react'
-import { askRisk, compareHedge, evaluateCustomScenario, reverseStress } from '../api'
 import {
-  SCENARIO_PRESETS, defaultHedgeScenarios, defaultScenarioForm, hedgeComparisonSummary,
-  money, percent, scenarioPayload, spyFlatHedgePortfolio, validateScenarioForm,
+  askRisk, compareHedge, evaluateCustomScenario, reverseStress, reverseStressMulti,
+} from '../api'
+import {
+  REVERSE_MULTI_FACTORS, SCENARIO_PRESETS, defaultHedgeScenarios, defaultReverseMultiForm,
+  defaultScenarioForm, formatFactorShock, hedgeComparisonSummary, money, percent,
+  reverseMultiRequestBody, reverseStressMultiSummary, scenarioPayload, spyFlatHedgePortfolio,
+  validateReverseMultiForm, validateScenarioForm,
 } from '../lib/risk.mjs'
 
 const HEDGE_METHODS = ['LINEAR', 'DELTA_GAMMA', 'FULL_REVALUATION']
@@ -152,6 +156,171 @@ export function ReverseStress({ portfolio }) {
             ? `Required ${factor} shock: ${factor === 'rates' ? `${result.required_shock.toFixed(0)} bp` : percent(result.required_shock)}`
             : 'Target not reached within search bound.'}
         </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Multi-factor reverse stress — POST /api/v1/risk/stress/reverse/multi.
+ * Displays MultiFactorReverseStressResult only; no client search/optimization.
+ */
+export function ReverseStressMulti({ portfolio }) {
+  const [form, setForm] = useState(defaultReverseMultiForm)
+  const [summary, setSummary] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  function toggleFactor(factor) {
+    setForm({
+      ...form,
+      factors: { ...form.factors, [factor]: !form.factors[factor] },
+    })
+  }
+
+  function setWeight(factor, value) {
+    setForm({ ...form, weights: { ...form.weights, [factor]: value } })
+  }
+
+  async function run() {
+    if (!portfolio) return
+    const check = validateReverseMultiForm(form)
+    if (!check.ok) {
+      setError(check.error)
+      setSummary(null)
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const body = reverseMultiRequestBody(form)
+      const result = await reverseStressMulti(portfolio, body.target_loss_pct, {
+        factors: body.factors,
+        weights: body.weights,
+        max_shock: body.max_shock,
+      })
+      setSummary(reverseStressMultiSummary(result))
+    } catch (e) {
+      setError(e.message || 'Multi-factor reverse stress failed')
+      setSummary(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="card wide" data-testid="reverse-stress-multi">
+      <h3>Multi-Factor Reverse Stress</h3>
+      <div className="muted">
+        Constrained joint adverse moves → POST /api/v1/risk/stress/reverse/multi
+        (server ray search + coordinate descent; not a certified global optimum)
+      </div>
+      <div className="reverse-multi-factors" role="group" aria-label="reverse multi factors">
+        {REVERSE_MULTI_FACTORS.map((f) => (
+          <label key={f} className="reverse-multi-factor">
+            <input
+              type="checkbox"
+              checked={!!form.factors[f]}
+              onChange={() => toggleFactor(f)}
+              disabled={loading}
+              aria-label={`factor ${f}`}
+            />
+            {f}
+          </label>
+        ))}
+      </div>
+      <div className="inline-form risk-run-form reverse-multi-form">
+        <label>
+          Target loss %
+          <input
+            type="number"
+            value={form.target_loss_pct}
+            onChange={(e) => setForm({ ...form, target_loss_pct: e.target.value })}
+            disabled={loading}
+            aria-label="multi reverse target loss percent"
+          />
+        </label>
+        <label>
+          Max shock %
+          <input
+            type="number"
+            value={form.max_shock}
+            onChange={(e) => setForm({ ...form, max_shock: e.target.value })}
+            disabled={loading}
+            aria-label="multi reverse max shock percent"
+          />
+        </label>
+        {REVERSE_MULTI_FACTORS.filter((f) => form.factors[f]).map((f) => (
+          <label key={`w-${f}`}>
+            Weight {f}
+            <input
+              type="number"
+              value={form.weights[f]}
+              onChange={(e) => setWeight(f, e.target.value)}
+              disabled={loading}
+              placeholder="equal"
+              aria-label={`weight ${f}`}
+            />
+          </label>
+        ))}
+        <button type="button" onClick={run} disabled={!portfolio || loading}>
+          {loading ? 'Solving…' : 'Solve multi-factor'}
+        </button>
+      </div>
+      {error && <div className="error risk-run-error">{error}</div>}
+      {!summary && !error && (
+        <div className="muted foot">No multi-factor reverse run yet</div>
+      )}
+      {summary && (
+        <div className="risk-panel-result reverse-multi-result">
+          <div className="attribution-total">
+            <span>
+              Status{' '}
+              <strong className={summary.converged ? 'positive' : 'negative'}>
+                {summary.converged ? 'Converged' : 'Not converged'}
+              </strong>
+            </span>
+            <span>Target {percent(summary.target_loss_pct ?? 0)}</span>
+            <span>Achieved {percent(summary.achieved_loss_pct ?? 0)}</span>
+            <span className={(summary.pnl ?? 0) < 0 ? 'negative' : 'positive'}>
+              P&amp;L {money(summary.pnl ?? 0)}
+            </span>
+            {summary.method && <span className="muted">{summary.method}</span>}
+            {summary.iterations != null && (
+              <span className="muted">{summary.iterations} iter</span>
+            )}
+          </div>
+          {summary.message && <div className="muted foot">{summary.message}</div>}
+          {summary.shocks.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Factor</th>
+                  <th>Required shock</th>
+                  <th>Unit</th>
+                  <th>Weight</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.shocks.map((s) => (
+                  <tr key={s.factor}>
+                    <td>{s.factor}</td>
+                    <td>{formatFactorShock(s)}</td>
+                    <td className="muted">{s.shock_unit}</td>
+                    <td>{s.weight == null ? '—' : Number(s.weight).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {summary.assumptions.length > 0 && (
+            <ul className="muted foot reverse-multi-assumptions">
+              {summary.assumptions.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   )

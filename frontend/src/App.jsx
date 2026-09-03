@@ -7,7 +7,9 @@ import {
   Attribution, ESContributions, Hierarchy, RiskChangeAttribution, RiskFactors, RiskRuns,
   VaRAnalytics, VaRCompare,
 } from './components/Analytics'
-import { HedgeCompare, ReverseStress, RiskQuery, ScenarioBuilder } from './components/ScenarioBuilder'
+import {
+  HedgeCompare, ReverseStress, ReverseStressMulti, RiskQuery, ScenarioBuilder,
+} from './components/ScenarioBuilder'
 import {
   FactorExposureHeatmap, HierarchyRiskHeatmap, LimitUtilizationHeatmap, StressPnlHeatmap,
 } from './components/Heatmaps'
@@ -138,6 +140,7 @@ export default function App() {
             <Stress items={stress} />
             <ThreatScenarios report={threats} />
             <ReverseStress portfolio={portfolio} />
+            <ReverseStressMulti portfolio={portfolio} />
           </div>
         </SectionFrame>
       )
