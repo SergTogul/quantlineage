@@ -56,9 +56,7 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 - QuantLib: preferred for broader suite when `RISKFORGE_PRICING_ENGINE=quantlib`
 - C++: N/A
 - Build: N/A
-- Ruff: clean on new/changed API + test files
-- Milestone 9: **COMPLETE** (Redis/RQ deferred residual)
-- M3.8: **DONE**
+- CI/push: SHA `9fd2884` on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
 
 ## Known limitations / risks
 - Redis/RQ still not implemented — deferred for fair scheduling/ops only; Postgres SKIP LOCKED remains the claim path
