@@ -1,63 +1,65 @@
-# Handoff — M9.1 + M9.3/M9.5 (QA)
+# Handoff — M9.4 QuantLib golden expand (QA)
 
 ## Task
-M9.1 Vitest/RTL/MSW; then M9.3 Hypothesis broaden + M9.5 stress invariants
+M9.4 — Expand QuantLib golden coverage with documented tolerances/reference
 
 ## Owner
-QA & Quant Validation Engineer (Frontend harness only for M9.1)
+QA & Quant Validation Engineer
 
 ## Summary
-- **M9.1 DONE (staged):** Vitest + RTL + MSW dual-run with existing node:test lib helpers; representative component slice (MetricCard, AppNav, ScenarioBuilder + MSW).
-- **M9.3 DONE (staged):** Hypothesis portfolio/VaR properties beyond pricing Greeks.
-- **M9.5 DONE (staged):** Hypothesis stress aggregation / empty / monotonicity invariants.
-- Milestone 9 remains **PARTIAL** — do **not** mark COMPLETE.
+- Expanded `backend/tests/test_quantlib_golden.py` from a thin M1.8 slice to ~49 golden cases across equity/FX options, ZC bonds, IRS, equity futures, FX forwards, IR futures, edge evaluation dates, and PricingEngine seam checks.
+- Bond day-count gap **documented and closed for validation**: tight continuous Actual365Fixed golden replaces reliance on annual-compound parity (wide band retained as documentation).
+- **No production/adapter code changes** — PricingEngine seams preserved.
+- **M9.4 DONE**. Milestone 9 remains **PARTIAL** (M9.8 Redis optional; M9.10 reverse-multi UI/E2E open). Do **not** mark Milestone 9 COMPLETE.
 
 ## Files changed
-### M9.1 (`bd46a1a`)
-- `frontend/package.json`, `package-lock.json`, `vite.config.js`, `eslint.config.js`
-- `frontend/src/test/{setup,mswServer}.js`
-- `frontend/src/components/{MetricCard,AppNav,ScenarioBuilder}.test.jsx`
-- `ROADMAP.md`, `BUILD_NOTES.md`
-
-### M9.3 / M9.5 (this commit)
-- `backend/tests/test_m9_risk_properties.py`
+- `backend/tests/test_quantlib_golden.py`
 - `ROADMAP.md`
 - `docs/agents/HANDOFF_M9_QA.md` (this file)
 
 ## Public/interface changes
-- None (tests + docs + frontend test harness only)
+- None (tests + docs only)
 
 ## Numerical conventions
-- VaR/ES: currency loss, floored ≥ 0; ES99 ≥ VaR99 ≥ VaR95
-- Component VaR: Euler allocation; Σ components = parametric VaR (abs 1e-6 / rel 1e-8)
-- Stress: portfolio pnl = Σ by_position (abs 1e-9); long equity equity-shock monotone
+- Options: analytic BS/GK via `statistics.NormalDist`; QL `AnalyticEuropeanEngine`; **rel=2e-3**, abs=1e-6 (date-rounded exercise vs continuous T)
+- Equity future / FX forward: CIP via FlatForward Time DFs ≡ Builtin → **rel=1e-12**, abs=1e-9
+- IR future: STIR algebra `qty*pv01*(quoted-forward)*1e4` → **rel=1e-12**, abs=1e-9
+- Bond (tight): `face * exp(-y * Actual365Fixed.yearFraction(eval, round(T*365)))` → **rel=1e-10**
+- Bond (documented gap): annual compound vs QL continuous → **rel=5e-2** only
+- IRS ATM residual: Actual365Fixed fixed vs Actual360 float → **|PV|/notional < 50bp**; payer DV01 > 0
+- Eval dates pinned (weekday / Saturday / leap day / year-end) — no wall-clock flakiness
 
 ## Tests added/updated
-- Vitest/RTL/MSW: 6 component tests
-- Hypothesis: 6 properties in `test_m9_risk_properties.py`
+- Equity option moneyness + edge eval dates + 1-day tenor finite
+- Continuous ZC bond ladder + annual-compound gap documentation + yield monotonicity
+- IRS ATM residual, receive=-payer, tenor DV01
+- Equity future CIP ladder; FX forward CIP + market snapshot
+- FX option moneyness ladder; IR STIR algebra + forward shock
+- Deterministic replay + `isinstance(..., PricingEngine)`
 
 ## Commands executed
 ```bash
-cd frontend && npm test && npm run lint && npm run build
-# → 56 node:test + 6 Vitest; lint OK; build OK
+cd backend && RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_golden.py -v
+# → 49 passed
 
-cd backend && pytest tests/test_m9_risk_properties.py tests/test_quant_properties.py tests/test_component_var.py -q
-# → 20 passed
+cd backend && RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_golden.py tests/test_quantlib_pricing.py -q
+# → 60 passed
+
+cd backend && RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
+# → 564 passed, 1 warning (Starlette/httpx deprecation)
 ```
 
 ## Results
-- Frontend: green (dual-run)
-- Backend focused: 20 passed
+- Golden focused: 49 passed
+- Full backend QuantLib: 564 passed, 0 unexpected skips
 - Milestone 9: still PARTIAL
 
 ## Known limitations / risks
-- Lib helpers still on node:test (migration residual for M9.1)
-- M9.4 golden instrument expand not done
-- M9.8 Redis/RQ optional containers not done
-- Multi-factor reverse stress has API but **no UI panel** → blocks M9.10 reverse-multi E2E
+- Very short option tenors (`T ≲ 0.05`) and sub-day clamp policy remain in `test_quantlib_pricing.py` (wider bands) — not asserted at 2e-3 in golden file
+- IRS NPV not identical to Builtin annuity model (QL VanillaSwap schedule/day-count)
+- Caps/floors/swaptions still deferred product gap (not M9.4)
 
 ## Follow-up / next owner
-1. **Owner: Quant Pricing / QA — M9.4** — Expand `test_quantlib_golden.py` (IRS/FX/futures golden bands; close or document bond day-count gap). Blocking?: no for M9 complete until done.
-2. **Owner: Frontend — reverse-multi UI** — Stress section multi-factor reverse panel wired to `POST /risk/stress/reverse/multi`; then QA closes M9.10 residual E2E. Blocking?: yes for that E2E gap.
-3. **Owner: DevOps — M9.8** — Optional Redis/RQ worker path in compose (Postgres SKIP LOCKED path already exists). Blocking?: no (optional).
-4. Do **not** mark Milestone 9 COMPLETE until M9.4 + M9.8 honesty + reverse-multi E2E (or explicit deferral) are settled.
+1. **Owner: Frontend — reverse-multi UI** — Stress section multi-factor reverse panel wired to `POST /risk/stress/reverse/multi`; then QA closes M9.10 residual E2E. **Blocking?: yes** for that E2E gap / honest M9 close path.
+2. **Owner: DevOps — M9.8** — Optional Redis/RQ worker path in compose (Postgres SKIP LOCKED path already exists). **Blocking?: no** (optional) — but ROADMAP should stay PARTIAL until M9.8 is DONE or explicitly deferred with Lead Architect note.
+3. Do **not** mark Milestone 9 COMPLETE until M9.8 honesty + reverse-multi E2E (or explicit deferral) are settled.
