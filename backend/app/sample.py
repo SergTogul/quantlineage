@@ -391,6 +391,7 @@ _DEMO_AGGREGATE_MARKETS: dict[str, MarketSnapshot] = {
         equity_spots={"NVDA": 118.50, "SPY": 565.00},
         equity_vols={"NVDA": 0.46, "SPY": 0.18},
         rates={"USD": 0.04},
+        dividend_yields={"NVDA": 0.0, "SPY": 0.0},
     ),
     "rates-macro": MarketSnapshot(
         id="demo-aggregate:rates-macro",
@@ -403,6 +404,7 @@ _DEMO_AGGREGATE_MARKETS: dict[str, MarketSnapshot] = {
         fx_spots={"EURUSD": 1.10},
         fx_vols={"EURUSD": 0.12},
         rates={"USD": 0.04, "EUR": 0.03},
+        dividend_yields={"NVDA": 0.0, "SPY": 0.0},
     ),
 }
 

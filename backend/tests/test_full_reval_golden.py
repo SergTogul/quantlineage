@@ -97,6 +97,7 @@ def test_historical_engine_full_reval_is_not_the_linear_path():
         equity_spots={"UNIT": 100.0},
         equity_vols={"UNIT": 0.25},
         rates={"USD": 0.04},
+        dividend_yields={"UNIT": 0.0},
     )
     pricing = BuiltinPricingEngine()
     dataset = _dataset(np.array([-0.20, 0.0, 0.15]))
