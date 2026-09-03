@@ -18,8 +18,10 @@
 #
 # QuantLib E2E (quantlib-e2e) is nightly-only. Do not add it to PR-FULL needs
 # or to pull_request. If QuantLib cannot be installed, the job fails
-# (RISKFORGE_NIGHTLY=1; no skip-green / no-ql fallback). Hierarchy bench
-# remains an RF-016 leftover.
+# (RISKFORGE_NIGHTLY=1; no skip-green / no-ql fallback).
+#
+# Hierarchy job is checksum / node-count / MV identity, not a host SLA.
+# Do not run benchmarks/check_m6_sla.py or invent a host throughput floor.
 name: Nightly
 
 on:
@@ -241,3 +243,52 @@ jobs:
           RISKFORGE_PRICING_ENGINE: quantlib
           RISKFORGE_REQUIRE_QUANTLIB: "1"
         run: npx playwright test tests/r0-critical-journey.spec.ts
+
+  # RF-016 leftover: hierarchy identity (checksum / node counts / MV), not host SLA.
+  # Sibling nightly only. Do not add to PR-FULL needs or pull_request.
+  hierarchy-benchmark:
+    name: nightly-hierarchy-benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies (builtin is enough)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          if pip install -r requirements.txt; then
+            echo "Installed backend/requirements.txt"
+          else
+            echo "::warning::Full requirements install failed; retrying without QuantLib"
+            grep -Eiv '^[[:space:]]*QuantLib' requirements.txt > /tmp/requirements-no-ql.txt
+            pip install -r /tmp/requirements-no-ql.txt
+          fi
+
+      - name: Hierarchy identity benchmark (checksum / nodes / MV)
+        env:
+          PYTHONPATH: backend
+          RISKFORGE_PRICING_ENGINE: builtin
+          RISKFORGE_NIGHTLY: "1"
+          RISKFORGE_SCENARIO_KERNEL: python
+        run: |
+          python benchmarks/run_hierarchy_bench.py --json \
+            | tee /tmp/hierarchy_bench.json
+          python3 -c "
+          import json
+          row = json.loads(open('/tmp/hierarchy_bench.json', encoding='utf-8').read())
+          assert row.get('impl') == 'hierarchy_python', row
+          assert int(row['n_positions']) == 64, row
+          assert int(row['n_nodes']) == 94, row
+          assert float(row['market_value']) == 64000.0, row
+          assert row.get('additive_ok') is True, row
+          assert row['checksum'] == '2a51c37798de149329b37c58729c13302de6f902bcc26e3316542dab12537d1d', row
+          print('hierarchy benchmark 64-trade / 94-node checksum/identity ok')
+          "

@@ -845,7 +845,7 @@ Capture/assert request units where percent/bp conversion matters.
 - larger FULL_REVALUATION sample;
 - native benchmark SLA;
 - scenario-application benchmark;
-- hierarchy benchmark;
+- hierarchy benchmark — COMPLETE (nightly identity, `reviews/r0.12-hierarchy-bench-independent-review.md`);
 - optional QuantLib E2E — COMPLETE (`reviews/r0.12-ql-e2e-independent-review.md`; nightly job only).
 
 ## R0.12.5 Native ABI safety
