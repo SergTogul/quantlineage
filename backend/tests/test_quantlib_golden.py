@@ -16,11 +16,14 @@ Numerical conventions (documented for M9.4)
   **Time(years)** discount — identical to Builtin ⇒ **rel=1e-12, abs=1e-9**.
 - **IR future:** Algebraic STIR mark ``qty * pv01 * (quoted - forward) * 1e4``
   (same formula in both engines) ⇒ **rel=1e-12, abs=1e-9**.
-- **Bond day-count gap (documented):** Builtin (no curve) uses annual compound
-  ``face / (1+y)^T``. QuantLib ZeroCouponBond uses continuous Actual365Fixed on
-  the calendar-rounded maturity. Do **not** expect tight parity vs annual
-  compound (historical **rel=5e-2** band). Prefer continuous DF golden:
-  ``face * exp(-y * Actual365Fixed.yearFraction(eval, maturity))`` ⇒ **rel=1e-10**.
+- **ZC bond (M1.12 closed):** Both adapters use continuous compounding. QuantLib
+  ``ZeroCouponBond`` + ``FlatForward(Continuous, Actual365Fixed)`` discounts on
+  calendar-rounded maturity ``eval + max(1, round(T*365))``. Builtin scalar
+  (no curve) uses the same year fraction ``max(1, round(T*365))/365`` and
+  ``face * exp(-y * t_act)`` ⇒ **rel=1e-10** vs QL and vs continuous golden.
+  With curves attached, Builtin still discounts at domain ``maturity_years``
+  pillar T (curve scaffold); that path is covered in ``test_curve_pricing.py``.
+  Historical annual compound ``face/(1+y)^T`` is **not** a reference.
 - **IRS:** QL VanillaSwap (payer when ``pay_fixed=True``); at-market PV residual
   from Actual365Fixed fixed vs Actual360 float on a flat curve is **< 50bp of
   notional** (not machine-zero). Sign/monotonicity vs Builtin annuity model
@@ -65,7 +68,6 @@ _OPT_ABS = 1e-6
 _CIP_REL = 1e-12
 _CIP_ABS = 1e-9
 _BOND_CONTINUOUS_REL = 1e-10
-_BOND_ANNUAL_COMPOUND_REL = 5e-2  # documented day-count / compounding gap
 
 
 def _bs_price(spot, strike, t, r, q, vol, option_type: str) -> float:
@@ -226,7 +228,7 @@ def test_ql_option_near_one_day_tenor_finite(ql_engine):
 
 
 # ---------------------------------------------------------------------------
-# Bond — continuous golden (tight) + annual-compound gap (documented)
+# Bond — continuous Actual365Fixed golden + Builtin↔QL scalar parity (M1.12)
 # ---------------------------------------------------------------------------
 
 
@@ -251,26 +253,52 @@ def test_ql_zero_coupon_bond_matches_continuous_actual365(ql_engine, eval_date):
     assert v.dv01 == pytest.approx(bumped - expected, rel=1e-8, abs=1e-4)
 
 
-def test_ql_zero_coupon_bond_annual_compound_gap_documented(ql_engine):
-    """Documented gap: annual compound vs QL continuous — wide band only."""
+def test_builtin_ql_zero_coupon_bond_scalar_parity(ql_engine, eval_date):
+    """M1.12: Builtin scalar continuous Act/365 Fixed matches QuantLib ZCB."""
+    builtin = BuiltinPricingEngine()
     face, t, y = 1_000_000.0, 5.0, 0.04
     p = BondPosition(
         type="bond",
-        id="b",
+        id="b-parity",
         issuer="UST",
         face_value=face,
         maturity_years=t,
         yield_rate=y,
         duration=4.5,
     )
+    # No curves → both engines on flat continuous yield.
+    market = MarketSnapshot(id="flat", rates={"USD": y})
+    ql_pv = ql_engine.value(p, market).market_value
+    bi_pv = builtin.value(p, market).market_value
+    expected = _continuous_zc_bond_pv(face, y, eval_date, t)
+    assert ql_pv == pytest.approx(expected, rel=_BOND_CONTINUOUS_REL)
+    assert bi_pv == pytest.approx(expected, rel=_BOND_CONTINUOUS_REL)
+    assert bi_pv == pytest.approx(ql_pv, rel=_BOND_CONTINUOUS_REL)
+    # Historical annual compound is no longer the Builtin convention.
     annual = face / ((1.0 + y) ** t)
-    v = ql_engine.value(p)
-    assert v.market_value == pytest.approx(annual, rel=_BOND_ANNUAL_COMPOUND_REL)
-    assert v.market_value > 0
-    assert v.dv01 < 0
-    # Continuous reference is the correct tight match; annual differs by design.
-    continuous = _continuous_zc_bond_pv(face, y, date(2026, 9, 1), t)
-    assert abs(v.market_value - continuous) < abs(v.market_value - annual) * 0.01 + 1e-6
+    assert abs(bi_pv - expected) < abs(bi_pv - annual)
+
+
+@pytest.mark.parametrize("years", [0.25, 1.0, 2.0, 7.0, 10.0])
+def test_builtin_ql_bond_tenor_ladder_scalar_parity(ql_engine, eval_date, years):
+    """Fractional and integer tenors: Builtin scalar ≡ QL continuous Act/365."""
+    builtin = BuiltinPricingEngine()
+    face, y = 500_000.0, 0.035
+    p = BondPosition(
+        type="bond",
+        id=f"b-parity-{years}",
+        issuer="UST",
+        face_value=face,
+        maturity_years=years,
+        yield_rate=y,
+        duration=max(0.1, years * 0.9),
+    )
+    expected = _continuous_zc_bond_pv(face, y, eval_date, years)
+    ql_pv = ql_engine.value(p).market_value
+    bi_pv = builtin.value(p).market_value
+    assert ql_pv == pytest.approx(expected, rel=_BOND_CONTINUOUS_REL)
+    assert bi_pv == pytest.approx(expected, rel=_BOND_CONTINUOUS_REL)
+    assert bi_pv == pytest.approx(ql_pv, rel=_BOND_CONTINUOUS_REL)
 
 
 @pytest.mark.parametrize("years", [0.25, 1.0, 2.0, 7.0, 10.0])
