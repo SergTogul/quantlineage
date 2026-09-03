@@ -16,7 +16,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent** in this checkout
 | Milestone 7 — API Productionization | **COMPLETE** (2026-09-02 — M7.1–M7.6: dual-mount + typed models + OpenAPI examples + error model + `/api/v1` canonical / legacy sunset plan) |
 | Milestone 8 — Risk Terminal UI | **COMPLETE** (2026-09-02) — SPA `/api/v1`; nav; heatmaps; overview collage; scenario builder; hierarchy drill; P&L attribution API; limits UX; hedge-compare; risk-run poll; analytics panels |
 | Milestone 9 — Testing, CI & Engineering Quality | **COMPLETE** (2026-09-02 Lead Architect: M9.1–M9.10; M9.8 containers DONE; Redis/RQ **deferred** residual — not claimed done) |
-| Milestone 10 — Demo Data & Reproducibility | **PARTIAL** (M10.1–M10.2 DONE; M10.3 open) |
+| Milestone 10 — Demo Data & Reproducibility | **COMPLETE** (2026-09-02 — M10.1–M10.3) |
 | Milestone 11 — AI Risk Assistant | NOT STARTED |
 | Milestone 12 — Documentation & Portfolio Presentation | NOT STARTED |
 | Milestone 13 — Final Portfolio Demo | NOT STARTED |
@@ -860,7 +860,7 @@ Status: **COMPLETE** (2026-09-02 Lead Architect formal acceptance — M9.1–M9.
 
 ## Milestone 10 — Demo Data & Reproducibility
 
-Status: **PARTIAL** (2026-09-02 — M10.1–M10.2 DONE; do **not** mark COMPLETE)
+Status: **COMPLETE** (2026-09-02 — M10.1–M10.3 DONE)
 
 ### Tasks
 
@@ -874,14 +874,25 @@ Status: **PARTIAL** (2026-09-02 — M10.1–M10.2 DONE; do **not** mark COMPLETE
   - Env `RISKFORGE_HISTORICAL_DATASET=demo|synthetic|/path.csv`; API DI defaults to demo CSV
   - Removed unused orphan `data/sample_portfolio.csv` (portfolios are in-code since M10.1)
   - Docs: `data/README.md`; evidence `tests/test_demo_historical_dataset.py`
-- [ ] M10.3 Deterministic demo scripts — NOT STARTED
+- [x] M10.3 Deterministic demo scripts — **DONE** (2026-09-02)
+  - Module/CLI: `backend/app/demo/run_demo_risk.py` (+ `scripts/run_demo_risk.py` shim)
+  - Loads M10.1 portfolios + M10.2 demo factors; emits sorted-key VaR/stress JSON via `PortfolioService`
+  - Defaults: builtin pricing + Python scenario kernel; `--check` asserts byte-identical re-runs
+  - Frozen artifact: `data/demo_risk_artifact.json`; evidence `tests/test_demo_scripts.py`
+
+### Progress update (2026-09-02, Lead Architect / Backend — M10.3)
+
+- Owner: Backend/API (+ Lead Architect coordination); no Frontend / Market Data changes
+- Deterministic offline demo harness; no live vendors; PricingEngine seams untouched
+- **Milestone 10 COMPLETE** — M10.1–M10.3 all DONE per checklist above
+- Next residuals (ROADMAP): M11 AI / M6 SLA / M3.9 methodology docs
 
 ### Progress update (2026-09-02, Market Data — M10.2)
 
 - Owner: Market Data & Curves (+ Backend DI for `deps.py` / `PortfolioService` dataset sharing)
 - File-backed aggregate factor history for Historical VaR / scenario replay; no live vendors; PricingEngine untouched.
 - Demo CSV numerically identical to prior seed-7 / 750 synthetic default (API VaR continuity).
-- Milestone 10 remains **PARTIAL** — do **not** invent COMPLETE (M10.3 deterministic demo scripts still open).
+- Milestone 10 remained **PARTIAL** until M10.3 (now closed same day).
 
 ### Progress update (2026-09-02, Lead Architect / Market Data — M10.1)
 

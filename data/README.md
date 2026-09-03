@@ -46,3 +46,23 @@ dataset = create_historical_dataset("/path/to/factors.csv")
 Risk HTTP routers (`backend/app/api/deps.py`) construct
 `HistoricalRiskEngine(dataset=create_historical_dataset())`, so the API default
 is the packaged demo CSV (`RISKFORGE_HISTORICAL_DATASET` overrides).
+
+## Deterministic demo scripts (M10.3)
+
+CLI / module: `backend/app/demo/run_demo_risk.py` (shim: `scripts/run_demo_risk.py`).
+
+Loads all M10.1 demo portfolios + the M10.2 factor CSV, runs summary VaR and
+`DEFAULT_SCENARIOS` stress through `PortfolioService`, and writes sorted-key
+JSON. Default pricing for artifacts is **builtin** (set
+`RISKFORGE_PRICING_ENGINE`); scenario kernel forced to Python for parity.
+
+Frozen reference artifact: [`demo_risk_artifact.json`](demo_risk_artifact.json)
+
+```bash
+cd backend
+PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_PRICING_CACHE=0 \
+  .venv/bin/python -m app.demo.run_demo_risk --check -o ../data/demo_risk_artifact.json
+```
+
+`--check` fails if two consecutive builds are not byte-identical. Evidence:
+`backend/tests/test_demo_scripts.py`.
