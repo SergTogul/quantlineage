@@ -3,7 +3,11 @@ from __future__ import annotations
 import numpy as np
 
 from app.compute.kernel import (
+    KERNEL_ERR_LENGTH,
+    KERNEL_EXPOSURE_STRIDE,
+    KERNEL_SHOCK_STRIDE,
     Exposure,
+    NativeKernelError,
     ScenarioKernel,
     Shock,
     get_scenario_kernel,
@@ -32,6 +36,34 @@ def _aggregate_greeks(vals: list[Valuation]) -> tuple[float, float, float, float
     return mv, delta, gamma, vega, dv01, fx_delta
 
 
+def _require_aligned_1d_factors(
+    equity_ret: np.ndarray,
+    vol_points: np.ndarray,
+    rates_bps: np.ndarray,
+    fx_ret: np.ndarray,
+) -> int:
+    """Fail closed unless all four factor arrays are 1-D with the same length."""
+    named = (
+        ("equity_ret", equity_ret),
+        ("vol_points", vol_points),
+        ("rates_bps", rates_bps),
+        ("fx_ret", fx_ret),
+    )
+    n: int | None = None
+    for name, raw in named:
+        arr = np.asarray(raw)
+        if arr.ndim != 1:
+            raise ValueError(f"{name} must be 1-D, got shape {arr.shape}")
+        length = int(arr.shape[0])
+        if n is None:
+            n = length
+        elif length != n:
+            raise ValueError(
+                f"factor arrays must have the same length; {name} has {length}, expected {n}"
+            )
+    return int(n or 0)
+
+
 def _pnl_via_scenario_kernel(
     kernel: ScenarioKernel,
     *,
@@ -45,10 +77,45 @@ def _pnl_via_scenario_kernel(
     rates_bps: np.ndarray,
     fx_ret: np.ndarray,
 ) -> np.ndarray:
-    """Map aggregated Greeks + factor arrays onto the Exposure/Shock kernel ABI."""
-    n = int(equity_ret.shape[0])
+    """Map aggregated Greeks + factor arrays onto the Exposure/Shock kernel ABI.
+
+    Native kernels (``pnl_from_arrays``) receive C-contiguous float64 buffers:
+    exposures ``(1, 5)`` and shocks ``(n, 4)``. Object ``pnl()`` packing is
+    reserved for the Python reference kernel.
+    """
+    n = _require_aligned_1d_factors(equity_ret, vol_points, rates_bps, fx_ret)
     if n == 0:
         return np.zeros(0, dtype=float)
+
+    pnl_from_arrays = getattr(kernel, "pnl_from_arrays", None)
+    if callable(pnl_from_arrays):
+        exposures = np.empty((1, KERNEL_EXPOSURE_STRIDE), dtype=np.float64)
+        exposures[0, 0] = float(delta)
+        exposures[0, 1] = float(gamma)
+        exposures[0, 2] = float(vega)
+        exposures[0, 3] = float(dv01)
+        exposures[0, 4] = float(fx_delta)
+        shocks = np.empty((n, KERNEL_SHOCK_STRIDE), dtype=np.float64)
+        shocks[:, 0] = np.asarray(equity_ret, dtype=np.float64)
+        shocks[:, 1] = np.asarray(vol_points, dtype=np.float64)
+        shocks[:, 2] = np.asarray(rates_bps, dtype=np.float64)
+        shocks[:, 3] = np.asarray(fx_ret, dtype=np.float64)
+        if not exposures.flags.c_contiguous:
+            exposures = np.ascontiguousarray(exposures)
+        if not shocks.flags.c_contiguous:
+            shocks = np.ascontiguousarray(shocks)
+        if exposures.shape != (1, KERNEL_EXPOSURE_STRIDE) or shocks.shape != (
+            n,
+            KERNEL_SHOCK_STRIDE,
+        ):
+            raise NativeKernelError(
+                KERNEL_ERR_LENGTH,
+                f"packed buffers have wrong shape: exposures {exposures.shape}, "
+                f"shocks {shocks.shape}, expected (1, {KERNEL_EXPOSURE_STRIDE}) and "
+                f"({n}, {KERNEL_SHOCK_STRIDE})",
+            )
+        return np.asarray(pnl_from_arrays(exposures, shocks), dtype=float)
+
     exposures = [
         Exposure(
             delta=float(delta),
@@ -94,8 +161,10 @@ def approximate_pnl_series(
 
     Kernel backend (M6.3): default NumPy (``RISKFORGE_SCENARIO_KERNEL=python``).
     When ``native`` is selected (or ``scenario_kernel`` is injected), P&L is
-    evaluated via the linear Δ-Γ scenario kernel. Methodology / unit conversion
-    remain in Python.
+    evaluated via the linear Δ-Γ scenario kernel. Native kernels receive
+    C-contiguous float64 exposure/shock arrays (``pnl_from_arrays``); the
+    Python reference kernel still uses object ``pnl()``. Methodology / unit
+    conversion remain in Python.
 
     ``FULL_REVALUATION`` cannot use this function or the scenario kernel — it
     requires ``PricingEngine`` revaluation on shocked snapshots

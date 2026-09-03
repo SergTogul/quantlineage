@@ -20,9 +20,12 @@ import numpy as np
 import pytest
 
 from app.compute.kernel import (
+    KERNEL_EXPOSURE_STRIDE,
     KERNEL_PNL_ABS_TOL,
     KERNEL_PNL_REL_TOL,
+    KERNEL_SHOCK_STRIDE,
     Exposure,
+    NativeKernelError,
     NativeScenarioKernel,
     PythonScenarioKernel,
     Shock,
@@ -288,3 +291,103 @@ def test_empty_observations_native(tmp_path):
         scenario_kernel=NativeScenarioKernel(lib),
     )
     assert out.shape == (0,)
+
+
+def test_native_historical_uses_pnl_from_arrays_not_object_pack(tmp_path):
+    """R0.17 leftover: native Historical VaR must not pack Exposure/Shock objects."""
+    lib = _build_native_lib(tmp_path)
+    native = NativeScenarioKernel(lib)
+    captured: list[tuple[str, object, object]] = []
+    orig_arrays = native.pnl_from_arrays
+    orig_pnl = native.pnl
+
+    def spy_arrays(exposures, shocks, out=None):
+        captured.append(("arrays", exposures, shocks))
+        return orig_arrays(exposures, shocks, out=out)
+
+    def spy_pnl(exposures, shocks):
+        captured.append(("pnl", exposures, shocks))
+        return orig_pnl(exposures, shocks)
+
+    native.pnl_from_arrays = spy_arrays
+    native.pnl = spy_pnl
+    series = _factor_series()
+    kwargs = dict(
+        delta=1200.0,
+        gamma=180.0,
+        vega=40.0,
+        dv01=-8.5,
+        fx_delta=250.0,
+        equity_ret=series.equity_returns,
+        vol_pct=series.vol_moves,
+        rates_bps=series.rate_moves_bps,
+        fx_ret=series.fx_returns,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        scenario_kernel=native,
+    )
+    actual = approximate_pnl_series(**kwargs)
+    assert [kind for kind, _e, _s in captured] == ["arrays"]
+    exposures, shocks = captured[0][1], captured[0][2]
+    assert isinstance(exposures, np.ndarray) and isinstance(shocks, np.ndarray)
+    assert exposures.dtype == np.float64 and shocks.dtype == np.float64
+    assert exposures.flags.c_contiguous and shocks.flags.c_contiguous
+    assert exposures.shape == (1, KERNEL_EXPOSURE_STRIDE)
+    assert shocks.shape == (series.n_observations, KERNEL_SHOCK_STRIDE)
+    ref = approximate_pnl_series(
+        delta=1200.0,
+        gamma=180.0,
+        vega=40.0,
+        dv01=-8.5,
+        fx_delta=250.0,
+        equity_ret=series.equity_returns,
+        vol_pct=series.vol_moves,
+        rates_bps=series.rate_moves_bps,
+        fx_ret=series.fx_returns,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        scenario_backend="python",
+    )
+    _assert_pnl_close(actual, ref)
+
+
+def test_native_historical_mismatched_factor_lengths_fail_closed(tmp_path):
+    """R0.17 leftover: unequal factor lengths must not pack a truncated shock matrix."""
+    lib = _build_native_lib(tmp_path)
+    native = NativeScenarioKernel(lib)
+    series = _factor_series()
+    short_vol = series.vol_moves[:-1]
+    with pytest.raises((ValueError, NativeKernelError), match="length|shape|stride"):
+        approximate_pnl_series(
+            delta=100.0,
+            gamma=10.0,
+            vega=1.0,
+            dv01=0.0,
+            fx_delta=0.0,
+            equity_ret=series.equity_returns,
+            vol_pct=short_vol,
+            rates_bps=series.rate_moves_bps,
+            fx_ret=series.fx_returns,
+            methodology=VaRMethodology.LINEAR,
+            scenario_kernel=native,
+        )
+
+
+def test_native_historical_non_1d_factor_fails_closed(tmp_path):
+    """R0.17 leftover: a column vector must not be silently treated as 1-D shocks."""
+    lib = _build_native_lib(tmp_path)
+    native = NativeScenarioKernel(lib)
+    series = _factor_series()
+    eq_col = series.equity_returns.reshape(-1, 1)
+    with pytest.raises((ValueError, NativeKernelError), match="1-D|shape|stride"):
+        approximate_pnl_series(
+            delta=100.0,
+            gamma=10.0,
+            vega=1.0,
+            dv01=0.0,
+            fx_delta=0.0,
+            equity_ret=eq_col,
+            vol_pct=series.vol_moves,
+            rates_bps=series.rate_moves_bps,
+            fx_ret=series.fx_returns,
+            methodology=VaRMethodology.LINEAR,
+            scenario_kernel=native,
+        )
