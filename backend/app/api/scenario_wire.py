@@ -10,9 +10,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from app.domain.models import MarketSnapshot, Portfolio, StressScenario
+from app.domain.models import (
+    FiniteFloat,
+    FiniteInputMixin,
+    MarketSnapshot,
+    Portfolio,
+    StressScenario,
+)
 from app.risk.factor_types import FactorType, parse_risk_factor
 from app.risk.scenario_model import (
     FactorShock,
@@ -25,12 +31,12 @@ from app.risk.scenario_model import (
 )
 
 
-class FactorShockWire(BaseModel):
+class FactorShockWire(FiniteInputMixin):
     """One typed factor shock on the HTTP wire."""
 
     factor_type: FactorType
     key: str = Field(description="Stable factor key (e.g. SPY, SPY:VOL, USD:RATE, EURUSD).")
-    amount: float = Field(
+    amount: FiniteFloat = Field(
         description=(
             "Shock in MarketSnapshot.bump units: relative for equity/FX/vol; "
             "absolute decimal rate for RateZero (0.0001 = +1bp)."
@@ -44,7 +50,7 @@ class FactorShockWire(BaseModel):
     moneyness: str = "ATM"
 
 
-class ScenarioWire(BaseModel):
+class ScenarioWire(FiniteInputMixin):
     """Formal Scenario HTTP wire type (M3.8)."""
 
     id: str
@@ -52,12 +58,12 @@ class ScenarioWire(BaseModel):
     category: ScenarioCategory
     shocks: list[FactorShockWire] = Field(default_factory=list)
     description: str = ""
-    max_loss_pct: float | None = Field(default=None, gt=0)
+    max_loss_pct: FiniteFloat | None = Field(default=None, gt=0)
     severity: ScenarioSeverity | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class FormalCustomStressRequest(BaseModel):
+class FormalCustomStressRequest(FiniteInputMixin):
     """Custom stress / threat evaluate using formal Scenario wire payloads."""
 
     portfolio: Portfolio
