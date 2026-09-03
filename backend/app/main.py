@@ -2,7 +2,7 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.attribution import router as attribution_router
@@ -16,6 +16,7 @@ from app.api.portfolio import router as portfolio_router
 from app.api.risk import router as risk_router
 from app.api.risk_runs import router as risk_runs_router
 from app.api.stress import router as stress_router
+from app.api.workload import WorkloadBodyLimitMiddleware, enforce_workload_limits
 from app.persistence.wiring import build_persistence_wiring
 from app.services.risk_run_worker import RiskRunWorker
 
@@ -69,7 +70,12 @@ async def lifespan(app: FastAPI):
     worker.shutdown(wait=False)
 
 
-app = FastAPI(title="RiskForge API", version="0.3.0", lifespan=lifespan)
+app = FastAPI(
+    title="RiskForge API",
+    version="0.3.0",
+    lifespan=lifespan,
+    dependencies=[Depends(enforce_workload_limits)],
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -79,6 +85,9 @@ app.add_middleware(
 )
 # M7.6: Deprecation/Sunset/Link on legacy dual-mount only (canonical = /api/v1).
 app.add_middleware(LegacyDeprecationMiddleware)
+# Byte cap must sit outside BaseHTTPMiddleware and FastAPI body parsing.
+# Last add_middleware is outermost: sees the raw ASGI receive stream first.
+app.add_middleware(WorkloadBodyLimitMiddleware)
 
 # M7.5: one error envelope for legacy and /api/v1 mounts.
 register_exception_handlers(app)
