@@ -164,7 +164,9 @@ def test_bootstrapped_curve_feeds_builtin_bond_and_swap_pricing():
 
 @pytest.fixture
 def ql_engine():
-    pytest.importorskip("QuantLib")
+    from tests.quantlib_gate import import_quantlib
+
+    import_quantlib()
     from app.pricing.quantlib import QuantLibPricingEngine
 
     return QuantLibPricingEngine()
