@@ -32,8 +32,10 @@ from app.risk.reverse_stress import (
     to_wire_shock,
 )
 from app.risk.scenario_model import ScenarioCategory
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 
 @pytest.fixture
@@ -87,7 +89,7 @@ def test_zero_magnitude_builds_empty_shocks():
 
 def test_equity_reverse_stress_converges_to_target(engine, pricing):
     target = 0.01
-    result = engine.solve(SAMPLE_PORTFOLIO, pricing, target, "equity", 0.8)
+    result = engine.solve(SAMPLE_PORTFOLIO, pricing, target, "equity", 0.8, market=SAMPLE_MARKET)
     assert result.converged is True
     assert result.required_shock is not None
     assert 0 < result.required_shock <= 0.8
@@ -105,14 +107,16 @@ def test_equity_reverse_stress_converges_to_target(engine, pricing):
 
 
 def test_equity_reverse_stress_deterministic(engine, pricing):
-    a = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.02, "equity", 0.8)
-    b = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.02, "equity", 0.8)
+    a = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.02, "equity", 0.8, market=SAMPLE_MARKET)
+    b = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.02, "equity", 0.8, market=SAMPLE_MARKET)
     assert a.model_dump() == b.model_dump()
 
 
 def test_no_solution_within_bound(engine, pricing):
     # Unreachable: demand 50% NAV loss but only allow a 1bp-scale equity move.
-    result = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.50, "equity", max_shock=0.001)
+    result = engine.solve(
+        SAMPLE_PORTFOLIO, pricing, 0.50, "equity", max_shock=0.001, market=SAMPLE_MARKET
+    )
     assert result.converged is False
     assert result.required_shock is None
     assert result.achieved_loss_pct < 0.50
@@ -124,7 +128,7 @@ def test_no_solution_within_bound(engine, pricing):
 
 
 def test_vol_reverse_stress_returns_relative_shock(engine, pricing):
-    result = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.005, "vol", 0.8)
+    result = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.005, "vol", 0.8, market=SAMPLE_MARKET)
     if result.converged:
         assert result.shock_unit == "relative"
         assert result.required_shock is not None and result.required_shock > 0
@@ -141,7 +145,7 @@ def test_rates_wire_units_bp(engine, pricing):
     assert from_wire_bound("rates", 0.80) == pytest.approx(0.80)
     assert from_wire_bound("rates", 500.0) == pytest.approx(0.5)  # explicit bp bound
 
-    result = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.002, "rates", 0.8)
+    result = engine.solve(SAMPLE_PORTFOLIO, pricing, 0.002, "rates", 0.8, market=SAMPLE_MARKET)
     assert result.shock_unit == "bp"
     if result.converged:
         assert result.required_shock is not None
@@ -180,12 +184,12 @@ def test_service_and_api_compatibility():
 
 def test_invalid_factor_raises(engine, pricing):
     with pytest.raises(ValueError, match="unsupported"):
-        engine.solve(SAMPLE_PORTFOLIO, pricing, 0.01, "commodity", 0.8)
+        engine.solve(SAMPLE_PORTFOLIO, pricing, 0.01, "commodity", 0.8, market=SAMPLE_MARKET)
 
 
 def test_empty_portfolio_no_factor_exposure(engine, pricing):
     empty = Portfolio(id="empty", name="Empty", positions=[])
-    result = engine.solve(empty, pricing, 0.01, "equity", 0.8)
+    result = engine.solve(empty, pricing, 0.01, "equity", 0.8, market=MarketSnapshot(id="empty"))
     assert result.converged is False
     assert result.required_shock is None
     assert result.achieved_loss_pct == pytest.approx(0.0)

@@ -78,7 +78,9 @@ def test_enrich_matches_limit_result_fields():
     risk = HistoricalRiskEngine(seed=1, observations=40).calculate(
         SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET
     )
-    results = LimitEngine().evaluate(SAMPLE_PORTFOLIO, pricing, risk, DEFAULT_LIMITS)
+    results = LimitEngine().evaluate(
+        SAMPLE_PORTFOLIO, pricing, risk, DEFAULT_LIMITS, market=SAMPLE_MARKET
+    )
     engine = LimitDrilldownEngine(HistoricalRiskEngine(seed=1, observations=40))
     report = engine.report(
         SAMPLE_PORTFOLIO,
@@ -235,6 +237,7 @@ def test_stress_loss_contributors_nonempty():
         "stress_loss",
         top_n=5,
         label_fn=position_label,
+        market=SAMPLE_MARKET,
     )
     assert contribs
     assert contribs[0].risk_amount >= 0.0

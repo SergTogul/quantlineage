@@ -112,7 +112,7 @@ Pricing tests are strong. VaR/ES tests are broad but do not yet pin exact quanti
 Priority: **P0**  
 Risk types: CORRECTNESS, ARCHITECTURE, MAINTAINABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.2-A APPROVE; equity spots+option vol fail closed; what-if reuses one snapshot; equity future/option r/q fail closed with aggregate demo yields seeded; dashboard/compare/reverse/drilldown thread one root snapshot; FX forward/option spots+vol+rd/rf fail closed; VaR/ES/full-reval require explicit market. Remaining: bond/swap/IR families, terms split, hierarchy/stress/reverse omitted-`market=` inference.)
+Status: **IN PROGRESS** (R0.2-A APPROVE; equity+FX+bond/swap/IR fail closed on supplied market; dashboard and VaR/ES/hierarchy/stress/reverse require explicit market. Remaining: InstrumentTerms split. `ScenarioAttributionEngine.decompose` still infers if called directly.)
 
 Source findings:
 

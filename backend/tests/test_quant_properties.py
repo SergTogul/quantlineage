@@ -30,6 +30,7 @@ from app.domain.models import (
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.stress import StressEngine
+from app.sample import demo_market_snapshot
 
 engine = BuiltinPricingEngine()
 
@@ -284,7 +285,9 @@ def test_zero_shock_produces_zero_stress_pnl(quantity, price):
         rates_shift_bps=0.0,
         fx_shock=0.0,
     )
-    results = StressEngine().run(portfolio, engine, [zero])
+    results = StressEngine().run(
+        portfolio, engine, [zero], market=demo_market_snapshot(portfolio)
+    )
     assert len(results) == 1
     assert results[0].pnl == pytest.approx(0.0, abs=1e-9)
     assert all(pnl == pytest.approx(0.0, abs=1e-9) for pnl in results[0].by_position.values())
