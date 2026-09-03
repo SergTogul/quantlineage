@@ -115,15 +115,17 @@ def test_demo_dataset_feeds_historical_var_and_scenarios():
     dataset = load_demo_historical_dataset()
     pricing = BuiltinPricingEngine()
     engine = HistoricalRiskEngine(dataset=dataset)
-    risk = engine.calculate(SAMPLE_PORTFOLIO, pricing)
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
+    risk = engine.calculate(SAMPLE_PORTFOLIO, pricing, market=market)
     assert risk["var_99"] >= risk["var_95"] >= 0.0
     assert risk["expected_shortfall_99"] >= risk["var_99"]
 
-    report = VaRAnalytics(dataset=dataset).report(SAMPLE_PORTFOLIO, pricing, confidence=0.99)
+    report = VaRAnalytics(dataset=dataset).report(
+        SAMPLE_PORTFOLIO, pricing, confidence=0.99, market=market
+    )
     hist = next(m for m in report.methods if m.method == "historical")
     assert hist.var >= 0.0
 
-    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
     shocked = historical_shocked_snapshots(market, dataset)
     assert len(shocked) == dataset.factor_observations().n_observations
     assert all(s.id.startswith(f"{market.id}:") for s in shocked[:3])
@@ -139,8 +141,9 @@ def test_api_portfolio_service_uses_configured_historical_dataset(monkeypatch: p
     engine = HistoricalRiskEngine(dataset=ds)
     assert engine.dataset.factor_observations().n_observations == 750
     # Parity with default seed-7 synthetic so switching API source does not invent new numbers.
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
     baseline = HistoricalRiskEngine(seed=7, observations=750).calculate(
-        SAMPLE_PORTFOLIO, BuiltinPricingEngine()
+        SAMPLE_PORTFOLIO, BuiltinPricingEngine(), market=market
     )
-    via_demo = engine.calculate(SAMPLE_PORTFOLIO, BuiltinPricingEngine())
+    via_demo = engine.calculate(SAMPLE_PORTFOLIO, BuiltinPricingEngine(), market=market)
     assert via_demo == baseline

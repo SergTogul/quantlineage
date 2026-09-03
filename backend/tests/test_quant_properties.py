@@ -22,6 +22,7 @@ from app.domain.models import (
     BondPosition,
     EquityPosition,
     EuropeanOptionPosition,
+    MarketSnapshot,
     Portfolio,
     StressScenario,
     SwapPosition,
@@ -291,7 +292,9 @@ def test_zero_shock_produces_zero_stress_pnl(quantity, price):
 
 def test_empty_portfolio_has_zero_aggregate_risk():
     empty = Portfolio(id="empty", name="empty", positions=[])
-    r = HistoricalRiskEngine(seed=1).calculate(empty, engine)
+    r = HistoricalRiskEngine(seed=1).calculate(
+        empty, engine, market=MarketSnapshot(id="empty")
+    )
     for key in (
         "market_value",
         "delta",

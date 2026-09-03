@@ -34,7 +34,7 @@ from app.risk.scenarios import (
     to_stress_scenario,
 )
 from app.risk.var import VaRAnalytics
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 
 
 def _base_snapshot() -> MarketSnapshot:
@@ -190,7 +190,10 @@ def test_var_analytics_unaffected_by_scenario_module():
         fx_returns=np.zeros(40),
     )
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(series)).report(
-        SAMPLE_PORTFOLIO, BuiltinPricingEngine(), confidence=0.95
+        SAMPLE_PORTFOLIO,
+        BuiltinPricingEngine(),
+        confidence=0.95,
+        market=demo_market_snapshot(SAMPLE_PORTFOLIO),
     )
     hist = next(m for m in report.methods if m.method == "historical")
     assert hist.var >= 0.0

@@ -37,7 +37,9 @@ from app.risk.historical import (
     full_revaluation_pnl_series,
 )
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 
 def _build_native_lib(tmp_path: Path) -> Path:
@@ -197,8 +199,12 @@ def test_historical_engine_native_var_matches_python(tmp_path, monkeypatch):
         scenario_kernel=NativeScenarioKernel(lib),
     )
     for meth in (VaRMethodology.LINEAR, VaRMethodology.DELTA_GAMMA):
-        py = py_engine.calculate(SAMPLE_PORTFOLIO, pricing, methodology=meth)
-        nat = native_engine.calculate(SAMPLE_PORTFOLIO, pricing, methodology=meth)
+        py = py_engine.calculate(
+            SAMPLE_PORTFOLIO, pricing, methodology=meth, market=SAMPLE_MARKET
+        )
+        nat = native_engine.calculate(
+            SAMPLE_PORTFOLIO, pricing, methodology=meth, market=SAMPLE_MARKET
+        )
         for key in ("var_95", "var_99", "expected_shortfall_99", "market_value", "delta", "gamma"):
             assert nat[key] == pytest.approx(
                 py[key], rel=KERNEL_PNL_REL_TOL, abs=KERNEL_PNL_ABS_TOL
@@ -250,7 +256,10 @@ def test_full_revaluation_path_unaffected_by_native_flag(tmp_path, monkeypatch):
     engine = HistoricalRiskEngine(dataset=dataset)
     # Must complete without routing through approximate_pnl_series / kernel.
     out = engine.calculate(
-        SAMPLE_PORTFOLIO, pricing, methodology=VaRMethodology.FULL_REVALUATION
+        SAMPLE_PORTFOLIO,
+        pricing,
+        methodology=VaRMethodology.FULL_REVALUATION,
+        market=SAMPLE_MARKET,
     )
     assert out["methodology"] == "FULL_REVALUATION"
     assert out["var_95"] >= 0.0

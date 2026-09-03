@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.domain.models import RiskLimit
+from app.domain.models import MarketSnapshot, RiskLimit
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.limits import (
@@ -10,7 +10,9 @@ from app.risk.limits import (
     LimitEngine,
     classify_limit_status,
 )
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+
+SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 from app.services.portfolio_service import PortfolioService
 
 EXPECTED_DEFAULT_METRICS = {
@@ -42,7 +44,9 @@ def test_default_limits_cover_required_metrics():
 
 def test_evaluate_statuses_and_fields():
     pricing = BuiltinPricingEngine()
-    risk = HistoricalRiskEngine(seed=1, observations=40).calculate(SAMPLE_PORTFOLIO, pricing)
+    risk = HistoricalRiskEngine(seed=1, observations=40).calculate(
+        SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET
+    )
     # Force known utilization bands via tiny / huge limits.
     limits = [
         RiskLimit(metric="var_99", limit=1e18, warning_threshold_pct=80.0, label="huge"),
@@ -94,7 +98,9 @@ def test_zero_portfolio_zero_risk_limits_ok():
 
     empty = Portfolio(id="empty", name="Empty", positions=[])
     pricing = BuiltinPricingEngine()
-    risk = HistoricalRiskEngine(seed=1, observations=20).calculate(empty, pricing)
+    risk = HistoricalRiskEngine(seed=1, observations=20).calculate(
+        empty, pricing, market=MarketSnapshot(id="empty")
+    )
     enriched = {**risk, "stress_loss": 0.0, "key_rate_dv01": 0.0}
     rows = LimitEngine().evaluate(empty, pricing, enriched, DEFAULT_LIMITS)
     assert all(r.value == 0.0 or r.metric == "single_position_pct" for r in rows)
