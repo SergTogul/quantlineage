@@ -23,6 +23,7 @@ LEGACY_DEPRECATION_VALUE = "true"
 _LEGACY_API_ROOTS = (
     "/health",
     "/portfolio",
+    "/portfolios",
     "/market",
     "/risk",
 )

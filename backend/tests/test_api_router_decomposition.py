@@ -26,6 +26,8 @@ _ROUTER_MODULES = (
 _CRITICAL_PATHS = (
     ("GET", "/health"),
     ("GET", "/portfolio"),
+    ("GET", "/portfolios"),
+    ("GET", "/portfolios/{portfolio_id}"),
     ("POST", "/market/snapshot"),
     ("POST", "/risk/summary"),
     ("POST", "/risk/var"),

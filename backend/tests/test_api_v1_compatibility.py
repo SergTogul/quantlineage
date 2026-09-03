@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 _DUAL_MOUNTED_PATHS = (
     ("GET", "/health"),
     ("GET", "/portfolio"),
+    ("GET", "/portfolios"),
+    ("GET", "/portfolios/{portfolio_id}"),
     ("POST", "/market/snapshot"),
     ("POST", "/risk/summary"),
     ("POST", "/risk/var"),
@@ -74,6 +76,7 @@ def test_m72_risk_runs_not_triple_mounted() -> None:
     [
         ("/health", "/api/v1/health"),
         ("/portfolio", "/api/v1/portfolio"),
+        ("/portfolios", "/api/v1/portfolios"),
         ("/risk/stress/scenarios", "/api/v1/risk/stress/scenarios"),
     ],
 )

@@ -1,9 +1,9 @@
 """Optional SQLAlchemy wiring for FastAPI (M5.6).
 
 When ``RISKFORGE_DATABASE_URL`` is set, build a session factory and seed the
-demo portfolio, market snapshot, scenario definitions, and limit definitions.
-When unset, callers stay on sample / in-memory backends so existing unit tests
-remain unchanged.
+demo portfolios (M10.1 themed books), market snapshot, scenario definitions,
+and limit definitions. When unset, callers stay on sample / in-memory backends
+so existing unit tests remain unchanged.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from app.persistence.sqlalchemy_repos import (
 )
 from app.risk.limits import DEFAULT_LIMITS
 from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import DEMO_PORTFOLIOS, SAMPLE_PORTFOLIO
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ DEFAULT_MARKET_SNAPSHOT_ID = "position_marks"
 
 
 def default_sample_market_snapshot() -> MarketSnapshot:
-    """Immutable marks snapshot derived from ``SAMPLE_PORTFOLIO``."""
+    """Immutable marks snapshot derived from ``SAMPLE_PORTFOLIO`` (Cross-Asset)."""
     snap = PositionMarketDataProvider().snapshot(SAMPLE_PORTFOLIO)
     return snap.model_copy(update={"id": DEFAULT_MARKET_SNAPSHOT_ID})
 
@@ -141,9 +141,10 @@ def _build_memory_wiring(*, seed_sample: bool) -> PersistenceWiring:
 def _seed_sqlalchemy_defaults(factory: sessionmaker[Session]) -> None:
     with session_scope(factory) as session:
         portfolio_repo = SqlAlchemyPortfolioRepository(session)
-        if portfolio_repo.get(SAMPLE_PORTFOLIO.id) is None:
-            portfolio_repo.save(SAMPLE_PORTFOLIO)
-            logger.info("seeded sample portfolio %s", SAMPLE_PORTFOLIO.id)
+        for portfolio in DEMO_PORTFOLIOS:
+            if portfolio_repo.get(portfolio.id) is None:
+                portfolio_repo.save(portfolio)
+                logger.info("seeded demo portfolio %s", portfolio.id)
 
         market_repo = SqlAlchemyMarketSnapshotRepository(session)
         scenario_repo = SqlAlchemyScenarioDefinitionRepository(session)
