@@ -65,7 +65,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 ## Local Demo Security
 
-- The Compose local/demo profile can publish the unauthenticated API and Postgres ports. It is not internet-ready and must not be treated as a production security or IAM deployment (RF-014).
+- Default Compose binds published Postgres (`5432`), API (`8000`), and frontend (`5173`) ports to loopback (`127.0.0.1`). The local/demo profile is still unauthenticated and is not internet-ready; it must not be treated as a production security or IAM deployment (RF-014).
 
 ## Frontend
 
