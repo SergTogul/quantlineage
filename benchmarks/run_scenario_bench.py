@@ -12,9 +12,10 @@ M6.2 baseline: single-thread (``--threads 1`` / ``RISKFORGE_KERNEL_THREADS=1``).
 M6.4: C++ ``std::jthread`` shock-partition pool — compare serial vs parallel
 with ``--threads N`` (no OpenMP; do not mix strategies).
 
-Not a production SLA claim. Does not call risk-run APIs. Product
-LINEAR/DELTA_GAMMA may opt into the same ctypes kernel via
-RISKFORGE_SCENARIO_KERNEL (M6.3); this harness is not a VaR SLA.
+Not an HTTP/API latency claim. Product LINEAR/DELTA_GAMMA may opt into the same
+ctypes kernel via RISKFORGE_SCENARIO_KERNEL (M6.3). Formal relative floors are
+documented in ``benchmarks/RESULTS.md`` (SLA-K1/K2) and checked by
+``benchmarks/check_m6_sla.py``.
 """
 
 from __future__ import annotations

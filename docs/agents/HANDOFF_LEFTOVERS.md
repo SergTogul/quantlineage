@@ -30,7 +30,7 @@ This note avoids editing `ROADMAP.md` (may be mid-edit by another agent). Treat 
 
 | Item | Notes |
 |------|-------|
-| **M6 SLA** | Option B 2026-09-02: no product VaR wall-time SLA; M6 stays **PARTIAL**; `docs/agents/HANDOFF_M6_SLA.md` |
+| *(none for M6)* | M6 SLA **COMPLETE** 2026-09-02 — Option B reversed; SLA-K1/K2 in `benchmarks/RESULTS.md`; `docs/agents/HANDOFF_M6_SLA.md` |
 
 ## (C) Deferred explicitly (accepted residuals)
 
@@ -61,7 +61,7 @@ Different owners / file sets; no M11/M12; no SLA invention:
 2. **M4.7** — Portfolio Risk: tenor KR contributors in limit drill-down + tests  
 3. **M1.12** — Quant Pricing: Builtin vs QL ZC bond day-count / compounding (Frontend M9 Vitest lib migrate **closed**)
 
-**Do not parallel:** M1.10 + M1.11 (same market/pricing blast radius); M1.9 alone is a multi-session epic. M6 SLA disposed (accepted PARTIAL) — do not invent COMPLETE.
+**Do not parallel:** M1.10 + M1.11 (same market/pricing blast radius); M1.9 alone is a multi-session epic. M6 **COMPLETE** (scenario-kernel SLA) — do not reopen Option B.
 
 ## Completion report stub
 
