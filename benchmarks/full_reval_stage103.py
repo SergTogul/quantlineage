@@ -653,6 +653,9 @@ def run_matrix(
         "profile_smoke": profile_phases(
             build_multi_asset_workload(SMOKE_N_TRADES, SMOKE_N_SCENARIOS, seed=SEED)
         ),
+        "profile_100x250": profile_phases(
+            build_multi_asset_workload(100, 250, seed=SEED)
+        ),
         "results": results,
     }
 
@@ -785,7 +788,21 @@ def render_markdown(payload: dict[str, Any]) -> str:
     if profile:
         lines.extend(
             [
-                "## Coarse profile (smoke fixture)",
+                "## Coarse profile",
+                "",
+                "Smoke (4×8) is too small for pricing to dominate: scenario/snapshot",
+                "construction can exceed the product reprice. At 100×250 (same seed/book",
+                "family) pricing is the bottleneck. Persistence is not in this harness (0 ms).",
+                "Timed cells use the product iterator (no second materialized snapshot list).",
+                "LINEAR/DELTA_GAMMA stay on `approximate_pnl_from_panel` — the native scenario",
+                "kernel is not swapped in to look faster. No product-code rewrite: C++ / API",
+                "pricing paths are out of this lane, and methodology is unchanged.",
+                "",
+            ]
+        )
+        lines.extend(
+            [
+                "### Smoke 4×8",
                 "",
                 "| Phase | ms |",
                 "|---|---:|",
@@ -796,12 +813,25 @@ def render_markdown(payload: dict[str, Any]) -> str:
                 f"| persistence | {_fmt(profile.get('persistence_ms'))} |",
                 f"| aggregation / checksum | {_fmt(profile.get('aggregation_ms'))} |",
                 "",
-                "Pricing dominates. Persistence is not in this harness (0 ms).",
-                "Harness uses the product iterator (does not materialize a second snapshot list",
-                "on the timed path). No methodology change.",
-                "",
             ]
         )
+        profile_mid = payload.get("profile_100x250") or {}
+        if profile_mid:
+            lines.extend(
+                [
+                    "### 100×250 FULL_REVALUATION builtin (same fixture family)",
+                    "",
+                    "| Phase | ms |",
+                    "|---|---:|",
+                    f"| scenario construction | {_fmt(profile_mid.get('scenario_construction_ms'))} |",
+                    f"| snapshot transforms | {_fmt(profile_mid.get('snapshot_transform_ms'))} |",
+                    f"| engine construction | {_fmt(profile_mid.get('engine_construction_ms'))} |",
+                    f"| pricing (product path) | {_fmt(profile_mid.get('pricing_ms'))} |",
+                    f"| persistence | {_fmt(profile_mid.get('persistence_ms'))} |",
+                    f"| aggregation / checksum | {_fmt(profile_mid.get('aggregation_ms'))} |",
+                    "",
+                ]
+            )
     rows = csv_rows_from_payload(payload)
     lines.extend(
         [
@@ -845,8 +875,18 @@ def render_markdown(payload: dict[str, Any]) -> str:
         )
         for row in chart_rows:
             label = f"{row['n_trades']}×{row['n_scenarios']} {row['methodology']} {row['engine']}"
-            lines.append(f"- `{label}`: {row['wall_ms']} ms")
-    lines.extend(["", "R0.6 identity benches in `run_full_reval_bench.py` are unchanged.", ""])
+            lines.append(f"- `{label}`: {_fmt(row['wall_ms'])} ms")
+    lines.extend(
+        [
+            "",
+            "Warm vs cold is recorded when N×S ≤ 100×1000; larger cells record cold only",
+            "(same checksum path). QuantLib warm can be slower than cold on this host —",
+            "that is left as observed, not smoothed.",
+            "",
+            "R0.6 identity benches in `run_full_reval_bench.py` are unchanged.",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 

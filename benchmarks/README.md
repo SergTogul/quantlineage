@@ -188,10 +188,10 @@ Attempted cells (record honestly if a cell exceeds `--max-cell-wall-s`):
 - 1000 × 1000 FULL_REVALUATION if it finishes in budget
 - 10000 × 1000 LINEAR and DELTA_GAMMA
 
-Host observations are written with `--markdown` / `--csv` (typically
-`benchmarks/FULL_REVAL_RESULTS.md`). This is **not** an HTTP SLA, **not**
-multi-tenant capacity, and **does not** change labeled-runner SLA-K1/K2
-(post-R0). Do not invoke `check_m6_sla.py`.
+Host observations: [`FULL_REVAL_RESULTS.md`](FULL_REVAL_RESULTS.md) (generated from
+`full_reval_stage103.json`). This is **not** an HTTP SLA, **not** multi-tenant
+capacity, and **does not** change labeled-runner SLA-K1/K2 (post-R0). Do not
+invoke `check_m6_sla.py`.
 
 ```bash
 # CI-safe 4×8 smoke (JSON + CSV + Markdown)
