@@ -1,8 +1,10 @@
 # RiskForge CI — honest gates matching README / BUILD_NOTES commands.
 #
 # Jobs: backend-pytest, backend-quantlib-hard-gate (R0.1.6), PR-FAST (R0.12.1),
-# postgres-smoke, frontend-test-build, lint (M9.7), e2e-playwright (M9.2 / M9.10).
+# PR-FULL (R0.12.2), postgres-smoke, frontend-test-build, lint (M9.7),
+# e2e-playwright (M9.2 / M9.10).
 # R0.12.1: a green "PR-FAST" means deterministic goldens + frontend unit/lint ran (not PR-FULL).
+# R0.12.2: a green "PR-FULL" means the production-relevant jobs below all succeeded.
 name: CI
 
 on:
@@ -364,3 +366,21 @@ jobs:
         env:
           CI: true
         run: npm test
+
+  # R0.12.2 / RF-016: single required check whose display name contains PR-FULL.
+  # Green only when the production-relevant jobs have all succeeded. This job
+  # does not re-run pytest. It does not skip when QuantLib is missing — the
+  # hard-gate (backend-quantlib) remains mandatory. Not nightly (R0.12.4) or ABI (R0.12.5).
+  pr-full:
+    name: PR-FULL
+    needs:
+      - backend
+      - backend-quantlib
+      - frontend
+      - lint
+      - e2e
+      - postgres-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Production-relevant jobs succeeded
+        run: echo "PR-FULL: backend, backend-quantlib, frontend, lint, e2e, postgres-smoke succeeded"
