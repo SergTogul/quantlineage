@@ -957,7 +957,7 @@ AI remains **after** deterministic risk remediation.
 Priority: **P2**  
 Risk types: DOCUMENTATION, PROCESS  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0 row in ROADMAP; known_limitations aligned; agent TASKS.md pointers removed. Residual: stale suite counts in old ROADMAP baselines.)
+Status: **IN PROGRESS** (R0 row in ROADMAP; known_limitations aligned; agent TASKS.md pointers removed. Residual: stale suite counts in old ROADMAP baselines. Current gate is the recorded Phase A baseline, not a live matrix.)
 
 Source findings:
 

@@ -6,6 +6,28 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent**; do not recreate
 
 Milestone R0 — Core Remediation & Trustworthiness is **IN PROGRESS** on branch `r0-core-remediation`. Net-new feature development is paused until R0 completes; `reviews/FINDINGS.md` and `reviews/REMEDIATION_MILESTONE.md` are the authoritative remediation backlog.
 
+### Recorded Phase A baseline (2026-09-03; not re-run)
+
+Copied from `reviews/REMEDIATION_MILESTONE.md` (R0 Baseline Verification, local macOS, branch `r0-core-remediation`). This is the **recorded Phase A baseline**, **not re-run** in this slice. Reproducible commands live in that file. Milestone R0 is **IN PROGRESS**, not COMPLETE.
+
+Builtin **659** and QuantLib **688** are **not** contemporaneous two-engine results on one tree: builtin 659 is **pre-insertion** (before new R0.1 test files); QuantLib 688 is **after R0.1.1–R0.1.6** test/CI helper insertion.
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| Backend pytest `RISKFORGE_PRICING_ENGINE=builtin` | **659 passed** | Recorded baseline; **pre-insertion** (before new R0.1 test files) |
+| Backend pytest `RISKFORGE_PRICING_ENGINE=quantlib` `RISKFORGE_REQUIRE_QUANTLIB=1` | **688 passed**, **0 skipped** | Recorded baseline; **after R0.1.1–R0.1.6** |
+| Ruff `ruff check app tests` | exit 0 | Recorded baseline |
+| mypy `mypy app` | exit 0 | Recorded baseline |
+| Frontend `npm test` | **74 passed** | Recorded baseline |
+| Frontend `npm run lint` | exit 0 | Recorded baseline |
+| Frontend `npm run build` | OK | Recorded baseline |
+| Native `g++` `native/tests/kernel_test.cpp` | **risk_kernel_ok** | Recorded baseline |
+| Native pytest `tests/test_native_kernel.py` | **8 passed** | Recorded baseline |
+| Playwright E2E | **12 passed** | Recorded baseline |
+| PostgreSQL smoke | **BLOCKED** (no Docker daemon on this host) | Environment block (recorded baseline) |
+
+Historical Progress tables below keep their original dated counts. The 2026-09-02 **160 passed** figure remains the R0.13.1 historical snapshot and was not rewritten.
+
 ## Progress
 
 | Workstream | Status |
