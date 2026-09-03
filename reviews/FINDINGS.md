@@ -707,7 +707,8 @@ Keep an explicit inline/debug calculation endpoint only for tests/demo tooling.
 
 Priority: **P1**  
 Risk types: SECURITY, AVAILABILITY, OPERABILITY  
-Confidence: HIGH
+Confidence: HIGH  
+Status: **IN PROGRESS** (R0.11.4 error sanitization APPROVE; loopback/finite/workload/container slices still open)
 
 Source findings:
 

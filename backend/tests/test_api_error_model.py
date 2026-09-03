@@ -173,7 +173,9 @@ def test_m75_unsupported_run_type_400_message(
     err = resp.json()
     _assert_error_shape(err)
     assert err["code"] == "bad_request"
-    assert "unsupported run_type" in err["message"]
+    assert err["message"] == "Invalid request"
+    assert "unsupported run_type" not in err["message"]
+    assert "not-a-real-type" not in resp.text
 
 
 def test_m75_unhandled_500_shape() -> None:

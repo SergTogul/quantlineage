@@ -20,6 +20,7 @@ from typing import Any, Callable
 
 from pydantic import BaseModel
 
+from app.api.errors import PUBLIC_RISK_RUN_FAILURE_MESSAGE
 from app.domain.models import Portfolio, RiskRun, RiskRunStatus, RiskRunView, VaRMethodology
 from app.persistence.config import external_worker_enabled
 from app.persistence.memory_repos import InMemoryRiskRunRepository
@@ -328,12 +329,11 @@ class RiskRunWorker:
             )
         except RiskRunNotFound:
             logger.exception("risk run disappeared during execution: %s", run_id)
-        except Exception as exc:  # noqa: BLE001 — surface as FAILED status
+        except Exception:  # noqa: BLE001 — surface as FAILED status
             logger.exception("risk run failed: %s", run_id)
-            err_msg = str(exc) or type(exc).__name__
             try:
                 self._with_service(
-                    lambda svc, msg=err_msg: svc.fail(run_id, msg)
+                    lambda svc: svc.fail(run_id, PUBLIC_RISK_RUN_FAILURE_MESSAGE)
                 )
             except Exception:  # noqa: BLE001
                 logger.exception("could not mark risk run FAILED: %s", run_id)
