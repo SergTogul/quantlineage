@@ -4,10 +4,11 @@ import { expect, test } from '@playwright/test'
  * R0.12.3 — Critical E2E journey against the live local API (builtin pricing).
  *
  * load demo portfolio → inspect dashboard VaR/ES → run a named custom scenario
- * → inspect contributors → SPY-flat hedge compare → confirm risk figures after rerun.
+ * → inspect contributors → SPY-flat hedge compare → verify changed risk from compare JSON.
  *
  * Asserts UI → API → rendered results only. Does not invent or pin dollar VaR/ES.
  * Request units (display % / bp → API decimal / bp) are captured where they matter.
+ * Hedge change is `base_var_99 !== hedged_var_99` from POST /risk/stress/compare JSON.
  */
 
 const MAIN = { name: 'Main' }
@@ -18,13 +19,21 @@ function metricCard(page, label) {
   })
 }
 
+function isPostPath(url, method, pathname) {
+  return method === 'POST' && new URL(url).pathname === pathname
+}
+
 test.describe('R0.12.3 critical journey', () => {
   test('demo portfolio → VaR/ES → custom scenario → contributors → hedge compare', async ({
     page,
   }) => {
     test.setTimeout(120_000)
 
+    const dashboardVar = page.waitForResponse(
+      (res) => isPostPath(res.url(), res.request().method(), '/api/v1/risk/var') && res.ok(),
+    )
     await page.goto('/')
+    await dashboardVar
     await expect(page.getByText('Loading portfolio risk')).toHaveCount(0)
     await expect(page.getByText('API error')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Global Macro Demo' })).toBeVisible()
@@ -51,13 +60,15 @@ test.describe('R0.12.3 critical journey', () => {
     await expect(builder.locator('.scenario-payload-preview')).toContainText('API shocks: equity -0.2')
     await expect(builder.locator('.scenario-payload-preview')).toContainText('rates 100 bp')
 
-    const scenarioRequest = page.waitForRequest(
-      (req) =>
-        req.method() === 'POST'
-        && req.url().includes('/api/v1/risk/stress/evaluate/custom'),
+    const scenarioRequest = page.waitForRequest((req) =>
+      isPostPath(req.url(), req.method(), '/api/v1/risk/stress/evaluate/custom'),
+    )
+    const scenarioResponse = page.waitForResponse(
+      (res) => isPostPath(res.url(), res.request().method(), '/api/v1/risk/stress/evaluate/custom') && res.ok(),
     )
     await builder.getByRole('button', { name: 'Run scenario' }).click()
     const scenarioPost = await scenarioRequest
+    await scenarioResponse
     const scenarioBody = scenarioPost.postDataJSON()
     const custom = scenarioBody.scenarios[0]
     expect(custom.name).toBe('R0 Critical Journey')
@@ -87,7 +98,11 @@ test.describe('R0.12.3 critical journey', () => {
     const esCard = page.locator('.card', { has: page.getByRole('heading', { name: 'ES Contributions' }) })
     await expect(esCard).toBeVisible()
     await esCard.getByLabel('es methodology').selectOption('DELTA_GAMMA')
+    const esResponse = page.waitForResponse(
+      (res) => isPostPath(res.url(), res.request().method(), '/api/v1/risk/es') && res.ok(),
+    )
     await esCard.getByRole('button', { name: 'Load ES' }).click()
+    await esResponse
 
     const esResult = esCard.locator('.risk-panel-result')
     await expect(esResult).toBeVisible({ timeout: 30_000 })
@@ -104,17 +119,29 @@ test.describe('R0.12.3 critical journey', () => {
     await expect(hedge).toBeVisible()
     await hedge.getByLabel('hedge methodology').selectOption('DELTA_GAMMA')
 
-    const hedgeRequest = page.waitForRequest(
-      (req) => req.method() === 'POST' && req.url().includes('/api/v1/risk/stress/compare'),
+    const hedgeRequest = page.waitForRequest((req) =>
+      isPostPath(req.url(), req.method(), '/api/v1/risk/stress/compare'),
+    )
+    const hedgeResponse = page.waitForResponse(
+      (res) => isPostPath(res.url(), res.request().method(), '/api/v1/risk/stress/compare') && res.ok(),
     )
     await hedge.getByRole('button', { name: 'Compare hedge' }).click()
     const hedgePost = await hedgeRequest
+    const hedgeRes = await hedgeResponse
     const hedgeBody = hedgePost.postDataJSON()
     expect(hedgeBody.scenarios[0].equity_shock).toBeCloseTo(-0.2, 10)
     const spyEquity = (hedgeBody.hedged_portfolio?.positions || []).find(
       (p) => p.symbol === 'SPY' && p.type === 'equity',
     )
     expect(spyEquity?.quantity).toBe(0)
+
+    const compareJson = await hedgeRes.json()
+    expect(compareJson.base_var_99, JSON.stringify({
+      base_var_99: compareJson.base_var_99,
+      hedged_var_99: compareJson.hedged_var_99,
+      var_improvement: compareJson.var_improvement,
+    })).not.toBe(compareJson.hedged_var_99)
+    expect(compareJson.var_improvement).not.toBe(0)
 
     const hedgeResult = hedge.locator('.hedge-compare-result')
     await expect(hedgeResult).toBeVisible({ timeout: 45_000 })
