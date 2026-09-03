@@ -15,7 +15,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from app.market.snapshot import PositionMarketDataProvider
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import (
@@ -28,7 +27,7 @@ from app.risk.historical_data import (
 )
 from app.risk.scenarios import historical_shocked_snapshots
 from app.risk.var import VaRAnalytics
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 
 
 def _write_mini_csv(path: Path) -> None:
@@ -124,7 +123,7 @@ def test_demo_dataset_feeds_historical_var_and_scenarios():
     hist = next(m for m in report.methods if m.method == "historical")
     assert hist.var >= 0.0
 
-    market = PositionMarketDataProvider().snapshot(SAMPLE_PORTFOLIO)
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
     shocked = historical_shocked_snapshots(market, dataset)
     assert len(shocked) == dataset.factor_observations().n_observations
     assert all(s.id.startswith(f"{market.id}:") for s in shocked[:3])

@@ -36,6 +36,7 @@ from app.risk.hierarchy_placement import (
 )
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
+from app.sample import demo_market_snapshot
 
 
 def _path(*parts: str) -> str:
@@ -102,7 +103,13 @@ class HierarchyEngine:
             enriched["stress_loss"] = max(
                 0.0, max((-float(s.pnl) for s in stress), default=0.0)
             )
-        return self.limit_engine.evaluate(portfolio, pricing, enriched, DEFAULT_LIMITS)
+        return self.limit_engine.evaluate(
+            portfolio,
+            pricing,
+            enriched,
+            DEFAULT_LIMITS,
+            market=demo_market_snapshot(portfolio),
+        )
 
     def _node(
         self,

@@ -22,6 +22,7 @@ import numpy as np
 from app.domain.models import (
     EquityPosition,
     EuropeanOptionPosition,
+    MarketSnapshot,
     Portfolio,
     VaRMethodology,
 )
@@ -82,6 +83,15 @@ def _option_equity_book() -> Portfolio:
     )
 
 
+def _option_market() -> MarketSnapshot:
+    return MarketSnapshot(
+        id="component-var",
+        equity_spots={"SPY": 100.0},
+        equity_vols={"SPY": 0.25},
+        rates={"USD": 0.04},
+    )
+
+
 def _parametric_var(report) -> float:
     return next(m.var for m in report.methods if m.method == "parametric")
 
@@ -90,7 +100,11 @@ def test_component_var_reconciles_under_delta_gamma():
     pricing = BuiltinPricingEngine()
     analytics = VaRAnalytics(dataset=ArrayHistoricalDataset(_mixed_series()))
     report = analytics.report(
-        _option_equity_book(), pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA
+        _option_equity_book(),
+        pricing,
+        confidence=0.99,
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=_option_market(),
     )
     pvar = _parametric_var(report)
     assert pvar > 0
@@ -107,6 +121,7 @@ def test_component_var_reconciles_under_full_revaluation():
         pricing,
         confidence=0.95,
         methodology=VaRMethodology.FULL_REVALUATION,
+        market=_option_market(),
     )
     pvar = _parametric_var(report)
     assert pvar > 0
@@ -165,7 +180,10 @@ def test_zero_shock_series_yields_zero_component_var():
         fx_returns=z.copy(),
     )
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(series)).report(
-        _option_equity_book(), BuiltinPricingEngine(), methodology=VaRMethodology.DELTA_GAMMA
+        _option_equity_book(),
+        BuiltinPricingEngine(),
+        methodology=VaRMethodology.DELTA_GAMMA,
+        market=_option_market(),
     )
     assert _parametric_var(report) == 0.0
     assert all(c.component_var == 0.0 for c in report.contributions)

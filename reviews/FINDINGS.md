@@ -1,7 +1,7 @@
 # RiskForge Consolidated Engineering Findings
 
 Date: 2026-09-03  
-Status: R0 IN PROGRESS — Phase A safety nets  
+Status: R0 IN PROGRESS — Phase B (R0.2-A APPROVE; RF-001 still open)  
 Inputs:
 
 - `architecture-review.md`
@@ -111,7 +111,8 @@ Pricing tests are strong. VaR/ES tests are broad but do not yet pin exact quanti
 
 Priority: **P0**  
 Risk types: CORRECTNESS, ARCHITECTURE, MAINTAINABILITY  
-Confidence: HIGH
+Confidence: HIGH  
+Status: **IN PROGRESS** (slice R0.2-A APPROVE: conflict adapter, equity-spot authority on `value(trade, market)`, exact demo identity, service snapshot threading. Remaining: family terms, other-family fallbacks, deferred goldens/no-market inference.)
 
 Source findings:
 

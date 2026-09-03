@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from app.domain.models import EuropeanOptionPosition, Portfolio, VaRMethodology
+from app.domain.models import EuropeanOptionPosition, MarketSnapshot, Portfolio, VaRMethodology
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
@@ -66,6 +66,15 @@ def _option_book() -> Portfolio:
     )
 
 
+def _option_market() -> MarketSnapshot:
+    return MarketSnapshot(
+        id="option-test",
+        equity_spots={"SPY": 100.0},
+        equity_vols={"SPY": 0.25},
+        rates={"USD": 0.04},
+    )
+
+
 def _large_move_series() -> FactorObservationSeries:
     """Large equity / vol moves so γ and BS reval diverge from linear."""
     eq = np.array([-0.15, -0.10, -0.05, 0.0, 0.05, 0.10, 0.15, -0.20, 0.12, -0.08])
@@ -101,7 +110,7 @@ def test_zero_shocks_yield_near_zero_var_all_methodologies():
     engine = HistoricalRiskEngine(dataset=dataset)
     book = _option_book()
     for meth in VaRMethodology:
-        r = engine.calculate(book, pricing, methodology=meth)
+        r = engine.calculate(book, pricing, methodology=meth, market=_option_market())
         assert r["var_95"] == 0.0
         assert r["var_99"] == 0.0
         assert r["expected_shortfall_99"] == 0.0
@@ -113,9 +122,10 @@ def test_full_reval_differs_from_linear_on_options_book():
     dataset = ArrayHistoricalDataset(_large_move_series())
     engine = HistoricalRiskEngine(dataset=dataset)
     book = _option_book()
-    linear = engine.calculate(book, pricing, methodology=VaRMethodology.LINEAR)
-    full = engine.calculate(book, pricing, methodology=VaRMethodology.FULL_REVALUATION)
-    dg = engine.calculate(book, pricing, methodology=VaRMethodology.DELTA_GAMMA)
+    market = _option_market()
+    linear = engine.calculate(book, pricing, methodology=VaRMethodology.LINEAR, market=market)
+    full = engine.calculate(book, pricing, methodology=VaRMethodology.FULL_REVALUATION, market=market)
+    dg = engine.calculate(book, pricing, methodology=VaRMethodology.DELTA_GAMMA, market=market)
     # Large spot moves: BS reval ≠ first-order; also ≠ pure Δ-Γ on this book.
     assert abs(full["var_99"] - linear["var_99"]) > 1.0
     assert abs(full["var_99"] - dg["var_99"]) > 1e-6
@@ -134,8 +144,9 @@ def test_linear_omits_gamma_vs_delta_gamma():
     )
     engine = HistoricalRiskEngine(dataset=ArrayHistoricalDataset(series))
     book = _option_book()
-    linear = engine.calculate(book, pricing, methodology=VaRMethodology.LINEAR)
-    dg = engine.calculate(book, pricing, methodology=VaRMethodology.DELTA_GAMMA)
+    market = _option_market()
+    linear = engine.calculate(book, pricing, methodology=VaRMethodology.LINEAR, market=market)
+    dg = engine.calculate(book, pricing, methodology=VaRMethodology.DELTA_GAMMA, market=market)
     assert book.positions  # gamma present on options
     assert abs(linear["var_99"] - dg["var_99"]) > 1e-6
 
@@ -144,7 +155,11 @@ def test_var_report_exposes_methodology_and_reconciles_contributions():
     pricing = BuiltinPricingEngine()
     dataset = ArrayHistoricalDataset(_large_move_series())
     report = VaRAnalytics(dataset=dataset).report(
-        _option_book(), pricing, confidence=0.9, methodology=VaRMethodology.FULL_REVALUATION
+        _option_book(),
+        pricing,
+        confidence=0.9,
+        methodology=VaRMethodology.FULL_REVALUATION,
+        market=_option_market(),
     )
     assert report.methodology == VaRMethodology.FULL_REVALUATION
     assert {m.method for m in report.methods} == {"historical", "parametric"}

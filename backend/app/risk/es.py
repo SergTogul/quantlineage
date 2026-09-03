@@ -24,7 +24,6 @@ from app.domain.models import (
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.snapshot import PositionMarketDataProvider
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.scenarios import (
@@ -35,6 +34,7 @@ from app.risk.scenarios import (
     market_scenario_from_change,
 )
 from app.risk.var import VaRAnalytics
+from app.sample import demo_market_snapshot
 
 # Aggregate risk-factor families used for ES factor attribution.
 _FACTOR_KEYS = ("equity", "vol", "rate", "fx")
@@ -96,6 +96,7 @@ def _reconciliation_error(contributions: list[ESContribution], portfolio_es: flo
 def _aggregate_factor_pnl_linear(
     portfolio: Portfolio,
     pricing: PricingEngine,
+    market: MarketSnapshot,
     methodology: VaRMethodology,
     equity_ret: np.ndarray,
     vol_pct: np.ndarray,
@@ -106,7 +107,7 @@ def _aggregate_factor_pnl_linear(
     n = equity_ret.shape[0]
     out = {k: np.zeros(n, dtype=float) for k in _FACTOR_KEYS}
     for p in portfolio.positions:
-        v = pricing.value(p)
+        v = pricing.value(p, market)
         out["equity"] += v.delta * equity_ret
         if methodology is VaRMethodology.DELTA_GAMMA:
             out["equity"] += 0.5 * v.gamma * equity_ret * equity_ret
@@ -175,7 +176,6 @@ class ESContributionAnalytics:
         self._var = VaRAnalytics(
             seed=seed, observations=observations, dataset=self.dataset, methodology=methodology
         )
-        self._market_data = PositionMarketDataProvider()
 
     def report(
         self,
@@ -200,15 +200,7 @@ class ESContributionAnalytics:
                 by_risk_factor=[],
             )
 
-        base_market = (
-            market
-            if market is not None
-            else (
-                self._market_data.snapshot(portfolio)
-                if meth is VaRMethodology.FULL_REVALUATION
-                else None
-            )
-        )
+        base_market = market if market is not None else demo_market_snapshot(portfolio)
         pos_pnl = self._var._position_pnls(portfolio, pricing, meth, base_market)
         n = next(iter(pos_pnl.values())).shape[0]
         total_pnl = sum(pos_pnl.values(), start=np.zeros(n))
@@ -241,6 +233,7 @@ class ESContributionAnalytics:
             factor_pnl = _aggregate_factor_pnl_linear(
                 portfolio,
                 pricing,
+                base_market,
                 meth,
                 obs.equity_returns,
                 obs.vol_moves,

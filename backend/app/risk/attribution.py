@@ -49,7 +49,7 @@ from app.domain.models import (
     Valuation,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.snapshot import PositionMarketDataProvider
+from app.sample import DemoAggregateMarketDataProvider
 
 # Stable driver labels (API / UI). Residual stays on AttributionReport.residual.
 DRIVER_DELTA = "Delta"
@@ -212,7 +212,7 @@ def _trade_flow_pnl(
 
 class AttributionEngine:
     def __init__(self, market_data=None):
-        self.market_data = market_data or PositionMarketDataProvider()
+        self.market_data = market_data or DemoAggregateMarketDataProvider()
 
     def explain(self, req: AttributionRequest, pricing: PricingEngine) -> AttributionReport:
         pm = req.previous_market or self.market_data.snapshot(req.previous_portfolio)

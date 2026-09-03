@@ -15,7 +15,6 @@ from app.domain.models import (
     InterestRateFuturePosition,
     SwapPosition,
 )
-from app.market.snapshot import PositionMarketDataProvider
 from app.persistence.session import session_scope
 from app.persistence.sqlalchemy_repos import SqlAlchemyPortfolioRepository
 from app.pricing.builtin import BuiltinPricingEngine
@@ -26,6 +25,7 @@ from app.sample import (
     EQUITY_VOL_PORTFOLIO,
     RATES_MACRO_PORTFOLIO,
     SAMPLE_PORTFOLIO,
+    demo_market_snapshot,
     demo_portfolio_summaries,
     get_demo_portfolio,
 )
@@ -98,11 +98,10 @@ def test_cross_asset_theme_spans_equity_rates_fx():
 
 def test_demo_position_ids_unique_within_and_marks_priceable():
     pricing = BuiltinPricingEngine()
-    md = PositionMarketDataProvider()
     for portfolio in DEMO_PORTFOLIOS:
         ids = [p.id for p in portfolio.positions]
         assert len(ids) == len(set(ids))
-        market = md.snapshot(portfolio)
+        market = demo_market_snapshot(portfolio)
         values = [pricing.value(p, market).market_value for p in portfolio.positions]
         assert all(isinstance(v, float) for v in values)
         assert abs(sum(values)) > 0.0

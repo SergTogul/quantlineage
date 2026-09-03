@@ -8,7 +8,13 @@ status. Warning bands are per-limit via ``RiskLimit.warning_threshold_pct``
 
 from __future__ import annotations
 
-from app.domain.models import LimitResult, LimitStatus, Portfolio, RiskLimit
+from app.domain.models import (
+    LimitResult,
+    LimitStatus,
+    MarketSnapshot,
+    Portfolio,
+    RiskLimit,
+)
 from app.interfaces.pricing import PricingEngine
 
 DEFAULT_WARNING_THRESHOLD_PCT = 80.0
@@ -89,8 +95,14 @@ def classify_limit_status(
     return "OK"
 
 
-def _concentration_pct(portfolio: Portfolio, pricing_engine: PricingEngine) -> float:
-    values = [abs(pricing_engine.value(p).market_value) for p in portfolio.positions]
+def _concentration_pct(
+    portfolio: Portfolio,
+    pricing_engine: PricingEngine,
+    market: MarketSnapshot | None = None,
+) -> float:
+    values = [
+        abs(pricing_engine.value(p, market).market_value) for p in portfolio.positions
+    ]
     gross = sum(values) or 1.0
     return max(values, default=0.0) / gross * 100.0
 
@@ -99,6 +111,7 @@ def _key_rate_dv01_abs(
     portfolio: Portfolio,
     pricing_engine: PricingEngine,
     risk: dict[str, float],
+    market: MarketSnapshot | None = None,
 ) -> float:
     if "key_rate_dv01" in risk:
         return abs(float(risk["key_rate_dv01"]))
@@ -106,7 +119,7 @@ def _key_rate_dv01_abs(
     from app.risk.sensitivities import SensitivityEngine
 
     measures = SensitivityEngine().calculate(
-        portfolio, pricing_engine, measures=("key_rate_dv01",)
+        portfolio, pricing_engine, measures=("key_rate_dv01",), market=market
     )
     if not measures:
         # Fall back to parallel DV01 when no key-rate pillars are available.
@@ -137,6 +150,7 @@ class LimitEngine:
         pricing_engine: PricingEngine,
         risk: dict[str, float],
         needed: set[str] | None = None,
+        market: MarketSnapshot | None = None,
     ) -> dict[str, float]:
         """Absolute metric values used for utilization / breach checks."""
         want = needed or {
@@ -164,9 +178,13 @@ class LimitEngine:
         if "fx_delta" in want:
             out["fx_delta"] = abs(float(risk.get("fx_delta", 0.0)))
         if "single_position_pct" in want:
-            out["single_position_pct"] = _concentration_pct(portfolio, pricing_engine)
+            out["single_position_pct"] = _concentration_pct(
+                portfolio, pricing_engine, market
+            )
         if "key_rate_dv01" in want:
-            out["key_rate_dv01"] = _key_rate_dv01_abs(portfolio, pricing_engine, risk)
+            out["key_rate_dv01"] = _key_rate_dv01_abs(
+                portfolio, pricing_engine, risk, market
+            )
         if "stress_loss" in want:
             out["stress_loss"] = _stress_loss_abs(portfolio, pricing_engine, risk)
         return out
@@ -177,9 +195,12 @@ class LimitEngine:
         pricing_engine: PricingEngine,
         risk: dict[str, float],
         limits: list[RiskLimit],
+        market: MarketSnapshot | None = None,
     ) -> list[LimitResult]:
         needed = {item.metric for item in limits}
-        metrics = self.resolve_metrics(portfolio, pricing_engine, risk, needed)
+        metrics = self.resolve_metrics(
+            portfolio, pricing_engine, risk, needed, market=market
+        )
         results: list[LimitResult] = []
         for item in limits:
             value = metrics[item.metric]

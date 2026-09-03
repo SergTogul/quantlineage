@@ -38,7 +38,6 @@ from app.domain.models import (
     Portfolio,
 )
 from app.interfaces.pricing import PricingEngine
-from app.market.snapshot import PositionMarketDataProvider
 from app.risk.reverse_stress import (
     DEFAULT_LOSS_TOLERANCE,
     DEFAULT_MAX_ITERATIONS,
@@ -50,6 +49,7 @@ from app.risk.reverse_stress import (
 )
 from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory
+from app.sample import DemoAggregateMarketDataProvider
 
 DEFAULT_FACTORS: tuple[FactorFamily, ...] = ("equity", "rates", "vol", "fx")
 DEFAULT_COORDINATE_PASSES = 8
@@ -170,7 +170,7 @@ class MultiFactorReverseStressEngine:
     """Constrained multi-factor reverse stress via ray search + coordinate descent."""
 
     def __init__(self) -> None:
-        self.market_data = PositionMarketDataProvider()
+        self.market_data = DemoAggregateMarketDataProvider()
 
     def solve(
         self,

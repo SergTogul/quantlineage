@@ -19,6 +19,7 @@ from app.domain.models import (
     Valuation,
 )
 from app.interfaces.pricing import PricingEngine
+from app.market.demo_snapshot import MissingMarketDataError
 from app.pricing.curve_rates import continuous_zero, discount_factor
 from app.pricing.surface_vol import option_vol_from_snapshot
 
@@ -47,7 +48,15 @@ class BuiltinPricingEngine(PricingEngine):
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
         if isinstance(position, EquityPosition):
-            spot = market.equity_spots.get(position.symbol, position.price) if market else position.price
+            if market is None:
+                spot = position.price
+            else:
+                try:
+                    spot = market.equity_spots[position.symbol]
+                except KeyError:
+                    raise MissingMarketDataError(
+                        f"equity_spots[{position.symbol}]"
+                    ) from None
             return Valuation(position_id=position.id, market_value=position.quantity*spot, delta=position.quantity*spot)
         if isinstance(position, EquityFuturePosition):
             s = market.equity_spots.get(position.symbol, position.spot) if market else position.spot
