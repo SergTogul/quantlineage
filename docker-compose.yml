@@ -25,13 +25,15 @@ services:
       # Defer execution to the ``worker`` service (shared Postgres QUEUED rows).
       RISKFORGE_EXTERNAL_WORKER: "1"
     # Local demo: bind to loopback (unauthenticated API; not internet-ready).
+    # Shared/non-loopback: set RISKFORGE_SHARED_DEPLOYMENT=1 and RISKFORGE_API_TOKEN (R0.11.5).
     ports: ["127.0.0.1:8000:8000"]
     depends_on:
       postgres:
         condition: service_healthy
 
   # Same image / RiskRunWorker as API lifespan; claims QUEUED via FOR UPDATE SKIP LOCKED (M5.7).
-  # Compose ships one worker for the demo; extra replicas are claim-safe on Postgres (no Redis/RQ).
+  # Distinct OS process from ``backend`` (R0.3.5 QuantLib process partition). Extra replicas
+  # are claim-safe on Postgres (no Redis/RQ); do not run QuantLib in the API process.
   worker:
     build: ./backend
     command: ["python", "-m", "app.worker"]

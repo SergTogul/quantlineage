@@ -716,7 +716,7 @@ Keep an explicit inline/debug calculation endpoint only for tests/demo tooling.
 Priority: **P1**  
 Risk types: SECURITY, AVAILABILITY, OPERABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.11.1 loopback APPROVE; R0.11.2 finite scalars APPROVE; R0.11.3 workload caps APPROVE; R0.11.4 sanitization APPROVE; R0.11.6 container pins APPROVE; remaining R0.11.5 auth)
+Status: **IN PROGRESS** (R0.11.1–R0.11.6 APPROVE including R0.11.5 shared-token gate. Residual shared-profile items: object ACLs, TLS/reverse-proxy, secret management. Local demo stays unauthenticated.)
 
 Source findings:
 
