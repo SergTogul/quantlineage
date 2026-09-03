@@ -68,6 +68,7 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 - C++: N/A
 - Build: N/A
 - Milestone 10: **PARTIAL** (M10.1 DONE only)
+- Push: SHA `1fd27b9` on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
 
 ## Known limitations / risks
 - UI still loads default Cross-Asset book only (no portfolio picker wired to `/portfolios`)
