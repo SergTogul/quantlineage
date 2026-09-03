@@ -52,9 +52,11 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 ```
 
 ## Results
-- Backend: focused pricing/golden/curve/demo suites green
+- Backend: focused pricing/golden/curve/demo suites green (61 passed post-push recheck)
 - QuantLib: golden bond continuous + Builtin parity green (**rel=1e-10**)
 - Frontend / C++ / Build: not in scope
+- Pushed: `f39ba6a` (M1.12 parity) + `8d3d67a` (ROADMAP highest-risk note) on `origin/master`
+  - https://github.com/SergTogul/riskforge-mvp/commit/f39ba6ad1e5294352b0e9597f354f682c1df5030
 
 ## Known limitations / risks
 - Curve-attached Builtin bonds still discount at domain `maturity_years` (pillar T), not calendar-rounded Act/365; QL ZeroCurve pillars use calendar-rounded dates — residual can appear when curves are attached (covered by curve tests, not M1.12 scalar gap).
@@ -63,6 +65,6 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 - Parallel M5.5 cache/memo work left unstaged (`curve_cache.py` / `scenario_memo.py` / related); not part of this commit.
 
 ## Follow-up / next owner
-- Owner: Lead Architect (optional) — note M1.12 closed in leftovers tracker if still listing it
+- Owner: Lead Architect — leftovers tracker refreshed (`HANDOFF_LEFTOVERS.md`); M1.12 listed under Recently closed
 - Requested action: none blocking
 - Blocking?: no
