@@ -1,4 +1,8 @@
-"""Stress / reverse-stress / threat routes (M7.1). Under /risk until M7.2."""
+"""Stress / reverse-stress / threat routes (M7.1). Under /risk until M7.2.
+
+M3.8: formal ``Scenario`` wire under ``/risk/stress/formal/*`` and
+``GET /risk/stress/scenarios/formal`` (legacy ``StressScenario`` endpoints unchanged).
+"""
 
 from __future__ import annotations
 
@@ -8,10 +12,12 @@ from fastapi import APIRouter, Body, Depends
 
 from app.api.deps import (
     get_baseline_stress_scenarios,
+    get_default_market_snapshot,
     get_default_stress_scenarios,
     get_portfolio_service,
 )
 from app.api.openapi_examples import (
+    FORMAL_CUSTOM_STRESS_BODY_EXAMPLES,
     HEDGE_COMPARE_BODY_EXAMPLES,
     RESP_HEDGE_COMPARE,
     RESP_REVERSE,
@@ -21,9 +27,16 @@ from app.api.openapi_examples import (
     REVERSE_MULTI_BODY_EXAMPLES,
     STRESS_BODY_EXAMPLES,
 )
+from app.api.scenario_wire import (
+    FormalCustomStressRequest,
+    ScenarioWire,
+    stress_to_wire,
+    wires_to_stress,
+)
 from app.domain.models import (
     CustomStressRequest,
     HedgeComparisonReport,
+    MarketSnapshot,
     MultiFactorReverseStressRequest,
     MultiFactorReverseStressResult,
     Portfolio,
@@ -64,12 +77,42 @@ def risk_stress_scenarios(
     return scenarios
 
 
+@router.get(
+    "/stress/scenarios/formal",
+    response_model=list[ScenarioWire],
+    summary="List scenarios as formal Scenario wire (M3.8)",
+)
+def risk_stress_scenarios_formal(
+    scenarios: list[StressScenario] = Depends(get_default_stress_scenarios),
+    base: MarketSnapshot = Depends(get_default_market_snapshot),
+) -> list[ScenarioWire]:
+    """Same DI defaults as ``GET /stress/scenarios``, projected to formal wire."""
+    return [stress_to_wire(s, base) for s in scenarios]
+
+
 @router.post("/stress/custom")
 def risk_stress_custom(
     request: CustomStressRequest,
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     return service.stresses(request.portfolio, request.scenarios)
+
+
+@router.post(
+    "/stress/formal/custom",
+    response_model=list[StressResult],
+    summary="Custom stress P&L (formal Scenario wire)",
+    responses=RESP_STRESS,
+)
+def risk_stress_formal_custom(
+    request: Annotated[
+        FormalCustomStressRequest,
+        Body(openapi_examples=FORMAL_CUSTOM_STRESS_BODY_EXAMPLES),
+    ],
+    service: PortfolioService = Depends(get_portfolio_service),
+) -> list[StressResult]:
+    """Accept formal Scenario wire; adapt to StressScenario for StressEngine (M3.8)."""
+    return service.stresses(request.portfolio, wires_to_stress(request.scenarios))
 
 
 @router.post("/stress/evaluate")
@@ -88,6 +131,23 @@ def risk_stress_evaluate_custom(
     service: PortfolioService = Depends(get_portfolio_service),
 ):
     return service.threat_evaluation(request.portfolio, request.scenarios)
+
+
+@router.post(
+    "/stress/formal/evaluate/custom",
+    summary="Threat evaluation (formal Scenario wire)",
+)
+def risk_stress_formal_evaluate_custom(
+    request: Annotated[
+        FormalCustomStressRequest,
+        Body(openapi_examples=FORMAL_CUSTOM_STRESS_BODY_EXAMPLES),
+    ],
+    service: PortfolioService = Depends(get_portfolio_service),
+):
+    """Accept formal Scenario wire; adapt to StressScenario for threat evaluate (M3.8)."""
+    return service.threat_evaluation(
+        request.portfolio, wires_to_stress(request.scenarios)
+    )
 
 
 @router.post(
