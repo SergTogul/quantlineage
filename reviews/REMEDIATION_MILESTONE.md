@@ -603,7 +603,9 @@ Related findings:
 - RF-013
 - RF-010
 
-## R0.8.1 Deterministic RiskRun specification
+## R0.8.1 Deterministic RiskRun specification — COMPLETE (2026-09-04)
+
+First-class optional `historical_dataset_id`/`version`, `as_of`, `calculation_config` on `RiskRun` with memory/SQLite round-trip. Alembic `003_risk_run_spec_fields`. RF-009 stays open for R0.8.2 factory unification.
 
 RiskRun must reference:
 
