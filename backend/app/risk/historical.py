@@ -12,11 +12,34 @@ from app.compute.kernel import (
     Shock,
     get_scenario_kernel,
 )
-from app.domain.models import MarketSnapshot, Portfolio, Valuation, VaRMethodology
+from app.domain.models import (
+    BondPosition,
+    EquityFuturePosition,
+    EquityPosition,
+    EuropeanOptionPosition,
+    FXForwardPosition,
+    FXOptionPosition,
+    InterestRateFuturePosition,
+    MarketSnapshot,
+    Portfolio,
+    Position,
+    SwapPosition,
+    Valuation,
+    VaRMethodology,
+)
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
+from app.risk.factor_panel import HistoricalFactorPanel, panel_factor_identity
+from app.risk.factor_types import (
+    EquitySpot,
+    EquityVol,
+    FXSpot,
+    FXVol,
+    RateZero,
+    RiskFactor,
+)
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
-from app.risk.scenarios import iter_historical_shocked_snapshots
+from app.risk.scenarios import iter_historical_shocked_snapshots, iter_panel_shocked_snapshots
 
 
 def require_explicit_market(market: MarketSnapshot | None) -> MarketSnapshot:
@@ -214,6 +237,134 @@ def approximate_pnl_series(
     return linear + 0.5 * gamma * equity_ret * equity_ret
 
 
+def _rate_tenor(maturity_years: float) -> str:
+    return f"{round(float(maturity_years))}Y"
+
+
+def required_factors_for_position(position: Position) -> tuple[RiskFactor, ...]:
+    """Typed factors a panel must contain for one position (fail-closed).
+
+    Identity matches ``RiskFactorEngine.calculate_typed``: per-name equity/FX
+    and per-tenor rates via ``round(maturity_years)Y``. Options also require
+    their vol factor. Cap/floor and swaption are not mapped here.
+    """
+    if isinstance(position, (EquityPosition, EquityFuturePosition, EuropeanOptionPosition)):
+        factors: list[RiskFactor] = [EquitySpot(position.symbol)]
+        if isinstance(position, EuropeanOptionPosition):
+            factors.append(EquityVol(underlying=position.symbol))
+        return tuple(factors)
+    if isinstance(position, (BondPosition, SwapPosition, InterestRateFuturePosition)):
+        return (RateZero(currency=position.currency, tenor=_rate_tenor(position.maturity_years)),)
+    if isinstance(position, (FXForwardPosition, FXOptionPosition)):
+        factors = [FXSpot(position.pair)]
+        if isinstance(position, FXOptionPosition):
+            factors.append(FXVol(pair=position.pair))
+        return tuple(factors)
+    raise TypeError(f"unsupported position type for panel path: {type(position)!r}")
+
+
+def required_panel_factors(portfolio: Portfolio) -> tuple[RiskFactor, ...]:
+    """Union of ``required_factors_for_position`` across the book."""
+    factors: list[RiskFactor] = []
+    seen: set[tuple[str, str, str]] = set()
+    for position in portfolio.positions:
+        for factor in required_factors_for_position(position):
+            identity = panel_factor_identity(factor)
+            if identity not in seen:
+                seen.add(identity)
+                factors.append(factor)
+    return tuple(factors)
+
+
+def require_panel_covers_portfolio(portfolio: Portfolio, panel: HistoricalFactorPanel) -> None:
+    """Fail closed if any required position factor is absent from ``panel``.
+
+    Missing is not treated as a zero move.
+    """
+    column_ids = {panel_factor_identity(factor) for factor in panel.factors}
+    missing = [
+        factor
+        for factor in required_panel_factors(portfolio)
+        if panel_factor_identity(factor) not in column_ids
+    ]
+    if missing:
+        identities = ", ".join(str(panel_factor_identity(f)) for f in missing)
+        raise ValueError(f"panel missing required factor(s): {identities}")
+
+
+def _panel_linear_contribution(factor: RiskFactor, valuation: Valuation, move: float) -> float:
+    if isinstance(factor, EquitySpot):
+        return float(valuation.delta) * move
+    if isinstance(factor, FXSpot):
+        return float(valuation.fx_delta) * move
+    if isinstance(factor, (EquityVol, FXVol)):
+        return float(valuation.vega) * (move * 100.0)
+    if isinstance(factor, RateZero):
+        return float(valuation.dv01) * move
+    raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
+
+
+def approximate_pnl_from_panel(
+    portfolio: Portfolio,
+    pricing_engine: PricingEngine,
+    base_market: MarketSnapshot,
+    panel: HistoricalFactorPanel,
+    *,
+    methodology: VaRMethodology = VaRMethodology.LINEAR,
+) -> np.ndarray:
+    """Per-factor LINEAR / DELTA_GAMMA P&L from a ``HistoricalFactorPanel``.
+
+    Each position is shocked by its own typed column — two equities or two
+    rate tenors in one observation are not broadcast. Units match
+    ``approximate_pnl_series`` / ``FactorObservationSeries``.
+    """
+    if methodology is VaRMethodology.FULL_REVALUATION:
+        raise ValueError(
+            "FULL_REVALUATION cannot use approximate_pnl_from_panel; "
+            "use full_revaluation_pnl_from_panel instead"
+        )
+    if methodology not in (VaRMethodology.LINEAR, VaRMethodology.DELTA_GAMMA):
+        raise ValueError(f"approximate_pnl_from_panel does not support {methodology!r}")
+    require_panel_covers_portfolio(portfolio, panel)
+    vals = pricing_engine.value_portfolio(portfolio, base_market)
+    if len(vals) != len(portfolio.positions):
+        raise ValueError("valuation count does not match portfolio positions")
+
+    position_factors = [required_factors_for_position(p) for p in portfolio.positions]
+    pnls = np.zeros(panel.n_observations, dtype=float)
+    use_gamma = methodology is VaRMethodology.DELTA_GAMMA
+    for i, observation in enumerate(panel.observations):
+        total = 0.0
+        for factors, valuation in zip(position_factors, vals, strict=True):
+            for factor in factors:
+                move = observation.change(factor)
+                total += _panel_linear_contribution(factor, valuation, move)
+                if use_gamma and isinstance(factor, EquitySpot):
+                    total += 0.5 * float(valuation.gamma) * move * move
+        pnls[i] = total
+    return pnls
+
+
+def full_revaluation_pnl_from_panel(
+    portfolio: Portfolio,
+    pricing_engine: PricingEngine,
+    base_market: MarketSnapshot,
+    panel: HistoricalFactorPanel,
+) -> np.ndarray:
+    """P&L under each panel-shocked snapshot (independent, not cumulative).
+
+    ``pnl[i] = PV(shocked_i) - PV(base)``. Required position factors must
+    exist on the panel; missing is not treated as a zero move.
+    """
+    require_panel_covers_portfolio(portfolio, panel)
+    base_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, base_market))
+    pnls: list[float] = []
+    for snap in iter_panel_shocked_snapshots(base_market, panel):
+        shocked_mv = sum(v.market_value for v in pricing_engine.value_portfolio(portfolio, snap))
+        pnls.append(shocked_mv - base_mv)
+    return np.asarray(pnls, dtype=float)
+
+
 def full_revaluation_pnl_series(
     portfolio: Portfolio,
     pricing_engine: PricingEngine,
@@ -250,6 +401,12 @@ class HistoricalRiskEngine(RiskEngine):
 
     Default dataset is :class:`SyntheticHistoricalDataset` (deterministic RNG)
     so MVP results stay reproducible without an external market-data feed.
+
+    Opt-in ``factor_panel`` (R0.5.3 leftover): when supplied, LINEAR /
+    DELTA_GAMMA / FULL_REVALUATION consume per-name and per-tenor panel
+    columns instead of ``dataset.factor_observations()``. Default
+    ``HistoricalRiskEngine()`` leaves this ``None`` and stays on the
+    four-macro demo path. RF-005 remains open until that default changes.
     """
 
     def __init__(
@@ -260,6 +417,7 @@ class HistoricalRiskEngine(RiskEngine):
         methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
         scenario_kernel: ScenarioKernel | None = None,
         scenario_backend: str | None = None,
+        factor_panel: HistoricalFactorPanel | None = None,
     ):
         self.seed = seed
         self.observations = observations
@@ -269,6 +427,7 @@ class HistoricalRiskEngine(RiskEngine):
         self.methodology = methodology
         self.scenario_kernel = scenario_kernel
         self.scenario_backend = scenario_backend
+        self.factor_panel = factor_panel
 
     def calculate(
         self,
@@ -284,7 +443,20 @@ class HistoricalRiskEngine(RiskEngine):
         vals = pricing_engine.value_portfolio(portfolio, base_market)
         mv, delta, gamma, vega, dv01, fx_delta = _aggregate_greeks(vals)
 
-        if meth is VaRMethodology.FULL_REVALUATION:
+        if self.factor_panel is not None:
+            if meth is VaRMethodology.FULL_REVALUATION:
+                pnl = full_revaluation_pnl_from_panel(
+                    portfolio, pricing_engine, base_market, self.factor_panel
+                )
+            else:
+                pnl = approximate_pnl_from_panel(
+                    portfolio,
+                    pricing_engine,
+                    base_market,
+                    self.factor_panel,
+                    methodology=meth,
+                )
+        elif meth is VaRMethodology.FULL_REVALUATION:
             pnl = full_revaluation_pnl_series(portfolio, pricing_engine, base_market, self.dataset)
         else:
             obs = self.dataset.factor_observations()
