@@ -77,6 +77,29 @@ def test_create_returns_202_queued(client, tiny_portfolio):
     assert body["results"] == []
 
 
+def test_create_persists_factory_dataset_identity(client, tiny_portfolio):
+    resp = client.post(
+        "/risk/runs",
+        json={
+            "portfolio": tiny_portfolio.model_dump(mode="json"),
+            "run_type": "summary",
+            "request": {
+                "methodology": "DELTA_GAMMA",
+                "as_of": "current",
+                "calculation_config": {"observations": 750, "seed": 7},
+            },
+        },
+    )
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["historical_dataset_id"] is not None
+    assert body["historical_dataset_version"] is not None
+    assert body["as_of"] == "current"
+    assert body["calculation_config"] is not None
+    assert body["calculation_config"]["observations"] == 750
+    assert body["calculation_config"]["seed"] == 7
+
+
 def test_poll_until_completed_with_summary_result(client, tiny_portfolio):
     created = client.post(
         "/risk/runs",
