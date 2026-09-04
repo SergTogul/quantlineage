@@ -161,14 +161,14 @@ def test_service_and_api(svc):
     assert result.achieved_loss_pct >= 0.01
     assert result.assumptions
 
-    client = TestClient(app)
-    portfolio = client.get("/portfolio").json()
-    rev = client.post(
-        "/risk/stress/reverse/multi",
-        json={"portfolio": portfolio, "target_loss_pct": 0.01, "factors": ["equity", "vol"]},
-    )
-    assert rev.status_code == 200, rev.text
-    body = rev.json()
-    assert body["converged"] is True
-    assert body["method"] == "ray_search_coordinate_descent"
-    assert len(body["assumptions"]) >= 1
+    with TestClient(app) as client:
+        portfolio = client.get("/portfolio").json()
+        rev = client.post(
+            "/risk/stress/reverse/multi",
+            json={"portfolio": portfolio, "target_loss_pct": 0.01, "factors": ["equity", "vol"]},
+        )
+        assert rev.status_code == 200, rev.text
+        body = rev.json()
+        assert body["converged"] is True
+        assert body["method"] == "ray_search_coordinate_descent"
+        assert len(body["assumptions"]) >= 1

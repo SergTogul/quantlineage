@@ -41,7 +41,7 @@ EXPECTED_CHECKSUM = "6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a4
 
 
 def bench_book() -> tuple[Portfolio, MarketSnapshot, ArrayHistoricalDataset]:
-    pos = EquityPosition(type="equity", id="eq", symbol="UNIT", quantity=QUANTITY, price=SPOT)
+    pos = EquityPosition(type="equity", id="eq", symbol="UNIT", quantity=QUANTITY)
     book = Portfolio(id="r061-full-reval", name="r061", positions=[pos])
     market = MarketSnapshot(id="base", equity_spots={"UNIT": SPOT}, rates={"USD": 0.04})
     equity_returns = np.linspace(-0.05, 0.05, N_OBS)

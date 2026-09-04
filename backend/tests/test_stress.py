@@ -16,7 +16,7 @@ BOOK = Portfolio(
     id="stress-omit",
     name="stress-omit",
     positions=[
-        EquityPosition(type="equity", id="unit", symbol="UNIT", quantity=1.0, price=1.0)
+        EquityPosition(type="equity", id="unit", symbol="UNIT", quantity=1.0, )
     ],
 )
 

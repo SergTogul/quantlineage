@@ -91,7 +91,7 @@ def test_linear_equals_delta_gamma_when_gamma_zero():
     )
     pricing = BuiltinPricingEngine()
     engine = _engine()
-    market = demo_market_snapshot(equity_only)
+    market = SAMPLE_MARKET
     greeks = engine.calculate(
         equity_only, pricing, methodology=VaRMethodology.LINEAR, market=market
     )

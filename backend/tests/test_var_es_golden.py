@@ -32,7 +32,6 @@ UNIT_BOOK = Portfolio(
             id="unit",
             symbol="UNIT",
             quantity=1.0,
-            price=1.0,
         )
     ],
 )

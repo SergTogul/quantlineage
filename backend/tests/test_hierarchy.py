@@ -18,6 +18,7 @@ from app.domain.models import (
     HierarchyLevel,
     HierarchyNode,
     HierarchyRef,
+    MarketSnapshot,
     Portfolio,
 )
 from app.pricing.builtin import BuiltinPricingEngine
@@ -31,7 +32,7 @@ from app.risk.hierarchy import (
 )
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.limits import DEFAULT_LIMITS
-from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
 
 _ADDITIVE = ("market_value", "delta", "gamma", "vega", "dv01", "fx_delta")
@@ -69,6 +70,14 @@ def _assert_additive_reconciles(node: HierarchyNode, tol: float = 1e-9) -> None:
         _assert_additive_reconciles(child, tol)
 
 
+
+def _multi_desk_market() -> MarketSnapshot:
+    return MarketSnapshot(
+        id="multi-desk",
+        equity_spots={"AAA": 10.0, "BBB": 20.0, "CCC": 40.0, "X": 1.0, "Y": 1.0},
+        rates={"USD": 0.04},
+    )
+
 def _engine(seed: int = 1, observations: int = 40) -> HierarchyEngine:
     return HierarchyEngine(HistoricalRiskEngine(seed=seed, observations=observations))
 
@@ -86,7 +95,6 @@ def _multi_desk_portfolio() -> Portfolio:
                 id="eq-a",
                 symbol="AAA",
                 quantity=100,
-                price=10.0,
                 book="Cash A",
                 desk="Rates Desk",
                 strategy="Carry",
@@ -96,7 +104,6 @@ def _multi_desk_portfolio() -> Portfolio:
                 id="eq-b",
                 symbol="BBB",
                 quantity=50,
-                price=20.0,
                 book="Cash B",
                 desk="Equity Desk",
                 strategy="Momentum",
@@ -106,7 +113,6 @@ def _multi_desk_portfolio() -> Portfolio:
                 id="eq-c",
                 symbol="CCC",
                 quantity=25,
-                price=40.0,
                 book="Cash B",
                 # desk/strategy omitted → inherit portfolio defaults
             ),
@@ -133,9 +139,9 @@ def test_resolve_desk_strategy_defaults():
         strategy="Multi",
         positions=[
             EquityPosition(
-                type="equity", id="x", symbol="X", quantity=1, price=1.0, desk="FX Desk"
+                type="equity", id="x", symbol="X", quantity=1, desk="FX Desk"
             ),
-            EquityPosition(type="equity", id="y", symbol="Y", quantity=1, price=1.0),
+            EquityPosition(type="equity", id="y", symbol="Y", quantity=1),
         ],
     )
     assert resolve_desk(pf.positions[0], pf) == "FX Desk"
@@ -147,7 +153,7 @@ def test_resolve_desk_strategy_defaults():
 def test_build_firm_to_trade_tree():
     pricing = BuiltinPricingEngine()
     pf = _multi_desk_portfolio()
-    root = _engine().build(pf, pricing, market=demo_market_snapshot(pf))
+    root = _engine().build(pf, pricing, market=_multi_desk_market())
 
     assert root.level == "firm"
     assert root.name == "Acme Capital"
@@ -187,7 +193,7 @@ def test_build_firm_to_trade_tree():
 def test_market_value_reconciles_at_every_level():
     pricing = BuiltinPricingEngine()
     pf = _multi_desk_portfolio()
-    root = _engine().build(pf, pricing, market=demo_market_snapshot(pf))
+    root = _engine().build(pf, pricing, market=_multi_desk_market())
     _assert_mv_reconciles(root)
     # Spot check: three equities 1000 + 1000 + 1000
     assert math.isclose(root.market_value, 3000.0, abs_tol=1e-9)
@@ -208,7 +214,7 @@ def test_sample_portfolio_hierarchy_still_drills_to_trade():
 def test_empty_portfolio_zero_risk_tree():
     pricing = BuiltinPricingEngine()
     empty = Portfolio(id="empty", name="Empty", firm="F", positions=[])
-    root = _engine(observations=20).build(empty, pricing, market=demo_market_snapshot(empty))
+    root = _engine(observations=20).build(empty, pricing, market=MarketSnapshot(id="empty"))
     assert root.level == "firm"
     assert root.market_value == 0.0
     assert root.var_99 == 0.0
@@ -281,7 +287,7 @@ def test_es_contributions_split_by_position_desk_strategy():
     pricing = BuiltinPricingEngine()
     pf = _multi_desk_portfolio()
     report = ESContributionAnalytics(seed=1, observations=60).report(
-        pf, pricing, confidence=0.9, market=demo_market_snapshot(pf)
+        pf, pricing, confidence=0.9, market=_multi_desk_market()
     )
     desks = {c.key for c in report.by_desk}
     strategies = {c.key for c in report.by_strategy}
@@ -302,7 +308,7 @@ def test_risk_at_matches_subset_var():
         portfolio_id="multi-desk",
         desk="Rates Desk",
     )
-    market = demo_market_snapshot(pf)
+    market = _multi_desk_market()
     subset = portfolio_at(pf, ref)
     node = engine.risk_at(pf, pricing, ref, market=market)
     assert node.level == "desk"
@@ -322,7 +328,7 @@ def test_greeks_var_es_stress_limits_on_nodes():
     risk = HistoricalRiskEngine(seed=1, observations=40)
     engine = HierarchyEngine(risk)
     pf = _multi_desk_portfolio()
-    market = demo_market_snapshot(pf)
+    market = _multi_desk_market()
     root = engine.build(pf, pricing, market=market)
 
     _assert_additive_reconciles(root)
@@ -359,7 +365,7 @@ def test_risk_at_includes_stress_and_limits():
         desk="Rates Desk",
         strategy="Carry",
     )
-    node = engine.risk_at(pf, pricing, ref, market=demo_market_snapshot(pf))
+    node = engine.risk_at(pf, pricing, ref, market=_multi_desk_market())
     assert node.level == "strategy"
     assert node.stress
     assert node.limits

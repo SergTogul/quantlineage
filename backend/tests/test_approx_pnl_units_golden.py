@@ -35,7 +35,6 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import RateZero
 from app.risk.historical import approximate_pnl_series
 from app.risk.sensitivities import SensitivityEngine
-from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 _PY = "python"
 
@@ -145,7 +144,6 @@ def test_key_rate_dv01_is_exact_swap_annuity_times_one_bp():
         notional=5_000_000,
         maturity_years=5.0,
         fixed_rate=0.039,
-        market_swap_rate=0.041,
         pay_fixed=True,
         duration=4.3,
     )
@@ -195,12 +193,16 @@ def test_swap_dv01_times_bps_matches_approximate_pnl():
         notional=5_000_000,
         maturity_years=5.0,
         fixed_rate=0.039,
-        market_swap_rate=0.041,
         pay_fixed=True,
         duration=4.3,
     )
+    market = MarketSnapshot(
+        id="swap-dv01",
+        rates={"USD": 0.041},
+        key_rates={"USD": {"5Y": 0.041, "10Y": 0.04}},
+    )
     pricing = BuiltinPricingEngine()
-    dv01 = LegacyDemoPricingAdapter(pricing).value(pos).dv01
+    dv01 = pricing.value(pos, market).dv01
     rates = np.array([1.0, 25.0, -10.0, 100.0])
     pnl = _pnl(dv01=dv01, rates_bps=rates)
     np.testing.assert_allclose(pnl, dv01 * rates, atol=1e-12)

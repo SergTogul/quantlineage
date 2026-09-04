@@ -10,7 +10,6 @@ from datetime import date
 
 import pytest
 from tests.quantlib_gate import import_quantlib
-from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 ql = import_quantlib()
 
