@@ -239,11 +239,14 @@ Related findings:
 | R0.2 hierarchy/stress/reverse require explicit market | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-hierarchy-stress-market-independent-review.md`). |
 | R0.2.4 cache identity (all families) | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-terms-cache-independent-review.md`). |
 | R0.2 decompose require explicit market | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-decompose-market-independent-review.md`). |
-| Remaining typed InstrumentTerms / DTO mark removal | OPEN | Compatibility `*Position` DTOs remain. Deferred: golden snapshot-routing. |
+| R0.2.1 typed InstrumentTerms | COMPLETE | Independent review **APPROVE** (`reviews/r0.2.1-instrument-terms-independent-review.md`). Extraction only; cache/`value()` not wired. |
+| Remaining DTO mark removal | OPEN | Compatibility `*Position` DTOs remain. Deferred: golden snapshot-routing. |
 
 RF-001 remains **OPEN** until remaining families cannot silently fall back to trade-local marks and production methods no longer infer markets.
 
-## R0.2.1 Introduce contractual trade/instrument terms
+## R0.2.1 Introduce contractual trade/instrument terms — COMPLETE (2026-09-04)
+
+`backend/app/domain/instrument_terms.py`: `terms_from_position` is an allow-list economics projection for all ten `trade_cache_key` families. Unknown types raise `TypeError`. `*Position` DTOs still carry marks. Cache and pricing `value()` are not wired. RF-001 stays open.
 
 Production trade models should contain contractual economics such as:
 
