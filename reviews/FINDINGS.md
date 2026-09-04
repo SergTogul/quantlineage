@@ -112,7 +112,7 @@ Pricing tests are strong. VaR/ES tests are broad but do not yet pin exact quanti
 Priority: **P0**  
 Risk types: CORRECTNESS, ARCHITECTURE, MAINTAINABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.2-A APPROVE; equity+FX+bond/swap/IR fail closed on supplied market; dashboard and VaR/ES/hierarchy/stress/reverse/decompose require explicit market; R0.2.4 cache identity hashes economics only; R0.2.1 typed `InstrumentTerms` APPROVE; `trade_cache_key` hashes `terms_from_position`; QuantLib `value()` projects through terms and takes snapshot marks. Remaining: compatibility `*Position` DTOs still carry marks; omitted `market=` and Builtin still use those marks.)
+Status: **IN PROGRESS** (R0.2-A APPROVE; equity+FX+bond/swap/IR fail closed on supplied market; dashboard and VaR/ES/hierarchy/stress/reverse/decompose require explicit market; R0.2.4 cache identity hashes economics only; R0.2.1 typed `InstrumentTerms` APPROVE; `trade_cache_key` hashes `terms_from_position`; QuantLib and Builtin `value()` project through terms and take snapshot marks. Remaining: compatibility `*Position` DTOs still carry marks; omitted `market=` still uses those marks.)
 
 Source findings:
 

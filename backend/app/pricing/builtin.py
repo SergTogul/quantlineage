@@ -3,13 +3,24 @@ from __future__ import annotations
 import math
 from statistics import NormalDist
 
+from app.domain.instrument_terms import (
+    BondTerms,
+    CapFloorTerms,
+    EquityFutureTerms,
+    EquityTerms,
+    EuropeanOptionTerms,
+    FXForwardTerms,
+    FXOptionTerms,
+    InstrumentTerms,
+    InterestRateFutureTerms,
+    SwapTerms,
+    SwaptionTerms,
+    terms_from_position,
+)
 from app.domain.models import (
     BondPosition,
     CapFloorPosition,
-    EquityFuturePosition,
-    EquityPosition,
     EuropeanOptionPosition,
-    FXForwardPosition,
     FXOptionPosition,
     InterestRateFuturePosition,
     MarketSnapshot,
@@ -69,6 +80,129 @@ def _required_fx_spot(market: MarketSnapshot, pair: str) -> float:
         raise MissingMarketDataError(f"fx_spots[{pair}]") from None
 
 
+def _economics_from_terms(position: Position, terms: InstrumentTerms) -> dict:
+    """Copy contractual terms onto Position field names (marks stay off terms)."""
+    fields = type(position).model_fields
+    return {name: value for name, value in terms.model_dump().items() if name in fields}
+
+
+def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -> dict:
+    """Resolve live marks from the explicit snapshot using terms keys only."""
+    if isinstance(terms, EquityTerms):
+        return {"price": _required_equity_spot(market, terms.symbol)}
+    if isinstance(terms, EquityFutureTerms):
+        return {
+            "spot": _required_equity_spot(market, terms.symbol),
+            "risk_free_rate": _required_settlement_rate(market, terms.currency),
+            "dividend_yield": _required_dividend_yield(market, terms.symbol),
+        }
+    if isinstance(terms, EuropeanOptionTerms):
+        spot = _required_equity_spot(market, terms.symbol)
+        return {
+            "spot": spot,
+            "volatility": required_equity_option_vol(
+                market,
+                name=terms.symbol,
+                maturity_years=terms.maturity_years,
+                strike=terms.strike,
+                spot=spot,
+            ),
+            "risk_free_rate": _required_settlement_rate(market, terms.currency),
+            "dividend_yield": _required_dividend_yield(market, terms.symbol),
+        }
+    if isinstance(terms, BondTerms):
+        return {
+            "yield_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.maturity_years,
+            )
+        }
+    if isinstance(terms, SwapTerms):
+        return {
+            "market_swap_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.maturity_years,
+            )
+        }
+    if isinstance(terms, InterestRateFutureTerms):
+        return {
+            "forward_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.maturity_years,
+                prefer_projection=True,
+            ),
+            "quoted_rate": required_ir_future_quote(market, terms.currency),
+        }
+    if isinstance(terms, CapFloorTerms):
+        forward = required_continuous_zero(
+            market,
+            terms.currency,
+            terms.maturity_years,
+            prefer_projection=True,
+        )
+        return {
+            "forward_rate": forward,
+            "discount_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.maturity_years,
+            ),
+            "volatility": required_ir_option_vol(
+                market,
+                name=terms.currency,
+                maturity_years=terms.maturity_years,
+                strike=terms.strike,
+                forward=forward,
+            ),
+        }
+    if isinstance(terms, SwaptionTerms):
+        forward = required_continuous_zero(
+            market,
+            terms.currency,
+            terms.option_maturity_years,
+            prefer_projection=True,
+        )
+        return {
+            "forward_swap_rate": forward,
+            "discount_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.option_maturity_years + terms.swap_tenor_years,
+            ),
+            "volatility": required_ir_option_vol(
+                market,
+                name=terms.currency,
+                maturity_years=terms.option_maturity_years,
+                strike=terms.strike,
+                forward=forward,
+            ),
+        }
+    if isinstance(terms, FXForwardTerms):
+        return {
+            "spot": _required_fx_spot(market, terms.pair),
+            "domestic_rate": _required_settlement_rate(market, terms.pair[-3:]),
+            "foreign_rate": _required_settlement_rate(market, terms.pair[:3]),
+        }
+    if isinstance(terms, FXOptionTerms):
+        spot = _required_fx_spot(market, terms.pair)
+        return {
+            "spot": spot,
+            "volatility": required_fx_option_vol(
+                market,
+                name=terms.pair,
+                maturity_years=terms.maturity_years,
+                strike=terms.strike,
+                spot=spot,
+            ),
+            "domestic_rate": _required_settlement_rate(market, terms.pair[-3:]),
+            "foreign_rate": _required_settlement_rate(market, terms.pair[:3]),
+        }
+    return {}
+
+
 def _act365_fixed_years(maturity_years: float) -> float:
     """Actual/365 Fixed year fraction matching QuantLib ZeroCouponBond.
 
@@ -88,56 +222,74 @@ class BuiltinPricingEngine(PricingEngine):
     """
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
-        if isinstance(position, EquityPosition):
-            spot = (
-                position.price
-                if market is None
-                else _required_equity_spot(market, position.symbol)
+        try:
+            terms = terms_from_position(position)
+        except TypeError:
+            raise TypeError(f"Unsupported position: {type(position)!r}") from None
+
+        updates = _economics_from_terms(position, terms)
+        if market is not None:
+            # Snapshot is the sole mark authority; leftover DTO marks are ignored.
+            updates.update(_snapshot_marks_from_terms(terms, market))
+        working = position.model_copy(update=updates)
+
+        if isinstance(terms, EquityTerms):
+            return Valuation(
+                position_id=terms.id,
+                market_value=terms.quantity * working.price,
+                delta=terms.quantity * working.price,
             )
-            return Valuation(position_id=position.id, market_value=position.quantity*spot, delta=position.quantity*spot)
-        if isinstance(position, EquityFuturePosition):
+        if isinstance(terms, EquityFutureTerms):
             s = (
-                position.spot
+                working.spot
                 if market is None
-                else _required_equity_spot(market, position.symbol)
+                else _required_equity_spot(market, terms.symbol)
             )
             if market is None:
-                r = position.risk_free_rate
-                q = position.dividend_yield
+                r = working.risk_free_rate
+                q = working.dividend_yield
             else:
-                currency = _equity_settlement_currency(position)
-                r = _required_settlement_rate(market, currency)
-                q = _required_dividend_yield(market, position.symbol)
-            f = s * math.exp((r-q)*position.maturity_years)
-            mv = position.quantity*position.multiplier*f
-            return Valuation(position_id=position.id, market_value=mv, delta=mv, dv01=mv*position.maturity_years*0.0001)
-        if isinstance(position, EuropeanOptionPosition):
-            return self._equity_option(position, market)
-        if isinstance(position, BondPosition):
-            return self._bond(position, market)
-        if isinstance(position, SwapPosition):
-            return self._swap(position, market)
-        if isinstance(position, FXForwardPosition):
+                r = _required_settlement_rate(market, terms.currency)
+                q = _required_dividend_yield(market, terms.symbol)
+            f = s * math.exp((r - q) * terms.maturity_years)
+            mv = terms.quantity * terms.multiplier * f
+            return Valuation(
+                position_id=terms.id,
+                market_value=mv,
+                delta=mv,
+                dv01=mv * terms.maturity_years * 0.0001,
+            )
+        if isinstance(terms, EuropeanOptionTerms):
+            return self._equity_option(working, market)
+        if isinstance(terms, BondTerms):
+            return self._bond(working, market)
+        if isinstance(terms, SwapTerms):
+            return self._swap(working, market)
+        if isinstance(terms, FXForwardTerms):
             if market is None:
-                s = position.spot
-                rd = position.domestic_rate
-                rf = position.foreign_rate
+                s = working.spot
+                rd = working.domestic_rate
+                rf = working.foreign_rate
             else:
-                s = _required_fx_spot(market, position.pair)
-                rd = _required_settlement_rate(market, position.pair[-3:])
-                rf = _required_settlement_rate(market, position.pair[:3])
-            forward = s*math.exp((rd-rf)*position.maturity_years)
-            pv = position.notional_base*(forward-position.strike)*math.exp(-rd*position.maturity_years)
-            return Valuation(position_id=position.id, market_value=pv, fx_delta=position.notional_base*s)
-        if isinstance(position, FXOptionPosition):
-            return self._fx_option(position, market)
-        if isinstance(position, InterestRateFuturePosition):
-            return self._ir_future(position, market)
-        if isinstance(position, CapFloorPosition):
-            return self._cap_floor(position, market)
-        if isinstance(position, SwaptionPosition):
-            return self._swaption(position, market)
-        raise TypeError(f"Unsupported position: {type(position)!r}")
+                s = _required_fx_spot(market, terms.pair)
+                rd = _required_settlement_rate(market, terms.pair[-3:])
+                rf = _required_settlement_rate(market, terms.pair[:3])
+            forward = s * math.exp((rd - rf) * terms.maturity_years)
+            pv = terms.notional_base * (forward - terms.strike) * math.exp(-rd * terms.maturity_years)
+            return Valuation(
+                position_id=terms.id,
+                market_value=pv,
+                fx_delta=terms.notional_base * s,
+            )
+        if isinstance(terms, FXOptionTerms):
+            return self._fx_option(working, market)
+        if isinstance(terms, InterestRateFutureTerms):
+            return self._ir_future(working, market)
+        if isinstance(terms, CapFloorTerms):
+            return self._cap_floor(working, market)
+        if isinstance(terms, SwaptionTerms):
+            return self._swaption(working, market)
+        raise TypeError(f"Unsupported position: {type(working)!r}")
 
     def _bond(self, p: BondPosition, market: MarketSnapshot | None) -> Valuation:
         df = discount_factor(
