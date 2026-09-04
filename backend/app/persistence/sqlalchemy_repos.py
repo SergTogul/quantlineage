@@ -32,6 +32,8 @@ from app.persistence.models import (
 from app.persistence.repositories import (
     LimitDefinitionRepository,
     MarketSnapshotRepository,
+    PortfolioAlreadyExists,
+    PortfolioNotFound,
     PortfolioRepository,
     RiskRunRepository,
     ScenarioDefinitionRepository,
@@ -53,11 +55,28 @@ class SqlAlchemyPortfolioRepository(PortfolioRepository):
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def create(self, portfolio: Portfolio) -> Portfolio:
+        if self._session.get(PortfolioRow, portfolio.id) is not None:
+            raise PortfolioAlreadyExists(portfolio.id)
+        row = PortfolioRow(id=portfolio.id)
+        self._session.add(row)
+        return self._write(row, portfolio)
+
+    def update(self, portfolio: Portfolio) -> Portfolio:
+        row = self._session.get(PortfolioRow, portfolio.id)
+        if row is None:
+            raise PortfolioNotFound(portfolio.id)
+        return self._write(row, portfolio)
+
     def save(self, portfolio: Portfolio) -> Portfolio:
+        """Legacy upsert for seed/callers that have not switched to create/update."""
         row = self._session.get(PortfolioRow, portfolio.id)
         if row is None:
             row = PortfolioRow(id=portfolio.id)
             self._session.add(row)
+        return self._write(row, portfolio)
+
+    def _write(self, row: PortfolioRow, portfolio: Portfolio) -> Portfolio:
         row.name = portfolio.name
         row.firm = portfolio.firm
         row.desk = portfolio.desk
