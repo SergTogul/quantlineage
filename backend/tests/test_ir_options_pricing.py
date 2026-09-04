@@ -14,6 +14,7 @@ import pytest
 from app.domain.models import CapFloorPosition, MarketSnapshot, Portfolio, SwaptionPosition
 from app.market.snapshot import PositionMarketDataProvider
 from app.pricing.builtin import BuiltinPricingEngine
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 _N = NormalDist()
 
@@ -118,7 +119,7 @@ def test_swaption_position_round_trips_through_discriminated_union():
 def test_builtin_cap_floor_matches_independent_black76_reference():
     cap = _cap()
 
-    valuation = BuiltinPricingEngine().value(cap)
+    valuation = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(cap)
 
     assert valuation.market_value == pytest.approx(
         _black76_strip_reference(cap),
@@ -130,7 +131,7 @@ def test_builtin_cap_floor_matches_independent_black76_reference():
 def test_builtin_swaption_matches_independent_black76_reference():
     swaption = _swaption()
 
-    valuation = BuiltinPricingEngine().value(swaption)
+    valuation = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(swaption)
 
     assert valuation.market_value == pytest.approx(
         _swaption_black76_reference(swaption),
@@ -144,8 +145,8 @@ def test_builtin_cap_floor_sign_and_parity_invariants():
     cap = _cap(option_type="cap")
     floor = _cap(id="usd-floor", option_type="floor")
 
-    cap_v = engine.value(cap)
-    floor_v = engine.value(floor)
+    cap_v = LegacyDemoPricingAdapter(engine).value(cap)
+    floor_v = LegacyDemoPricingAdapter(engine).value(floor)
 
     assert cap_v.market_value > 0.0
     assert floor_v.market_value > 0.0
@@ -161,8 +162,8 @@ def test_builtin_swaption_payer_receiver_sign_and_parity_invariants():
     payer = _swaption(option_type="payer")
     receiver = _swaption(id="usd-receiver-swaption", option_type="receiver")
 
-    payer_v = engine.value(payer)
-    receiver_v = engine.value(receiver)
+    payer_v = LegacyDemoPricingAdapter(engine).value(payer)
+    receiver_v = LegacyDemoPricingAdapter(engine).value(receiver)
 
     assert payer_v.market_value > 0.0
     assert receiver_v.market_value > 0.0
@@ -186,8 +187,8 @@ def test_builtin_cap_floor_rate_and_vol_monotonicity():
         rates={"USD": 0.04}, projection_rates={"USD": 0.04}, ir_vols={"USD": 0.25}
     )
 
-    assert engine.value(cap, higher_rate_market).market_value > engine.value(cap).market_value
-    assert engine.value(floor, higher_rate_market).market_value < engine.value(floor).market_value
+    assert engine.value(cap, higher_rate_market).market_value > LegacyDemoPricingAdapter(engine).value(cap).market_value
+    assert engine.value(floor, higher_rate_market).market_value < LegacyDemoPricingAdapter(engine).value(floor).market_value
     assert engine.value(cap, higher_vol_market).market_value > engine.value(cap, base_vol_market).market_value
 
 
@@ -206,8 +207,8 @@ def test_builtin_swaption_rate_and_vol_monotonicity():
         rates={"USD": 0.04}, projection_rates={"USD": 0.04}, ir_vols={"USD": 0.25}
     )
 
-    assert engine.value(payer, higher_rate_market).market_value > engine.value(payer).market_value
-    assert engine.value(receiver, higher_rate_market).market_value < engine.value(receiver).market_value
+    assert engine.value(payer, higher_rate_market).market_value > LegacyDemoPricingAdapter(engine).value(payer).market_value
+    assert engine.value(receiver, higher_rate_market).market_value < LegacyDemoPricingAdapter(engine).value(receiver).market_value
     assert engine.value(payer, higher_vol_market).market_value > engine.value(payer, base_vol_market).market_value
 
 
@@ -216,7 +217,7 @@ def test_builtin_cap_floor_respects_snapshot_rate_inputs():
     cap = _cap(forward_rate=0.04, discount_rate=0.03)
     market = MarketSnapshot(rates={"USD": 0.03}, projection_rates={"USD": 0.05}, ir_vols={"USD": 0.20})
 
-    base = engine.value(cap).market_value
+    base = LegacyDemoPricingAdapter(engine).value(cap).market_value
     shocked = engine.value(cap, market).market_value
 
     assert shocked > base
@@ -227,7 +228,7 @@ def test_builtin_swaption_respects_snapshot_rate_inputs():
     payer = _swaption(forward_swap_rate=0.04, discount_rate=0.03)
     market = MarketSnapshot(rates={"USD": 0.03}, projection_rates={"USD": 0.05}, ir_vols={"USD": 0.20})
 
-    base = engine.value(payer).market_value
+    base = LegacyDemoPricingAdapter(engine).value(payer).market_value
     shocked = engine.value(payer, market).market_value
 
     assert shocked > base

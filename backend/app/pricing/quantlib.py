@@ -50,6 +50,7 @@ from app.pricing.surface_vol import (
     required_fx_option_vol,
     required_ir_option_vol,
 )
+from app.risk.historical import require_explicit_market
 
 try:
     import QuantLib as ql
@@ -289,6 +290,7 @@ class QuantLibPricingEngine(PricingEngine):
         return self._ql_date(self.evaluation_date + timedelta(days=days))
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
+        market = require_explicit_market(market)
         try:
             terms = terms_from_position(position)
         except TypeError:
@@ -298,13 +300,12 @@ class QuantLibPricingEngine(PricingEngine):
             ) from None
 
         session_date = self.evaluation_date
+        parsed_as_of = _parse_snapshot_as_of(market.as_of)
+        if parsed_as_of is not None:
+            session_date = parsed_as_of
+        # Snapshot is the sole mark authority; leftover DTO marks are ignored.
         updates = _economics_from_terms(position, terms)
-        if market is not None:
-            parsed_as_of = _parse_snapshot_as_of(market.as_of)
-            if parsed_as_of is not None:
-                session_date = parsed_as_of
-            # Snapshot is the sole mark authority; leftover DTO marks are ignored.
-            updates.update(_snapshot_marks_from_terms(terms, market))
+        updates.update(_snapshot_marks_from_terms(terms, market))
         working = position.model_copy(update=updates)
 
         with self._session(evaluation_date=session_date):

@@ -35,6 +35,7 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import RateZero
 from app.risk.historical import approximate_pnl_series
 from app.risk.sensitivities import SensitivityEngine
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 _PY = "python"
 
@@ -199,7 +200,7 @@ def test_swap_dv01_times_bps_matches_approximate_pnl():
         duration=4.3,
     )
     pricing = BuiltinPricingEngine()
-    dv01 = pricing.value(pos).dv01
+    dv01 = LegacyDemoPricingAdapter(pricing).value(pos).dv01
     rates = np.array([1.0, 25.0, -10.0, 100.0])
     pnl = _pnl(dv01=dv01, rates_bps=rates)
     np.testing.assert_allclose(pnl, dv01 * rates, atol=1e-12)

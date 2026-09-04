@@ -16,6 +16,7 @@ ql = import_quantlib()
 from app.domain.instrument_terms import EquityTerms, terms_from_position
 from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot
 from app.pricing.quantlib import QuantLibPricingEngine
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 
 @pytest.fixture
@@ -102,8 +103,8 @@ def test_dto_mark_divergence_does_not_change_snapshot_option_pv(engine):
     high_pv = engine.value(high, market).market_value
     assert low_pv == pytest.approx(high_pv, rel=1e-12, abs=1e-9)
     # Snapshot ATM 20% vol is not the leftover 5% or 80% DTO marks.
-    assert low_pv != pytest.approx(engine.value(low).market_value, rel=1e-6)
-    assert high_pv != pytest.approx(engine.value(high).market_value, rel=1e-6)
+    assert low_pv != pytest.approx(LegacyDemoPricingAdapter(engine).value(low).market_value, rel=1e-6)
+    assert high_pv != pytest.approx(LegacyDemoPricingAdapter(engine).value(high).market_value, rel=1e-6)
 
 
 def test_terms_quantity_and_strike_change_snapshot_pv(engine):

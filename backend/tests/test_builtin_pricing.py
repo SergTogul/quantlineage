@@ -24,6 +24,7 @@ from app.domain.models import (
 )
 from app.market.demo_snapshot import MissingMarketDataError
 from app.pricing.builtin import BuiltinPricingEngine
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 from app.sample import (
     CROSS_ASSET_PORTFOLIO,
     RATES_MACRO_PORTFOLIO,
@@ -169,7 +170,7 @@ def test_complete_snapshot_fx_forward_matches_cip_and_does_not_mutate_trade() ->
     )
 
     assert valuation.market_value == pytest.approx(expected, rel=1e-12, abs=1e-9)
-    assert valuation.market_value != BuiltinPricingEngine().value(position).market_value
+    assert valuation.market_value != LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position).market_value
     assert position.model_dump(mode="json") == original
 
 
@@ -182,10 +183,10 @@ def test_complete_snapshot_fx_option_prices_without_mutating_trade() -> None:
     )
 
     valuation = BuiltinPricingEngine().value(position, market)
-    reference = BuiltinPricingEngine().value(local_marks)
+    reference = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(local_marks)
 
     assert valuation.market_value == pytest.approx(reference.market_value, rel=1e-12, abs=1e-9)
-    assert valuation.market_value != BuiltinPricingEngine().value(position).market_value
+    assert valuation.market_value != LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position).market_value
     assert position.model_dump(mode="json") == original
 
 
@@ -202,8 +203,8 @@ def test_fx_uses_trade_local_marks_when_market_is_none() -> None:
         forward.domestic_rate,
         forward.foreign_rate,
     )
-    assert pricing.value(forward).market_value == pytest.approx(fwd_expected, rel=1e-12, abs=1e-9)
-    assert pricing.value(option).market_value > 0.0
+    assert LegacyDemoPricingAdapter(pricing).value(forward).market_value == pytest.approx(fwd_expected, rel=1e-12, abs=1e-9)
+    assert LegacyDemoPricingAdapter(pricing).value(option).market_value > 0.0
 
 
 def test_fx_option_surface_quote_satisfies_vol_without_fx_vols() -> None:
@@ -458,9 +459,9 @@ def test_complete_snapshot_bond_matches_scalar_path_and_does_not_mutate_trade() 
 
     assert valuation.market_value == pytest.approx(expected, rel=1e-12, abs=1e-9)
     assert valuation.market_value == pytest.approx(
-        BuiltinPricingEngine().value(local).market_value, rel=1e-12, abs=1e-9
+        LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(local).market_value, rel=1e-12, abs=1e-9
     )
-    assert valuation.market_value != BuiltinPricingEngine().value(position).market_value
+    assert valuation.market_value != LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position).market_value
     assert position.model_dump(mode="json") == original
 
 
@@ -471,10 +472,10 @@ def test_complete_snapshot_swap_prices_without_mutating_trade() -> None:
     local = position.model_copy(update={"market_swap_rate": 0.041})
 
     valuation = BuiltinPricingEngine().value(position, market)
-    reference = BuiltinPricingEngine().value(local)
+    reference = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(local)
 
     assert valuation.market_value == pytest.approx(reference.market_value, rel=1e-12, abs=1e-9)
-    assert valuation.market_value != BuiltinPricingEngine().value(position).market_value
+    assert valuation.market_value != LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position).market_value
     assert position.model_dump(mode="json") == original
 
 
@@ -490,10 +491,10 @@ def test_complete_snapshot_ir_future_prices_without_mutating_trade() -> None:
     local = position.model_copy(update={"quoted_rate": 0.042, "forward_rate": 0.0425})
 
     valuation = BuiltinPricingEngine().value(position, market)
-    reference = BuiltinPricingEngine().value(local)
+    reference = LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(local)
 
     assert valuation.market_value == pytest.approx(reference.market_value, rel=1e-12, abs=1e-9)
-    assert valuation.market_value != BuiltinPricingEngine().value(position).market_value
+    assert valuation.market_value != LegacyDemoPricingAdapter(BuiltinPricingEngine()).value(position).market_value
     assert position.model_dump(mode="json") == original
 
 
@@ -517,13 +518,13 @@ def test_complete_snapshot_ir_options_price_without_mutating_trade() -> None:
     pricing = BuiltinPricingEngine()
 
     assert pricing.value(cap, market).market_value == pytest.approx(
-        pricing.value(cap_local).market_value, rel=1e-12, abs=1e-8
+        LegacyDemoPricingAdapter(pricing).value(cap_local).market_value, rel=1e-12, abs=1e-8
     )
     assert pricing.value(swaption, market).market_value == pytest.approx(
-        pricing.value(swaption_local).market_value, rel=1e-12, abs=1e-8
+        LegacyDemoPricingAdapter(pricing).value(swaption_local).market_value, rel=1e-12, abs=1e-8
     )
-    assert pricing.value(cap, market).market_value != pricing.value(cap).market_value
-    assert pricing.value(swaption, market).market_value != pricing.value(swaption).market_value
+    assert pricing.value(cap, market).market_value != LegacyDemoPricingAdapter(pricing).value(cap).market_value
+    assert pricing.value(swaption, market).market_value != LegacyDemoPricingAdapter(pricing).value(swaption).market_value
     assert cap.model_dump(mode="json") == original_cap
     assert swaption.model_dump(mode="json") == original_swaption
 
@@ -538,11 +539,11 @@ def test_rates_ir_use_trade_local_marks_when_market_is_none() -> None:
     future = _ir_future()
     future_expected = future.quantity * future.pv01 * (future.quoted_rate - future.forward_rate) * 10000.0
 
-    assert pricing.value(bond).market_value == pytest.approx(bond_expected, rel=1e-12, abs=1e-9)
-    assert pricing.value(swap).market_value == pytest.approx(swap_expected, rel=1e-12, abs=1e-9)
-    assert pricing.value(future).market_value == pytest.approx(future_expected, rel=1e-12, abs=1e-9)
-    assert pricing.value(_cap()).market_value > 0.0
-    assert pricing.value(_swaption()).market_value > 0.0
+    assert LegacyDemoPricingAdapter(pricing).value(bond).market_value == pytest.approx(bond_expected, rel=1e-12, abs=1e-9)
+    assert LegacyDemoPricingAdapter(pricing).value(swap).market_value == pytest.approx(swap_expected, rel=1e-12, abs=1e-9)
+    assert LegacyDemoPricingAdapter(pricing).value(future).market_value == pytest.approx(future_expected, rel=1e-12, abs=1e-9)
+    assert LegacyDemoPricingAdapter(pricing).value(_cap()).market_value > 0.0
+    assert LegacyDemoPricingAdapter(pricing).value(_swaption()).market_value > 0.0
 
 
 def test_aggregate_demo_snapshots_seed_required_rates_ir_marks() -> None:

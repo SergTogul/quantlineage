@@ -240,7 +240,7 @@ Related findings:
 | R0.2.4 cache identity (all families) | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-terms-cache-independent-review.md`). |
 | R0.2 decompose require explicit market | COMPLETE | Independent review **APPROVE** (`reviews/r0.2-decompose-market-independent-review.md`). |
 | R0.2.1 typed InstrumentTerms | COMPLETE | Independent review **APPROVE**. Cache wiring APPROVE (`reviews/r0.2.1-cache-terms-independent-review.md`); `value()` still takes Position. |
-| Remaining DTO mark removal | OPEN | Compatibility `*Position` DTOs remain. Deferred: golden snapshot-routing. |
+| Remaining DTO mark removal | IN PROGRESS | Phase A: production `value` requires market (2026-09-04). Phase B: strip mark fields from `*Position`. |
 
 RF-001 remains **OPEN** until remaining families cannot silently fall back to trade-local marks and production methods no longer infer markets.
 

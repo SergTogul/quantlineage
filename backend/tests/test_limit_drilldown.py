@@ -35,10 +35,10 @@ from app.risk.limit_drilldown import LimitDrilldownEngine, contributors_for_metr
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.sensitivities import SensitivityEngine
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
+from app.services.portfolio_service import PortfolioService, position_label
+from app.interfaces.pricing import LegacyDemoPricingAdapter
 
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
-from app.services.portfolio_service import PortfolioService, position_label
-
 
 def _svc() -> PortfolioService:
     return PortfolioService(BuiltinPricingEngine(), HistoricalRiskEngine(seed=1, observations=40))
@@ -381,7 +381,7 @@ def test_key_rate_dv01_contributors_fallback_matches_parallel_without_key_rates(
     assert kr_m.method == "bump_revalue_parallel_fallback"
     assert abs(kr_m.value) == pytest.approx(abs(dv01_m.value), rel=1e-9, abs=1e-9)
     # Analytic Valuation.dv01 uses duration field — not the FD reference.
-    assert abs(pricing.value(bond).dv01) != pytest.approx(abs(kr_m.value), rel=1e-3)
+    assert abs(LegacyDemoPricingAdapter(pricing).value(bond).dv01) != pytest.approx(abs(kr_m.value), rel=1e-3)
 
     kr = contributors_for_metric(portfolio, pricing, "key_rate_dv01", top_n=2)
     assert [c.position_id for c in kr] == ["b", "e"]
