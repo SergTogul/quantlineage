@@ -5,11 +5,24 @@ from contextlib import contextmanager
 from datetime import date, timedelta
 from threading import RLock
 
+from app.domain.instrument_terms import (
+    BondTerms,
+    CapFloorTerms,
+    EquityFutureTerms,
+    EquityTerms,
+    EuropeanOptionTerms,
+    FXForwardTerms,
+    FXOptionTerms,
+    InstrumentTerms,
+    InterestRateFutureTerms,
+    SwapTerms,
+    SwaptionTerms,
+    terms_from_position,
+)
 from app.domain.models import (
     BondPosition,
     CapFloorPosition,
     EquityFuturePosition,
-    EquityPosition,
     EuropeanOptionPosition,
     FXForwardPosition,
     FXOptionPosition,
@@ -69,11 +82,6 @@ def _required_equity_spot(market: MarketSnapshot, symbol: str) -> float:
         raise MissingMarketDataError(f"equity_spots[{symbol}]") from None
 
 
-def _equity_settlement_currency(position) -> str:
-    currency = getattr(position, "currency", None)
-    return str(currency) if currency else "USD"
-
-
 def _required_settlement_rate(market: MarketSnapshot, currency: str) -> float:
     try:
         return market.rates[currency]
@@ -93,6 +101,129 @@ def _required_fx_spot(market: MarketSnapshot, pair: str) -> float:
         return market.fx_spots[pair]
     except KeyError:
         raise MissingMarketDataError(f"fx_spots[{pair}]") from None
+
+
+def _economics_from_terms(position: Position, terms: InstrumentTerms) -> dict:
+    """Copy contractual terms onto Position field names (marks stay off terms)."""
+    fields = type(position).model_fields
+    return {name: value for name, value in terms.model_dump().items() if name in fields}
+
+
+def _snapshot_marks_from_terms(terms: InstrumentTerms, market: MarketSnapshot) -> dict:
+    """Resolve live marks from the explicit snapshot using terms keys only."""
+    if isinstance(terms, EquityTerms):
+        return {"price": _required_equity_spot(market, terms.symbol)}
+    if isinstance(terms, EquityFutureTerms):
+        return {
+            "spot": _required_equity_spot(market, terms.symbol),
+            "risk_free_rate": _required_settlement_rate(market, terms.currency),
+            "dividend_yield": _required_dividend_yield(market, terms.symbol),
+        }
+    if isinstance(terms, EuropeanOptionTerms):
+        spot = _required_equity_spot(market, terms.symbol)
+        return {
+            "spot": spot,
+            "volatility": required_equity_option_vol(
+                market,
+                name=terms.symbol,
+                maturity_years=terms.maturity_years,
+                strike=terms.strike,
+                spot=spot,
+            ),
+            "risk_free_rate": _required_settlement_rate(market, terms.currency),
+            "dividend_yield": _required_dividend_yield(market, terms.symbol),
+        }
+    if isinstance(terms, BondTerms):
+        return {
+            "yield_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.maturity_years,
+            )
+        }
+    if isinstance(terms, SwapTerms):
+        return {
+            "market_swap_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.maturity_years,
+            )
+        }
+    if isinstance(terms, InterestRateFutureTerms):
+        return {
+            "forward_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.maturity_years,
+                prefer_projection=True,
+            ),
+            "quoted_rate": required_ir_future_quote(market, terms.currency),
+        }
+    if isinstance(terms, CapFloorTerms):
+        forward = required_continuous_zero(
+            market,
+            terms.currency,
+            terms.maturity_years,
+            prefer_projection=True,
+        )
+        return {
+            "forward_rate": forward,
+            "discount_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.maturity_years,
+            ),
+            "volatility": required_ir_option_vol(
+                market,
+                name=terms.currency,
+                maturity_years=terms.maturity_years,
+                strike=terms.strike,
+                forward=forward,
+            ),
+        }
+    if isinstance(terms, SwaptionTerms):
+        forward = required_continuous_zero(
+            market,
+            terms.currency,
+            terms.option_maturity_years,
+            prefer_projection=True,
+        )
+        return {
+            "forward_swap_rate": forward,
+            "discount_rate": required_continuous_zero(
+                market,
+                terms.currency,
+                terms.option_maturity_years + terms.swap_tenor_years,
+            ),
+            "volatility": required_ir_option_vol(
+                market,
+                name=terms.currency,
+                maturity_years=terms.option_maturity_years,
+                strike=terms.strike,
+                forward=forward,
+            ),
+        }
+    if isinstance(terms, FXForwardTerms):
+        return {
+            "spot": _required_fx_spot(market, terms.pair),
+            "domestic_rate": _required_settlement_rate(market, terms.pair[-3:]),
+            "foreign_rate": _required_settlement_rate(market, terms.pair[:3]),
+        }
+    if isinstance(terms, FXOptionTerms):
+        spot = _required_fx_spot(market, terms.pair)
+        return {
+            "spot": spot,
+            "volatility": required_fx_option_vol(
+                market,
+                name=terms.pair,
+                maturity_years=terms.maturity_years,
+                strike=terms.strike,
+                spot=spot,
+            ),
+            "domestic_rate": _required_settlement_rate(market, terms.pair[-3:]),
+            "foreign_rate": _required_settlement_rate(market, terms.pair[:3]),
+        }
+    return {}
 
 
 class QuantLibPricingEngine(PricingEngine):
@@ -158,153 +289,52 @@ class QuantLibPricingEngine(PricingEngine):
         return self._ql_date(self.evaluation_date + timedelta(days=days))
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
+        try:
+            terms = terms_from_position(position)
+        except TypeError:
+            raise TypeError(
+                f"unsupported instrument for QuantLib production pricing: "
+                f"{type(position).__name__}"
+            ) from None
+
         session_date = self.evaluation_date
+        updates = _economics_from_terms(position, terms)
         if market is not None:
             parsed_as_of = _parse_snapshot_as_of(market.as_of)
             if parsed_as_of is not None:
                 session_date = parsed_as_of
-            # Convert immutable market snapshot values into the trade-local marks QuantLib consumes.
-            updates = {}
-            if isinstance(position, EquityPosition):
-                updates["price"] = _required_equity_spot(market, position.symbol)
-            elif isinstance(position, EquityFuturePosition):
-                currency = _equity_settlement_currency(position)
-                updates = {
-                    "spot": _required_equity_spot(market, position.symbol),
-                    "risk_free_rate": _required_settlement_rate(market, currency),
-                    "dividend_yield": _required_dividend_yield(market, position.symbol),
-                }
-            elif isinstance(position, EuropeanOptionPosition):
-                currency = _equity_settlement_currency(position)
-                spot = _required_equity_spot(market, position.symbol)
-                updates = {
-                    "spot": spot,
-                    "volatility": required_equity_option_vol(
-                        market,
-                        name=position.symbol,
-                        maturity_years=position.maturity_years,
-                        strike=position.strike,
-                        spot=spot,
-                    ),
-                    "risk_free_rate": _required_settlement_rate(market, currency),
-                    "dividend_yield": _required_dividend_yield(market, position.symbol),
-                }
-            elif isinstance(position, BondPosition):
-                updates["yield_rate"] = required_continuous_zero(
-                    market,
-                    position.currency,
-                    position.maturity_years,
-                )
-            elif isinstance(position, SwapPosition):
-                updates["market_swap_rate"] = required_continuous_zero(
-                    market,
-                    position.currency,
-                    position.maturity_years,
-                )
-            elif isinstance(position, InterestRateFuturePosition):
-                updates = {
-                    "forward_rate": required_continuous_zero(
-                        market,
-                        position.currency,
-                        position.maturity_years,
-                        prefer_projection=True,
-                    ),
-                    "quoted_rate": required_ir_future_quote(market, position.currency),
-                }
-            elif isinstance(position, CapFloorPosition):
-                forward = required_continuous_zero(
-                    market,
-                    position.currency,
-                    position.maturity_years,
-                    prefer_projection=True,
-                )
-                updates = {
-                    "forward_rate": forward,
-                    "discount_rate": required_continuous_zero(
-                        market,
-                        position.currency,
-                        position.maturity_years,
-                    ),
-                    "volatility": required_ir_option_vol(
-                        market,
-                        name=position.currency,
-                        maturity_years=position.maturity_years,
-                        strike=position.strike,
-                        forward=forward,
-                    ),
-                }
-            elif isinstance(position, SwaptionPosition):
-                forward = required_continuous_zero(
-                    market,
-                    position.currency,
-                    position.option_maturity_years,
-                    prefer_projection=True,
-                )
-                updates = {
-                    "forward_swap_rate": forward,
-                    "discount_rate": required_continuous_zero(
-                        market,
-                        position.currency,
-                        position.option_maturity_years + position.swap_tenor_years,
-                    ),
-                    "volatility": required_ir_option_vol(
-                        market,
-                        name=position.currency,
-                        maturity_years=position.option_maturity_years,
-                        strike=position.strike,
-                        forward=forward,
-                    ),
-                }
-            elif isinstance(position, FXForwardPosition):
-                updates = {
-                    "spot": _required_fx_spot(market, position.pair),
-                    "domestic_rate": _required_settlement_rate(market, position.pair[-3:]),
-                    "foreign_rate": _required_settlement_rate(market, position.pair[:3]),
-                }
-            elif isinstance(position, FXOptionPosition):
-                spot = _required_fx_spot(market, position.pair)
-                updates = {
-                    "spot": spot,
-                    "volatility": required_fx_option_vol(
-                        market,
-                        name=position.pair,
-                        maturity_years=position.maturity_years,
-                        strike=position.strike,
-                        spot=spot,
-                    ),
-                    "domestic_rate": _required_settlement_rate(market, position.pair[-3:]),
-                    "foreign_rate": _required_settlement_rate(market, position.pair[:3]),
-                }
-            if updates:
-                position = position.model_copy(update=updates)
+            # Snapshot is the sole mark authority; leftover DTO marks are ignored.
+            updates.update(_snapshot_marks_from_terms(terms, market))
+        working = position.model_copy(update=updates)
+
         with self._session(evaluation_date=session_date):
-            if isinstance(position, EquityPosition):
+            if isinstance(terms, EquityTerms):
                 return Valuation(
-                    position_id=position.id,
-                    market_value=position.quantity * position.price,
-                    delta=position.quantity * position.price,
+                    position_id=terms.id,
+                    market_value=terms.quantity * working.price,
+                    delta=terms.quantity * working.price,
                 )
-            if isinstance(position, EquityFuturePosition):
-                return self._equity_future(position)
-            if isinstance(position, EuropeanOptionPosition):
-                return self._option(position, market)
-            if isinstance(position, BondPosition):
-                return self._bond(position, market)
-            if isinstance(position, SwapPosition):
-                return self._swap(position, market)
-            if isinstance(position, InterestRateFuturePosition):
-                return self._ir_future(position)
-            if isinstance(position, CapFloorPosition):
-                return self._cap_floor(position, market)
-            if isinstance(position, SwaptionPosition):
-                return self._swaption(position, market)
-            if isinstance(position, FXForwardPosition):
-                return self._fx_forward(position)
-            if isinstance(position, FXOptionPosition):
-                return self._fx_option(position, market)
+            if isinstance(terms, EquityFutureTerms):
+                return self._equity_future(working)
+            if isinstance(terms, EuropeanOptionTerms):
+                return self._option(working, market)
+            if isinstance(terms, BondTerms):
+                return self._bond(working, market)
+            if isinstance(terms, SwapTerms):
+                return self._swap(working, market)
+            if isinstance(terms, InterestRateFutureTerms):
+                return self._ir_future(working)
+            if isinstance(terms, CapFloorTerms):
+                return self._cap_floor(working, market)
+            if isinstance(terms, SwaptionTerms):
+                return self._swaption(working, market)
+            if isinstance(terms, FXForwardTerms):
+                return self._fx_forward(working)
+            if isinstance(terms, FXOptionTerms):
+                return self._fx_option(working, market)
             raise TypeError(
                 f"unsupported instrument for QuantLib production pricing: "
-                f"{type(position).__name__}"
+                f"{type(working).__name__}"
             )
 
     def _flat_curve(self, rate: float):
