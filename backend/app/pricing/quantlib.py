@@ -302,9 +302,10 @@ class QuantLibPricingEngine(PricingEngine):
                 return self._fx_forward(position)
             if isinstance(position, FXOptionPosition):
                 return self._fx_option(position, market)
-        # Instruments not yet covered by native QuantLib adapter use the reference pricer.
-        from app.pricing.builtin import BuiltinPricingEngine
-        return BuiltinPricingEngine().value(position, market)
+            raise TypeError(
+                f"unsupported instrument for QuantLib production pricing: "
+                f"{type(position).__name__}"
+            )
 
     def _flat_curve(self, rate: float):
         today = self._ql_date(self.evaluation_date)

@@ -339,6 +339,8 @@ Tests must fail for:
 
 ## RF-005 — Historical risk is a four-macro broadcast, not a factor-complete multi-asset model
 
+Status: **IN PROGRESS** (2026-09-04). R0.5.2 QuantLib unknown-instrument fail-closed APPROVE — `QuantLibPricingEngine.value` raises `TypeError` instead of calling Builtin. Factory Builtin path unchanged. Remaining: R0.5.1 capability registry, R0.5.3 per-factor historical panel (the four-macro hole). Do not close.
+
 Priority: **P0**  
 Risk types: CORRECTNESS, METHODOLOGY, ARCHITECTURE  
 Confidence: HIGH
