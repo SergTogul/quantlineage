@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Query
 
+from app.api.backpressure import reject_inline_heavy
 from app.api.dashboard import router as dashboard_router
 from app.api.deps import get_portfolio_service
 from app.api.errors import http_bad_request
@@ -37,6 +38,8 @@ def risk_summary(
     methodology: VaRMethodology = Query(default=VaRMethodology.DELTA_GAMMA),
     service: PortfolioService = Depends(get_portfolio_service),
 ):
+    if methodology is VaRMethodology.FULL_REVALUATION:
+        reject_inline_heavy(route="POST /risk/summary")
     return service.summary(portfolio, methodology=methodology)
 
 

@@ -2,7 +2,8 @@
 
 One POST returns the keys ``loadDashboard`` already consumes. The service
 calls existing PortfolioService methods sequentially; this is not a RiskRun
-job platform and does not move work off the request thread.
+job platform. R0.10.3 refuses that inline compute when an external worker
+is configured (see ``app.api.backpressure``).
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends
 from pydantic import BaseModel
 
+from app.api.backpressure import reject_inline_heavy
 from app.api.deps import (
     get_baseline_stress_scenarios,
     get_default_portfolio,
@@ -68,7 +70,12 @@ def risk_dashboard(
     Body is an optional ``Portfolio``. Omit or send JSON ``null`` to use the
     default demo book (same as ``GET /portfolio``). Dual-mounted at
     ``/risk/dashboard`` and ``/api/v1/risk/dashboard``.
+
+    When ``RISKFORGE_EXTERNAL_WORKER=1`` or ``RISKFORGE_HEAVY_INLINE=0``,
+    this HEAVY batch refuses request-thread compute (R0.10.3) and points
+    clients at ``POST /risk/runs``.
     """
+    reject_inline_heavy(route="POST /risk/dashboard")
     book = portfolio if portfolio is not None else default_portfolio
     return DashboardBatchResponse.model_validate(
         service.dashboard(
