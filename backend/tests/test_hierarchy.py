@@ -152,24 +152,32 @@ def test_build_firm_to_trade_tree():
     assert root.level == "firm"
     assert root.name == "Acme Capital"
     assert root.path == "Acme Capital"
+    assert root.id == "firm:Acme Capital"
     assert len(root.children) == 1
 
     portfolio_node = root.children[0]
     assert portfolio_node.level == "portfolio"
     assert portfolio_node.name == "Multi Desk Book"
     assert portfolio_node.path == "Acme Capital/multi-desk"
+    assert portfolio_node.id == "portfolio:multi-desk"
 
     desks = {d.name: d for d in portfolio_node.children}
     assert desks.keys() == {"Rates Desk", "Equity Desk", "Default Desk"}
     assert all(d.level == "desk" for d in desks.values())
 
     rates = desks["Rates Desk"]
+    assert rates.id == "desk:Rates Desk"
     assert len(rates.children) == 1
     assert rates.children[0].level == "strategy"
     assert rates.children[0].name == "Carry"
+    assert rates.children[0].id == "strategy:Rates Desk/Carry"
     assert rates.children[0].children[0].level == "book"
+    assert rates.children[0].children[0].id == "book:Rates Desk/Carry/Cash A"
     assert rates.children[0].children[0].children[0].level == "trade"
     assert rates.children[0].children[0].children[0].name == "eq-a"
+    assert rates.children[0].children[0].children[0].id == (
+        "trade:Rates Desk/Carry/Cash A/eq-a"
+    )
 
     inherited = desks["Default Desk"]
     assert inherited.children[0].name == "Default Strat"
@@ -295,10 +303,12 @@ def test_risk_at_matches_subset_var():
         desk="Rates Desk",
     )
     market = demo_market_snapshot(pf)
+    subset = portfolio_at(pf, ref)
     node = engine.risk_at(pf, pricing, ref, market=market)
     assert node.level == "desk"
     assert node.name == "Rates Desk"
-    subset = portfolio_at(pf, ref)
+    assert node.id == "desk:Rates Desk"
+    assert node.id == subset.id
     expected = risk.calculate(subset, pricing, market=market)
     assert math.isclose(node.market_value, expected["market_value"], abs_tol=1e-9)
     assert math.isclose(node.var_99, expected["var_99"], abs_tol=1e-9)

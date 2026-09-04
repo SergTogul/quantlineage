@@ -31,6 +31,7 @@ from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.risk.hierarchy_placement import (
     filter_positions,
+    hierarchy_node_id,
     portfolio_at,
     resolve_desk,
     resolve_strategy,
@@ -130,10 +131,13 @@ class HierarchyEngine:
         pricing: PricingEngine,
         market: MarketSnapshot,
         children: Sequence[HierarchyNode] | None = None,
+        *,
+        node_id: str,
     ) -> HierarchyNode:
         r = self._metrics(portfolio, pricing, market)
         stress = self._stress(portfolio, pricing, market)
         return HierarchyNode(
+            id=node_id,
             name=name,
             level=level,  # type: ignore[arg-type]
             path=path,
@@ -168,6 +172,7 @@ class HierarchyEngine:
             sub,
             pricing,
             root_market,
+            node_id=sub.id,
         )
 
     def build(
@@ -205,7 +210,15 @@ class HierarchyEngine:
                     trade_nodes = []
                     for p in sorted(positions, key=lambda x: x.id):
                         trade_pf = Portfolio(
-                            id=p.id,
+                            id=hierarchy_node_id(
+                                "trade",
+                                firm=portfolio.firm,
+                                portfolio_id=portfolio.id,
+                                desk=desk_name,
+                                strategy=strategy_name,
+                                book=book_name,
+                                trade_id=p.id,
+                            ),
                             name=p.id,
                             positions=[p],
                             firm=portfolio.firm,
@@ -220,10 +233,26 @@ class HierarchyEngine:
                                 trade_pf,
                                 pricing,
                                 root_market,
+                                node_id=hierarchy_node_id(
+                                    "trade",
+                                    firm=portfolio.firm,
+                                    portfolio_id=portfolio.id,
+                                    desk=desk_name,
+                                    strategy=strategy_name,
+                                    book=book_name,
+                                    trade_id=p.id,
+                                ),
                             )
                         )
                     book_pf = Portfolio(
-                        id=f"book:{desk_name}/{strategy_name}/{book_name}",
+                        id=hierarchy_node_id(
+                            "book",
+                            firm=portfolio.firm,
+                            portfolio_id=portfolio.id,
+                            desk=desk_name,
+                            strategy=strategy_name,
+                            book=book_name,
+                        ),
                         name=book_name,
                         positions=positions,
                         firm=portfolio.firm,
@@ -239,10 +268,24 @@ class HierarchyEngine:
                             pricing,
                             root_market,
                             trade_nodes,
+                            node_id=hierarchy_node_id(
+                                "book",
+                                firm=portfolio.firm,
+                                portfolio_id=portfolio.id,
+                                desk=desk_name,
+                                strategy=strategy_name,
+                                book=book_name,
+                            ),
                         )
                     )
                 strategy_pf = Portfolio(
-                    id=f"strategy:{desk_name}/{strategy_name}",
+                    id=hierarchy_node_id(
+                        "strategy",
+                        firm=portfolio.firm,
+                        portfolio_id=portfolio.id,
+                        desk=desk_name,
+                        strategy=strategy_name,
+                    ),
                     name=strategy_name,
                     positions=strategy_positions,
                     firm=portfolio.firm,
@@ -258,10 +301,22 @@ class HierarchyEngine:
                         pricing,
                         root_market,
                         book_nodes,
+                        node_id=hierarchy_node_id(
+                            "strategy",
+                            firm=portfolio.firm,
+                            portfolio_id=portfolio.id,
+                            desk=desk_name,
+                            strategy=strategy_name,
+                        ),
                     )
                 )
             desk_pf = Portfolio(
-                id=f"desk:{desk_name}",
+                id=hierarchy_node_id(
+                    "desk",
+                    firm=portfolio.firm,
+                    portfolio_id=portfolio.id,
+                    desk=desk_name,
+                ),
                 name=desk_name,
                 positions=desk_positions,
                 firm=portfolio.firm,
@@ -277,6 +332,12 @@ class HierarchyEngine:
                     pricing,
                     root_market,
                     strategy_nodes,
+                    node_id=hierarchy_node_id(
+                        "desk",
+                        firm=portfolio.firm,
+                        portfolio_id=portfolio.id,
+                        desk=desk_name,
+                    ),
                 )
             )
 
@@ -288,6 +349,11 @@ class HierarchyEngine:
             pricing,
             root_market,
             desk_nodes,
+            node_id=hierarchy_node_id(
+                "portfolio",
+                firm=portfolio.firm,
+                portfolio_id=portfolio.id,
+            ),
         )
         return self._node(
             portfolio.firm,
@@ -297,12 +363,18 @@ class HierarchyEngine:
             pricing,
             root_market,
             [portfolio_node],
+            node_id=hierarchy_node_id(
+                "firm",
+                firm=portfolio.firm,
+                portfolio_id=portfolio.id,
+            ),
         )
 
 
 __all__ = [
     "HierarchyEngine",
     "filter_positions",
+    "hierarchy_node_id",
     "portfolio_at",
     "resolve_desk",
     "resolve_strategy",
