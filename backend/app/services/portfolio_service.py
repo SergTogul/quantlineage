@@ -315,6 +315,32 @@ class PortfolioService:
         ))
     def query(self, portfolio, question): return self.query_engine.answer(question,portfolio,self)
 
+    def dashboard(
+        self,
+        portfolio: Portfolio,
+        *,
+        scenarios: list[StressScenario] | None = None,
+        threat_scenarios: list[StressScenario] | None = None,
+    ) -> dict:
+        """One sequential pass of existing dashboard methods (R0.10.2).
+
+        Does not share a market snapshot across methods (market-required
+        semantics on each method stay unchanged). The HTTP batch is one
+        request; each method still snapshots as it does today.
+        """
+        return {
+            "portfolio": portfolio,
+            "summary": self.summary(portfolio),
+            "stress": self.stresses(portfolio, scenarios),
+            "threats": self.threat_evaluation(portfolio, threat_scenarios),
+            "contributors": self.contributors(portfolio),
+            "limits": self.limits(portfolio),
+            "factors": self.factors(portfolio),
+            "varReport": self.var_report(portfolio),
+            "hierarchy": self.hierarchy(portfolio),
+            "attribution": self.demo_attribution(portfolio),
+        }
+
     def contributors(self, portfolio: Portfolio) -> list[Contributor]:
         """Rank positions by parametric component VaR with distinct trade labels."""
         report = self.var_engine.report(

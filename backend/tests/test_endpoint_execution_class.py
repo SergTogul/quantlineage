@@ -92,6 +92,12 @@ def test_dual_mount_shares_classification() -> None:
     assert normalize_path("/api/v1/risk/what-if") == "/risk/what-if"
 
 
+def test_dashboard_batch_is_heavy() -> None:
+    assert classify("POST", "/risk/dashboard") is ExecutionClass.HEAVY
+    assert classify("POST", "/api/v1/risk/dashboard") is ExecutionClass.HEAVY
+    assert not is_interactive_only("POST", "/risk/dashboard")
+
+
 def test_every_owned_route_is_classified() -> None:
     registered = _openapi_owned_routes()
     mapped = {(method, normalize_path(path)) for method, path in ENDPOINT_EXECUTION_CLASS}

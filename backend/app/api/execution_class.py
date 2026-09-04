@@ -90,6 +90,7 @@ ENDPOINT_EXECUTION_CLASS: Mapping[tuple[str, str], ExecutionClass] = {
     ("POST", "/risk/change-attribution"): ExecutionClass.HEAVY,
     ("POST", "/risk/limits"): ExecutionClass.HEAVY,
     ("POST", "/risk/runs"): ExecutionClass.HEAVY,
+    ("POST", "/risk/dashboard"): ExecutionClass.HEAVY,
 }
 
 

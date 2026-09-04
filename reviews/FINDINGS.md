@@ -777,7 +777,7 @@ Missing auth is not called a vulnerability for strict loopback use, but public e
 
 ## RF-015 — Interactive UI fans out redundant synchronous risk calculations
 
-Status: **IN PROGRESS** (2026-09-04). R0.10.1 classify-endpoints APPROVE — OpenAPI bijection INTERACTIVE/HEAVY; FULL_REVALUATION upgrades `POST /risk/summary`. Map is not wired to routers; request-thread compute and dashboard fan-out remain R0.10.2 / R0.10.3. Do not close.
+Status: **IN PROGRESS** (2026-09-04). R0.10.1 classify APPROVE. R0.10.2 dashboard batch APPROVE — `loadDashboard()` is one `POST /risk/dashboard` (HEAVY). Sequential request-thread compute remains R0.10.3. Do not close.
 
 Priority: **P1**  
 Risk types: PERFORMANCE, OPERABILITY, API  

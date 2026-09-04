@@ -130,6 +130,10 @@ Classification contract only (`backend/app/api/execution_class.py`). No job plat
 - `methodology=FULL_REVALUATION` upgrades methodology-bearing routes (including summary) to HEAVY.
 - Dual-mount `/api/v1` shares the same class. This map does not enqueue or reject requests; R0.10.2/R0.10.3 own batching and backpressure.
 
+## Dashboard batch (R0.10.2)
+
+`POST /risk/dashboard` (dual-mounted at `/api/v1/risk/dashboard`) returns the UI payload keys `{portfolio, summary, stress, threats, contributors, limits, factors, varReport, hierarchy, attribution}` from one request. `loadDashboard()` calls that path only. Classified HEAVY (includes hierarchy / VaR / evaluate). Sequential existing service methods — not a RiskRun job platform; work still runs on the request thread (R0.10.3).
+
 ## Performance reporting
 
 The current performance report is intentionally scoped:
