@@ -483,7 +483,7 @@ Do not set a fake universal SLA until benchmark environments are controlled.
 
 ## RF-008 — Hierarchy recomputes full risk independently at every node
 
-Status: **IN PROGRESS** (2026-09-04). R0.7.1 stable node ids APPROVE — every `HierarchyNode` has a prefixed id (`portfolio:…`, `trade:{desk}/{strategy}/{book}/{id}`); empty labels stay empty segments; `/` encodes as `%2F`. Legal books that used to collide (`portfolio.id == trade.id`, `""` vs `"trade"`) are unique. Still full reprice per node (R0.7.2 / R0.7.3). Do not close.
+Status: **IN PROGRESS** (2026-09-04). R0.7.1 stable node ids APPROVE. R0.7.2 trade-grain artifact type APPROVE — `TradeCalculationArtifact` holds PV, additive Greeks, stress P&L, optional historical vector; hierarchy does not consume it. Remaining: R0.7.3 aggregate-instead-of-reprice. Do not close.
 
 Priority: **P0**  
 Risk types: PERFORMANCE, ARCHITECTURE, OPERABILITY  
