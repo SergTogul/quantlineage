@@ -434,7 +434,9 @@ Related findings:
 - RF-005
 - RF-012
 
-## R0.5.1 Instrument capability registry
+## R0.5.1 Instrument capability registry — COMPLETE (2026-09-04)
+
+`backend/app/pricing/instrument_capabilities.py` is a static ten-family table (adapter name strings, required factor kinds, sensitivities, snapshot maps). Unknown families fail closed. Not wired into `value()`. RF-005 stays open for R0.5.3.
 
 Create a coherent registry or adapter mechanism that defines for each instrument family:
 
