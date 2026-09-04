@@ -6,7 +6,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - No live market-data vendor integration is implemented.
 - Demo historical factors are a packaged synthetic replay (`data/demo_historical_factors.csv`), not observed licensed market data.
-- Packaged demo history broadcasts four macro series (equity, volatility, rates, and FX) across matching exposures; it is not per-name or per-tenor factor history or a full multi-asset historical model (RF-005).
+- Shipped demo and synthetic history is a four-macro demo projection (`projection="four_macro_demo"`): equity/vol/rate/fx aggregates, not a per-name or per-tenor factor panel (RF-005).
 - Position objects still carry live marks such as spot, volatility, yield, and swap rate. `PositionMarketDataProvider` can resolve shared keys by last writer, so `MarketSnapshot` is the intended market authority while R0.2 remains in progress.
 - Market snapshots are immutable and deterministic, but production entitlement, quality checks, market close processes, and vendor symbology are out of scope.
 
