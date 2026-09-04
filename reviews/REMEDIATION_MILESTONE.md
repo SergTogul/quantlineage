@@ -513,9 +513,9 @@ Capture:
 - builtin vs QuantLib
 - cache hit/miss
 
-## R0.6.2 Stream/chunk shocked scenarios
+## R0.6.2 Stream/chunk shocked scenarios — COMPLETE (2026-09-04)
 
-Do not materialize all shocked markets when not required.
+`iter_shocked_snapshots` / `iter_historical_shocked_snapshots` yield one snapshot; list helpers wrap them. Full-reval loops consume the iterator. RF-007 stays open (still N×S pricing).
 
 ## R0.6.3 Reuse QuantLib structures where safe
 
