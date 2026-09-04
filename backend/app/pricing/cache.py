@@ -1,7 +1,7 @@
 """Valuation cache wrapping any ``PricingEngine`` without leaking QuantLib.
 
 Cache keys bind:
-- contractual trade economics (family terms projection; unknown families fail closed),
+- contractual trade economics (``terms_from_position``; unknown families fail closed),
 - required market snapshot content hash,
 - parseable snapshot ``as_of`` (``date`` or ISO ``YYYY-MM-DD``; engine labels omitted),
 - pricing configuration (engine identity + evaluation date + extras).
@@ -21,23 +21,30 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from app.domain.instrument_terms import terms_from_position
 from app.domain.models import (
-    BondPosition,
-    CapFloorPosition,
-    EquityFuturePosition,
-    EquityPosition,
-    EuropeanOptionPosition,
-    FXForwardPosition,
-    FXOptionPosition,
-    InterestRateFuturePosition,
     MarketSnapshot,
     Position,
-    SwapPosition,
-    SwaptionPosition,
     Valuation,
     calendar_as_of,
 )
 from app.interfaces.pricing import PricingEngine
+
+# Family schema ids keep v1 cache identity. Equity-family InstrumentTerms add
+# settlement ``currency`` that Positions never hashed; drop it at hash time.
+_TRADE_CACHE_SCHEMAS: dict[str, str] = {
+    "equity": "equity_terms_v1",
+    "equity_future": "equity_future_terms_v1",
+    "european_option": "equity_option_terms_v1",
+    "bond": "bond_terms_v1",
+    "swap": "swap_terms_v1",
+    "fx_forward": "fx_forward_terms_v1",
+    "fx_option": "fx_option_terms_v1",
+    "ir_future": "ir_future_terms_v1",
+    "cap_floor": "cap_floor_terms_v1",
+    "swaption": "swaption_terms_v1",
+}
+_EQUITY_FAMILY_TYPES = frozenset({"equity", "equity_future", "european_option"})
 
 
 def _stable_json_hash(payload: Any) -> str:
@@ -90,50 +97,16 @@ class PricingConfiguration:
 
 
 def trade_cache_key(position: Position) -> str:
-    """Versioned economics hash; snapshot marks and derived duration are excluded."""
-    payload = position.model_dump(mode="json")
-    if isinstance(position, EquityPosition):
-        observable_fields = {"price"}
-        schema = "equity_terms_v1"
-    elif isinstance(position, EquityFuturePosition):
-        observable_fields = {"spot", "risk_free_rate", "dividend_yield"}
-        schema = "equity_future_terms_v1"
-    elif isinstance(position, EuropeanOptionPosition):
-        observable_fields = {
-            "spot",
-            "volatility",
-            "risk_free_rate",
-            "dividend_yield",
-        }
-        schema = "equity_option_terms_v1"
-    elif isinstance(position, BondPosition):
-        observable_fields = {"yield_rate", "duration"}
-        schema = "bond_terms_v1"
-    elif isinstance(position, SwapPosition):
-        observable_fields = {"market_swap_rate", "duration"}
-        schema = "swap_terms_v1"
-    elif isinstance(position, FXForwardPosition):
-        observable_fields = {"spot", "domestic_rate", "foreign_rate"}
-        schema = "fx_forward_terms_v1"
-    elif isinstance(position, FXOptionPosition):
-        observable_fields = {"spot", "volatility", "domestic_rate", "foreign_rate"}
-        schema = "fx_option_terms_v1"
-    elif isinstance(position, InterestRateFuturePosition):
-        observable_fields = {"quoted_rate", "forward_rate"}
-        schema = "ir_future_terms_v1"
-    elif isinstance(position, CapFloorPosition):
-        observable_fields = {"volatility", "forward_rate", "discount_rate"}
-        schema = "cap_floor_terms_v1"
-    elif isinstance(position, SwaptionPosition):
-        observable_fields = {"volatility", "forward_swap_rate", "discount_rate"}
-        schema = "swaption_terms_v1"
-    else:
+    """Versioned economics hash from ``terms_from_position``; marks excluded."""
+    terms = terms_from_position(position)
+    schema = _TRADE_CACHE_SCHEMAS.get(terms.type)
+    if schema is None:
         raise TypeError(
             f"trade_cache_key has no terms projection for {type(position).__name__}"
         )
-    economics = {
-        key: value for key, value in payload.items() if key not in observable_fields
-    }
+    economics = terms.model_dump(mode="json")
+    if terms.type in _EQUITY_FAMILY_TYPES:
+        economics.pop("currency", None)
     return _stable_json_hash({"schema": schema, "economics": economics})
 
 
