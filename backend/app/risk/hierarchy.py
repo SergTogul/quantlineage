@@ -8,6 +8,11 @@ Additive metrics (parent == sum children within abs 1e-9):
 Node-level metrics (computed on the position subset, not summed):
   var_95, var_99, expected_shortfall_99, limits.
 
+When ``artifacts`` is supplied to ``build`` / ``risk_at``, additive fields are
+summed from ``TradeCalculationArtifact`` and pricing is not invoked. VaR / ES
+and limits are omitted on that path (not invented). An incomplete map fails
+closed. Omitting ``artifacts`` keeps the historical full-reprice path.
+
 Position-level ``desk`` / ``strategy`` override portfolio defaults when set.
 Placement helpers live in ``hierarchy_placement`` (re-exported here for API stability).
 """
@@ -15,7 +20,7 @@ Placement helpers live in ``hierarchy_placement`` (re-exported here for API stab
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from app.domain.models import (
     HierarchyLevel,
@@ -39,6 +44,7 @@ from app.risk.hierarchy_placement import (
 from app.risk.historical import HistoricalRiskEngine, require_explicit_market
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
+from app.risk.trade_artifacts import TradeCalculationArtifact
 
 
 def _path(*parts: str) -> str:
@@ -67,6 +73,86 @@ def _ref_path(portfolio: Portfolio, ref: HierarchyRef) -> str:
     if ref.trade_id is not None and ref.level is HierarchyLevel.TRADE:
         path_parts.append(ref.trade_id)
     return _path(*path_parts)
+
+
+def _normalize_artifacts(
+    artifacts: Mapping[str, TradeCalculationArtifact] | None,
+) -> dict[str, TradeCalculationArtifact] | None:
+    if artifacts is None:
+        return None
+    if isinstance(artifacts, str) or not isinstance(artifacts, Mapping):
+        raise TypeError("artifacts must be a mapping of trade id to TradeCalculationArtifact")
+    normalized: dict[str, TradeCalculationArtifact] = {}
+    for key, art in artifacts.items():
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError("artifact keys must be non-empty trade ids")
+        if not isinstance(art, TradeCalculationArtifact):
+            raise TypeError(
+                f"artifacts[{key!r}] must be TradeCalculationArtifact, got {type(art)!r}"
+            )
+        if art.trade_id != key:
+            raise ValueError(
+                f"incomplete artifact set: trade_id {art.trade_id!r} does not match key {key!r}"
+            )
+        normalized[key] = art
+    return normalized
+
+
+def _require_complete_artifacts(
+    positions: Sequence,
+    artifacts: Mapping[str, TradeCalculationArtifact],
+) -> None:
+    missing = sorted({p.id for p in positions} - set(artifacts))
+    if missing:
+        raise ValueError(f"incomplete artifact set; missing trade ids: {missing}")
+
+
+def _sum_artifacts(
+    positions: Sequence,
+    artifacts: Mapping[str, TradeCalculationArtifact],
+    node_id: str,
+) -> TradeCalculationArtifact | None:
+    _require_complete_artifacts(positions, artifacts)
+    if not positions:
+        return None
+    total = artifacts[positions[0].id]
+    for position in positions[1:]:
+        total = total.add(artifacts[position.id], trade_id=node_id)
+    return total
+
+
+def _scenario_ids(
+    positions: Sequence,
+    artifacts: Mapping[str, TradeCalculationArtifact],
+) -> tuple[str, ...]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for position in positions:
+        for scenario in artifacts[position.id].stress_pnl:
+            if scenario not in seen:
+                seen.add(scenario)
+                ordered.append(scenario)
+    return tuple(ordered)
+
+
+def _stress_from_artifacts(
+    summed: TradeCalculationArtifact | None,
+    positions: Sequence,
+    artifacts: Mapping[str, TradeCalculationArtifact],
+    scenario_ids: Sequence[str],
+) -> list[StressResult]:
+    pnl_by = {} if summed is None else dict(summed.stress_pnl)
+    return [
+        StressResult(
+            scenario=scenario,
+            pnl=float(pnl_by.get(scenario, 0.0)),
+            by_position={
+                p.id: float(artifacts[p.id].stress_pnl.get(scenario, 0.0))
+                for p in positions
+            },
+        )
+        for scenario in scenario_ids
+    ]
 
 
 class HierarchyEngine:
@@ -133,7 +219,20 @@ class HierarchyEngine:
         children: Sequence[HierarchyNode] | None = None,
         *,
         node_id: str,
+        artifacts: Mapping[str, TradeCalculationArtifact] | None = None,
+        scenario_ids: Sequence[str] = (),
     ) -> HierarchyNode:
+        if artifacts is not None:
+            return self._node_from_artifacts(
+                name,
+                level,
+                path,
+                portfolio,
+                children,
+                node_id=node_id,
+                artifacts=artifacts,
+                scenario_ids=scenario_ids,
+            )
         r = self._metrics(portfolio, pricing, market)
         stress = self._stress(portfolio, pricing, market)
         return HierarchyNode(
@@ -155,16 +254,55 @@ class HierarchyEngine:
             children=list(children or []),
         )
 
+    def _node_from_artifacts(
+        self,
+        name: str,
+        level: str,
+        path: str,
+        portfolio: Portfolio,
+        children: Sequence[HierarchyNode] | None,
+        *,
+        node_id: str,
+        artifacts: Mapping[str, TradeCalculationArtifact],
+        scenario_ids: Sequence[str],
+    ) -> HierarchyNode:
+        summed = _sum_artifacts(portfolio.positions, artifacts, node_id)
+        return HierarchyNode(
+            id=node_id,
+            name=name,
+            level=level,  # type: ignore[arg-type]
+            path=path,
+            market_value=0.0 if summed is None else float(summed.pv),
+            delta=0.0 if summed is None else float(summed.delta),
+            gamma=0.0 if summed is None else float(summed.gamma),
+            vega=0.0 if summed is None else float(summed.vega),
+            dv01=0.0 if summed is None else float(summed.dv01),
+            fx_delta=0.0 if summed is None else float(summed.fx_delta),
+            var_95=0.0,
+            var_99=0.0,
+            expected_shortfall_99=0.0,
+            stress=_stress_from_artifacts(
+                summed, portfolio.positions, artifacts, scenario_ids
+            ),
+            limits=[],
+            children=list(children or []),
+        )
+
     def risk_at(
         self,
         portfolio: Portfolio,
         pricing: PricingEngine,
         ref: HierarchyRef,
         market: MarketSnapshot | None = None,
+        artifacts: Mapping[str, TradeCalculationArtifact] | None = None,
     ) -> HierarchyNode:
         """Full metrics for one hierarchy node (no children)."""
         root_market = require_explicit_market(market)
+        artifact_map = _normalize_artifacts(artifacts)
         sub = portfolio_at(portfolio, ref)
+        scenario_ids = (
+            _scenario_ids(sub.positions, artifact_map) if artifact_map is not None else ()
+        )
         return self._node(
             sub.name,
             ref.level.value,
@@ -173,6 +311,8 @@ class HierarchyEngine:
             pricing,
             root_market,
             node_id=sub.id,
+            artifacts=artifact_map,
+            scenario_ids=scenario_ids,
         )
 
     def build(
@@ -180,9 +320,18 @@ class HierarchyEngine:
         portfolio: Portfolio,
         pricing: PricingEngine,
         market: MarketSnapshot | None = None,
+        artifacts: Mapping[str, TradeCalculationArtifact] | None = None,
     ) -> HierarchyNode:
         """Full Firm → … → Trade tree with NAV/Greeks/VaR/ES/stress/limits per node."""
         root_market = require_explicit_market(market)
+        artifact_map = _normalize_artifacts(artifacts)
+        if artifact_map is not None:
+            _require_complete_artifacts(portfolio.positions, artifact_map)
+        scenario_ids = (
+            _scenario_ids(portfolio.positions, artifact_map)
+            if artifact_map is not None
+            else ()
+        )
         # desk -> strategy -> book -> [positions]
         tree: dict[str, dict[str, dict[str, list]]] = defaultdict(
             lambda: defaultdict(lambda: defaultdict(list))
@@ -242,6 +391,8 @@ class HierarchyEngine:
                                     book=book_name,
                                     trade_id=p.id,
                                 ),
+                                artifacts=artifact_map,
+                                scenario_ids=scenario_ids,
                             )
                         )
                     book_pf = Portfolio(
@@ -276,6 +427,8 @@ class HierarchyEngine:
                                 strategy=strategy_name,
                                 book=book_name,
                             ),
+                            artifacts=artifact_map,
+                            scenario_ids=scenario_ids,
                         )
                     )
                 strategy_pf = Portfolio(
@@ -308,6 +461,8 @@ class HierarchyEngine:
                             desk=desk_name,
                             strategy=strategy_name,
                         ),
+                        artifacts=artifact_map,
+                        scenario_ids=scenario_ids,
                     )
                 )
             desk_pf = Portfolio(
@@ -338,6 +493,8 @@ class HierarchyEngine:
                         portfolio_id=portfolio.id,
                         desk=desk_name,
                     ),
+                    artifacts=artifact_map,
+                    scenario_ids=scenario_ids,
                 )
             )
 
@@ -354,6 +511,8 @@ class HierarchyEngine:
                 firm=portfolio.firm,
                 portfolio_id=portfolio.id,
             ),
+            artifacts=artifact_map,
+            scenario_ids=scenario_ids,
         )
         return self._node(
             portfolio.firm,
@@ -368,6 +527,8 @@ class HierarchyEngine:
                 firm=portfolio.firm,
                 portfolio_id=portfolio.id,
             ),
+            artifacts=artifact_map,
+            scenario_ids=scenario_ids,
         )
 
 
