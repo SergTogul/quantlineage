@@ -3,8 +3,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { RatesShowcase, RunProvenance } from './Analytics.jsx'
+import { RatesShowcase, RunProvenance, RiskRuns } from './Analytics.jsx'
 import { API_BASE, server } from '../test/mswServer.js'
 import { API_V1 } from '../api.js'
 
@@ -81,5 +82,41 @@ describe('RunProvenance panel', () => {
     expect(screen.getByText('builtin-0.3.0')).toBeTruthy()
     expect(screen.getByText('DELTA_GAMMA')).toBeTruthy()
     expect(screen.getByText('abc123')).toBeTruthy()
+  })
+
+  it('updates displayed lineage when the same runId goes QUEUED to COMPLETED', async () => {
+    const queued = { ...PROVENANCE, status: 'QUEUED', duration_seconds: null }
+    const completed = { ...PROVENANCE, status: 'COMPLETED', duration_seconds: 2.25 }
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/runs`, () =>
+        HttpResponse.json({
+          id: 'run-9',
+          status: 'QUEUED',
+          run_type: 'summary',
+          results: [],
+          provenance: queued,
+        }, { status: 202 })),
+      http.get(`${API_BASE}${API_V1}/risk/runs/:id`, () =>
+        HttpResponse.json({
+          id: 'run-9',
+          status: 'COMPLETED',
+          run_type: 'summary',
+          duration_seconds: 2.25,
+          results: [{ result_type: 'summary', payload: {} }],
+          provenance: completed,
+        })),
+      http.get(`${API_BASE}${API_V1}/risk/runs/:id/provenance`, () =>
+        HttpResponse.json(queued)),
+    )
+    const user = userEvent.setup()
+    render(<RiskRuns portfolio={{ id: 'rates-macro', positions: [] }} />)
+    await user.click(screen.getByRole('button', { name: /start run/i }))
+    const panel = () => screen.getByTestId('golden-demo-provenance')
+    await waitFor(() => expect(panel()).toHaveTextContent('QUEUED'))
+    await waitFor(() => {
+      expect(panel()).toHaveTextContent('COMPLETED')
+      expect(panel()).toHaveTextContent('2.25')
+    }, { timeout: 3000 })
+    expect(panel()).not.toHaveTextContent('QUEUED')
   })
 })
