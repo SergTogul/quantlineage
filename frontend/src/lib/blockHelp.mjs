@@ -51,7 +51,7 @@ const entries = {
   },
   'risk-change-attribution': {
     body:
-      'Why did risk change: two COMPLETED RiskRuns (POST /risk/runs/compare) or SPY×1.5 waterfall. Drivers, residual, and identity are the backend payload; the UI does not compute risk. Demo history is packaged synthetic replay, not observed data.',
+      'Waterfall or two-RiskRun explain of Δ(VaR/ES/DV01/Vega/stress). Drivers, residual, and identity come from the backend payload; the UI does not compute risk.',
   },
   'stress-pnl-heatmap': {
     body:
@@ -83,7 +83,7 @@ const entries = {
   },
   'risk-query': {
     body:
-      'NL question routed to deterministic tools (summary, stress, contributors, explain_risk_change). Answers come from API payloads only — no LLM-invented VaR. Risk-change questions need two completed RiskRun ids.',
+      'NL question routed to deterministic risk tools (summary, stress, contributors, etc.). Answer text is assembled from API results — no LLM-invented risk numbers.',
   },
   'pnl-explain': {
     body:

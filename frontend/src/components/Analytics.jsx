@@ -126,21 +126,26 @@ export function RatesShowcase() {
 /**
  * Stage 10.5: calculation lineage from GET /risk/runs/{id}/provenance.
  * Copies backend fields only — never invents a release SHA.
+ * When embedded, display `run.provenance` from the polled RiskRunView so
+ * status/duration stay equal to executed lineage after poll.
  */
-export function RunProvenance({ runId, embedded }) {
-  const [payload, setPayload] = useState(null)
+export function RunProvenance({ runId, embedded, provenance }) {
+  const [fetched, setFetched] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (embedded) {
+      return undefined
+    }
     if (!runId) {
-      setPayload(null)
+      setFetched(null)
       return undefined
     }
     let cancelled = false
     getRiskRunProvenance(runId)
       .then((body) => {
         if (!cancelled) {
-          setPayload(body)
+          setFetched(body)
           setError('')
         }
       })
@@ -148,7 +153,9 @@ export function RunProvenance({ runId, embedded }) {
         if (!cancelled) setError(e.message || 'Failed to load provenance')
       })
     return () => { cancelled = true }
-  }, [runId])
+  }, [runId, embedded])
+
+  const payload = embedded ? provenance : fetched
 
   const s = runProvenanceSummary(payload)
   const rows = s
@@ -551,7 +558,7 @@ export function RiskRuns({ portfolio }) {
                 </div>
               )
           )}
-          <RunProvenance runId={s.id} embedded />
+          <RunProvenance runId={s.id} embedded provenance={run?.provenance} />
         </div>
       )}
     </div>
@@ -631,9 +638,8 @@ export function RiskChangeAttribution({ portfolio }) {
         <BlockHelp id="risk-change-attribution" />
       </div>
       <div className="muted">
-        Why did my risk change? Compare two COMPLETED RiskRuns (POST /api/v1/risk/runs/compare)
-        or the SPY×1.5 waterfall. UI displays the backend payload only — demo books use
-        packaged synthetic history, not observed market data.
+        Why did risk change — two COMPLETED RiskRuns (POST /api/v1/risk/runs/compare) or SPY×1.5 waterfall.
+        UI displays the backend payload only.
       </div>
       <div className="inline-form risk-run-form">
         <select
