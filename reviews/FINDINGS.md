@@ -732,7 +732,7 @@ Keep an explicit inline/debug calculation endpoint only for tests/demo tooling.
 Priority: **P1**  
 Risk types: SECURITY, AVAILABILITY, OPERABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (R0.11.1–R0.11.6 APPROVE including R0.11.5 shared-token gate. Residual shared-profile items: object ACLs, TLS/reverse-proxy, secret management. Local demo stays unauthenticated.)
+Status: **CLOSED** (2026-09-09). QA local-demo close gate (`reviews/r0.11.7-rf014-close-gate-report.md`). Controller must not treat CLOSED as final until Task 15 independent review **APPROVE**. R0.11.1–R0.11.6 APPROVE. Local-demo required direction is **MET** (loopback Compose, finite numbers, positions/scenarios/body caps, error sanitization; local demo stays unauthenticated). Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** are **accepted residuals** (not MET). Not production IAM.
 
 Source findings:
 
@@ -772,7 +772,7 @@ For any non-local/shared profile:
 
 ### Acceptance evidence
 
-The repository clearly differentiates:
+The repository clearly differentiates (`BUILD_NOTES.md` “Local vs shared vs not production-like”):
 
 ```text
 local demo
@@ -781,6 +781,8 @@ production-like deployment
 ```
 
 Missing auth is not called a vulnerability for strict loopback use, but public exposure is blocked by configuration and documentation.
+
+Close-gate scores (2026-09-09, `reviews/r0.11.7-rf014-close-gate-report.md`): local-demo loopback / finite numbers / payload caps / sanitization **MET**; shared-token gate **MET** for authentication only. Object ACLs / TLS / secrets **UNMET** — accepted R0 residuals, not MET. HTTP enqueue queue-depth and Compose demo DB password remain named leftovers, not MET.
 
 ---
 

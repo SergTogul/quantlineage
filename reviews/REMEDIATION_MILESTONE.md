@@ -970,6 +970,14 @@ Do not overbuild enterprise auth for the local demo profile.
 
 `docker compose up` is safe by default for a local development machine and clearly not presented as internet-ready without the shared-deployment profile.
 
+## R0.11 close gate — CLOSED pending independent review (2026-09-09)
+
+QA local-demo close gate **CLOSE** (`reviews/r0.11.7-rf014-close-gate-report.md`). Independent review **pending**. **RF-014 CLOSED** (not final until Task 15 review APPROVE).
+
+R0.11.1–R0.11.6 APPROVE. Local-demo required direction **MET**: Compose loopback publishes; finite financial numbers; positions/scenarios/body caps; failed-run sanitization; local demo unauthenticated by design. Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** are **accepted residuals** (not MET). Do not invent IAM. Named leftovers (not MET): HTTP enqueue queue-depth; Compose `POSTGRES_PASSWORD=riskforge`; `docker run -p 8000:8000` without `RISKFORGE_SHARED_DEPLOYMENT=1` still unauthenticated.
+
+Evidence: `reviews/r0.11.7-rf014-close-gate-report.md`; focused suite 87 passed.
+
 ---
 
 # R0.12 — Production-Relevant Verification Matrix
