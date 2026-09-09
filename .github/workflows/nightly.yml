@@ -14,7 +14,14 @@
 #
 # Native job is compile + 10k×1k checksum/impl identity. Do not run
 # benchmarks/check_m6_sla.py on ubuntu-latest (host-specific SLA-K1/K2 floors
-# flake). Labeled-runner SLA remains an RF-016 leftover.
+# flake).
+#
+# RF-016 residual: labeled-runner SLA-K1/K2 is PARTIAL.
+# GitHub Actions self-hosted runner query for this repo returned
+# actions/runners total_count=0 (2026-09-09). Do not invent a flake-prone
+# ubuntu-latest SLA job. Harness and reference-host evidence remain:
+# benchmarks/check_m6_sla.py, docs/performance.md, benchmarks/RESULTS.md.
+# CI does not enforce host floors.
 #
 # QuantLib E2E (quantlib-e2e) is nightly-only. Do not add it to PR-FULL needs
 # or to pull_request. If QuantLib cannot be installed, the job fails

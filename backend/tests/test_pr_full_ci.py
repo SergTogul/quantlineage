@@ -68,6 +68,8 @@ def test_pr_full_needs_production_relevant_jobs():
     assert "quantlib-e2e" not in needed
     assert "hierarchy-benchmark" not in needed
     assert "full-reval-n100" not in needed
+    assert not any("sla" in job_id.lower() for job_id in needed)
+    assert "check_m6_sla.py" not in _workflow_text()
 
 
 def test_quantlib_hard_gate_still_requires_quantlib():
