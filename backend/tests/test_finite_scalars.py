@@ -43,6 +43,14 @@ def test_invalid_fx_pair_shape_raises_validation_error() -> None:
     with pytest.raises(ValidationError):
         FXForwardPosition(type='fx_forward', id='fxf-1', pair='not-a-pair', notional_base=1000000, strike=1.105, maturity_years=0.5)
 
+def test_market_snapshot_rejects_invalid_fx_spot_pair_key() -> None:
+    with pytest.raises(ValidationError):
+        MarketSnapshot(fx_spots={'EUR/USD': 1.1}, rates={'USD': 0.04})
+
+def test_market_snapshot_empty_fx_spots_remain_valid() -> None:
+    snap = MarketSnapshot(fx_spots={}, rates={'USD': 0.04})
+    assert dict(snap.fx_spots) == {}
+
 def test_market_snapshot_rejects_non_finite_spot() -> None:
     with pytest.raises(ValidationError):
         MarketSnapshot(equity_spots={'AAPL': float('nan')})

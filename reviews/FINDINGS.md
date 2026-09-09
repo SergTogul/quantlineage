@@ -619,7 +619,7 @@ Do not split files merely for aesthetics; split ownership and contracts.
 Priority: **P1**  
 Risk types: ARCHITECTURE, CORRECTNESS, MAINTAINABILITY  
 Confidence: HIGH
-Status: **IN PROGRESS** (2026-09-08). R0.4.1-A COMPLETE — `MarketSnapshot.equity` / `.rates_market` / `.vol` / `.fx` pinned as canonical typed views (`app.market.markets`); views wrap frozen MappingProxy fields; curve bp shifts use `shock_units.bps_to_decimal_rate`. Flat dict storage retained (no nested Pydantic rewrite). R0.4.2-C/D — HTTP list + primary UI POST path are formal `ScenarioWire`; legacy StressScenario POST routes remain as **deprecated** back-compat only (RF-004 closed). Remaining: broader typed curve/surface nesting; retire or further collapse dual domain StressScenario/Scenario models. Do not close.
+Status: **IN PROGRESS** (2026-09-09). R0.4.1-A COMPLETE — `MarketSnapshot.equity` / `.rates_market` / `.vol` / `.fx` pinned as canonical typed views (`app.market.markets`); views wrap frozen MappingProxy fields; curve bp shifts use `shock_units.bps_to_decimal_rate`. R0.4.1-B COMPLETE — `VolMarket.surfaces` is `Mapping[str, VolSurface]`; `RateMarket.curves` exposes named `YieldCurve`; invalid present surface/curve payloads and non-6-letter FX spot keys fail closed. Empty `vol_surfaces` / `curves` / `fx_spots` remain valid. Flat dict storage retained (no nested Pydantic rewrite). R0.4.2-C/D — HTTP list + primary UI POST path are formal `ScenarioWire`; legacy StressScenario POST routes remain as **deprecated** back-compat only (RF-004 closed). Remaining: retire or further collapse dual domain StressScenario/Scenario models. Do not close.
 
 Source findings:
 

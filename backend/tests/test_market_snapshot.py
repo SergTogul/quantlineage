@@ -427,7 +427,9 @@ def test_submarket_views_expose_grouped_marks():
     """R0.4.1-A: typed views are the canonical grouped inspection API."""
     from types import MappingProxyType
 
+    from app.market.curves import YieldCurve
     from app.market.markets import EquityMarket, FxMarket, RateMarket, VolMarket
+    from app.market.vol_surfaces import VolSurface
 
     snap = MarketSnapshot(
         equity_spots={"SPY": 100.0},
@@ -439,7 +441,7 @@ def test_submarket_views_expose_grouped_marks():
         projection_rates={"USD": 0.041},
         rate_spreads={"USD": 0.001},
         key_rates={"USD": {"10Y": 0.041}},
-        vol_surfaces={"SPY": {"asset_class": "equity", "atm_vol": 0.2}},
+        vol_surfaces={"SPY": build_equity_vol_surface("SPY", 0.2).to_dict()},
     )
 
     equity = snap.equity
@@ -468,10 +470,12 @@ def test_submarket_views_expose_grouped_marks():
 
     assert vol.equity is snap.equity_vols
     assert vol.fx is snap.fx_vols
-    assert vol.surfaces is snap.vol_surfaces
+    assert isinstance(vol.surfaces["SPY"], VolSurface)
     assert vol.equity["SPY"] == 0.2
     assert vol.fx["EURUSD"] == 0.1
-    assert vol.surfaces["SPY"]["atm_vol"] == 0.2
+    assert vol.surfaces["SPY"].atm_vol() == pytest.approx(0.2)
+    assert dict(rates.curves) == {}
+    assert all(isinstance(curve, YieldCurve) for curve in rates.curves.values())
 
     assert fx.spots is snap.fx_spots
     assert fx.spots["EURUSD"] == 1.1
@@ -490,6 +494,133 @@ def test_submarket_views_expose_grouped_marks():
     with pytest.raises(TypeError):
         rates.key_rates["USD"]["10Y"] = 0.99  # type: ignore[index]
     with pytest.raises(TypeError):
-        vol.surfaces["SPY"]["atm_vol"] = 0.99  # type: ignore[index]
+        vol.surfaces["SPY"] = vol.surfaces["SPY"]  # type: ignore[index]
     with pytest.raises(TypeError):
         fx.spots["EURUSD"] = 0.0  # type: ignore[index]
+
+
+def test_vol_market_surfaces_are_typed_vol_surfaces():
+    from types import MappingProxyType
+
+    from app.market.vol_surfaces import VolSurface
+
+    snap = attach_vol_surface(
+        MarketSnapshot(equity_vols={"SPY": 0.18}, rates={"USD": 0.04}),
+        build_equity_vol_surface("SPY", 0.18),
+    )
+    surfaces = snap.vol.surfaces
+    assert isinstance(surfaces, MappingProxyType)
+    surface = surfaces["SPY"]
+    assert isinstance(surface, VolSurface)
+    assert surface.name == "SPY"
+    assert surface.asset_class == "equity"
+    assert surface.atm_vol() == pytest.approx(0.18)
+    # Flat storage remains the dict payload.
+    assert snap.vol_surfaces["SPY"]["atm_vol"] == pytest.approx(0.18)
+
+
+def test_empty_vol_surfaces_view_is_empty_mapping():
+    snap = MarketSnapshot(rates={"USD": 0.04}, vol_surfaces={})
+    assert dict(snap.vol.surfaces) == {}
+
+
+def test_invalid_vol_surface_payload_fails_closed():
+    snap = MarketSnapshot(
+        rates={"USD": 0.04},
+        vol_surfaces={"SPY": {"asset_class": "equity", "atm_vol": 0.2}},
+    )
+    with pytest.raises((ValueError, KeyError, TypeError)):
+        _ = snap.vol.surfaces
+
+
+def test_vol_surface_missing_asset_class_fails_closed():
+    snap = MarketSnapshot(
+        rates={"USD": 0.04},
+        vol_surfaces={"SPY": {"grid": {"1Y|1": 0.2}}},
+    )
+    with pytest.raises((ValueError, KeyError, TypeError)):
+        _ = snap.vol.surfaces
+
+
+def test_rate_market_exposes_typed_yield_curves():
+    from types import MappingProxyType
+
+    from app.market.curves import YieldCurve
+
+    snap = attach_standard_usd_curves(MarketSnapshot(rates={"USD": 0.04}))
+    rates = snap.rates_market
+    assert isinstance(rates.curves, MappingProxyType)
+    ois = rates.curves["USD_OIS"]
+    sofr = rates.curves["USD_SOFR"]
+    assert isinstance(ois, YieldCurve)
+    assert isinstance(sofr, YieldCurve)
+    assert ois.currency == "USD"
+    assert ois.curve_type == "discount"
+    assert ois.zero(10.0) == pytest.approx(0.04)
+    assert sofr.curve_type == "projection"
+    assert sofr.zero(2.0) == pytest.approx(0.041)
+    # Scalars stay the frozen snapshot maps.
+    assert rates.discount is snap.rates
+    assert rates.projection is snap.projection_rates
+    assert rates.spreads is snap.rate_spreads
+    assert rates.key_rates is snap.key_rates
+    # Flat storage unchanged.
+    assert snap.curves["USD_OIS"]["zeros"]["10Y"] == pytest.approx(0.04)
+
+
+def test_empty_curves_view_is_empty_mapping():
+    snap = MarketSnapshot(rates={"USD": 0.04}, curves={})
+    assert dict(snap.rates_market.curves) == {}
+
+
+def test_invalid_curve_payload_fails_closed():
+    snap = MarketSnapshot(rates={"USD": 0.04}, curves={"USD_OIS": {"currency": "USD"}})
+    with pytest.raises((ValueError, KeyError, TypeError)):
+        _ = snap.rates_market.curves
+
+
+def test_curve_empty_zeros_payload_fails_closed():
+    snap = MarketSnapshot(
+        rates={"USD": 0.04},
+        curves={"USD_OIS": {"currency": "USD", "curve_type": "discount", "zeros": {}}},
+    )
+    with pytest.raises((ValueError, KeyError, TypeError)):
+        _ = snap.rates_market.curves
+
+
+def test_bootstrapped_curve_is_typed_on_rate_market():
+    from app.market.curves import CurveBootstrapInstrument, YieldCurve, attach_bootstrapped_curve
+
+    snap = attach_bootstrapped_curve(
+        MarketSnapshot(id="boot", rates={"USD": 0.01}),
+        currency="USD",
+        curve_type="discount",
+        name="USD_BOOT",
+        instruments=[
+            CurveBootstrapInstrument(kind="deposit", tenor="6M", rate=0.04),
+            CurveBootstrapInstrument(kind="zero", tenor="1Y", rate=0.041),
+            CurveBootstrapInstrument(kind="zero", tenor="2Y", rate=0.042),
+        ],
+    )
+    curve = snap.rates_market.curves["USD_BOOT"]
+    assert isinstance(curve, YieldCurve)
+    assert tuple(n.tenor for n in curve.nodes) == ("6M", "1Y", "2Y")
+    assert curve.zero(1.0) == pytest.approx(0.041)
+
+
+def test_invalid_fx_spot_key_fails_closed():
+    with pytest.raises((ValidationError, ValueError, KeyError, TypeError)):
+        MarketSnapshot(fx_spots={"EUR/USD": 1.1}, rates={"USD": 0.04})
+
+
+def test_fx_market_rejects_non_iso_pair_keys():
+    from app.market.markets import FxMarket
+
+    with pytest.raises((ValueError, KeyError, TypeError)):
+        FxMarket(spots={"US": 1.0})
+
+
+def test_empty_fx_spots_remain_valid():
+    snap = MarketSnapshot(fx_spots={}, rates={"USD": 0.04})
+    assert dict(snap.fx.spots) == {}
+    assert dict(snap.fx_spots) == {}
