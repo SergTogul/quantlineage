@@ -18,9 +18,10 @@ from pathlib import Path
 from typing import Any
 
 from app.domain.models import (
-    AsOfLabel,
+    RiskRun,
     RiskRunCalculationConfig,
     RiskRunRequestBody,
+    as_of_wire,
     dump_risk_run_request,
     parse_risk_run_request,
 )
@@ -292,6 +293,61 @@ def resolve_run_spec(
         as_of=typed.as_of,
         calculation_config=cfg or factory_config,
     )
+
+
+def request_blob_for_execute(run: RiskRun) -> dict[str, Any]:
+    """Build the execute request: first-class columns override the request blob.
+
+    R0.8.5: persisted ``historical_dataset_id`` / version / ``as_of`` /
+    ``calculation_config`` are the source of truth when present so a tampered or
+    emptied request JSON cannot silently rebind execution to the process engine.
+    Legacy rows without columns still resolve from the request blob alone.
+    """
+    req = dict(run.request or {})
+    if run.historical_dataset_id is not None:
+        req["historical_dataset_id"] = run.historical_dataset_id
+    if run.historical_dataset_version is not None:
+        req["historical_dataset_version"] = run.historical_dataset_version
+    if run.as_of is not None:
+        req["as_of"] = as_of_wire(run.as_of)
+    if run.calculation_config is not None:
+        req["calculation_config"] = run.calculation_config.model_dump(mode="json")
+    if run.methodology is not None and "methodology" not in req:
+        req["methodology"] = run.methodology.value
+    return req
+
+
+def resolve_execute_spec(
+    run: RiskRun,
+    *,
+    risk_engine: HistoricalRiskEngine | None = None,
+) -> ResolvedRiskRunSpec:
+    """Resolve the execute-time spec preferring persisted first-class columns.
+
+    When ``run.historical_dataset_id`` is set, the resolved identity must match
+    that column after canonicalization (fail closed on drift).
+    """
+    spec = resolve_run_spec(
+        request_blob_for_execute(run),
+        risk_engine=risk_engine,
+        run_type=run.run_type,
+    )
+    stored_id = _nonempty_str(run.historical_dataset_id)
+    if stored_id is not None and spec.historical_dataset_id != stored_id:
+        raise ValueError(
+            "persisted historical_dataset_id does not match execute resolution: "
+            f"stored={stored_id!r} resolved={spec.historical_dataset_id!r}"
+        )
+    stored_version = _nonempty_str(run.historical_dataset_version)
+    if (
+        stored_version is not None
+        and spec.historical_dataset_version != stored_version
+    ):
+        raise ValueError(
+            "persisted historical_dataset_version does not match execute resolution: "
+            f"stored={stored_version!r} resolved={spec.historical_dataset_version!r}"
+        )
+    return spec
 
 
 def _nonempty_str(value: Any) -> str | None:

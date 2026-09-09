@@ -48,7 +48,12 @@ from app.persistence.sqlalchemy_repos import (
 )
 from app.risk.historical import HistoricalRiskEngine
 from app.services.portfolio_service import PortfolioService
-from app.services.risk_factories import portfolio_service_for_spec, resolve_run_spec
+from app.services.risk_factories import (
+    portfolio_service_for_spec,
+    request_blob_for_execute,
+    resolve_execute_spec,
+    resolve_run_spec,
+)
 from app.services.risk_run_service import (
     InvalidRiskRunTransition,
     RiskRunNotFound,
@@ -382,12 +387,12 @@ class RiskRunWorker:
                 )
                 return
             header = self._with_service(lambda svc: svc.get(run_id))
-            req = dict(header.request or {})
+            # Prefer first-class persisted columns over the request blob (R0.8.5).
+            req = request_blob_for_execute(header)
             engine = getattr(self._portfolio_service, "risk", None)
-            spec = resolve_run_spec(
-                req,
+            spec = resolve_execute_spec(
+                header,
                 risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None,
-                run_type=header.run_type,
             )
             run_service = portfolio_service_for_spec(self._portfolio_service, spec)
             payload = execute_run_type(

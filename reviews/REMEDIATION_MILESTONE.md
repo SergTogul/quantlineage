@@ -694,23 +694,24 @@ Do not upsert arbitrary stored portfolios because a request supplied the same ID
 
 ## R0.8.4 Typed run requests — COMPLETE (2026-09-08)
 
-Independent review **APPROVE** (`reviews/r0.8.4-typed-run-requests-independent-review.md`). Replaced opaque `request: dict` calculation blobs with per-`run_type` Pydantic schemas (`extra='forbid'`). Create DTO + worker submit validate the same typed body; validated JSON dump is persisted. `historical_dataset_id` rebinds the historical engine through shared factory helpers for both spec resolve and worker execution, or fails 400 if unsupported — never silently ignored. CSV identities use path-derived `file:<abspath>`. Residual Minor (execute from request blob vs persisted columns) deferred to R0.8.5. RF-009 stays open for R0.8.5.
+Independent review **APPROVE** (`reviews/r0.8.4-typed-run-requests-independent-review.md`). Replaced opaque `request: dict` calculation blobs with per-`run_type` Pydantic schemas (`extra='forbid'`). Create DTO + worker submit validate the same typed body; validated JSON dump is persisted. `historical_dataset_id` rebinds the historical engine through shared factory helpers for both spec resolve and worker execution, or fails 400 if unsupported — never silently ignored. CSV identities use path-derived `file:<abspath>`. Residual Minor (execute from request blob vs persisted columns) addressed in R0.8.5.
 
-## R0.8.5 Postgres integration tests
+## R0.8.5 Postgres integration tests — COMPLETE (2026-09-08)
 
-Add pytest/integration coverage for:
+Independent review **APPROVE** (`reviews/r0.8.5-postgres-same-spec-independent-review.md`). **RF-009 CLOSED.**
 
-- save/load;
-- run create;
-- worker claim;
-- status lifecycle;
-- failed run;
-- two-worker claim safety;
-- portfolio identity protection.
+Coverage:
+
+- **Same-spec parity (SQLite, PR-green):** interactive `resolve_run_spec` + `portfolio_service_for_spec` + `execute_run_type` vs worker `submit(execute=False)` → `poll_once` → complete for `summary` and `var` with synthetic dataset — exact payload equality.
+- **Execute-from-columns (R0.8.4 residual Minor):** `_execute` uses `resolve_execute_spec` / `request_blob_for_execute` so persisted `historical_dataset_id` / version / `as_of` / `calculation_config` win over a tampered or emptied request blob; mismatch fails closed.
+- **Lifecycle gaps:** SQLite parity module covers identity-on-execute. Live Postgres module (`test_postgres_risk_run_lifecycle.py`) covers save/load, run create, claim, COMPLETED lifecycle, FAILED (missing portfolio), same-spec parity, and identity protection — skip/fail rules match `test_postgres_two_worker.py`.
+- **Two-worker claim:** `test_postgres_two_worker.py` (SKIP LOCKED).
 
 ### Exit criteria
 
-The same RiskRun spec yields the same result whether executed interactively or by the worker.
+The same RiskRun spec yields the same result whether executed interactively or by the worker — **met**. Residual Minor: `methodology` column does not override a conflicting request blob.
+
+Report: `reviews/r0.8.5-postgres-same-spec-report.md`.
 
 ---
 
