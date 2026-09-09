@@ -558,7 +558,7 @@ Related findings:
 
 ## R0.6.1 Baseline benchmark first — COMPLETE (2026-09-04)
 
-`benchmarks/run_full_reval_bench.py` + `backend/tests/test_full_reval_bench.py`. Identity remains **1 trade × 120 obs** builtin vs `full_revaluation_pnl_series`. `pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`; `wall_ms` recorded only. Not in nightly/PR-FULL. R0.6.7 extends the same harness with a PR-safe **10×50** acceptance payload. Close scores: wall / scenarios/sec / warm vs cold / identity **MET** at 10×50; N×S **PARTIAL**; peak RSS and builtin vs QuantLib **PARTIAL** (not MET). N=100/1k remain operator CLI, not the default PR test. RF-007 stays open.
+`benchmarks/run_full_reval_bench.py` + `backend/tests/test_full_reval_bench.py`. Identity remains **1 trade × 120 obs** builtin vs `full_revaluation_pnl_series`. `pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`; `wall_ms` recorded only. Not in PR-FULL. R0.6.7 extends the same harness with a PR-safe **10×50** cash-equity acceptance payload. R0.6.8 adds reconstruction-honest European options (checksums per engine) and nightly **N=100×50**. Close scores: wall / scenarios/sec / warm vs cold / identity **MET** at 10×50; builtin vs QuantLib **MET** on the option book; N×S **PARTIAL** (N=100 nightly; N=1k **UNMET**); peak RSS **PARTIAL** (isolated per impl; process-lifetime `ru_maxrss` within the child). RF-007 stays open.
 
 Record current performance for:
 
@@ -622,19 +622,23 @@ Full-reval ES factor contributions and scenario-attribution factor buckets reuse
 
 `benchmarks/run_full_reval_bench.py --json` now includes an `acceptance` object. PR-safe default **N=10 × S=50** (above 1×120). Each engine row records `wall_ms`, `wall_ms_cold`, `wall_ms_warm`, `peak_rss_kib`, `scenarios_per_sec` as finite numbers — pytest asserts presence/finiteness, **not** a floor. Builtin vs QuantLib at the same N×S; QuantLib skip-or-run (`RISKFORGE_REQUIRE_QUANTLIB=1` fail-closed). Identity: R0.6.1 `6602fa69…` (1×120) and `a28cf4ee6199bf40da3f2598f4241fc85fa4adc4f86bccbbd97e4938047d7537` (10×50). Close-matrix: N×S **PARTIAL**; wall **MET** at 10×50; peak RSS **PARTIAL** (process-lifetime `ru_maxrss`; QuantLib includes prior builtin); scenarios/sec **MET** at 10×50; builtin vs QuantLib **PARTIAL** (cash equity `quantity * spot`, not reconstruction); warm vs cold **MET** at 10×50; identity **MET**. N=100/1k remain **UNMET** in default PR. No `throughput` key; `check_m6_sla.py` not invoked. Not added to nightly/PR-FULL. Evidence: `backend/tests/test_full_reval_bench.py`; report `reviews/r0.6.7-acceptance-benches-report.md`. RF-007 stays **IN PROGRESS**.
 
+## R0.6.8 Reconstruction benches + N=100 nightly — COMPLETE pending review (2026-09-09)
+
+`benchmarks/run_full_reval_bench.py --json` adds a nested `reconstruction` object at PR-safe **N=10 × S=50** European options (`EuropeanOptionPosition`, live spot/vol/rate/div — not cash equity `quantity * spot`). Builtin checksum `3148a41a0b3b4bb515c75d07991a96ecc186fb9d2294ccb20347df8f5322526e`; QuantLib checksum `0594ecd65f68e33a800dbf5c331ead44b1fd353dadb198591721cc445f745eef` (pinned per engine; they need not match). P&L gap recorded at option-match `rel=2e-3` (`max_rel` ~3e-13 on this host). Peak RSS is measured in a **subprocess per impl**. Nightly sibling job `full-reval-n100` runs N=100×50 when `RISKFORGE_NIGHTLY=1` (skipped in default PR; not in PR-FULL `needs:`). Cash-equity identity pins `6602fa69…` / `a28cf4ee…` unchanged. No `throughput` key; `check_m6_sla.py` not invoked. Close-matrix: N×S **PARTIAL** (N=100 nightly; N=1k **UNMET**); wall **MET**; peak RSS **PARTIAL** (isolated child still process-lifetime `ru_maxrss`); scenarios/sec **MET**; builtin vs QuantLib **MET** on the option book; warm vs cold **MET**; identity **MET**. Evidence: `backend/tests/test_full_reval_bench.py`, `backend/tests/test_nightly_full_reval_n100.py`, `backend/tests/test_nightly_ci.py`; report `reviews/r0.6.8-reconstruction-benches-report.md`. RF-007 stays **IN PROGRESS**.
+
 ## R0.6 close gate — KEEP OPEN / not complete (2026-09-09)
 
 QA close gate **KEEP OPEN** (`reviews/r0.6-rf007-close-gate-report.md`; independent review KEEP OPEN). **RF-007 IN PROGRESS.**
 
 Required direction: 6 MET, 1 PARTIAL (option B job process, not intra-run chunks). Goldens/identity **69 passed**. Joint scaling is O(N×S) `value` + O(N) Greeks, bounded as a HEAVY RiskRun job. Interactive default remains DELTA_GAMMA. No SLA.
 
-Acceptance benches: N×S **PARTIAL** (10×50 + 1×120; N=100/1k **UNMET** in default PR); wall **MET** at 10×50; peak RSS **PARTIAL** (field exists; process-lifetime `ru_maxrss`; QuantLib includes prior builtin); scenarios/sec **MET** at 10×50; builtin vs QuantLib **PARTIAL** (same N×S, cash equity is `quantity * spot`, not reconstruction); warm vs cold **MET** at 10×50; identity **MET**. Do not invent a host SLA from recorded `wall_ms`. Task 7 close re-gate still owns CLOSED vs KEEP OPEN. RF-007 stays **IN PROGRESS**.
+Acceptance benches: N×S **PARTIAL** (10×50 + 1×120 in PR; N=100 **MET** in nightly; N=1k **UNMET**); wall **MET** at 10×50; peak RSS **PARTIAL** (isolated subprocess per impl; still process-lifetime `ru_maxrss` within that child); scenarios/sec **MET** at 10×50; builtin vs QuantLib **MET** on the European option reconstruction book (per-engine checksums; P&L gap within `rel=2e-3`); warm vs cold **MET** at 10×50; identity **MET**. Do not invent a host SLA from recorded `wall_ms`. Task 8 close re-gate still owns CLOSED vs KEEP OPEN. RF-007 stays **IN PROGRESS**.
 
 ### Exit criteria
 
 Full revaluation is still allowed to be expensive, but its scaling is explainable, benchmarked, bounded, and appropriate for a risk-run job.
 
-Explainable **yes**; bounded **yes**; appropriate **yes**. **Benchmarked** at PR-safe 10×50 (plus 1×120 identity) with peak RSS and QuantLib still **PARTIAL**; N=100/1k **UNMET** in default PR. Close-gate **not complete**.
+Explainable **yes**; bounded **yes**; appropriate **yes**. **Benchmarked** at PR-safe 10×50 reconstruction (plus 1×120 / 10×50 cash-equity identity) with peak RSS still **PARTIAL** and N=1k **UNMET**. N=100 recorded in nightly. Close-gate **not complete**.
 
 ---
 

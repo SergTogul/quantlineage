@@ -146,7 +146,7 @@ Benchmark scripts stay separate from product unit tests; equivalence stays in
 `backend/tests/test_native_kernel.py` and Historical VaR parity in
 `backend/tests/test_historical_scenario_kernel.py`.
 
-## FULL_REVALUATION baseline (R0.6.1 / R0.6.7)
+## FULL_REVALUATION baseline (R0.6.1 / R0.6.7 / R0.6.8)
 
 `run_full_reval_bench.py` records a **checksum/impl identity** on the nightly
 120-obs unit-equity sample (shocked PV − base PV). `wall_ms` is printed for
@@ -155,12 +155,19 @@ treat a positive throughput reading as a floor.
 
 R0.6.7 adds a nested `acceptance` object at PR-safe **N=10 × S=50** (above
 1×120): `peak_rss_kib`, `scenarios_per_sec`, `wall_ms_cold` / `wall_ms_warm`,
-and builtin vs QuantLib at the same N×S. QuantLib is skip-or-run (fail-closed
-when `RISKFORGE_REQUIRE_QUANTLIB=1`). Pytest asserts those values are finite
-numbers, not floors. Operators may pass `--acceptance-n` / `--acceptance-s`;
-do not use N=1000 in PR CI.
+and builtin vs QuantLib at the same N×S (cash equity). QuantLib is skip-or-run
+(fail-closed when `RISKFORGE_REQUIRE_QUANTLIB=1`). Pytest asserts those values
+are finite numbers, not floors. Operators may pass `--acceptance-n` /
+`--acceptance-s`; do not use N=1000 in PR CI.
+
+R0.6.8 adds a nested `reconstruction` object: European options with live
+spot/vol/rate/div, checksums **per engine**, isolated RSS via `--isolated-impl`
+subprocess, and a recorded P&L gap at option-match `rel=2e-3`. N=100×50 is
+nightly-only (`RISKFORGE_NIGHTLY=1`; job `full-reval-n100`). Not in PR-FULL
+`needs:`.
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python benchmarks/run_full_reval_bench.py --json
 python3 -m pytest backend/tests/test_full_reval_bench.py -q
+RISKFORGE_NIGHTLY=1 python3 -m pytest backend/tests/test_nightly_full_reval_n100.py -q
 ```
