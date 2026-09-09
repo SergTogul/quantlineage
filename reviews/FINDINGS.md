@@ -686,7 +686,7 @@ Adding a new instrument requires one coherent adapter registration plus tests, n
 
 ## RF-013 — Persistence and HTTP identity are not canonical; client IDs can overwrite stored portfolios
 
-Status: **CLOSED** (2026-09-09). Close gate (`reviews/r0.8.6-rf013-close-gate-report.md`); independent review pending. R0.8.3 create vs update + RiskRun create-if-absent/attach-stored; R0.8.6 HTTP pin: `POST /api/v1/risk/runs` (and `/risk/runs`) with `portfolio.id=global-macro` does not replace the seeded Cross-Asset book (`GET /portfolio` and SQL row unchanged). Reproduction from IDs: R0.8.5 same-spec (`test_same_spec_parity.py`). Postgres coverage: R0.8.5 (`test_postgres_risk_run_lifecycle.py`, including identity-on-execute). Typed requests: R0.8.4 (`extra='forbid'`). **P1 residuals:** no `portfolio_version` / server-issued ids (first persist is still create-if-absent with a client id); legacy `save` upsert remains for seed callers (not on submit); object ACLs are RF-014.
+Status: **IN PROGRESS** (2026-09-09). Independent review KEEP OPEN — do not CLOSE. R0.8.3 create vs update + RiskRun create-if-absent/attach-stored; R0.8.6 HTTP pin: `POST /api/v1/risk/runs` (and `/risk/runs`) with `portfolio.id=global-macro` does not replace the seeded Cross-Asset book (`GET /portfolio` and SQL row unchanged). Reproduction from IDs: R0.8.5 same-spec (`test_same_spec_parity.py`). Postgres coverage: R0.8.5 (`test_postgres_risk_run_lifecycle.py`, including identity-on-execute). **Residuals:** no `portfolio_version` / server-issued ids (first persist is still create-if-absent with a client id); live calculate still POSTs a full book; leftover `save` upsert for seed callers (not on submit); object ACLs = RF-014. Cell 4 (PERF-016 / `risk_results.payload`) is **UNMET** — R0.8.4 typed request bodies are not unconstrained derived-result JSON.
 
 Priority: **P1**  
 Risk types: INTEGRITY, ARCHITECTURE, SECURITY  
@@ -722,7 +722,7 @@ Keep an explicit inline/debug calculation endpoint only for tests/demo tooling.
 - a request cannot overwrite `global-macro` merely by supplying that ID — **MET** (`tests/test_portfolio_identity.py` HTTP + worker pins; R0.8.3 attach-stored);
 - a persisted risk run can be reproduced from IDs — **MET** (R0.8.5 `tests/test_same_spec_parity.py`; RF-009 CLOSED);
 - PostgreSQL path has real pytest/integration coverage — **MET** (R0.8.5 `tests/test_postgres_risk_run_lifecycle.py`; not duplicated here);
-- large derived payloads are not blindly duplicated as unconstrained JSON where a structured/reference model is better — **MET** (R0.8.4 typed per-`run_type` request schemas, `extra='forbid'`).
+- large derived payloads are not blindly duplicated as unconstrained JSON where a structured/reference model is better — **UNMET** (`risk_results.payload` remains unconstrained JSON in `backend/app/persistence/models.py`; PERF-016. R0.8.4 typed per-`run_type` request bodies are request-side `extra='forbid'`, not a structured/reference model for derived results).
 
 ---
 
