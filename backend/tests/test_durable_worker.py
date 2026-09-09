@@ -1,20 +1,27 @@
 """M5.7: durable worker poll + claim_queued + external-worker enqueue deferral."""
 from __future__ import annotations
+
 import time
 from unittest.mock import MagicMock
+
 import pytest
+from tests.market_fixtures import FixedMarketProvider, equity_spot_market
+
 from app.domain.models import EquityPosition, Portfolio, RiskRun, RiskRunStatus
 from app.persistence.config import external_worker_enabled
 from app.persistence.memory_repos import InMemoryRiskRunRepository
 from app.persistence.session import session_scope
-from app.persistence.sqlalchemy_repos import SqlAlchemyPortfolioRepository, SqlAlchemyRiskRunRepository
+from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyPortfolioRepository,
+    SqlAlchemyRiskRunRepository,
+)
 from app.persistence.testing import make_sqlite_session_factory
 from app.pricing.factory import create_pricing_engine
 from app.risk.historical import HistoricalRiskEngine
 from app.services.portfolio_service import PortfolioService
-from tests.market_fixtures import FixedMarketProvider, equity_spot_market
 from app.services.risk_run_service import RiskRunService
 from app.services.risk_run_worker import RiskRunWorker
+
 
 @pytest.fixture
 def tiny_portfolio() -> Portfolio:

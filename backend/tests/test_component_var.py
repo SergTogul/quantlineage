@@ -13,14 +13,24 @@ Conventions:
 - Tolerances: abs 1e-6 currency or rel 1e-8 for reconciliation
 """
 from __future__ import annotations
+
 import math
+
 import numpy as np
-from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot, Portfolio, VaRMethodology
+from tests.market_fixtures import equity_spot_market
+
+from app.domain.models import (
+    EquityPosition,
+    EuropeanOptionPosition,
+    MarketSnapshot,
+    Portfolio,
+    VaRMethodology,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.var import VaRAnalytics
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
-from tests.market_fixtures import equity_spot_market
+
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 def _mixed_series(n: int=100) -> FactorObservationSeries:
@@ -34,7 +44,7 @@ def _option_market() -> MarketSnapshot:
     return MarketSnapshot(id='component-var', equity_spots={'SPY': 100.0}, equity_vols={'SPY': 0.25}, rates={'USD': 0.04}, dividend_yields={'SPY': 0.0})
 
 def _parametric_var(report) -> float:
-    return next((m.var for m in report.methods if m.method == 'parametric'))
+    return next(m.var for m in report.methods if m.method == 'parametric')
 
 def test_component_var_reconciles_under_delta_gamma():
     pricing = BuiltinPricingEngine()
@@ -42,9 +52,9 @@ def test_component_var_reconciles_under_delta_gamma():
     report = analytics.report(_option_equity_book(), pricing, confidence=0.99, methodology=VaRMethodology.DELTA_GAMMA, market=_option_market())
     pvar = _parametric_var(report)
     assert pvar > 0
-    total = sum((c.component_var for c in report.contributions))
+    total = sum(c.component_var for c in report.contributions)
     assert math.isclose(total, pvar, rel_tol=1e-08, abs_tol=1e-06)
-    assert math.isclose(sum((c.contribution_pct for c in report.contributions)), 100.0, abs_tol=1e-06)
+    assert math.isclose(sum(c.contribution_pct for c in report.contributions), 100.0, abs_tol=1e-06)
 
 def test_component_var_reconciles_under_full_revaluation():
     pricing = BuiltinPricingEngine()
@@ -52,7 +62,7 @@ def test_component_var_reconciles_under_full_revaluation():
     report = analytics.report(_option_equity_book(), pricing, confidence=0.95, methodology=VaRMethodology.FULL_REVALUATION, market=_option_market())
     pvar = _parametric_var(report)
     assert pvar > 0
-    total = sum((c.component_var for c in report.contributions))
+    total = sum(c.component_var for c in report.contributions)
     assert math.isclose(total, pvar, rel_tol=1e-08, abs_tol=1e-06)
     assert report.methodology == VaRMethodology.FULL_REVALUATION
 
@@ -63,7 +73,7 @@ def test_component_var_reconciles_sample_portfolio_both_methodologies():
         report = VaRAnalytics(dataset=dataset).report(SAMPLE_PORTFOLIO, pricing, confidence=0.99, methodology=meth, market=SAMPLE_MARKET)
         pvar = _parametric_var(report)
         assert len(report.contributions) == len(SAMPLE_PORTFOLIO.positions)
-        assert math.isclose(sum((c.component_var for c in report.contributions)), pvar, rel_tol=1e-08, abs_tol=1e-06)
+        assert math.isclose(sum(c.component_var for c in report.contributions), pvar, rel_tol=1e-08, abs_tol=1e-06)
 
 def test_single_position_component_equals_portfolio_parametric_var():
     pricing = BuiltinPricingEngine()
@@ -79,5 +89,5 @@ def test_zero_shock_series_yields_zero_component_var():
     series = FactorObservationSeries(equity_returns=z.copy(), vol_moves=z.copy(), rate_moves_bps=z.copy(), fx_returns=z.copy())
     report = VaRAnalytics(dataset=ArrayHistoricalDataset(series)).report(_option_equity_book(), BuiltinPricingEngine(), methodology=VaRMethodology.DELTA_GAMMA, market=_option_market())
     assert _parametric_var(report) == 0.0
-    assert all((c.component_var == 0.0 for c in report.contributions))
-    assert all((c.contribution_pct == 0.0 for c in report.contributions))
+    assert all(c.component_var == 0.0 for c in report.contributions)
+    assert all(c.contribution_pct == 0.0 for c in report.contributions)

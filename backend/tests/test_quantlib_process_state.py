@@ -20,11 +20,12 @@ from tests.quantlib_gate import import_quantlib
 
 ql = import_quantlib()
 
+from tests.market_fixtures import usd_rate_market
+
 from app.domain.models import BondPosition, MarketSnapshot, SwapPosition
 from app.pricing import quantlib as quantlib_mod
 from app.pricing.cache import CachedPricingEngine
 from app.pricing.quantlib import QuantLibPricingEngine
-from tests.market_fixtures import usd_rate_market
 
 
 def _bond() -> BondPosition:

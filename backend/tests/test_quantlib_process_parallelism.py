@@ -12,6 +12,7 @@ Pins the bounded design in ADR 007:
 Does not start a job platform or a full-reval ``ProcessPoolExecutor``.
 """
 from __future__ import annotations
+
 import ast
 import inspect
 import os
@@ -22,7 +23,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
+
 from tests.test_compose_loopback import COMPOSE_PATH, _iter_service_bodies
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = BACKEND_ROOT / 'app'
@@ -53,7 +56,7 @@ def unlocked_ql_thread_pool_violations(source: str, *, filename: str='<mem>') ->
         return [f'{filename}: unparsed Python; fail closed']
     uses_pool = False
     for node in ast.walk(tree):
-        if isinstance(node, ast.Name) and node.id in _POOL_NAMES or (isinstance(node, ast.Attribute) and node.attr in _POOL_NAMES):
+        if (isinstance(node, ast.Name) and node.id in _POOL_NAMES) or (isinstance(node, ast.Attribute) and node.attr in _POOL_NAMES):
             uses_pool = True
     if not uses_pool:
         return []
@@ -64,7 +67,7 @@ def unlocked_ql_thread_pool_violations(source: str, *, filename: str='<mem>') ->
     return [f'{filename}: ThreadPoolExecutor/ProcessPoolExecutor prices QuantLib without _QL_PROCESS_LOCK / _session']
 
 def _iter_app_python_files() -> list[Path]:
-    return sorted((path for path in APP_ROOT.rglob('*.py') if path.is_file() and '.__pycache__' not in path.parts))
+    return sorted(path for path in APP_ROOT.rglob('*.py') if path.is_file() and '.__pycache__' not in path.parts)
 
 def test_detector_flags_thread_pool_that_prices_quantlib_without_lock():
     hits = unlocked_ql_thread_pool_violations(_UNSAFE_QL_THREAD_POOL, filename='unsafe.py')
@@ -91,7 +94,7 @@ def test_risk_run_worker_job_pool_does_not_import_quantlib():
     imported: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            imported.update((alias.name.split('.', 1)[0] for alias in node.names))
+            imported.update(alias.name.split('.', 1)[0] for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
             imported.add(node.module.split('.', 1)[0])
     assert 'QuantLib' not in imported

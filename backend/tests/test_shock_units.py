@@ -13,9 +13,16 @@ import inspect
 import numpy as np
 import pytest
 
-from app.risk import attribution, es, historical, reverse_stress, sensitivities
-from app.risk import scenario_model, scenarios
 from app.market import curves as curves_mod
+from app.risk import (
+    attribution,
+    es,
+    historical,
+    reverse_stress,
+    scenario_model,
+    scenarios,
+    sensitivities,
+)
 from app.risk.shock_units import (
     bps_to_decimal_rate,
     decimal_rate_to_bps,

@@ -10,14 +10,23 @@ Pinned on a unit equity so the identity is hand-computable:
     P&L = 10*90 − 10*100 = −100
 """
 from __future__ import annotations
+
 import numpy as np
 import pytest
-from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot, Portfolio, VaRMethodology
+
+from app.domain.models import (
+    EquityPosition,
+    EuropeanOptionPosition,
+    MarketSnapshot,
+    Portfolio,
+    VaRMethodology,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine, full_revaluation_pnl_series
 from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSeries
 from app.risk.scenarios import historical_shocked_snapshots
 from app.risk.var import VaRAnalytics
+
 
 def _equity_book() -> tuple[Portfolio, MarketSnapshot]:
     pos = EquityPosition(type='equity', id='eq', symbol='UNIT', quantity=10.0)

@@ -1,7 +1,10 @@
 """M2.9 What-if API — hypothetical add/remove/modify without mutating the request book."""
 from __future__ import annotations
+
 import math
+
 from fastapi.testclient import TestClient
+
 from app.domain.models import EquityPosition, VaRMethodology, WhatIfRequest
 from app.main import app
 from app.pricing.builtin import BuiltinPricingEngine
@@ -9,6 +12,7 @@ from app.risk.historical import HistoricalRiskEngine
 from app.risk.incremental_var import apply_what_if_changes
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
+
 _TOL = 1e-09
 _OBS = 80
 
@@ -27,7 +31,7 @@ def test_service_what_if_returns_before_after_incremental_and_deltas():
     assert report.after.var_99 >= 0.0
     assert math.isclose(report.incremental.var_99, report.after.var_99 - report.before.var_99, abs_tol=_TOL)
     assert math.isclose(report.incremental.expected_shortfall_99, report.after.expected_shortfall_99 - report.before.expected_shortfall_99, abs_tol=_TOL)
-    assert any((c.delta != 0.0 for c in report.changed_factor_exposures))
+    assert any(c.delta != 0.0 for c in report.changed_factor_exposures)
     assert len(report.changed_stress_losses) >= 1
     for s in report.changed_stress_losses:
         assert math.isclose(s.delta_pnl, s.after_pnl - s.before_pnl, abs_tol=_TOL)
@@ -45,7 +49,7 @@ def test_what_if_api_add_trade():
     assert 'changed_factor_exposures' in payload
     assert 'changed_stress_losses' in payload
     still = client.get('/portfolio').json()
-    assert all((p['id'] != 'eq-whatif' for p in still['positions']))
+    assert all(p['id'] != 'eq-whatif' for p in still['positions'])
 
 def test_what_if_api_methodology_query_override():
     client = TestClient(app)

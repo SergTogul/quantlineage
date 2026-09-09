@@ -30,7 +30,6 @@ from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.quantlib import QuantLibPricingEngine
 
 
-
 def _eq_m(spot=25.0, *, symbol='ABC', rate=0.04, vol=None, div=0.0):
     kw = dict(id='t', equity_spots={symbol: spot}, rates={'USD': rate}, dividend_yields={symbol: div})
     if vol is not None:

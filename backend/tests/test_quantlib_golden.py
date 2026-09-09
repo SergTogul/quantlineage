@@ -48,6 +48,8 @@ from tests.quantlib_gate import import_quantlib
 
 ql = import_quantlib()
 
+from tests.market_fixtures import equity_spot_market, fx_market, usd_rate_market
+
 from app.domain.models import (
     BondPosition,
     EquityFuturePosition,
@@ -60,7 +62,6 @@ from app.domain.models import (
 )
 from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.quantlib import QuantLibPricingEngine
-from tests.market_fixtures import equity_spot_market, fx_market, usd_rate_market
 
 _N = NormalDist()
 

@@ -23,9 +23,9 @@ from app.domain.models import (
 from app.market.demo_snapshot import MissingMarketDataError
 from app.pricing.builtin import BuiltinPricingEngine
 from app.sample import (
+    _DEMO_AGGREGATE_MARKETS,
     CROSS_ASSET_PORTFOLIO,
     RATES_MACRO_PORTFOLIO,
-    _DEMO_AGGREGATE_MARKETS,
     demo_aggregate_market_snapshot,
     demo_market_snapshot,
 )

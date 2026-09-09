@@ -7,13 +7,24 @@ breadcrumb (firm / portfolio / desk / strategy / book / trade labels).
 This slice does not change VaR/ES numbers or stop per-node recomputation.
 """
 from __future__ import annotations
+
 import math
-from app.domain.models import EquityPosition, HierarchyLevel, HierarchyNode, HierarchyRef, MarketSnapshot, Portfolio
+
+from tests.market_fixtures import equity_spots_market
+
+from app.domain.models import (
+    EquityPosition,
+    HierarchyLevel,
+    HierarchyNode,
+    HierarchyRef,
+    MarketSnapshot,
+    Portfolio,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.hierarchy import HierarchyEngine
 from app.risk.hierarchy_placement import hierarchy_node_id, portfolio_at
 from app.risk.historical import HistoricalRiskEngine
-from tests.market_fixtures import equity_spots_market
+
 _ADDITIVE = ('market_value', 'delta', 'gamma', 'vega', 'dv01', 'fx_delta')
 
 def _engine(seed: int=1, observations: int=40) -> HierarchyEngine:
@@ -103,12 +114,12 @@ def test_tree_ids_align_with_portfolio_at_and_risk_at():
     portfolio = by_level['portfolio'][0]
     assert portfolio.id == 'portfolio:multi-desk'
     assert portfolio.path == 'Acme Capital/multi-desk'
-    rates = next((n for n in by_level['desk'] if n.name == 'Rates Desk'))
+    rates = next(n for n in by_level['desk'] if n.name == 'Rates Desk')
     assert rates.id == 'desk:Rates Desk'
     assert rates.path == 'Acme Capital/multi-desk/Rates Desk'
-    carry = next((n for n in by_level['strategy'] if n.name == 'Carry'))
+    carry = next(n for n in by_level['strategy'] if n.name == 'Carry')
     assert carry.id == 'strategy:Rates Desk/Carry'
-    cash_c = next((n for n in by_level['book'] if n.name == 'Cash C'))
+    cash_c = next(n for n in by_level['book'] if n.name == 'Cash C')
     assert cash_c.id == 'book:Equity Desk/Momentum/Cash C'
     refs = [HierarchyRef(level=HierarchyLevel.FIRM, firm='Acme Capital'), HierarchyRef(level=HierarchyLevel.PORTFOLIO, firm='Acme Capital', portfolio_id='multi-desk'), HierarchyRef(level=HierarchyLevel.DESK, firm='Acme Capital', portfolio_id='multi-desk', desk='Rates Desk'), HierarchyRef(level=HierarchyLevel.STRATEGY, firm='Acme Capital', portfolio_id='multi-desk', desk='Rates Desk', strategy='Carry'), HierarchyRef(level=HierarchyLevel.BOOK, firm='Acme Capital', portfolio_id='multi-desk', desk='Equity Desk', strategy='Momentum', book='Cash C'), HierarchyRef(level=HierarchyLevel.TRADE, firm='Acme Capital', portfolio_id='multi-desk', desk='Rates Desk', strategy='Carry', book='Cash A', trade_id='eq-a')]
     tree_by_id = {n.id: n for n in _walk(root)}
@@ -132,11 +143,11 @@ def test_node_ids_do_not_change_var_es_or_additive_reconciliation():
             return
         for attr in _ADDITIVE:
             parent = getattr(node, attr)
-            child_sum = sum((getattr(c, attr) for c in node.children))
+            child_sum = sum(getattr(c, attr) for c in node.children)
             assert math.isclose(parent, child_sum, abs_tol=1e-09)
         parent_stress = {s.scenario: s.pnl for s in node.stress}
         for scenario, parent_pnl in parent_stress.items():
-            child_sum = sum((next((s.pnl for s in c.stress if s.scenario == scenario)) for c in node.children))
+            child_sum = sum(next(s.pnl for s in c.stress if s.scenario == scenario) for c in node.children)
             assert math.isclose(parent_pnl, child_sum, abs_tol=1e-09)
         for child in node.children:
             _reconcile(child)
@@ -159,7 +170,7 @@ def test_portfolio_id_equal_to_trade_id_does_not_collide():
     root = _engine().build(pf, pricing, market=_multi_book_market())
     ids = _assert_unique_nonempty_ids(root)
     assert 'portfolio:eq-a' in ids
-    assert any((i.endswith('/eq-a') and i.startswith('trade:') for i in ids))
+    assert any(i.endswith('/eq-a') and i.startswith('trade:') for i in ids)
 
 def test_empty_and_literal_trade_ids_under_different_books_do_not_collide():
     pricing = BuiltinPricingEngine()

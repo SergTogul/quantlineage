@@ -9,15 +9,26 @@ Conventions:
 - Tolerances: abs 1e-6 (currency) or rel 1e-8 for reconciliation
 """
 from __future__ import annotations
+
 import math
-from app.domain.models import EquityPosition, EuropeanOptionPosition, MarketSnapshot, Portfolio, ScenarioKind, StressScenario
+
+from tests.market_fixtures import equity_spots_market
+
+from app.domain.models import (
+    EquityPosition,
+    EuropeanOptionPosition,
+    MarketSnapshot,
+    Portfolio,
+    ScenarioKind,
+    StressScenario,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.factor_types import EquitySpot, EquityVol, RateZero
 from app.risk.scenario_attribution import ScenarioAttributionEngine
 from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory, ScenarioThreshold
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
-from tests.market_fixtures import equity_spots_market
+
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
 
 def _stress_market() -> MarketSnapshot:
@@ -34,10 +45,10 @@ def _two_book_portfolio() -> Portfolio:
     return Portfolio(id='stress-books', name='Stress Books', desk='Macro Desk', strategy='Directional', positions=[EquityPosition(type='equity', id='eq-a', symbol='SPY', quantity=100, book='Equity Cash'), EquityPosition(type='equity', id='eq-b', symbol='NVDA', quantity=50, book='Equity Cash'), EuropeanOptionPosition(type='european_option', id='opt-a', symbol='SPY', quantity=20, strike=480.0, maturity_years=0.5, option_type='put', book='Equity Derivatives')])
 
 def _assert_reconciles(contributions, portfolio_pnl: float, *, abs_tol: float=1e-06) -> None:
-    total = sum((c.pnl for c in contributions))
+    total = sum(c.pnl for c in contributions)
     assert math.isclose(total, portfolio_pnl, abs_tol=abs_tol, rel_tol=1e-08), f'contribution sum {total} vs portfolio P&L {portfolio_pnl}'
     if portfolio_pnl:
-        assert math.isclose(sum((c.contribution_pct for c in contributions)), 100.0, abs_tol=1e-06)
+        assert math.isclose(sum(c.contribution_pct for c in contributions), 100.0, abs_tol=1e-06)
 
 def test_scenario_attribution_importable():
     assert ScenarioAttributionEngine is not None
@@ -51,7 +62,7 @@ def test_trade_book_desk_strategy_portfolio_reconcile():
     book = _two_book_portfolio()
     scenario = StressScenario(id='eq_down', name='Equities -10%', kind=ScenarioKind.FACTOR, equity_shock=-0.1)
     report = ScenarioAttributionEngine().decompose(book, pricing, scenario, market=_stress_market())
-    assert math.isclose(report.portfolio_pnl, sum((c.pnl for c in report.by_trade)), abs_tol=1e-09)
+    assert math.isclose(report.portfolio_pnl, sum(c.pnl for c in report.by_trade), abs_tol=1e-09)
     _assert_reconciles(report.by_trade, report.portfolio_pnl)
     _assert_reconciles(report.by_book, report.portfolio_pnl)
     _assert_reconciles(report.by_desk, report.portfolio_pnl)
@@ -61,8 +72,8 @@ def test_trade_book_desk_strategy_portfolio_reconcile():
     assert report.by_desk[0].key == 'Macro Desk'
     assert report.by_strategy[0].key == 'Directional'
     assert report.by_portfolio[0].key == book.id
-    cash_trades = sum((c.pnl for c in report.by_trade if c.key in {'eq-a', 'eq-b'}))
-    cash_book = next((c.pnl for c in report.by_book if c.key == 'Equity Cash'))
+    cash_trades = sum(c.pnl for c in report.by_trade if c.key in {'eq-a', 'eq-b'})
+    cash_book = next(c.pnl for c in report.by_book if c.key == 'Equity Cash')
     assert math.isclose(cash_trades, cash_book, abs_tol=1e-09)
     assert report.reconciliation_error_trade < 1e-09
     assert report.reconciliation_error_book < 1e-09
@@ -118,7 +129,7 @@ def test_empty_scenario_zero_pnl():
     zero = StressScenario(id='flat', name='Flat', kind=ScenarioKind.FACTOR)
     report = ScenarioAttributionEngine().decompose(SAMPLE_PORTFOLIO, pricing, zero, market=SAMPLE_MARKET)
     assert report.portfolio_pnl == 0.0
-    assert all((c.pnl == 0.0 for c in report.by_trade))
+    assert all(c.pnl == 0.0 for c in report.by_trade)
     assert report.by_risk_factor == []
     _assert_reconciles(report.by_trade, 0.0)
 
@@ -149,7 +160,7 @@ def test_single_factor_interaction_near_zero():
     scenario = StressScenario(id='eq_only', name='Equity only', kind=ScenarioKind.FACTOR, equity_shock=-0.1)
     book = Portfolio(id='eq-only', name='Eq Only', positions=[EquityPosition(type='equity', id='eq1', symbol='SPY', quantity=10)])
     report = ScenarioAttributionEngine().decompose(book, pricing, scenario, market=_stress_market())
-    interaction = next((c for c in report.by_risk_factor if c.key == 'interaction'))
+    interaction = next(c for c in report.by_risk_factor if c.key == 'interaction')
     assert abs(interaction.pnl) < 1e-09
     _assert_reconciles(report.by_risk_factor, report.portfolio_pnl)
 

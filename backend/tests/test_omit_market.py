@@ -20,6 +20,7 @@ from app.risk.reverse_stress_multi import MultiFactorReverseStressEngine
 from app.risk.scenario_attribution import ScenarioAttributionEngine
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 from app.risk.var import VaRAnalytics
+
 PRICING = BuiltinPricingEngine()
 BOOK = Portfolio(
     id="omit-market",

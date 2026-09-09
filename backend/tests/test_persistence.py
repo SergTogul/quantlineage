@@ -1,16 +1,35 @@
 """M5.1 persistence: SQLite round-trips (no live Postgres required)."""
 from __future__ import annotations
+
 import math
 from datetime import date
 from pathlib import Path
+
 import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import inspect, text
-from app.domain.models import EquityPosition, MarketSnapshot, Portfolio, RiskLimit, RiskRun, RiskRunStatus, ScenarioKind, StressScenario
+
+from app.domain.models import (
+    EquityPosition,
+    MarketSnapshot,
+    Portfolio,
+    RiskLimit,
+    RiskRun,
+    RiskRunStatus,
+    ScenarioKind,
+    StressScenario,
+)
 from app.persistence.session import session_scope
-from app.persistence.sqlalchemy_repos import SqlAlchemyLimitDefinitionRepository, SqlAlchemyMarketSnapshotRepository, SqlAlchemyPortfolioRepository, SqlAlchemyRiskRunRepository, SqlAlchemyScenarioDefinitionRepository
+from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyLimitDefinitionRepository,
+    SqlAlchemyMarketSnapshotRepository,
+    SqlAlchemyPortfolioRepository,
+    SqlAlchemyRiskRunRepository,
+    SqlAlchemyScenarioDefinitionRepository,
+)
 from app.persistence.testing import make_sqlite_engine, make_sqlite_session_factory
+
 
 @pytest.fixture
 def session_factory():

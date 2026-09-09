@@ -1,15 +1,19 @@
 """R0.11.3 / RF-014: configurable HTTP workload caps (positions, scenarios, body size)."""
 from __future__ import annotations
+
 import asyncio
 import json
 from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
+
 from app.api import workload as workload_mod
 from app.api.errors import error_payload
 from app.domain.models import EquityPosition, Portfolio
 from app.main import app
 from app.sample import SAMPLE_PORTFOLIO
+
 
 def _assert_error_shape(body: dict[str, Any]) -> None:
     assert set(body.keys()) == {'code', 'message', 'details'}
@@ -111,8 +115,9 @@ def test_oversize_positions_rejected_on_legacy_risk_route(monkeypatch: pytest.Mo
 
 def test_exactly_max_positions_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv('RISKFORGE_MAX_POSITIONS', '2')
-    from app.api import deps
     from tests.market_fixtures import FixedMarketProvider, equity_spot_market
+
+    from app.api import deps
     previous = deps.portfolio_service.market_data
     deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market('AAPL', 190.0))
     try:
@@ -223,8 +228,8 @@ def _asgi_post_chunked_typed_body(chunks: list[bytes], *, path: str='/api/v1/mar
         await app(scope, receive, send)
     with TestClient(app):
         asyncio.run(_invoke())
-    status = next((m['status'] for m in messages if m['type'] == 'http.response.start'))
-    raw = b''.join((m.get('body', b'') for m in messages if m['type'] == 'http.response.body'))
+    status = next(m['status'] for m in messages if m['type'] == 'http.response.start')
+    raw = b''.join(m.get('body', b'') for m in messages if m['type'] == 'http.response.body')
     parsed: dict[str, Any] = json.loads(raw) if raw else {}
     return (status, parsed, receive_log)
 
@@ -241,7 +246,7 @@ def test_full_app_chunked_typed_body_stops_before_fastapi_joins(monkeypatch: pyt
     assert len(raw) >= 270
     chunks = [raw[i:i + 80] for i in range(0, len(raw), 80)]
     assert len(chunks) >= 4
-    offered = sum((len(c) for c in chunks))
+    offered = sum(len(c) for c in chunks)
     status, body, receive_log = _asgi_post_chunked_typed_body(chunks)
     assert status == 413
     _assert_error_shape(body)
@@ -264,7 +269,7 @@ def test_full_app_chunked_invalid_json_over_cap_is_413_not_422(monkeypatch: pyte
     """
     monkeypatch.setenv('RISKFORGE_MAX_REQUEST_BYTES', '64')
     chunks = [b'x' * 80, b'x' * 80, b'x' * 80, b'x' * 5]
-    offered = sum((len(c) for c in chunks))
+    offered = sum(len(c) for c in chunks)
     status, body, receive_log = _asgi_post_chunked_typed_body(chunks)
     assert status == 413
     assert status != 422

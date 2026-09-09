@@ -1,10 +1,13 @@
 """RF-001 Phase B: Position DTOs carry economics only; value() requires MarketSnapshot."""
 from __future__ import annotations
+
 import pytest
 from pydantic import ValidationError
+
 from app.domain.models import BondPosition, EquityPosition, MarketSnapshot, SwapPosition
 from app.pricing.builtin import BuiltinPricingEngine
 from app.pricing.quantlib import QuantLibPricingEngine
+
 MSG = 'production risk calculation requires an explicit MarketSnapshot'
 
 def _equity() -> EquityPosition:
