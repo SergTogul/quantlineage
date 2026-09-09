@@ -369,6 +369,13 @@ Related findings:
 
 ## R0.4.1 Typed market structures
 
+R0.4.1-A COMPLETE (2026-09-08): typed sub-market views
+(`MarketSnapshot.equity` / `.rates_market` / `.vol` / `.fx` → `app.market.markets`)
+documented and tested as canonical inspection APIs; nested maps remain
+MappingProxy-frozen; `curves.py` bp→decimal shifts go through
+`bps_to_decimal_rate`. Flat dict storage on MarketSnapshot retained.
+RF-004 / RF-011 stay IN PROGRESS.
+
 Replace nested raw dictionaries where practical with typed domain models for:
 
 - yield curves;

@@ -58,18 +58,22 @@ def test_interpolation_between_nodes():
 
 
 def test_parallel_shift_bps():
+    from app.risk.shock_units import bps_to_decimal_rate
+
     curve = build_usd_ois_discount(0.04)
     shifted = curve.parallel_shift_bps(25)
-    assert shifted.zero(10.0) == pytest.approx(curve.zero(10.0) + 0.0025)
+    assert shifted.zero(10.0) == pytest.approx(curve.zero(10.0) + bps_to_decimal_rate(25))
     assert curve.zero(10.0) == pytest.approx(0.04)  # immutable
 
 
 def test_key_rate_shift_only_moves_target_tenor_with_triangular_weights():
+    from app.risk.shock_units import bps_to_decimal_rate
+
     curve = build_flat_curve("USD", "discount", "USD_FLAT", 0.04)
     shocked = curve.key_rate_shift_bps("10Y", 50)
     # Exact node moves by 50bp; adjacent KEY_TENOR nodes stay put (tent weight 0);
     # interpolated points between 7Y–10Y and 10Y–20Y receive partial bumps.
-    assert shocked.zero(TENOR_YEARS["10Y"]) == pytest.approx(0.045)
+    assert shocked.zero(TENOR_YEARS["10Y"]) == pytest.approx(0.04 + bps_to_decimal_rate(50))
     assert shocked.zero(TENOR_YEARS["7Y"]) == pytest.approx(0.04)
     assert shocked.zero(TENOR_YEARS["20Y"]) == pytest.approx(0.04)
     assert shocked.zero(8.5) > 0.04

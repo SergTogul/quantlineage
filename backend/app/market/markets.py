@@ -1,4 +1,11 @@
-"""Sub-market views over a MarketSnapshot (immutable mappings)."""
+"""Canonical typed sub-market views over ``MarketSnapshot`` (R0.4.1-A).
+
+Flat dict fields on ``MarketSnapshot`` remain the storage/API shape. Risk and
+pricing consumers that need grouped market semantics should use
+``snapshot.equity``, ``.rates_market``, ``.vol``, and ``.fx``, which return the
+frozen dataclasses below wrapping the already-frozen nested mappings
+(``MappingProxyType``). This module does not replace snapshot storage.
+"""
 
 from __future__ import annotations
 
@@ -8,13 +15,15 @@ from typing import Mapping
 
 @dataclass(frozen=True, slots=True)
 class EquityMarket:
+    """Equity spots and dividend yields from a snapshot."""
+
     spots: Mapping[str, float]
     dividend_yields: Mapping[str, float]
 
 
 @dataclass(frozen=True, slots=True)
 class RateMarket:
-    """Scalar discount marks today; projection/spreads/key_rates scaffold for M1.4."""
+    """Scalar discount/projection/spreads plus key-rate pillars (M1.4)."""
 
     discount: Mapping[str, float]
     projection: Mapping[str, float]
@@ -33,4 +42,6 @@ class VolMarket:
 
 @dataclass(frozen=True, slots=True)
 class FxMarket:
+    """FX spot marks from a snapshot."""
+
     spots: Mapping[str, float]

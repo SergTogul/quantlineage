@@ -15,6 +15,7 @@ import pytest
 
 from app.risk import attribution, es, historical, reverse_stress, sensitivities
 from app.risk import scenario_model, scenarios
+from app.market import curves as curves_mod
 from app.risk.shock_units import (
     bps_to_decimal_rate,
     decimal_rate_to_bps,
@@ -81,6 +82,9 @@ def test_wired_call_sites_import_shock_units_helpers():
     assert "bps_to_decimal_rate" in inspect.getsource(scenarios.expand_aggregate_change)
     assert "bps_to_decimal_rate" in inspect.getsource(scenarios.panel_amount_to_bump)
     assert "decimal_rate_to_bps" in inspect.getsource(scenarios.to_stress_scenario)
+    # R0.4.1-A: curve bp shifts convert only via shock_units.
+    assert "bps_to_decimal_rate" in inspect.getsource(curves_mod.YieldCurve.parallel_shift_bps)
+    assert "bps_to_decimal_rate" in inspect.getsource(curves_mod.YieldCurve.key_rate_shift_bps)
 
 
 def test_wired_risk_modules_no_inline_vol_point_or_bp_shock_literals():
@@ -114,6 +118,11 @@ def test_wired_risk_modules_no_inline_vol_point_or_bp_shock_literals():
         assert "* 10000" not in src
         assert "* 10_000" not in src
 
+    # R0.4.1-A: curve shock application has no raw bp→decimal literals.
+    curves_src = inspect.getsource(curves_mod)
+    assert "/ 10000" not in curves_src
+    assert "/ 10_000" not in curves_src
+    assert "bps_to_decimal_rate" in curves_src
 
 def test_from_wire_bound_never_guesses_bp_from_magnitude():
     src = inspect.getsource(reverse_stress.from_wire_bound)
