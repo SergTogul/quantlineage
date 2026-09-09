@@ -38,6 +38,7 @@ from app.risk.factor_types import (
     RateZero,
     RiskFactor,
 )
+from app.risk.shock_units import relative_vol_move_to_vol_points
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.scenarios import iter_historical_shocked_snapshots, iter_panel_shocked_snapshots
 
@@ -203,7 +204,7 @@ def approximate_pnl_series(
 
     # LINEAR zeros γ so the same kernel ABI serves both approximate modes.
     gamma_eff = 0.0 if methodology is VaRMethodology.LINEAR else float(gamma)
-    vol_points = np.asarray(vol_pct, dtype=float) * 100.0
+    vol_points = relative_vol_move_to_vol_points(np.asarray(vol_pct, dtype=float))
     equity_ret = np.asarray(equity_ret, dtype=float)
     rates_bps = np.asarray(rates_bps, dtype=float)
     fx_ret = np.asarray(fx_ret, dtype=float)
