@@ -33,14 +33,29 @@ from app.services.risk_run_worker import RiskRunWorker
 
 _DEFAULT_SCENARIO_IDS = {s.id for s in DEFAULT_SCENARIOS if s.id}
 
-# Process-wide PortfolioService via shared factory (R0.8.2; M7.1 DI for routers).
-# Historical factors: ``RISKFORGE_HISTORICAL_DATASET`` (default ``demo`` CSV; M10.2).
-portfolio_service = build_portfolio_service()
+# TestClient-without-lifespan fallback only. Production HTTP reads ``app.state``.
+_legacy_portfolio_service: PortfolioService | None = None
 
 
-def get_portfolio_service() -> PortfolioService:
-    """Deterministic portfolio/risk service used by HTTP routers."""
-    return portfolio_service
+def fallback_portfolio_service() -> PortfolioService:
+    """Shared factory instance for legacy TestClient without lifespan.
+
+    Lifespan constructs its own ``app.state.portfolio_service``. This fallback
+    is used only when that attribute is missing so ``POST /risk/*`` does not
+    503 in tests that skip the context-manager TestClient.
+    """
+    global _legacy_portfolio_service
+    if _legacy_portfolio_service is None:
+        _legacy_portfolio_service = build_portfolio_service()
+    return _legacy_portfolio_service
+
+
+def get_portfolio_service(request: Request) -> PortfolioService:
+    """Portfolio/risk service from lifespan ``app.state`` (R0.9.3)."""
+    service = getattr(request.app.state, "portfolio_service", None)
+    if service is not None:
+        return service
+    return fallback_portfolio_service()
 
 
 def get_session_factory(request: Request) -> sessionmaker[Session] | None:

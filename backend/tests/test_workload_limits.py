@@ -117,15 +117,15 @@ def test_exactly_max_positions_is_allowed(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv('RISKFORGE_MAX_POSITIONS', '2')
     from tests.market_fixtures import FixedMarketProvider, equity_spot_market
 
-    from app.api import deps
-    previous = deps.portfolio_service.market_data
-    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market('AAPL', 190.0))
-    try:
-        with TestClient(app) as client:
+    with TestClient(app) as client:
+        svc = client.app.state.portfolio_service
+        previous = svc.market_data
+        svc.market_data = FixedMarketProvider(equity_spot_market('AAPL', 190.0))
+        try:
             resp = client.post('/api/v1/market/snapshot', json=_book(2))
-        assert resp.status_code == 200
-    finally:
-        deps.portfolio_service.market_data = previous
+        finally:
+            svc.market_data = previous
+    assert resp.status_code == 200
 
 def test_oversize_scenarios_rejected_on_custom_stress(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv('RISKFORGE_MAX_SCENARIOS', '1')

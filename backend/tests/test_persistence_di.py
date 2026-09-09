@@ -103,12 +103,12 @@ def test_depends_repos_available_without_database_url(clear_db_url):
         assert body['market_has_seed'] is True
 
 def test_default_risk_runs_use_memory_without_database_url(clear_db_url, tiny_portfolio):
-    from app.api import deps
     from app.main import app
-    previous = deps.portfolio_service.market_data
-    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market("SPY", 190.0))
-    try:
-        with TestClient(app) as client:
+    with TestClient(app) as client:
+        svc = client.app.state.portfolio_service
+        previous = svc.market_data
+        svc.market_data = FixedMarketProvider(equity_spot_market("SPY", 190.0))
+        try:
             created = client.post('/risk/runs', json={'portfolio': tiny_portfolio.model_dump(mode='json'), 'run_type': 'summary'})
             assert created.status_code == 202
             run_id = created.json()['id']
@@ -116,8 +116,8 @@ def test_default_risk_runs_use_memory_without_database_url(clear_db_url, tiny_po
             assert done['status'] == 'COMPLETED'
             assert getattr(client.app.state, 'session_factory', None) is None
             assert getattr(client.app.state, 'persistence_enabled', False) is False
-    finally:
-        deps.portfolio_service.market_data = previous
+        finally:
+            svc.market_data = previous
 
 @pytest.fixture
 def tiny_portfolio() -> Portfolio:
@@ -140,12 +140,12 @@ def test_database_url_wires_sqlalchemy_portfolio_and_risk_runs(monkeypatch, tmp_
     db_path = tmp_path / 'm56_di.db'
     url = f'sqlite:///{db_path}'
     monkeypatch.setenv('RISKFORGE_DATABASE_URL', url)
-    from app.api import deps
     from app.main import app
-    previous = deps.portfolio_service.market_data
-    deps.portfolio_service.market_data = FixedMarketProvider(equity_spot_market("SPY", 190.0))
-    try:
-        with TestClient(app) as client:
+    with TestClient(app) as client:
+        svc = client.app.state.portfolio_service
+        previous = svc.market_data
+        svc.market_data = FixedMarketProvider(equity_spot_market("SPY", 190.0))
+        try:
             assert client.app.state.persistence_enabled is True
             assert client.app.state.session_factory is not None
             assert client.app.state.market_snapshot_repo is None
@@ -173,8 +173,8 @@ def test_database_url_wires_sqlalchemy_portfolio_and_risk_runs(monkeypatch, tmp_
                 payloads = SqlAlchemyRiskRunRepository(session).get_result_payloads(run_id)
                 assert payloads is not None
                 assert 'summary' in payloads
-    finally:
-        deps.portfolio_service.market_data = previous
+        finally:
+            svc.market_data = previous
 
 def test_database_url_seeds_snapshots_scenarios_limits(monkeypatch, tmp_path):
     """SQLAlchemy path seeds market snapshot, scenarios, and limit definitions."""
