@@ -4,7 +4,7 @@ Conventions:
 - Stress P&L in currency units; negative = loss (same as StressEvaluation.pnl)
 - Hierarchy (portfolio/desk/strategy/book/trade) = exact sums of trade P&L
 - Desk/strategy keys via resolve_desk / resolve_strategy (per-position placement)
-- Risk-factor = factor-isolated full revaluation + ``interaction`` residual
+- Risk-factor = additive Greek split of the joint scenario P&L + ``interaction`` residual
 - Empty / zero shocks → portfolio_pnl = 0; factor list empty
 - Tolerances: abs 1e-6 (currency) or rel 1e-8 for reconciliation
 """

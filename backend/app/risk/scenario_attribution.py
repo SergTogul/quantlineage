@@ -4,8 +4,9 @@ For each stress scenario, attribute stress P&L by portfolio / desk / strategy /
 book / trade and by risk factor. Hierarchy rollups are exact sums of trade P&L.
 Desk and strategy keys use ``resolve_desk`` / ``resolve_strategy`` so
 per-position placement overrides portfolio defaults. Risk-factor contributions
-use factor-isolated full revaluation plus an ``interaction`` residual so the
-factor dimension also reconciles to portfolio stress P&L.
+reuse the joint trade/scenario P&L (one shocked snapshot) and the additive
+Greek split from the same base valuations, plus an ``interaction`` residual so
+the factor dimension reconciles to portfolio stress P&L.
 
 Inputs: formal ``Scenario`` (preferred) or legacy ``StressScenario``. Pricing
 goes through ``PricingEngine`` / shocked snapshots — no instrument formulas here.
@@ -19,19 +20,27 @@ from typing import Union
 from app.domain.models import (
     MarketSnapshot,
     Portfolio,
+    Position,
     ScenarioContribution,
     ScenarioContributionBreakdown,
     StressScenario,
+    Valuation,
 )
 from app.interfaces.pricing import PricingEngine
+from app.risk.factor_types import EquitySpot, RateZero
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
-from app.risk.historical import require_explicit_market
+from app.risk.historical import (
+    _panel_linear_contribution,
+    require_explicit_market,
+    required_factors_for_position,
+)
 from app.risk.scenario_engine import apply_scenario
 from app.risk.scenario_model import (
     FactorShock,
     Scenario,
     scenario_from_stress,
 )
+from app.risk.shock_units import decimal_rate_to_bps
 from app.sample import DemoAggregateMarketDataProvider
 
 ScenarioLike = Union[Scenario, StressScenario]
@@ -95,9 +104,9 @@ def _portfolio_pnl_by_position(
     market: MarketSnapshot,
     base_by_position: dict[str, float],
 ) -> dict[str, float]:
-    # One shocked snapshot per scenario (or isolated-factor sub-scenario), then
-    # revalue every position — do not rebuild via shocked_value per trade.
-    # Formal Scenario applies directly (no scenario_to_stress collapse).
+    # One shocked snapshot per scenario, then revalue every position — do not
+    # rebuild via shocked_value per trade. Formal Scenario applies directly
+    # (no scenario_to_stress collapse).
     shocked = apply_scenario(market, scenario)
     return {
         p.id: pricing.value(p, shocked).market_value - base_by_position[p.id]
@@ -130,15 +139,34 @@ def _factor_label(shocks: list[FactorShock]) -> str:
     return factor.key
 
 
+def _factor_keys_for_position(position: Position) -> set[str] | None:
+    """Risk-factor keys this position is sensitive to, or None if unmapped."""
+    try:
+        return {factor.key for factor in required_factors_for_position(position)}
+    except TypeError:
+        return None
+
+
+def _linear_shock_pnl(valuation: Valuation, shock: FactorShock) -> float:
+    """Additive Greek P&L for one typed shock (same units as panel LINEAR/Δ-Γ)."""
+    factor = shock.factor
+    move = decimal_rate_to_bps(shock.amount) if isinstance(factor, RateZero) else float(shock.amount)
+    pnl = _panel_linear_contribution(factor, valuation, move)
+    if isinstance(factor, EquitySpot):
+        pnl += 0.5 * float(valuation.gamma) * move * move
+    return pnl
+
+
 def _factor_isolated_pnl(
     portfolio: Portfolio,
-    pricing: PricingEngine,
     formal: Scenario,
-    market: MarketSnapshot,
-    base_by_position: dict[str, float],
+    base_valuations: dict[str, Valuation],
     total_pnl: float,
 ) -> tuple[dict[str, float], dict[str, str]]:
-    """Factor-isolated full-reval P&L + interaction residual, and display labels."""
+    """Family P&L from base Greeks + shocks; interaction vs joint scenario P&L.
+
+    Does not apply isolated-factor sub-scenarios or reprice the book per factor.
+    """
     grouped = _group_shocks_by_factor_key(formal.shocks)
     if not grouped:
         return {}, {}
@@ -146,17 +174,15 @@ def _factor_isolated_pnl(
     factor_pnl: dict[str, float] = {}
     labels: dict[str, str] = {_INTERACTION_KEY: _INTERACTION_LABEL}
     for key, shocks in grouped.items():
-        iso = Scenario(
-            id=f"{formal.id}__{key}",
-            name=f"{formal.name} [{key}]",
-            category=formal.category,
-            description=formal.description,
-            shocks=tuple(shocks),
-            threshold=formal.threshold,
-            metadata={"isolated_factor": key},
-        )
-        by_pos = _portfolio_pnl_by_position(portfolio, pricing, iso, market, base_by_position)
-        factor_pnl[key] = sum(by_pos.values())
+        attributed = 0.0
+        for position in portfolio.positions:
+            keys = _factor_keys_for_position(position)
+            valuation = base_valuations[position.id]
+            for shock in shocks:
+                if keys is not None and shock.factor.key not in keys:
+                    continue
+                attributed += _linear_shock_pnl(valuation, shock)
+        factor_pnl[key] = attributed
         labels[key] = _factor_label(shocks)
 
     factor_pnl[_INTERACTION_KEY] = total_pnl - sum(factor_pnl.values())
@@ -206,9 +232,10 @@ class ScenarioAttributionEngine:
                 by_risk_factor=empty,
             )
 
-        base_by_position = {
-            p.id: pricing.value(p, base_market).market_value for p in portfolio.positions
+        base_valuations = {
+            p.id: pricing.value(p, base_market) for p in portfolio.positions
         }
+        base_by_position = {pid: v.market_value for pid, v in base_valuations.items()}
         trade_pnl = by_trade_pnl if by_trade_pnl is not None else _portfolio_pnl_by_position(
             portfolio, pricing, formal, base_market, base_by_position
         )
@@ -239,7 +266,7 @@ class ScenarioAttributionEngine:
         )
 
         factor_pnl, factor_labels = _factor_isolated_pnl(
-            portfolio, pricing, formal, base_market, base_by_position, portfolio_pnl
+            portfolio, formal, base_valuations, portfolio_pnl
         )
         by_risk_factor = (
             _items_from_pnl_map(factor_pnl, portfolio_pnl, labels=factor_labels)

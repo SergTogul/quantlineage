@@ -6,8 +6,9 @@ built from them) sum exactly to portfolio ES.
 
 Risk-factor contributions:
 - ``LINEAR`` / ``DELTA_GAMMA``: additive Greek P&L terms (equity/vol/rate/fx)
-- ``FULL_REVALUATION``: factor-isolated full reval P&L plus an ``interaction``
-  residual so contributions still reconcile to portfolio ES
+- ``FULL_REVALUATION``: reuse the joint trade/scenario P&L already computed for
+  portfolio ES; attribute families via the additive Greek split (one base
+  valuation) and keep an ``interaction`` residual so contributions reconcile
 
 When ``factor_panel`` is set (R0.5.5), approximate and full-reval factor paths
 consume per-name / per-tenor panel columns instead of four-macro broadcast.
@@ -28,7 +29,6 @@ from app.domain.models import (
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
-from app.pricing.cache import bypass_valuation_lru
 from app.risk.factor_panel import HistoricalFactorPanel
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
@@ -39,16 +39,6 @@ from app.risk.historical import (
     required_factors_for_position,
 )
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
-from app.risk.scenarios import (
-    AggregateFactorChange,
-    FactorChange,
-    MarketScenario,
-    apply_market_scenario,
-    expand_aggregate_change,
-    factor_changes_from_panel_observation,
-    iter_aggregate_changes,
-    market_scenario_from_change,
-)
 from app.risk.shock_units import relative_vol_move_to_vol_points
 from app.risk.var import VaRAnalytics
 
@@ -178,35 +168,25 @@ def _aggregate_factor_pnl_full_reval(
     dataset: HistoricalMarketDataset,
     total_pnl: np.ndarray,
 ) -> dict[str, np.ndarray]:
-    """Factor-isolated full-reval P&L plus residual interaction.
+    """Family P&L from one base Greek valuation; interaction vs joint full-reval.
 
-    For each observation, apply only that aggregate factor family's shocks,
-    reprice, and attribute P&L. Residual ``interaction`` = total − sum(factors)
-    so contributions reconcile to full-revaluation portfolio ES.
+    Joint ``total_pnl`` is already priced at trade/scenario grain. This helper
+    does not apply family-isolated scenarios or reprice the book per family.
+    Residual ``interaction`` = total − sum(families) so contributions reconcile
+    to full-revaluation portfolio ES. Nonlinear / cross-factor terms that the
+    additive split does not capture stay in ``interaction``.
     """
-    series = dataset.factor_observations()
-    changes = iter_aggregate_changes(series)
-    n = len(changes)
-    factor_pnl = {k: np.zeros(n, dtype=float) for k in _FACTOR_KEYS}
-    base_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, base_market))
-
-    with bypass_valuation_lru():
-        for i, change in enumerate(changes):
-            isolated = {
-                "equity": AggregateFactorChange(change.index, change.equity_return, 0.0, 0.0, 0.0),
-                "vol": AggregateFactorChange(change.index, 0.0, change.vol_move, 0.0, 0.0),
-                "rate": AggregateFactorChange(change.index, 0.0, 0.0, change.rate_move_bps, 0.0),
-                "fx": AggregateFactorChange(change.index, 0.0, 0.0, 0.0, change.fx_return),
-            }
-            for key, iso in isolated.items():
-                if not expand_aggregate_change(iso, base_market):
-                    factor_pnl[key][i] = 0.0
-                    continue
-                scenario = market_scenario_from_change(iso, base_market, id_prefix=f"es_{key}")
-                snap = apply_market_scenario(base_market, scenario)
-                shocked_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, snap))
-                factor_pnl[key][i] = shocked_mv - base_mv
-
+    obs = dataset.factor_observations()
+    factor_pnl = _aggregate_factor_pnl_linear(
+        portfolio,
+        pricing,
+        base_market,
+        VaRMethodology.DELTA_GAMMA,
+        obs.equity_returns,
+        obs.vol_moves,
+        obs.rate_moves_bps,
+        obs.fx_returns,
+    )
     residual = total_pnl - sum(factor_pnl[k] for k in _FACTOR_KEYS)
     factor_pnl["interaction"] = residual
     return factor_pnl
@@ -219,41 +199,16 @@ def _aggregate_factor_pnl_full_reval_from_panel(
     panel: HistoricalFactorPanel,
     total_pnl: np.ndarray,
 ) -> dict[str, np.ndarray]:
-    """Panel factor-isolated full-reval P&L plus explicit interaction residual.
+    """Panel family P&L from one base Greek valuation; interaction vs joint P&L.
 
     Required portfolio factors must exist on the panel (fail closed). Isolation
-    applies only that family's typed panel shocks — not four-macro broadcast.
+    does not reprice the book per family — typed panel columns feed the same
+    additive split as LINEAR / DELTA_GAMMA, then ``interaction`` absorbs the
+    full-reval remainder.
     """
-    require_panel_covers_portfolio(portfolio, panel)
-    n = panel.n_observations
-    factor_pnl = {k: np.zeros(n, dtype=float) for k in _FACTOR_KEYS}
-    base_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, base_market))
-
-    with bypass_valuation_lru():
-        for i, observation in enumerate(panel.observations):
-            # Ensure the observation can resolve every required factor before isolating.
-            for factor in (
-                f for p in portfolio.positions for f in required_factors_for_position(p)
-            ):
-                observation.change(factor)
-            all_shocks = factor_changes_from_panel_observation(observation)
-            by_family: dict[str, list[FactorChange]] = {k: [] for k in _FACTOR_KEYS}
-            for shock in all_shocks:
-                by_family[_factor_family(shock.factor)].append(shock)
-            for key in _FACTOR_KEYS:
-                shocks = tuple(by_family[key])
-                if not shocks:
-                    factor_pnl[key][i] = 0.0
-                    continue
-                scenario = MarketScenario(
-                    id=f"es_panel_{key}_{i}",
-                    name=f"Panel {key} isolation {i}",
-                    shocks=shocks,
-                )
-                snap = apply_market_scenario(base_market, scenario)
-                shocked_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, snap))
-                factor_pnl[key][i] = shocked_mv - base_mv
-
+    factor_pnl = _aggregate_factor_pnl_from_panel(
+        portfolio, pricing, base_market, panel, VaRMethodology.DELTA_GAMMA
+    )
     residual = total_pnl - sum(factor_pnl[k] for k in _FACTOR_KEYS)
     factor_pnl["interaction"] = residual
     return factor_pnl

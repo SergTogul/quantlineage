@@ -602,9 +602,11 @@ If the valuation LRU is slower for unique shocked markets, disable it for that e
 
 Partition independent scenario blocks across worker processes when profiling shows value.
 
-## R0.6.6 Contribution reuse
+## R0.6.6 Contribution reuse — COMPLETE pending review (2026-09-09)
 
 Avoid whole-book full revaluation once per factor family when the same trade/scenario P&Ls can be reused or decomposed coherently.
+
+Full-reval ES factor contributions and scenario-attribution factor buckets reuse the already-computed joint trade/scenario P&L and attribute families from one base Δ-Γ Greek valuation. They do not apply family-isolated scenarios or reprice the book per family × observation. `interaction` = joint full-reval − sum(families). Bound: family path is O(N) base `value` calls, not O(N×S×F) extra books; scenario `apply_scenario` stays one full scenario (not × factor keys). Cash-equity family P&L matches LINEAR at abs `1e-12`; reconcile abs `1e-6` / rel `1e-8`. Evidence: `backend/tests/test_contribution_reuse.py`; focused suite including ES/VaR/attribution/anti-cache; report `reviews/r0.6.6-contribution-reuse-report.md`. RF-007 remains open for R0.6.5 / close gate.
 
 ### Exit criteria
 
