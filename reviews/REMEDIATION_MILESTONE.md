@@ -417,7 +417,7 @@ R0.4.2-E COMPLETE pending review (2026-09-09): Engine-facing `StressEngine.run` 
 
 R0.4.2-F COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/sdd-briefs/task-19-rf011-canonical-store-review.md`). DEFAULT/THREAT in-code libraries are `BroadcastScenarioDefinition` templates expanded at apply time against the live `MarketSnapshot` (same pattern as `crisis_scenarios(base)`); `ScenarioDefinitionRepository` persists canonical `Scenario` as ScenarioWire JSON; HTTP DI returns `Scenario`. Broadcast macros are not frozen to demo equity names at import. Deprecated StressScenario POST routes retained. Evidence: `reviews/r0.4.2-f-canonical-scenario-store-report.md`.
 
-R0.4.2-G COMPLETE pending review (2026-09-09): Historical replay generates/applies canonical `Scenario` + `FactorShock` (live-snapshot expansion; `MarketScenario` adapter only). Reverse-stress result carries the applied `Scenario`; `required_shock` wire units unchanged. **RF-011 CLOSED** with named residuals (deprecated StressScenario POSTs; MarketScenario adapter; one-factor-family reverse search; flat dict snapshot storage). Evidence: `reviews/r0.4.2-g-historical-reverse-scenario-report.md`.
+R0.4.2-G COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/sdd-briefs/task-20-rf011-historical-reverse-review.md`). Historical replay generates/applies canonical `Scenario` + `FactorShock` (live-snapshot expansion; `MarketScenario` adapter only). Reverse-stress result carries the applied `Scenario`; `required_shock` wire units unchanged. **RF-011 CLOSED** with named residuals (deprecated StressScenario POSTs; MarketScenario adapter; one-factor-family reverse search; flat dict snapshot storage). Evidence: `reviews/r0.4.2-g-historical-reverse-scenario-report.md`.
 
 Converge:
 
@@ -468,7 +468,7 @@ R0.4.2-F COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/sdd-bri
 canonical `Scenario` (in-code DEFAULT/THREAT are apply-time broadcast templates).
 Evidence: `reviews/r0.4.2-f-canonical-scenario-store-report.md`.
 
-R0.4.2-G COMPLETE pending review (2026-09-09): historical + reverse use canonical
+R0.4.2-G COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/sdd-briefs/task-20-rf011-historical-reverse-review.md`). Historical + reverse use canonical
 `Scenario`. **RF-011 CLOSED** (named residuals: deprecated StressScenario POSTs;
 MarketScenario adapter; reverse one-factor-family search). Evidence:
 `reviews/r0.4.2-g-historical-reverse-scenario-report.md`.
