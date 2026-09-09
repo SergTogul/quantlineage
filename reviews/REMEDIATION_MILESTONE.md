@@ -424,15 +424,21 @@ No magnitude heuristic may decide units.
 
 `MarketSnapshot.apply` unfreezes nested maps once, stages all `(RiskFactor, amount)` shocks with bump semantics, then a single `model_copy` / nested freeze. `bump` is the one-factor API via `apply([(f, a)])`. Mark + bump-chain id parity vs sequential bump; structural O(1) freeze/copy test. RF-006 stays open for R0.4.5 + full acceptance.
 
-## R0.4.5 Scenario once, price many
+## R0.4.5 Scenario once, price many — COMPLETE (2026-09-09)
 
-Stress/scenario execution creates one shocked snapshot per scenario and reuses it across positions.
+`StressEngine.run` / `evaluate` and scenario attribution create one shocked
+`MarketSnapshot` per scenario via `apply_scenario`, then revalue every position
+with `PricingEngine.value` on that shared snapshot. Structural monkeypatch
+asserts N positions × 1 scenario → one `apply_scenario` call; stress numerical
+parity retained. RF-006 stays open for full acceptance (bench × scenario count,
+contribution invariants).
 
 ### Exit criteria
 
 - semantic parity tests pass;
-- unit tests pin conversions;
-- factor count no longer causes repeated whole-snapshot copy/refreeze per factor.
+- structural once-per-scenario assert for StressEngine position loops;
+- factor count no longer causes repeated whole-snapshot copy/refreeze per factor
+  (R0.4.4).
 
 ---
 
