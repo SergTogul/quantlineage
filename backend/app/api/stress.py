@@ -32,7 +32,7 @@ from app.api.scenario_wire import (
     FormalCustomStressRequest,
     ScenarioWire,
     stress_to_wire,
-    wires_to_stress,
+    wires_to_scenarios,
 )
 from app.domain.models import (
     CustomStressRequest,
@@ -114,9 +114,9 @@ def risk_stress_formal_custom(
     ],
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> list[StressResult]:
-    """Accept formal Scenario wire; adapt to StressScenario for StressEngine (M3.8)."""
+    """Accept formal Scenario wire; apply via StressEngine without StressScenario collapse."""
     reject_inline_heavy(route="POST /risk/stress/formal/custom")
-    return service.stresses(request.portfolio, wires_to_stress(request.scenarios))
+    return service.stresses(request.portfolio, wires_to_scenarios(request.scenarios))
 
 
 @router.post("/stress/evaluate")
@@ -150,10 +150,10 @@ def risk_stress_formal_evaluate_custom(
     ],
     service: PortfolioService = Depends(get_portfolio_service),
 ):
-    """Accept formal Scenario wire; adapt to StressScenario for threat evaluate (M3.8)."""
+    """Accept formal Scenario wire; evaluate via StressEngine without StressScenario collapse."""
     reject_inline_heavy(route="POST /risk/stress/formal/evaluate/custom")
     return service.threat_evaluation(
-        request.portfolio, wires_to_stress(request.scenarios)
+        request.portfolio, wires_to_scenarios(request.scenarios)
     )
 
 
