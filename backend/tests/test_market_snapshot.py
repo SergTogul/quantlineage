@@ -233,10 +233,10 @@ def test_apply_mark_parity_vs_sequential_bump_multifactor():
 
 
 def test_apply_freezes_once_not_per_factor(monkeypatch):
-    """R0.4.4: multi-factor apply must not model_copy/freeze once per factor."""
+    """R0.4.4 / RF-006: multi-factor apply is O(1) freeze/copy, not O(K)."""
     base = MarketSnapshot(
         id="base",
-        equity_spots={"A": 10.0, "B": 20.0, "C": 30.0, "D": 40.0},
+        equity_spots={"A": 10.0, "B": 20.0, "C": 30.0, "D": 40.0, "E": 50.0},
         rates={"USD": 0.04},
     )
     shocks = [
@@ -244,9 +244,11 @@ def test_apply_freezes_once_not_per_factor(monkeypatch):
         (EquitySpot("B"), 0.02),
         (EquitySpot("C"), -0.01),
         (EquitySpot("D"), 0.03),
+        (EquitySpot("E"), -0.02),
         (RateZero(currency="USD", tenor="PARALLEL"), 0.0001),
     ]
-    assert len(shocks) > 1
+    k = len(shocks)
+    assert k >= 5
 
     copy_calls = {"n": 0}
     freeze_calls = {"n": 0}
@@ -265,14 +267,17 @@ def test_apply_freezes_once_not_per_factor(monkeypatch):
     monkeypatch.setattr(MarketSnapshot, "_apply_nested_freeze", counting_freeze)
 
     out = base.apply(shocks)
-    k = len(shocks)
-    # O(1) boundary: at most one model_copy and a small constant of freezes
-    # (constructor/validator + model_copy path), not one per factor.
-    assert copy_calls["n"] <= 1, f"model_copy called {copy_calls['n']} times for {k} shocks"
-    assert freeze_calls["n"] <= 2, f"_apply_nested_freeze called {freeze_calls['n']} times for {k} shocks"
-    assert copy_calls["n"] < k
-    assert freeze_calls["n"] < k
+    # Tight O(1) band: instrumentation must fire (lower bound) and must not
+    # grow with K (upper bound). Vacuous 0/0 would incorrectly pass upper-only.
+    assert copy_calls["n"] == 1, (
+        f"model_copy called {copy_calls['n']} times for {k} shocks; expected exactly 1"
+    )
+    assert 1 <= freeze_calls["n"] <= 2, (
+        f"_apply_nested_freeze called {freeze_calls['n']} times for {k} shocks; "
+        f"expected 1..2 (not O({k}))"
+    )
     assert out.equity_spots["A"] == pytest.approx(10.1)
+    assert out.equity_spots["E"] == pytest.approx(49.0)
     assert out.rates["USD"] == pytest.approx(0.0401)
 
 
