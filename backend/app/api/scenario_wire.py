@@ -1,12 +1,13 @@
-"""Formal ``Scenario`` HTTP wire DTOs and adapters (M3.8 / R0.4.2-D).
+"""Formal ``Scenario`` HTTP wire DTOs and adapters (M3.8 / R0.4.2-E).
 
 Canonical list wire is ``ScenarioWire`` on ``GET /risk/stress/scenarios``
 (and the ``/scenarios/formal`` alias). Primary custom / evaluate / compare POST
 paths are under ``/risk/stress/formal/*`` and lift wire → domain ``Scenario``
 for ``StressEngine`` without ``scenario_to_stress``. Legacy ``StressScenario``
 POST bodies on ``/stress/custom``, ``/evaluate/custom``, ``/compare`` remain
-as **deprecated** back-compat only. ``wire_to_stress`` remains for adapters /
-tests that still need the legacy StressScenario projection.
+as **deprecated** back-compat only and are adapted to canonical ``Scenario``
+via ``stresses_to_scenarios`` before the engine. ``wire_to_stress`` remains
+for adapters / tests that still need the legacy StressScenario projection.
 """
 
 from __future__ import annotations
@@ -152,6 +153,13 @@ def wires_to_scenarios(scenarios: list[ScenarioWire]) -> list[Scenario]:
     return [wire_to_scenario(s) for s in scenarios]
 
 
+def stresses_to_scenarios(
+    scenarios: list[StressScenario], base: MarketSnapshot
+) -> list[Scenario]:
+    """HTTP adapter: legacy ``StressScenario`` bodies → canonical ``Scenario``."""
+    return [scenario_from_stress(s, base) for s in scenarios]
+
+
 def wires_to_stress(scenarios: list[ScenarioWire]) -> list[StressScenario]:
     """Legacy adapter: formal wire → StressScenario (parity / migration helpers)."""
     return [wire_to_stress(s) for s in scenarios]
@@ -164,6 +172,7 @@ __all__ = [
     "ScenarioWire",
     "scenario_to_wire",
     "stress_to_wire",
+    "stresses_to_scenarios",
     "wire_to_scenario",
     "wire_to_stress",
     "wires_to_scenarios",

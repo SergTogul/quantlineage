@@ -403,6 +403,8 @@ R0.4.2-C COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-
 
 R0.4.2-D COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-d-formal-post-wire-independent-review.md`). Primary UI POST path uses formal ScenarioWire (`/formal/evaluate/custom`, `/formal/custom`, `/formal/compare`); frontend `scenarioPayload` / `compareHedge` no longer call legacy StressScenario POSTs. Legacy custom/evaluate/compare routes retained as **deprecated** back-compat. **RF-004 CLOSED**; RF-011 stays IN PROGRESS (typed nesting + deprecated dual POST residual). Review Important deferred: parity tests use `stress_to_wire` expansion, not frontend builders.
 
+R0.4.2-E COMPLETE pending review (2026-09-09): Engine-facing `StressEngine.run` / `evaluate` / `contributions` / compare convert `StressScenario` once at the HTTP or engine boundary (`to_canonical_scenario`); internals apply typed `Scenario` only. Deprecated StressScenario POST routes retained as adapters (`stresses_to_scenarios`). RF-011 stays **IN PROGRESS** (implicit USD rate default; library/persistence still StressScenario). Evidence: `reviews/r0.4.2-e-scenario-only-engine-report.md`.
+
 Converge:
 
 - legacy stress scenarios;
@@ -443,6 +445,11 @@ UI stress POST path (`scenarioPayload` → `/formal/evaluate/custom`; hedge →
 `/formal/compare`; thin formal compare route added). Legacy StressScenario POST
 routes deprecated but retained. **RF-004 CLOSED**; RF-011 remains IN PROGRESS.
 Evidence: `reviews/r0.4.2-d-formal-post-wire-report.md`.
+
+R0.4.2-E COMPLETE pending review (2026-09-09): Engine-facing stress / attribution /
+threat take canonical `Scenario`; legacy HTTP `StressScenario` is adapter-only.
+RF-011 stays IN PROGRESS (implicit USD equity-currency/rate default). Evidence:
+`reviews/r0.4.2-e-scenario-only-engine-report.md`.
 
 ## R0.4.3 Explicit shock units
 
