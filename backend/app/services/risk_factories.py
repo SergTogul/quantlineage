@@ -19,6 +19,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from app.domain.models import AsOf, AsOfLabel, RiskRunCalculationConfig
 from app.pricing.factory import create_pricing_engine
+from app.risk.factor_panel import create_synthetic_factor_panel
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_data import (
     DEMO_HISTORICAL_DATASET_ID,
@@ -29,6 +30,7 @@ from app.risk.historical_data import (
 from app.services.portfolio_service import PortfolioService
 
 DEFAULT_HISTORICAL_DATASET_VERSION = "v1"
+DEFAULT_HISTORICAL_PANEL_SEED = 7
 SYNTHETIC_HISTORICAL_DATASET_ID = "synthetic-historical-factors"
 
 _AS_OF_ADAPTER: TypeAdapter[date | AsOfLabel] = TypeAdapter(AsOf)
@@ -45,8 +47,24 @@ class ResolvedRiskRunSpec:
 
 
 def build_historical_risk_engine() -> HistoricalRiskEngine:
-    """Wire :class:`HistoricalRiskEngine` to :func:`create_historical_dataset`."""
-    return HistoricalRiskEngine(dataset=create_historical_dataset())
+    """Wire production historical VaR to a per-factor panel (R0.5.3 / RF-005).
+
+    Keeps :func:`create_historical_dataset` for dataset identity / run-spec
+    compatibility. The labeled ``four_macro_demo`` dataset is still available
+    via ``HistoricalRiskEngine(dataset=..., factor_panel=None)``.
+    """
+    dataset = create_historical_dataset()
+    observations = len(dataset.factor_observations().equity_returns)
+    panel = create_synthetic_factor_panel(
+        seed=DEFAULT_HISTORICAL_PANEL_SEED,
+        observations=observations,
+    )
+    return HistoricalRiskEngine(
+        dataset=dataset,
+        observations=observations,
+        seed=DEFAULT_HISTORICAL_PANEL_SEED,
+        factor_panel=panel,
+    )
 
 
 def build_portfolio_service() -> PortfolioService:
