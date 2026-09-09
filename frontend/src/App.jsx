@@ -14,6 +14,7 @@ import {
   FactorExposureHeatmap, HierarchyRiskHeatmap, LimitUtilizationHeatmap, StressPnlHeatmap,
 } from './components/Heatmaps'
 import { hashForSection, navSectionById, sectionFromHash } from './lib/nav.mjs'
+import BlockHelp from './components/BlockHelp'
 import './styles.css'
 
 function SectionFrame({ id, children }) {
@@ -88,7 +89,10 @@ export default function App() {
             <Hierarchy node={hierarchy} />
             <HierarchyRiskHeatmap node={hierarchy} />
             <div className="card wide">
-              <h3>Positions</h3>
+              <div className="block-title">
+                <h3>Positions</h3>
+                <BlockHelp id="positions" />
+              </div>
               <table>
                 <thead>
                   <tr><th>ID</th><th>Type</th><th>Book</th><th>Instrument</th></tr>

@@ -61,3 +61,10 @@ header{display:flex;justify-content:space-between;align-items:end;margin-bottom:
 .limits-table td:last-child,.limits-table th:last-child{text-align:right}.limits-row-focus{background:#151d28}
 @media(max-width:1100px){.overview-tiles{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:900px){.overview-tiles{grid-template-columns:1fr}}
+.block-title{display:flex;align-items:center;gap:8px;margin:0 0 16px;flex-wrap:wrap}
+.block-title h3{margin:0}
+.block-help{position:relative;display:inline-flex;flex-shrink:0;vertical-align:middle}
+.block-help-btn{width:22px;height:22px;padding:0;border-radius:999px;border:1px solid #33445a;background:#0b1119;color:#8ea0b5;font-size:12px;font-weight:700;line-height:1;cursor:pointer}
+.block-help-btn:hover,.block-help-btn[aria-expanded=true]{color:#e7edf5;border-color:#4a6a88}
+.block-help-popover{position:absolute;z-index:20;top:calc(100% + 8px);left:0;width:min(300px,70vw);padding:12px 14px;background:#0e141c;border:1px solid #33445a;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.block-help-popover p{margin:0;font-size:12px;line-height:1.45;color:#b6c4d5;font-weight:500}
