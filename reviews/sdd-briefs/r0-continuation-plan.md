@@ -59,8 +59,16 @@ RF-001, RF-002, RF-003, RF-004, RF-005, RF-006, RF-008, RF-009, RF-015 (and prio
 - **Finding:** RF-007 stays **IN PROGRESS** unless this slice actually records the matrix and Task 5-class close is re-justified (do not close in this slice unless the matrix is honestly filled).
 - **Goal:** Record FINDINGS acceptance fields without fake SLAs: N×S (at least one size above 1×120), wall time, peak RSS, scenarios/sec, builtin vs QuantLib, warm vs cold, identity vs goldens. PR-safe: skip or bound large N/S; do not assert wall-time floors.
 
-### Task 7+ (P1 after P0) — only after RF-007 CLOSED
-- RF-011 / RF-013 / RF-014 / RF-016 residuals as separate briefs.
+### Task 7 — RF-007 remaining acceptance (reconstruction QuantLib + N=100)
+- **Owner:** QA & Quant Validation
+- **Finding:** RF-007 stays **IN PROGRESS** until a later close-gate. Do not rubber-stamp CLOSE here.
+- **Goal:** Reconstruction-honest QuantLib vs builtin (European options, not `qty*spot`); isolated RSS per impl; N=100 nightly (PR skip). No wall-time SLA floors.
+
+### Task 8 — RF-007 close gate (only after Task 7 APPROVE)
+- Independent close vs KEEP OPEN. Do not re-stamp the rejected CLOSE.
+
+### Task 9+ (P1 after P0 CLOSED)
+- RF-011 / RF-013 / RF-014 / RF-016 / RF-010 / RF-012 residuals as separate briefs.
 
 ## Pre-flight conflict scan
 
