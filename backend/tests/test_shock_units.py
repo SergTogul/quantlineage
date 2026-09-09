@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 from app.risk import attribution, es, historical, reverse_stress, sensitivities
+from app.risk import scenario_model, scenarios
 from app.risk.shock_units import (
     bps_to_decimal_rate,
     decimal_rate_to_bps,
@@ -66,7 +67,7 @@ def test_relative_vol_move_to_vol_points_array():
 
 
 def test_wired_call_sites_import_shock_units_helpers():
-    """R0.4.3-B wiring pin: restore of inline ×100 / ÷10000 must fail source checks."""
+    """R0.4.3-B / R0.4.2-A wiring pin: restore of inline ×100 / ÷10000 must fail source checks."""
     assert "relative_vol_move_to_vol_points" in inspect.getsource(historical.approximate_pnl_series)
     assert "relative_vol_move_to_vol_points" in inspect.getsource(historical._panel_linear_contribution)
     assert "relative_vol_move_to_vol_points" in inspect.getsource(es._aggregate_factor_pnl_linear)
@@ -75,6 +76,11 @@ def test_wired_call_sites_import_shock_units_helpers():
     assert "bps_to_decimal_rate" in inspect.getsource(reverse_stress.build_single_factor_shocks)
     sens_src = inspect.getsource(sensitivities.SensitivityEngine)
     assert "bps_to_decimal_rate" in sens_src
+    assert "bps_to_decimal_rate" in inspect.getsource(scenario_model._expand_stress_to_shocks)
+    assert "decimal_rate_to_bps" in inspect.getsource(scenario_model.scenario_to_stress)
+    assert "bps_to_decimal_rate" in inspect.getsource(scenarios.expand_aggregate_change)
+    assert "bps_to_decimal_rate" in inspect.getsource(scenarios.panel_amount_to_bump)
+    assert "decimal_rate_to_bps" in inspect.getsource(scenarios.to_stress_scenario)
 
 
 def test_wired_risk_modules_no_inline_vol_point_or_bp_shock_literals():
@@ -99,6 +105,14 @@ def test_wired_risk_modules_no_inline_vol_point_or_bp_shock_literals():
     rates_src = inspect.getsource(reverse_stress.build_single_factor_shocks)
     assert "/ 10000" not in rates_src
     assert "/ 10_000" not in rates_src
+
+    # R0.4.2-A: scenario expand/collapse modules convert only via helpers.
+    for mod in (scenario_model, scenarios):
+        src = inspect.getsource(mod)
+        assert "/ 10000" not in src
+        assert "/ 10_000" not in src
+        assert "* 10000" not in src
+        assert "* 10_000" not in src
 
 
 def test_from_wire_bound_never_guesses_bp_from_magnitude():

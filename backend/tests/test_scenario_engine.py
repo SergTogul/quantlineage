@@ -11,7 +11,7 @@ Acceptance:
 
 Units / tolerances (aligned with MarketSnapshot.bump):
 - equity / FX: relative return; vol: relative vol level; rates: decimal in bump
-  (StressScenario rates_shift_bps / rate_shocks_bps → amount / 10000)
+  (StressScenario rates_shift_bps / rate_shocks_bps → bps_to_decimal_rate)
 - Exact mark equality where discrete; abs 1e-12 for rate decimal shifts
 """
 
@@ -38,6 +38,7 @@ from app.risk.scenario_model import (
     scenario_to_stress,
 )
 from app.risk.scenarios import FactorChange, MarketScenario
+from app.risk.shock_units import bps_to_decimal_rate
 
 
 def _base() -> MarketSnapshot:
@@ -160,6 +161,42 @@ def test_formal_stress_and_factor_lists_agree():
         shock_snapshot(base, scenario_to_stress(formal)).content_hash(),
     }
     assert len(hashes) == 1
+
+
+def test_r042a_stress_formal_parity_exact_marks_and_rate_units():
+    """R0.4.2-A: legacy StressScenario and formal Scenario share one conversion story.
+
+    Rate bp → decimal bump only via ``bps_to_decimal_rate`` at the adapter;
+    shocked spots/vols/rates and ``content_hash`` match with exact float equality.
+    """
+    base = _base()
+    legacy = StressScenario(
+        id="parity",
+        name="parity",
+        equity_shock=-0.10,
+        vol_shock=0.25,
+        rates_shift_bps=50.0,
+        rate_shocks_bps={"EUR": 25.0},
+        fx_shock=-0.05,
+    )
+    formal = scenario_from_stress(legacy, base)
+    rate_shocks = [s for s in formal.shocks if isinstance(s.factor, RateZero)]
+    by_ccy = {s.factor.currency: s.amount for s in rate_shocks}
+    assert by_ccy["USD"] == bps_to_decimal_rate(50.0)
+    assert by_ccy["EUR"] == bps_to_decimal_rate(25.0)
+
+    via_legacy = apply_scenario(base, legacy)
+    via_formal = apply_scenario(base, formal)
+    via_collapse = shock_snapshot(base, scenario_to_stress(formal))
+
+    assert via_legacy.equity_spots == via_formal.equity_spots == via_collapse.equity_spots
+    assert via_legacy.equity_vols == via_formal.equity_vols == via_collapse.equity_vols
+    assert via_legacy.fx_spots == via_formal.fx_spots == via_collapse.fx_spots
+    assert via_legacy.fx_vols == via_formal.fx_vols == via_collapse.fx_vols
+    assert via_legacy.rates == via_formal.rates == via_collapse.rates
+    assert via_legacy.content_hash() == via_formal.content_hash() == via_collapse.content_hash()
+    assert via_legacy.rates["USD"] == 0.04 + bps_to_decimal_rate(50.0)
+    assert via_legacy.rates["EUR"] == 0.03 + bps_to_decimal_rate(25.0)
 
 
 def test_market_scenario_path():

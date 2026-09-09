@@ -378,6 +378,8 @@ Replace nested raw dictionaries where practical with typed domain models for:
 
 ## R0.4.2 One canonical Scenario model
 
+R0.4.2-A COMPLETE (2026-09-09): scenario expand/collapse converts StressScenario bp fields only via `shock_units`; stress↔formal parity golden pins exact marks/`content_hash`. StressScenario wire adapters retained. Remaining R0.4.2: broader formal-only HTTP converge (not blocking one-pass).
+
 Converge:
 
 - legacy stress scenarios;
@@ -396,6 +398,11 @@ Scenario
 ```
 
 Keep legacy wire adapters only during the migration.
+
+R0.4.2-A COMPLETE (2026-09-09): engine-facing scenario expand/collapse
+(`scenario_model` / `scenarios`) converts StressScenario bp fields through
+`shock_units` (`bps_to_decimal_rate` / `decimal_rate_to_bps`); stress↔formal
+parity golden pins identical `content_hash` / marks. StressScenario wire retained.
 
 ## R0.4.3 Explicit shock units
 
