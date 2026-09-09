@@ -420,11 +420,9 @@ Examples:
 
 No magnitude heuristic may decide units.
 
-## R0.4.4 One-pass snapshot transformation
+## R0.4.4 One-pass snapshot transformation — COMPLETE (2026-09-09)
 
-Apply all scenario shocks to a staging market object and freeze once.
-
-Do not perform one deep immutable copy per factor.
+`MarketSnapshot.apply` unfreezes nested maps once, stages all `(RiskFactor, amount)` shocks with bump semantics, then a single `model_copy` / nested freeze. `bump` is the one-factor API via `apply([(f, a)])`. Mark + bump-chain id parity vs sequential bump; structural O(1) freeze/copy test. RF-006 stays open for R0.4.5 + full acceptance.
 
 ## R0.4.5 Scenario once, price many
 
