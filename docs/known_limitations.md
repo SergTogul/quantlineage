@@ -49,7 +49,7 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - The accepted performance claim is limited to the native scenario-kernel SLA in [`performance.md`](performance.md) and [`benchmarks/RESULTS.md`](../benchmarks/RESULTS.md).
 - No HTTP risk-run latency, multi-tenant capacity, or FULL_REVALUATION performance SLA is claimed.
-- In-process QuantLib is serialized by `_QL_PROCESS_LOCK`; valuation cache keys include parseable snapshot as-of (ISO `YYYY-MM-DD` or `date`; labels such as `current` / `t0` stay equivalent and use the engine evaluation date). Parallel full revaluation is process-partitioned (R0.3.5): Compose `worker` (`python -m app.worker`) is a separate OS process from the API; native kernels stay QuantLib-free; there is no in-process QuantLib thread pool and no `ProcessPoolExecutor` job platform.
+- In-process QuantLib is serialized by `_QL_PROCESS_LOCK`; valuation cache keys include parseable snapshot as-of (ISO `YYYY-MM-DD` or `date`; labels such as `current` / `t0` stay equivalent and use the engine evaluation date). Parallel full revaluation is process-partitioned (R0.3.5 / R0.6.5 option B): Compose `worker` (`python -m app.worker`) is a separate OS process from the API; HEAVY `FULL_REVALUATION` summary/var refuse the request thread when `RISKFORGE_EXTERNAL_WORKER=1` (`details.use=/risk/runs`); native kernels stay QuantLib-free; there is no in-process QuantLib thread pool and no unused `ProcessPoolExecutor` job platform. R0.6.1 `pnl_checksum` is identity evidence, not a FULL_REVALUATION SLA.
 
 ## Persistence And Workers
 

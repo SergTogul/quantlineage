@@ -10,8 +10,10 @@ When ``RISKFORGE_EXTERNAL_WORKER=1``, ``submit`` only enqueues QUEUED rows;
 shared Postgres via ``claim_queued`` (Postgres: ``FOR UPDATE SKIP LOCKED``).
 The Compose worker is a **separate OS process** with its own QuantLib globals.
 Additional worker replicas are the supported parallel full-revaluation scale-out.
-This module does not start a ``ProcessPoolExecutor`` or a job platform
-(R0.6.5 may add a scenario-block process pool after profiling).
+This module does not start a ``ProcessPoolExecutor`` or a job platform.
+R0.6.5 keeps HEAVY full-reval on this worker process (Compose ``worker`` /
+``RISKFORGE_EXTERNAL_WORKER``); it does not add unused scenario-block
+multiprocessing.
 Redis/RQ is not required for safe multi-worker claim.
 
 Lifecycle transitions go through ``RiskRunService``; persistence is either the
