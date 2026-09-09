@@ -1,6 +1,6 @@
 """Shared pricing + historical-dataset construction for API and worker (R0.8.2 / R0.8.4).
 
-Both FastAPI deps and ``python -m app.worker`` must call
+FastAPI lifespan and ``python -m app.worker`` must call
 :func:`build_portfolio_service` so interactive and queued runs resolve the
 same historical dataset and calculation knobs.
 

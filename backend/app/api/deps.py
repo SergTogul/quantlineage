@@ -28,34 +28,20 @@ from app.persistence.wiring import (
 from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
-from app.services.risk_factories import build_portfolio_service
 from app.services.risk_run_worker import RiskRunWorker
 
 _DEFAULT_SCENARIO_IDS = {s.id for s in DEFAULT_SCENARIOS if s.id}
-
-# TestClient-without-lifespan fallback only. Production HTTP reads ``app.state``.
-_legacy_portfolio_service: PortfolioService | None = None
-
-
-def fallback_portfolio_service() -> PortfolioService:
-    """Shared factory instance for legacy TestClient without lifespan.
-
-    Lifespan constructs its own ``app.state.portfolio_service``. This fallback
-    is used only when that attribute is missing so ``POST /risk/*`` does not
-    503 in tests that skip the context-manager TestClient.
-    """
-    global _legacy_portfolio_service
-    if _legacy_portfolio_service is None:
-        _legacy_portfolio_service = build_portfolio_service()
-    return _legacy_portfolio_service
 
 
 def get_portfolio_service(request: Request) -> PortfolioService:
     """Portfolio/risk service from lifespan ``app.state`` (R0.9.3)."""
     service = getattr(request.app.state, "portfolio_service", None)
-    if service is not None:
-        return service
-    return fallback_portfolio_service()
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="portfolio service is not configured",
+        )
+    return service
 
 
 def get_session_factory(request: Request) -> sessionmaker[Session] | None:

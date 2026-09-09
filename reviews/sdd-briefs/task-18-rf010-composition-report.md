@@ -7,32 +7,36 @@ RF-010 / R0.9.3 — explicit application composition
 Backend / API Engineer (`docs/agents/07_BACKEND_API_ENGINEER.md`)
 
 ## Status
-**CLOSED** (four FINDINGS acceptance cells MET; independent review pending)
+**IN PROGRESS** (do not CLOSE RF-010)
 
 ## Summary
 Removed `app.api.deps.portfolio_service = build_portfolio_service()` at import.
 Lifespan constructs one `PortfolioService` via the same factory, stores it on
 `app.state`, and passes it to `RiskRunWorker`. HTTP `get_portfolio_service(request)`
-reads `app.state`. `app.main.service` is a thin alias to that instance.
-Legacy TestClient without lifespan falls back to the same factory (pinned; no
-503). No DI container. Risk numbers unchanged.
+reads `app.state` and **fails closed (503)** when missing — same as
+`get_risk_run_worker`. `app.main.service` aliases `app.state` only. There is no
+`_legacy_portfolio_service` / module-global HTTP cache. No DI container. Risk
+numbers unchanged.
 
 TDD: five composition pins failed first (module-global assignment present;
 Depends had no `Request`; `app.state.portfolio_service` missing). Then green.
+Fail-closed follow-up: pins for `_legacy_portfolio_service` / HTTP 200 without
+lifespan failed first; then 503 + source/AST pins green.
 
-**Disposition: CLOSED** — domain without FastAPI; schemas split; typed results;
-explicit composition. Dual-use `AttributionRequest` in domain is a named residual.
+**Disposition: IN PROGRESS** — do not CLOSE RF-010. Dual-use `AttributionRequest`
+in domain remains. Independent review found CLOSE overreached while HTTP still
+served a module-global fallback.
 
 ## Files changed
-- `backend/app/api/deps.py` — lifespan/`app.state` Depends; factory fallback
-- `backend/app/main.py` — construct service + worker in lifespan; `service` alias
+- `backend/app/api/deps.py` — lifespan/`app.state` Depends; 503 when missing
+- `backend/app/main.py` — construct service + worker in lifespan; `service` aliases `app.state` only
 - `backend/app/services/risk_factories.py` — docstring
-- `backend/tests/test_application_composition.py` — new pins
+- `backend/tests/test_application_composition.py` — fail-closed + broadened AST pins
 - `backend/tests/test_risk_run_api.py` — mutate `app.state` not module singleton
 - `backend/tests/test_persistence_di.py` — same
 - `backend/tests/test_workload_limits.py` — same
-- `reviews/FINDINGS.md` — RF-010 **CLOSED**
-- `reviews/REMEDIATION_MILESTONE.md` — R0.9.3 COMPLETE
+- `reviews/FINDINGS.md` — RF-010 **IN PROGRESS**
+- `reviews/REMEDIATION_MILESTONE.md` — R0.9.3 COMPLETE; RF-010 stays IN PROGRESS
 - `reviews/r0.9.3-application-composition-report.md`
 - `reviews/sdd-briefs/task-18-rf010-composition-report.md` — this handoff
 
@@ -54,7 +58,7 @@ explicit composition. Dual-use `AttributionRequest` in domain is a named residua
 - `test_http_depends_reads_app_state_portfolio_service`
 - `test_main_service_aliases_lifespan_instance`
 - `test_composition_modules_do_not_import_di_container`
-- `test_http_portfolio_service_fallback_without_lifespan`
+- `test_http_portfolio_service_without_lifespan_is_503`
 
 ## Commands executed
 TDD red (new file, before production change): 5 failed as expected
@@ -101,12 +105,35 @@ httpx). No unexplained skips.
 
 ## Known limitations / risks
 - Dual-use `AttributionRequest`, `RiskChangeAttributionRequest`, and
-  `WhatIfRequest` remain in domain (named residual; not KEEP OPEN)
-- TestClient without lifespan uses a lazy factory fallback distinct from a
-  later lifespan instance in the same pytest process; production has one
+  `WhatIfRequest` remain in domain (**Do not CLOSE** RF-010)
+- TestClient without lifespan 503s on `/risk/*`; tests must use `with TestClient(app)`
 - `PortfolioService` is still a large orchestrator (split out of scope)
 
 ## Follow-up / next owner
 - Owner: Lead Architect / independent reviewer
-- Requested action: independent review of RF-010 CLOSE
+- Requested action: independent review of fail-closed composition; do not CLOSE RF-010
 - Blocking?: no
+
+## Follow-up after independent review (fail closed)
+
+Deleted `_legacy_portfolio_service` / `fallback_portfolio_service`. HTTP
+`get_portfolio_service` raises 503 when `app.state.portfolio_service` is
+missing. `app.main.service` aliases `app.state` only. AST/source pin forbids
+any `build_portfolio_service()` call in `deps.py` (any name, including
+annotated assigns). RF-010 remains **IN PROGRESS**.
+
+Covering (after follow-up):
+
+```bash
+cd /Users/user/src/riskforge-mvp/backend
+PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
+  tests/test_application_composition.py tests/test_api_error_model.py \
+  tests/test_risk_run_api.py tests/test_persistence_di.py
+```
+
+```text
+53 passed, 1 warning in 10.66s
+```
+
+Warning is pre-existing (`StarletteDeprecationWarning` from FastAPI TestClient
+httpx). No TestClient-without-lifespan failures in this covering set.

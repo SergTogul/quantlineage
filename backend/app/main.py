@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.attribution import router as attribution_router
 from app.api.auth import SharedTokenMiddleware, require_shared_auth_configured
-from app.api.deps import fallback_portfolio_service
 from app.api.errors import register_exception_handlers
 from app.api.health import router as health_router
 from app.api.legacy_deprecation import LegacyDeprecationMiddleware
@@ -109,15 +108,17 @@ app.include_router(risk_runs_router, prefix=f"{API_V1_PREFIX}/risk")
 
 
 def __getattr__(name: str):
-    """``app.main.service`` is a thin alias to the lifespan instance.
+    """``app.main.service`` is a thin alias to ``app.state.portfolio_service``.
 
-    Before lifespan (legacy TestClient without context manager), this returns
-    the same factory fallback ``get_portfolio_service`` uses so tests/tools do
-    not observe a second live service.
+    Lifespan constructs that instance. Tests that need ``service`` must start
+    lifespan (``with TestClient(app)``). There is no module-global fallback.
     """
     if name != "service":
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     svc = getattr(app.state, "portfolio_service", None)
-    if svc is not None:
-        return svc
-    return fallback_portfolio_service()
+    if svc is None:
+        raise AttributeError(
+            "app.main.service is unavailable until FastAPI lifespan sets "
+            "app.state.portfolio_service; use `with TestClient(app)` in tests"
+        )
+    return svc
