@@ -3,21 +3,14 @@ from __future__ import annotations
 from collections import defaultdict
 
 from app.domain.models import (
-    BondPosition,
-    EquityFuturePosition,
-    EquityPosition,
-    EuropeanOptionPosition,
-    FXForwardPosition,
-    FXOptionPosition,
-    InterestRateFuturePosition,
     MarketSnapshot,
     Portfolio,
     RiskFactorExposure,
-    SwapPosition,
+    Valuation,
 )
 from app.interfaces.pricing import PricingEngine
 from app.market.snapshot import MarketDataProvider
-from app.pricing.instrument_capabilities import get_capability
+from app.pricing.instrument_capabilities import named_risk_factors
 from app.risk.factor_types import (
     EquitySpot,
     EquityVol,
@@ -28,6 +21,18 @@ from app.risk.factor_types import (
     factor_sort_key,
 )
 from app.sample import DemoPortfolioMarketDataProvider
+
+
+def _sensitivity_for_factor(factor: RiskFactor, valuation: Valuation) -> float:
+    if isinstance(factor, EquitySpot):
+        return float(valuation.delta)
+    if isinstance(factor, FXSpot):
+        return float(valuation.fx_delta)
+    if isinstance(factor, (EquityVol, FXVol)):
+        return float(valuation.vega)
+    if isinstance(factor, RateZero):
+        return float(valuation.dv01)
+    raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
 
 
 class RiskFactorEngine:
@@ -44,19 +49,13 @@ class RiskFactorEngine:
         market = market or self.market_data.snapshot(portfolio)
         agg: dict[RiskFactor, float] = defaultdict(float)
         for p in portfolio.positions:
-            get_capability(getattr(p, "type", None))
+            factors = named_risk_factors(p)
             v = pricing.value(p, market)
-            if isinstance(p, (EquityPosition, EquityFuturePosition, EuropeanOptionPosition)):
-                agg[EquitySpot(p.symbol)] += v.delta
-                if v.vega:
-                    agg[EquityVol(underlying=p.symbol)] += v.vega
-            elif isinstance(p, (BondPosition, SwapPosition, InterestRateFuturePosition)):
-                tenor = f"{round(p.maturity_years)}Y"
-                agg[RateZero(currency=p.currency, tenor=tenor)] += v.dv01
-            elif isinstance(p, (FXForwardPosition, FXOptionPosition)):
-                agg[FXSpot(p.pair)] += v.fx_delta
-                if v.vega:
-                    agg[FXVol(pair=p.pair)] += v.vega
+            for factor in factors:
+                amount = _sensitivity_for_factor(factor, v)
+                if isinstance(factor, (EquityVol, FXVol)) and not amount:
+                    continue
+                agg[factor] += amount
         return sorted(agg.items(), key=lambda item: factor_sort_key(item[0]))
 
     def calculate(

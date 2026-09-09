@@ -655,7 +655,7 @@ Three scenario forms coexist, while curves and volatility surfaces use nested un
 Priority: **P1**  
 Risk types: ARCHITECTURE, CORRECTNESS, MAINTAINABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-09). R0.5.6 wired `get_capability` as a fail-closed gate on QuantLib/Builtin `value()`, snapshot overlay, `trade_cache_key`, and `RiskFactorEngine.calculate_typed`. Overlay no longer returns `{}` for unknown families. QuantLib still does not call Builtin (R0.5.2). **Do not CLOSE:** adding a new instrument still requires parallel edits (models, terms, both pricer `isinstance` ladders plus duplicated overlay, cache schema ids, factor/historical ladders, tests). Residuals: cap/floor/swaption still omitted from `calculate_typed` after a successful registry lookup; `required_factors_for_position` / `position_label` / `_TRADE_CACHE_SCHEMAS` remain independent ladders. Evidence: `reviews/r0.5.6-rf012-capability-wire-report.md`.
+Status: **IN PROGRESS** (2026-09-09). R0.5.7: `calculate_typed` and `required_factors_for_position` share registry `named_risk_factors` (cap/floor/swaption contribute `dv01` onto `RateZero`; unknown families fail closed). Trade-cache schema ids live on `InstrumentCapability.trade_cache_schema` (no second dict in `cache.py`). **Do not CLOSE:** adding a family still requires models, terms, both pricer `value()` `isinstance` ladders, duplicated overlay, and tests. Remaining ladders: Builtin `value()` isinstance, QuantLib `value()` isinstance, duplicated `_snapshot_marks_from_terms` overlay, `position_label` UX. Evidence: `reviews/r0.5.7-rf012-remaining-ladders-report.md`.
 
 Source findings:
 

@@ -40,20 +40,9 @@ from app.domain.models import (
 from app.interfaces.pricing import PricingEngine
 from app.pricing.instrument_capabilities import get_capability
 
-# Family schema ids keep v1 cache identity. Equity-family InstrumentTerms add
-# settlement ``currency`` that Positions never hashed; drop it at hash time.
-_TRADE_CACHE_SCHEMAS: dict[str, str] = {
-    "equity": "equity_terms_v1",
-    "equity_future": "equity_future_terms_v1",
-    "european_option": "equity_option_terms_v1",
-    "bond": "bond_terms_v1",
-    "swap": "swap_terms_v1",
-    "fx_forward": "fx_forward_terms_v1",
-    "fx_option": "fx_option_terms_v1",
-    "ir_future": "ir_future_terms_v1",
-    "cap_floor": "cap_floor_terms_v1",
-    "swaption": "swaption_terms_v1",
-}
+# Family schema ids live on the capability registry (v1 cache identity).
+# Equity-family InstrumentTerms add settlement ``currency`` that Positions
+# never hashed; drop it at hash time.
 _EQUITY_FAMILY_TYPES = frozenset({"equity", "equity_future", "european_option"})
 _bypass_valuation_lru: ContextVar[bool] = ContextVar(
     "riskforge_bypass_valuation_lru", default=False
@@ -131,12 +120,7 @@ class PricingConfiguration:
 def trade_cache_key(position: Position) -> str:
     """Versioned economics hash from ``terms_from_position``; marks excluded."""
     terms = terms_from_position(position)
-    get_capability(terms.type)
-    schema = _TRADE_CACHE_SCHEMAS.get(terms.type)
-    if schema is None:
-        raise TypeError(
-            f"trade_cache_key has no terms projection for {type(position).__name__}"
-        )
+    schema = get_capability(terms.type).trade_cache_schema
     economics = terms.model_dump(mode="json")
     if terms.type in _EQUITY_FAMILY_TYPES:
         economics.pop("currency", None)
