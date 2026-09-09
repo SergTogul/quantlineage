@@ -27,6 +27,7 @@ from app.interfaces.pricing import PricingEngine
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
 from app.risk.historical import require_explicit_market
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
+from app.risk.shock_units import relative_vol_move_to_vol_points
 from app.risk.scenarios import (
     AggregateFactorChange,
     apply_market_scenario,
@@ -111,7 +112,7 @@ def _aggregate_factor_pnl_linear(
         out["equity"] += v.delta * equity_ret
         if methodology is VaRMethodology.DELTA_GAMMA:
             out["equity"] += 0.5 * v.gamma * equity_ret * equity_ret
-        out["vol"] += v.vega * (vol_pct * 100.0)
+        out["vol"] += v.vega * relative_vol_move_to_vol_points(vol_pct)
         out["rate"] += v.dv01 * rates_bps
         out["fx"] += v.fx_delta * fx_ret
     return out

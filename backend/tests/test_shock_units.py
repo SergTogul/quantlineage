@@ -1,13 +1,19 @@
-"""R0.4.3-A — pin canonical shock-unit conversion helpers.
+"""R0.4.3 — pin canonical shock-unit conversion helpers and call-site wiring.
 
 Wrong scales (×100, ÷100, bp-as-percent) must not equal the helpers.
+R0.4.3-B: wired risk call sites must import helpers (no inline ×100 / ÷10000
+on relative-vol→points or bp→decimal shock paths); reverse-stress must not
+guess rate units from magnitude.
 """
 
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 import pytest
 
+from app.risk import attribution, es, historical, reverse_stress, sensitivities
 from app.risk.shock_units import (
     bps_to_decimal_rate,
     decimal_rate_to_bps,
@@ -57,3 +63,48 @@ def test_relative_vol_move_to_vol_points_array():
     assert not np.allclose(points, vol_pct)  # missing ×100
     assert not np.allclose(points, vol_pct / 100.0)  # ÷100
     assert not np.allclose(points, vol_pct * 100.0 / 100.0)  # cancel scales
+
+
+def test_wired_call_sites_import_shock_units_helpers():
+    """R0.4.3-B wiring pin: restore of inline ×100 / ÷10000 must fail source checks."""
+    assert "relative_vol_move_to_vol_points" in inspect.getsource(historical.approximate_pnl_series)
+    assert "relative_vol_move_to_vol_points" in inspect.getsource(historical._panel_linear_contribution)
+    assert "relative_vol_move_to_vol_points" in inspect.getsource(es._aggregate_factor_pnl_linear)
+    assert "relative_vol_move_to_vol_points" in inspect.getsource(attribution._greek_buckets_for_position)
+    assert "decimal_rate_to_bps" in inspect.getsource(attribution._greek_buckets_for_position)
+    assert "bps_to_decimal_rate" in inspect.getsource(reverse_stress.build_single_factor_shocks)
+    sens_src = inspect.getsource(sensitivities.SensitivityEngine)
+    assert "bps_to_decimal_rate" in sens_src
+
+
+def test_wired_risk_modules_no_inline_vol_point_or_bp_shock_literals():
+    """Inline relative→points / bp→decimal shock scales belong only in shock_units."""
+    panel_src = inspect.getsource(historical._panel_linear_contribution)
+    assert "move * 100" not in panel_src
+    assert "* 100.0" not in panel_src
+
+    approx_src = inspect.getsource(historical.approximate_pnl_series)
+    assert "* 100.0" not in approx_src
+    assert "* 100" not in approx_src
+
+    es_src = inspect.getsource(es._aggregate_factor_pnl_linear)
+    assert "vol_pct * 100" not in es_src
+    assert "* 100.0" not in es_src
+
+    attr_src = inspect.getsource(attribution._greek_buckets_for_position)
+    assert "* 100.0" not in attr_src
+    assert "* 10000.0" not in attr_src
+    assert "* 10_000" not in attr_src
+
+    rates_src = inspect.getsource(reverse_stress.build_single_factor_shocks)
+    assert "/ 10000" not in rates_src
+    assert "/ 10_000" not in rates_src
+
+
+def test_from_wire_bound_never_guesses_bp_from_magnitude():
+    src = inspect.getsource(reverse_stress.from_wire_bound)
+    assert "max_shock > 1" not in src
+    assert "RATES_BP_SCALE" not in src
+    # 500 stays 500 (search magnitude); 500 bp wire requires magnitude 0.5.
+    assert reverse_stress.from_wire_bound("rates", 500.0) == pytest.approx(500.0)
+    assert reverse_stress.to_wire_shock("rates", 0.5) == pytest.approx(500.0)

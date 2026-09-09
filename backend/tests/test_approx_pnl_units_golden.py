@@ -3,16 +3,18 @@
 Pins the Historical VaR LINEAR / DELTA_GAMMA P&L contract in
 ``approximate_pnl_series`` (and the matching SensitivityEngine conventions).
 
-Internal units (must not be confused at the call site):
+Internal units (must not be confused at the call site). Conversions live in
+``app.risk.shock_units`` — call sites must not inline ``* 100`` / ``/ 10_000``:
 
 - equity / FX: relative return; ``0.01`` = +1%. Cash delta / FX delta.
 - gamma: dollar gamma; DELTA_GAMMA adds ``0.5 * gamma * r^2``; LINEAR omits it.
 - vol observations (``vol_pct`` / ``vol_moves``): relative vol move.
   Vega is quoted per 1 *vol point* (0.01 absolute vol). The engine converts
-  ``vol_points = vol_pct * 100`` so a +1% relative vol move (0.01) is +1 vol
-  point of vega P&L.
+  via ``relative_vol_move_to_vol_points`` so a +1% relative vol move (0.01) is
+  +1 vol point of vega P&L.
 - rates: ``rate_moves_bps`` are basis points; ``1.0`` = +1bp. DV01 is P&L per bp.
-- SensitivityEngine rate bumps convert ``bps / 10_000`` before ``MarketSnapshot.bump``.
+- SensitivityEngine rate bumps convert via ``bps_to_decimal_rate`` before
+  ``MarketSnapshot.bump``.
 - SensitivityEngine vol bumps are *absolute* decimal vol (``0.01`` = +1 vol point),
   which differs from ``MarketSnapshot.bump(EquityVol, amount)`` (relative).
 
