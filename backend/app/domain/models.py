@@ -294,6 +294,7 @@ class EquityPosition(PositionHierarchyMixin):
     id: str
     symbol: str
     quantity: FiniteFloat
+    currency: str = "USD"
     sector: str = "Other"
     book: str = "Equity"
 
@@ -307,6 +308,7 @@ class EquityFuturePosition(PositionHierarchyMixin):
     quantity: FiniteFloat
     multiplier: FiniteFloat = 50.0
     maturity_years: FiniteFloat = Field(default=0.25, gt=0)
+    currency: str = "USD"
     sector: str = "Index"
     book: str = "Equity Derivatives"
 
@@ -321,6 +323,7 @@ class EuropeanOptionPosition(PositionHierarchyMixin):
     strike: FiniteFloat
     maturity_years: FiniteFloat = Field(gt=0)
     option_type: Literal["call", "put"]
+    currency: str = "USD"
     sector: str = "Other"
     book: str = "Equity Derivatives"
 

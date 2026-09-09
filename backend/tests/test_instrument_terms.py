@@ -280,20 +280,20 @@ def _assert_contractual_round_trip(position, terms) -> None:
     if isinstance(position, EquityPosition):
         assert terms.symbol == position.symbol
         assert terms.quantity == position.quantity
-        assert terms.currency == "USD"
+        assert terms.currency == position.currency
     elif isinstance(position, EquityFuturePosition):
         assert terms.symbol == position.symbol
         assert terms.quantity == position.quantity
         assert terms.multiplier == position.multiplier
         assert terms.maturity_years == position.maturity_years
-        assert terms.currency == "USD"
+        assert terms.currency == position.currency
     elif isinstance(position, EuropeanOptionPosition):
         assert terms.symbol == position.symbol
         assert terms.quantity == position.quantity
         assert terms.strike == position.strike
         assert terms.maturity_years == position.maturity_years
         assert terms.option_type == position.option_type
-        assert terms.currency == "USD"
+        assert terms.currency == position.currency
     elif isinstance(position, BondPosition):
         assert terms.issuer == position.issuer
         assert terms.face_value == position.face_value

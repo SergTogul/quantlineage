@@ -102,7 +102,7 @@ def _rate_currency(position: Position) -> str | None:
     if isinstance(position, (BondPosition, SwapPosition, InterestRateFuturePosition)):
         return position.currency
     if isinstance(position, (EuropeanOptionPosition, EquityFuturePosition)):
-        return "USD"
+        return position.currency
     if isinstance(position, (FXForwardPosition, FXOptionPosition)):
         return position.pair[-3:]
     return None
