@@ -710,8 +710,8 @@ Hierarchy time is driven primarily by one base calculation + aggregation, not nu
 
 Related findings:
 
-- RF-009
-- RF-013
+- RF-009 (**CLOSED**)
+- RF-013 (**CLOSED** pending independent review; `reviews/r0.8.6-rf013-close-gate-report.md`)
 - RF-010
 
 ## R0.8.1 Deterministic RiskRun specification — COMPLETE (2026-09-04)
@@ -737,7 +737,7 @@ API interactive path and worker must resolve historical data/pricing config thro
 
 ## R0.8.3 Server-owned persistence identity — COMPLETE (2026-09-04)
 
-`PortfolioRepository.create` fails if the id exists; `update` fails if missing. Persist `RiskRunWorker.submit` create-if-absents or attaches the stored book (does not upsert). Legacy `save` remains an upsert for seed callers. RF-009 stays open for R0.8.4. RF-013 stays open.
+`PortfolioRepository.create` fails if the id exists; `update` fails if missing. Persist `RiskRunWorker.submit` create-if-absents or attaches the stored book (does not upsert). Legacy `save` remains an upsert for seed callers. RF-009 stays open for R0.8.4. RF-013 HTTP pin is R0.8.6.
 
 Separate:
 
@@ -771,6 +771,19 @@ The same RiskRun spec yields the same result whether executed interactively or b
 
 Report: `reviews/r0.8.5-postgres-same-spec-report.md`.
 
+## R0.8.6 Canonical identity HTTP pin — COMPLETE pending independent review (2026-09-09)
+
+Close gate (`reviews/r0.8.6-rf013-close-gate-report.md`). **RF-013 CLOSED** (not final until Task 9 independent review APPROVE).
+
+Acceptance:
+
+- HTTP `POST /api/v1/risk/runs` and `/risk/runs` with `portfolio.id=global-macro` cannot overwrite the seeded Cross-Asset book (`GET /portfolio` + SQL). Catalog `GET /portfolios/global-macro` remains the in-code SAMPLE contract. Evidence: `backend/tests/test_portfolio_identity.py`.
+- Persisted RiskRun reproduced from IDs — **cite R0.8.5** `tests/test_same_spec_parity.py` (RF-009 CLOSED).
+- PostgreSQL pytest/integration — **cite R0.8.5** `tests/test_postgres_risk_run_lifecycle.py` (identity-on-execute included). Not duplicated.
+- Large derived payloads not unconstrained JSON — **cite R0.8.4** typed per-`run_type` schemas (`extra='forbid'`).
+
+Residuals (not blocking the four acceptance cells): no `portfolio_version` / server-issued ids; leftover `save` upsert for seed; object ACLs are RF-014.
+
 ---
 
 # R0.9 — Separate Domain, API, and Application Contracts
@@ -778,7 +791,7 @@ Report: `reviews/r0.8.5-postgres-same-spec-report.md`.
 Related findings:
 
 - RF-010
-- RF-013
+- RF-013 (identity **CLOSED** in R0.8.6; remaining domain/API split is RF-010)
 
 ## R0.9.1 Split transport schemas
 
