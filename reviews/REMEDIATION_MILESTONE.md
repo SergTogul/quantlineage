@@ -630,6 +630,10 @@ A risk run should be able to produce/reuse:
 
 Do not return massive nested by-position payloads on every hierarchy node unless requested.
 
+## R0.7.5 Default build uses trade artifacts — COMPLETE (2026-09-08)
+
+Independent review **APPROVE** (`reviews/r0.7.5-default-hierarchy-artifacts-independent-review.md`). When `artifacts` is omitted, `HierarchyEngine.build` / `risk_at` build a complete trade-grain `TradeCalculationArtifact` map **once** (`pricing.value` + shared `historical_pnl_for_valuation` per position) and then use the existing artifact aggregation path. Explicit `artifacts=` maps are unchanged. Node VaR/ES remain VaR/ES of the summed historical vector. Stress maps stay empty and limits stay `[]` on the default producer path (same as `PortfolioService.hierarchy`). Probe: 2 `value` / 0 portfolio / 0 shocked for 7 nodes. RF-008 stays **IN PROGRESS** for empty stress/limits on that path and R0.7.4 lazy drilldown.
+
 ### Exit criteria
 
 Hierarchy time is driven primarily by one base calculation + aggregation, not number-of-nodes × full-risk-run.

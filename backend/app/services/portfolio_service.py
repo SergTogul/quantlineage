@@ -34,7 +34,7 @@ from app.risk.attribution import AttributionEngine
 from app.risk.es import ESContributionAnalytics
 from app.risk.factors import RiskFactorEngine
 from app.risk.hierarchy import HierarchyEngine
-from app.risk.historical import HistoricalRiskEngine, approximate_pnl_series
+from app.risk.historical import HistoricalRiskEngine, historical_pnl_for_valuation
 from app.risk.limit_drilldown import LimitDrilldownEngine
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.query import RiskQueryEngine
@@ -289,53 +289,20 @@ class PortfolioService:
             market=market,
         )
 
-    def _historical_pnl_for_valuation(self, valuation):
-        """One historical P&L series from already-valued Greeks (no reprice).
-
-        Uses the injected ``HistoricalRiskEngine`` dataset + methodology and
-        ``approximate_pnl_series`` (LINEAR / DELTA_GAMMA). One series per
-        trade, shared factor observations so lengths match. Not a book-level
-        series split.
-
-        FULL_REVALUATION and an opt-in ``factor_panel`` are omitted (``None``):
-        those paths would call ``value`` again. Default engine is DELTA_GAMMA
-        with no panel.
-        """
-        if not isinstance(self.risk, HistoricalRiskEngine):
-            return None
-        if self.risk.methodology is VaRMethodology.FULL_REVALUATION:
-            return None
-        if self.risk.factor_panel is not None:
-            return None
-        observations = self.risk.dataset.factor_observations()
-        series = approximate_pnl_series(
-            delta=valuation.delta,
-            gamma=valuation.gamma,
-            vega=valuation.vega,
-            dv01=valuation.dv01,
-            fx_delta=valuation.fx_delta,
-            equity_ret=observations.equity_returns,
-            vol_pct=observations.vol_moves,
-            rates_bps=observations.rate_moves_bps,
-            fx_ret=observations.fx_returns,
-            methodology=self.risk.methodology,
-            scenario_kernel=self.risk.scenario_kernel,
-            scenario_backend=self.risk.scenario_backend,
-        )
-        if series.size == 0:
-            return None
-        return tuple(float(point) for point in series)
-
     def hierarchy(self, portfolio):
         """Build the firm tree from one valuation per trade (R0.7.3 leftover).
 
         PV and additive Greeks come from ``self.pricing.value`` once per
         position. Historical P&L is attached once per trade from those
-        Greeks via ``approximate_pnl_series`` (same dataset as ``self.risk``).
-        ``HierarchyEngine`` sums the vectors and computes node VaR / ES.
-        Stress P&L is left empty: ``self.stresses`` would snapshot again and
-        ``StressEngine.run`` would re-call ``value`` plus ``shocked_value``
-        per scenario (once-per-trade, not once-per-node, but not value-once).
+        Greeks via ``historical_pnl_for_valuation`` (same dataset as
+        ``self.risk``). ``HierarchyEngine`` sums the vectors and computes
+        node VaR / ES. Stress P&L is left empty: ``self.stresses`` would
+        snapshot again and ``StressEngine.run`` would re-call ``value``
+        plus ``shocked_value`` per scenario (once-per-trade, not
+        once-per-node, but not value-once).
+
+        Callers may also omit ``artifacts`` on ``HierarchyEngine.build``;
+        that path now builds the same trade-grain map once (R0.7.5).
         """
         market = self.market_snapshot(portfolio)
         artifacts = {}
@@ -344,7 +311,7 @@ class PortfolioService:
             artifacts[position.id] = TradeCalculationArtifact.from_valuation(
                 valuation,
                 trade_id=position.id,
-                historical_pnl=self._historical_pnl_for_valuation(valuation),
+                historical_pnl=historical_pnl_for_valuation(self.risk, valuation),
             )
         return self.hierarchy_engine.build(
             portfolio, self.pricing, market=market, artifacts=artifacts

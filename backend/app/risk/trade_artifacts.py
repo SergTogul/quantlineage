@@ -8,8 +8,9 @@ A risk run should be able to produce and reuse, per stable trade id:
 - stress P&L keyed by scenario id;
 - an optional historical P&L vector.
 
-This module is the **type + aggregation helpers only**. Hierarchy still
-full-reprices per node (R0.7.3 will consume these artifacts). Do not import
+This module is the **type + aggregation helpers only**. Hierarchy consumes
+these artifacts on both the explicit ``artifacts=`` path and the default
+no-artifact path (R0.7.5 builds the map once per run). Do not import
 ``hierarchy``.
 
 Units / signs match ``Valuation`` / ``HierarchyNode``:

@@ -2,7 +2,12 @@
 
 Conventions:
 - Additive: parent == sum(children) within abs 1e-9 for MV, Greeks, stress P&L
-- VaR / ES / limits: computed on the node sub-portfolio (not summed)
+- VaR / ES: VaR/ES of the summed trade historical P&L vector (not sum of
+  child VaRs). Matches ``HistoricalRiskEngine.calculate`` for LINEAR /
+  DELTA_GAMMA without a factor panel (series is linear in Greeks).
+- Limits / stress: omitted on the default trade-artifact path (empty
+  stress maps; ``limits == []``). Explicit ``artifacts=`` with stress
+  keys still aggregate stress additively.
 - Position desk/strategy None → inherit Portfolio defaults
 - Empty book → zero MV / zero risk metrics at every level
 """
@@ -31,7 +36,6 @@ from app.risk.hierarchy import (
     resolve_strategy,
 )
 from app.risk.historical import HistoricalRiskEngine
-from app.risk.limits import DEFAULT_LIMITS
 from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
 
@@ -220,10 +224,9 @@ def test_empty_portfolio_zero_risk_tree():
     assert root.var_99 == 0.0
     assert root.expected_shortfall_99 == 0.0
     assert root.delta == 0.0
-    assert root.stress  # default scenarios still attached
-    assert all(s.pnl == 0.0 for s in root.stress)
-    assert root.limits
-    assert all(not lim.breached for lim in root.limits)
+    # Default producer path leaves stress empty (same as PortfolioService).
+    assert root.stress == []
+    assert root.limits == []
     assert root.children[0].market_value == 0.0
     assert root.children[0].var_99 == 0.0
     assert root.children[0].children == []
@@ -323,7 +326,7 @@ def test_risk_at_matches_subset_var():
 
 
 def test_greeks_var_es_stress_limits_on_nodes():
-    """M4.2: full metric set present; additives reconcile; VaR/ES match subset."""
+    """M4.2: full additive set; VaR/ES match subset; stress/limits omitted."""
     pricing = BuiltinPricingEngine()
     risk = HistoricalRiskEngine(seed=1, observations=40)
     engine = HierarchyEngine(risk)
@@ -333,10 +336,8 @@ def test_greeks_var_es_stress_limits_on_nodes():
 
     _assert_additive_reconciles(root)
 
-    assert root.limits
-    assert {lim.metric for lim in root.limits} == {lim.metric for lim in DEFAULT_LIMITS}
-    assert root.stress
-    assert all(hasattr(s, "pnl") and hasattr(s, "scenario") for s in root.stress)
+    assert root.limits == []
+    assert root.stress == []
 
     desk_ref = HierarchyRef(
         level=HierarchyLevel.DESK,
@@ -367,6 +368,6 @@ def test_risk_at_includes_stress_and_limits():
     )
     node = engine.risk_at(pf, pricing, ref, market=_multi_desk_market())
     assert node.level == "strategy"
-    assert node.stress
-    assert node.limits
-    assert len(node.limits) == len(DEFAULT_LIMITS)
+    # Default no-artifact path uses trade artifacts; stress/limits omitted.
+    assert node.stress == []
+    assert node.limits == []
