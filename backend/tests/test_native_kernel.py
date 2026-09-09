@@ -58,19 +58,16 @@ from app.compute.kernel import (
     Shock,
 )
 
-
 def _approx(actual, expected):
     return actual == pytest.approx(
         expected, abs=KERNEL_ABI_ABS_TOL, rel=KERNEL_ABI_REL_TOL
     )
-
 
 def test_python_kernel_math():
     e = Exposure(delta=1000, gamma=200, vega=30, dv01=-10, fx_delta=500)
     s = Shock(-0.1, 5, 20, -0.02)
     expected = 1000 * (-0.1) + 0.5 * 200 * 0.01 + 30 * 5 - 10 * 20 + 500 * (-0.02)
     assert PythonScenarioKernel().pnl([e], [s]) == pytest.approx([expected])
-
 
 def test_cpp_kernel_compiles_and_executes(tmp_path):
     if not shutil.which("g++"):
@@ -95,47 +92,19 @@ def test_cpp_kernel_compiles_and_executes(tmp_path):
     result = subprocess.run([str(exe)], capture_output=True, text=True, check=True)
     assert "risk_kernel_ok" in result.stdout
 
-
-def _build_native_lib(tmp_path: Path) -> Path:
-    root = Path(__file__).parents[1] / "native"
-    lib = tmp_path / ("libriskkernel.dylib" if os.uname().sysname == "Darwin" else "libriskkernel.so")
-    subprocess.run(
-        [
-            "g++",
-            "-std=c++20",
-            "-O3",
-            "-shared",
-            "-fPIC",
-            "-pthread",
-            "-I",
-            str(root / "include"),
-            str(root / "src/risk_kernel_capi.cpp"),
-            "-o",
-            str(lib),
-        ],
-        check=True,
-    )
-    return lib
-
-
-def test_native_ctypes_kernel_matches_python(tmp_path, monkeypatch):
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
+def test_native_ctypes_kernel_matches_python(native_scenario_lib, monkeypatch):
     # Force serial path for a clean single-thread baseline compare.
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     exposures = [Exposure(1000, 200, 30, -10, 500), Exposure(-300, 80, 10, 5, -200)]
     shocks = [Shock(-0.1, 5, 20, -0.02), Shock(0.03, -2, -10, 0.01)]
     expected = PythonScenarioKernel().pnl(exposures, shocks)
     actual = NativeScenarioKernel(lib).pnl(exposures, shocks)
     assert _approx(actual, expected)
 
-
-def test_native_ctypes_parallel_matches_serial(tmp_path, monkeypatch):
+def test_native_ctypes_parallel_matches_serial(native_scenario_lib, monkeypatch):
     """M6.4: stdlib thread pool must match serial nested-loop results (bit-level approx)."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     exposures = [
         Exposure(1000, 200, 30, -10, 500),
         Exposure(-300, 80, 10, 5, -200),
@@ -154,13 +123,10 @@ def test_native_ctypes_parallel_matches_serial(tmp_path, monkeypatch):
         parallel = NativeScenarioKernel(lib).pnl(exposures, shocks)
         assert _approx(parallel, serial)
 
-
-def test_native_empty_shocks_and_exposures(tmp_path, monkeypatch):
+def test_native_empty_shocks_and_exposures(native_scenario_lib, monkeypatch):
     """M6.5: empty inputs — length-0 out; zero exposures → zeros per shock."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     native = NativeScenarioKernel(lib)
     py = PythonScenarioKernel()
     e = [Exposure(1.0, 2.0, 3.0, 4.0, 5.0)]
@@ -173,13 +139,10 @@ def test_native_empty_shocks_and_exposures(tmp_path, monkeypatch):
     assert native.pnl([], []) == []
     assert py.pnl([], []) == []
 
-
-def test_native_single_shock_and_zero_greeks(tmp_path, monkeypatch):
+def test_native_single_shock_and_zero_greeks(native_scenario_lib, monkeypatch):
     """M6.5: one-element path (forces serial even if threads>1) and all-zero Greeks."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "4")
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     native = NativeScenarioKernel(lib)
     py = PythonScenarioKernel()
     exposures = [Exposure(100.0, -20.0, 5.0, -1.5, 10.0), Exposure(0.0, 0.0, 0.0, 0.0, 0.0)]
@@ -187,13 +150,10 @@ def test_native_single_shock_and_zero_greeks(tmp_path, monkeypatch):
     assert _approx(native.pnl(exposures, shocks), py.pnl(exposures, shocks))
     assert _approx(native.pnl([Exposure()], [Shock(0.1, 1.0, 1.0, 0.1)]), [0.0])
 
-
-def test_native_nan_propagates_like_python(tmp_path, monkeypatch):
+def test_native_nan_propagates_like_python(native_scenario_lib, monkeypatch):
     """M6.5: NaN is not sanitized; both backends must propagate."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     exposures = [Exposure(1.0, 0.0, 0.0, 0.0, 0.0)]
     shocks = [Shock(float("nan"), 0.0, 0.0, 0.0)]
     py_out = PythonScenarioKernel().pnl(exposures, shocks)
@@ -201,13 +161,10 @@ def test_native_nan_propagates_like_python(tmp_path, monkeypatch):
     assert len(py_out) == 1 and len(nat_out) == 1
     assert math.isnan(py_out[0]) and math.isnan(nat_out[0])
 
-
-def test_native_multi_exposure_matrix_matches_python(tmp_path, monkeypatch):
+def test_native_multi_exposure_matrix_matches_python(native_scenario_lib, monkeypatch):
     """M6.5: denser book × shock matrix beyond the two-row smoke case."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     exposures = [
         Exposure(
             delta=10.0 * (i + 1),
@@ -231,12 +188,9 @@ def test_native_multi_exposure_matrix_matches_python(tmp_path, monkeypatch):
     actual = NativeScenarioKernel(lib).pnl(exposures, shocks)
     assert _approx(actual, expected)
 
-
-def test_native_abi_version_readable(tmp_path):
+def test_native_abi_version_readable(native_scenario_lib):
     """R0.12.5: Python bridge can read the exported ABI version."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     native = NativeScenarioKernel(lib)
     assert KERNEL_ABI_VERSION == 1
     assert native.abi_version == KERNEL_ABI_VERSION
@@ -245,24 +199,18 @@ def test_native_abi_version_readable(tmp_path):
     raw.riskforge_kernel_abi_version.restype = ctypes.c_int
     assert raw.riskforge_kernel_abi_version() == KERNEL_ABI_VERSION
 
-
-def test_native_constructor_rejects_abi_mismatch(tmp_path, monkeypatch):
+def test_native_constructor_rejects_abi_mismatch(native_scenario_lib, monkeypatch):
     """R0.12.5: a stale Python ABI expectation must fail closed at load."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
-    lib = _build_native_lib(tmp_path)
+    lib = native_scenario_lib
     monkeypatch.setattr("app.compute.kernel.KERNEL_ABI_VERSION", 99)
     with pytest.raises(NativeKernelError) as exc:
         NativeScenarioKernel(lib)
     assert exc.value.code == KERNEL_ERR_ABI
 
-
-def test_native_wrong_abi_arg_fails_closed(tmp_path, monkeypatch):
+def test_native_wrong_abi_arg_fails_closed(native_scenario_lib, monkeypatch):
     """R0.12.5: compute entry rejects a mismatched ABI argument and does not write."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
     s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
     out = (ctypes.c_double * 1)(99.0)
@@ -270,13 +218,10 @@ def test_native_wrong_abi_arg_fails_closed(tmp_path, monkeypatch):
     assert rc == KERNEL_ERR_ABI
     assert out[0] == 99.0
 
-
-def test_native_length_mismatch_fails_closed(tmp_path, monkeypatch):
+def test_native_length_mismatch_fails_closed(native_scenario_lib, monkeypatch):
     """R0.12.5: mismatched exposure/shock/out lengths return an error, no overrun."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
     s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
     out = (ctypes.c_double * 1)(99.0)
@@ -293,22 +238,18 @@ def test_native_length_mismatch_fails_closed(tmp_path, monkeypatch):
     assert rc == KERNEL_ERR_LENGTH
     assert out[0] == 99.0
 
-
 def _size_max() -> int:
     return (1 << (ctypes.sizeof(ctypes.c_size_t) * 8)) - 1
 
-
-def test_native_wrap_sized_counts_fail_closed(tmp_path, monkeypatch):
+def test_native_wrap_sized_counts_fail_closed(native_scenario_lib, monkeypatch):
     """R0.12.5: wrap-sized n_exposures/n_shocks must ERR_LENGTH without a huge alloc.
 
     SIZE_MAX/5+1 makes *5 wrap to 4; SIZE_MAX/4+1 makes *4 wrap to 0. Passing
     those wrapped products as n_*_doubles (and n_out == wrap n_shocks) means a
     deleted overflow guard would treat lengths as matching and walk huge n_*.
     """
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
     s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
     out = (ctypes.c_double * 1)(99.0)
@@ -324,13 +265,10 @@ def test_native_wrap_sized_counts_fail_closed(tmp_path, monkeypatch):
     assert rc == KERNEL_ERR_LENGTH
     assert out[0] == 99.0
 
-
-def test_native_tight_buffer_mismatch_fails_closed(tmp_path, monkeypatch):
+def test_native_tight_buffer_mismatch_fails_closed(native_scenario_lib, monkeypatch):
     """R0.12.5: tight out/exposure buffers so a skipped predicate is an ASan overrun."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
     two_s = (ctypes.c_double * 8)(-0.1, 5.0, 20.0, -0.02, 0.03, -2.0, -10.0, 0.01)
     out = (ctypes.c_double * 1)(99.0)
@@ -343,13 +281,10 @@ def test_native_tight_buffer_mismatch_fails_closed(tmp_path, monkeypatch):
     assert rc == KERNEL_ERR_LENGTH
     assert out[0] == 99.0
 
-
-def test_native_null_pointer_nonzero_count_fails_closed(tmp_path, monkeypatch):
+def test_native_null_pointer_nonzero_count_fails_closed(native_scenario_lib, monkeypatch):
     """R0.12.5: NULL + count > 0 is an error; out is not written."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
     out = (ctypes.c_double * 1)(99.0)
     rc = native.fn(KERNEL_ABI_VERSION, None, 1, 5, s, 1, 4, out, 1)
@@ -364,13 +299,10 @@ def test_native_null_pointer_nonzero_count_fails_closed(tmp_path, monkeypatch):
     rc = native.fn(KERNEL_ABI_VERSION, e, 1, 5, s, 1, 4, None, 1)
     assert rc == KERNEL_ERR_NULL
 
-
-def test_native_empty_null_pointers_ok(tmp_path, monkeypatch):
+def test_native_empty_null_pointers_ok(native_scenario_lib, monkeypatch):
     """R0.12.5: count == 0 may pass NULL; empty book writes zeros per shock."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     rc = native.fn(KERNEL_ABI_VERSION, None, 0, 0, None, 0, 0, None, 0)
     assert rc == KERNEL_OK
 
@@ -380,12 +312,10 @@ def test_native_empty_null_pointers_ok(tmp_path, monkeypatch):
     assert rc == KERNEL_OK
     assert out[0] == 0.0
 
-
 def _ptr_addr(p) -> int | None:
     if not p:
         return None
     return ctypes.cast(p, ctypes.c_void_p).value
-
 
 def _spy_native_fn(native: NativeScenarioKernel) -> list[dict]:
     """Capture buffer addresses passed into the C ABI (proves no extra copy)."""
@@ -405,13 +335,10 @@ def _spy_native_fn(native: NativeScenarioKernel) -> list[dict]:
     native.fn = spy
     return captured
 
-
-def test_native_contiguous_numpy_no_copy_matches_python(tmp_path, monkeypatch):
+def test_native_contiguous_numpy_no_copy_matches_python(native_scenario_lib, monkeypatch):
     """R0.17: C-contiguous float64 buffers go to the kernel without a pack copy."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     exposures = [
         Exposure(1000, 200, 30, -10, 500),
         Exposure(-300, 80, 10, 5, -200),
@@ -435,13 +362,10 @@ def test_native_contiguous_numpy_no_copy_matches_python(tmp_path, monkeypatch):
     assert _approx(actual.tolist(), expected)
     assert _approx(actual.tolist(), native.pnl(exposures, shocks))
 
-
-def test_native_flat_1d_contiguous_numpy_no_copy(tmp_path, monkeypatch):
+def test_native_flat_1d_contiguous_numpy_no_copy(native_scenario_lib, monkeypatch):
     """R0.17: packed 1-D C-contiguous float64 is the same ABI layout, no copy."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     e = np.array([1000.0, 200.0, 30.0, -10.0, 500.0], dtype=np.float64)
     s = np.array([-0.1, 5.0, 20.0, -0.02], dtype=np.float64)
     captured = _spy_native_fn(native)
@@ -453,13 +377,10 @@ def test_native_flat_1d_contiguous_numpy_no_copy(tmp_path, monkeypatch):
     )
     assert _approx(actual.tolist(), expected)
 
-
-def test_native_numpy_out_buffer_no_copy(tmp_path, monkeypatch):
+def test_native_numpy_out_buffer_no_copy(native_scenario_lib, monkeypatch):
     """R0.17: caller-supplied C-contiguous float64 out is written in place."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     e = np.array([[1000.0, 200.0, 30.0, -10.0, 500.0]], dtype=np.float64)
     s = np.array([[-0.1, 5.0, 20.0, -0.02]], dtype=np.float64)
     out = np.full(1, 99.0, dtype=np.float64)
@@ -472,13 +393,10 @@ def test_native_numpy_out_buffer_no_copy(tmp_path, monkeypatch):
     )
     assert _approx(out.tolist(), expected)
 
-
-def test_native_noncontiguous_numpy_matches_python(tmp_path, monkeypatch):
+def test_native_noncontiguous_numpy_matches_python(native_scenario_lib, monkeypatch):
     """R0.17: Fortran / strided arrays still match; they may copy."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     e_c = np.array(
         [[1000.0, 200.0, 30.0, -10.0, 500.0], [-300.0, 80.0, 10.0, 5.0, -200.0]],
         dtype=np.float64,
@@ -501,13 +419,10 @@ def test_native_noncontiguous_numpy_matches_python(tmp_path, monkeypatch):
     )
     assert _approx(actual.tolist(), expected)
 
-
-def test_native_numpy_empty_and_shape_mismatch(tmp_path, monkeypatch):
+def test_native_numpy_empty_and_shape_mismatch(native_scenario_lib, monkeypatch):
     """R0.17: empty arrays follow the ABI; wrong stride is KERNEL_ERR_LENGTH."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     e = np.zeros((0, 5), dtype=np.float64)
     s = np.array([[0.01, 1.0, 2.0, -0.01]], dtype=np.float64)
     assert _approx(native.pnl_from_arrays(e, s).tolist(), [0.0])
@@ -518,14 +433,11 @@ def test_native_numpy_empty_and_shape_mismatch(tmp_path, monkeypatch):
         native.pnl_from_arrays(bad, s)
     assert exc.value.code == KERNEL_ERR_LENGTH
 
-
-def test_native_tiny_workload_matches_python_with_many_threads(tmp_path, monkeypatch):
+def test_native_tiny_workload_matches_python_with_many_threads(native_scenario_lib, monkeypatch):
     """R0.17: 1×S Historical-VaR shape stays correct when THREADS>1 (serial path)."""
-    if not shutil.which("g++"):
-        pytest.skip("g++ unavailable")
     assert KERNEL_PARALLEL_MIN_WORK == 4096
     monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "8")
-    native = NativeScenarioKernel(_build_native_lib(tmp_path))
+    native = NativeScenarioKernel(native_scenario_lib)
     exposures = [Exposure(1000, 200, 30, -10, 500)]
     shocks = [Shock(-0.01 + 0.0001 * k, 2.0, 5.0, -0.002) for k in range(64)]
     assert 1 * 64 < KERNEL_PARALLEL_MIN_WORK
