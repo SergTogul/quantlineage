@@ -472,6 +472,22 @@ def test_in_memory_repo_status_enum_matches_service():
     assert queued.status == RiskRunStatus.QUEUED
     running = svc.start('mem-1')
     assert running.status == RiskRunStatus.RUNNING
-    done = svc.complete('mem-1', result_type='summary', payload={'ok': True})
+    done = svc.complete(
+        'mem-1',
+        result_type='summary',
+        payload={
+            'portfolio_id': 'p',
+            'market_value': 1.0,
+            'delta': 0.0,
+            'gamma': 0.0,
+            'vega': 0.0,
+            'dv01': 0.0,
+            'fx_delta': 0.0,
+            'var_95': 0.0,
+            'var_99': 0.0,
+            'expected_shortfall_99': 0.0,
+            'methodology': 'DELTA_GAMMA',
+        },
+    )
     assert done.status == RiskRunStatus.COMPLETED
-    assert svc.get_result_payloads('mem-1')['summary']['ok'] is True
+    assert svc.get_result_payloads('mem-1')['summary']['portfolio_id'] == 'p'

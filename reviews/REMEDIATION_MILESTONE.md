@@ -758,7 +758,7 @@ Hierarchy time is driven primarily by one base calculation + aggregation, not nu
 Related findings:
 
 - RF-009 (**CLOSED**)
-- RF-013 (**IN PROGRESS**; HTTP overwrite pin landed in R0.8.6; finding not CLOSED — `reviews/r0.8.6-rf013-close-gate-report.md`)
+- RF-013 (**IN PROGRESS**; HTTP overwrite pin R0.8.6; typed `risk_results.payload` R0.8.7; finding not CLOSED — `reviews/r0.8.7-typed-result-payload-report.md`)
 - RF-010
 
 ## R0.8.1 Deterministic RiskRun specification — COMPLETE (2026-09-04)
@@ -830,6 +830,21 @@ Acceptance:
 - Large derived payloads not unconstrained JSON — **UNMET**. PERF-016 is `risk_results.payload` unconstrained JSON (`backend/app/persistence/models.py`). R0.8.4 typed per-`run_type` request bodies are not this cell.
 
 Residuals (keep finding IN PROGRESS): no `portfolio_version` / server-issued ids; live calculate still POSTs a full book; leftover `save` upsert for seed callers; object ACLs = RF-014.
+
+## R0.8.7 Typed risk_results.payload — COMPLETE; RF-013 stays IN PROGRESS (2026-09-09)
+
+`add_result` / `complete` validate derived payloads against a known schema per `result_type` (`extra='forbid'`), reusing existing domain/API result models (VaR, stress, reverse, summary, dashboard, …). Unknown `result_type` and extra keys fail closed. Physical JSON column remains; unconstrained dict writes are the defect that is now gated. Evidence: `backend/tests/test_result_payload_schema.py`. **Do not CLOSE RF-013.**
+
+Acceptance:
+
+- overwrite `global-macro` — **MET** (cite R0.8.6).
+- Persisted RiskRun reproduced from IDs — **MET** (cite R0.8.5).
+- PostgreSQL pytest/integration — **MET** (cite R0.8.5).
+- Derived payloads not unconstrained JSON — **MET** (this slice). R0.8.4 typed request bodies are not this cell.
+
+Residuals (keep finding IN PROGRESS): no `portfolio_version` / server-issued ids; live calculate still POSTs a full book; leftover `save` upsert for seed callers; object ACLs = RF-014.
+
+Report: `reviews/r0.8.7-typed-result-payload-report.md`.
 
 ---
 
