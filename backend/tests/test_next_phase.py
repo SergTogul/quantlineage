@@ -11,7 +11,6 @@ from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 from app.services.portfolio_service import PortfolioService
 
 svc=PortfolioService(BuiltinPricingEngine(),HistoricalRiskEngine())
-client=TestClient(app)
 
 
 def test_market_snapshot_and_instrument_specific_shock():
@@ -84,15 +83,16 @@ def test_deterministic_query_routes_to_risk_tools():
 
 
 def test_new_api_endpoints():
-    portfolio=client.get('/portfolio').json()
-    for endpoint in ['/risk/factors','/risk/var','/risk/hierarchy']:
-        r=client.post(endpoint,json=portfolio); assert r.status_code==200, r.text
-    rev=client.post('/risk/stress/reverse',json={"portfolio":portfolio,"target_loss_pct":0.01,"factor":"equity"})
-    assert rev.status_code==200 and rev.json()['converged']
-    q=client.post('/risk/query',json={"portfolio":portfolio,"question":"What is 99% VaR?"})
-    assert q.status_code==200 and q.json()['intent']=='var'
-    att=client.post('/risk/attribution',json={"previous_portfolio":portfolio,"current_portfolio":portfolio})
-    assert att.status_code==200 and abs(att.json()['residual']) < 1e-8
+    with TestClient(app) as client:
+        portfolio=client.get('/portfolio').json()
+        for endpoint in ['/risk/factors','/risk/var','/risk/hierarchy']:
+            r=client.post(endpoint,json=portfolio); assert r.status_code==200, r.text
+        rev=client.post('/risk/stress/reverse',json={"portfolio":portfolio,"target_loss_pct":0.01,"factor":"equity"})
+        assert rev.status_code==200 and rev.json()['converged']
+        q=client.post('/risk/query',json={"portfolio":portfolio,"question":"What is 99% VaR?"})
+        assert q.status_code==200 and q.json()['intent']=='var'
+        att=client.post('/risk/attribution',json={"previous_portfolio":portfolio,"current_portfolio":portfolio})
+        assert att.status_code==200 and abs(att.json()['residual']) < 1e-8
 
 
 def test_scenario_comparison_measures_hedge_improvement():
@@ -107,8 +107,9 @@ def test_scenario_comparison_measures_hedge_improvement():
 
 
 def test_market_and_demo_attribution_api():
-    portfolio=client.get('/portfolio').json()
-    market=client.post('/market/snapshot',json=portfolio)
-    demo=client.post('/risk/attribution/demo',json=portfolio)
-    assert market.status_code==200 and 'equity_spots' in market.json()
-    assert demo.status_code==200 and abs(demo.json()['total_change']) > 0
+    with TestClient(app) as client:
+        portfolio=client.get('/portfolio').json()
+        market=client.post('/market/snapshot',json=portfolio)
+        demo=client.post('/risk/attribution/demo',json=portfolio)
+        assert market.status_code==200 and 'equity_spots' in market.json()
+        assert demo.status_code==200 and abs(demo.json()['total_change']) > 0

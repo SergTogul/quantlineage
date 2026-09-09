@@ -138,122 +138,122 @@ def test_m73_live_responses_validate_against_domain_models() -> None:
     """HTTP JSON from critical POSTs validates as domain response models."""
     from app.main import app
 
-    client = TestClient(app)
-    portfolio = client.get("/portfolio").json()
+    with TestClient(app) as client:
+        portfolio = client.get("/portfolio").json()
 
-    var_payload = client.post("/risk/var", json=portfolio)
-    assert var_payload.status_code == 200
-    VaRReport.model_validate(var_payload.json())
+        var_payload = client.post("/risk/var", json=portfolio)
+        assert var_payload.status_code == 200
+        VaRReport.model_validate(var_payload.json())
 
-    es_payload = client.post("/risk/es", json=portfolio)
-    assert es_payload.status_code == 200
-    ESContributionReport.model_validate(es_payload.json())
+        es_payload = client.post("/risk/es", json=portfolio)
+        assert es_payload.status_code == 200
+        ESContributionReport.model_validate(es_payload.json())
 
-    stress_payload = client.post("/risk/stress", json=portfolio)
-    assert stress_payload.status_code == 200
-    TypeAdapter(list[StressResult]).validate_python(stress_payload.json())
+        stress_payload = client.post("/risk/stress", json=portfolio)
+        assert stress_payload.status_code == 200
+        TypeAdapter(list[StressResult]).validate_python(stress_payload.json())
 
-    reverse_payload = client.post(
-        "/risk/stress/reverse",
-        json={"portfolio": portfolio, "target_loss_pct": 0.05, "factor": "equity"},
-    )
-    assert reverse_payload.status_code == 200
-    ReverseStressResult.model_validate(reverse_payload.json())
+        reverse_payload = client.post(
+            "/risk/stress/reverse",
+            json={"portfolio": portfolio, "target_loss_pct": 0.05, "factor": "equity"},
+        )
+        assert reverse_payload.status_code == 200
+        ReverseStressResult.model_validate(reverse_payload.json())
 
-    multi_payload = client.post(
-        "/risk/stress/reverse/multi",
-        json={"portfolio": portfolio, "target_loss_pct": 0.05, "factors": ["equity", "vol"]},
-    )
-    assert multi_payload.status_code == 200
-    MultiFactorReverseStressResult.model_validate(multi_payload.json())
+        multi_payload = client.post(
+            "/risk/stress/reverse/multi",
+            json={"portfolio": portfolio, "target_loss_pct": 0.05, "factors": ["equity", "vol"]},
+        )
+        assert multi_payload.status_code == 200
+        MultiFactorReverseStressResult.model_validate(multi_payload.json())
 
-    hedged = {
-        **portfolio,
-        "id": f"{portfolio['id']}-hedged",
-        "positions": [
-            {**portfolio["positions"][0], "quantity": float(portfolio["positions"][0]["quantity"]) * 0.5},
-            *portfolio["positions"][1:],
-        ],
-    }
-    compare_payload = client.post(
-        "/risk/stress/compare",
-        json={
-            "portfolio": portfolio,
-            "hedged_portfolio": hedged,
-            "scenarios": [
-                {
-                    "name": "Equity -10%",
-                    "equity_shock": -0.10,
-                    "vol_shock": 0.0,
-                    "rates_shift_bps": 0.0,
-                    "fx_shock": 0.0,
-                }
+        hedged = {
+            **portfolio,
+            "id": f"{portfolio['id']}-hedged",
+            "positions": [
+                {**portfolio["positions"][0], "quantity": float(portfolio["positions"][0]["quantity"]) * 0.5},
+                *portfolio["positions"][1:],
             ],
-            "methodology": "DELTA_GAMMA",
-        },
-    )
-    assert compare_payload.status_code == 200
-    HedgeComparisonReport.model_validate(compare_payload.json())
-
-    # What-if: add a small equity clip
-    base_pos = next(p for p in portfolio["positions"] if p["type"] == "equity")
-    what_if_payload = client.post(
-        "/risk/what-if",
-        json={
-            "portfolio": portfolio,
-            "methodology": "DELTA_GAMMA",
-            "changes": [
-                {
-                    "operation": "add",
-                    "position": {
-                        **base_pos,
-                        "id": "m73-whatif-eq",
-                        "quantity": 1.0,
-                    },
-                }
-            ],
-        },
-    )
-    assert what_if_payload.status_code == 200
-    WhatIfReport.model_validate(what_if_payload.json())
-
-    # Change attribution: bump first equity quantity
-    bumped = {
-        **portfolio,
-        "positions": [
-            {
-                **portfolio["positions"][0],
-                "quantity": float(portfolio["positions"][0]["quantity"]) * 1.1,
+        }
+        compare_payload = client.post(
+            "/risk/stress/compare",
+            json={
+                "portfolio": portfolio,
+                "hedged_portfolio": hedged,
+                "scenarios": [
+                    {
+                        "name": "Equity -10%",
+                        "equity_shock": -0.10,
+                        "vol_shock": 0.0,
+                        "rates_shift_bps": 0.0,
+                        "fx_shock": 0.0,
+                    }
+                ],
+                "methodology": "DELTA_GAMMA",
             },
-            *portfolio["positions"][1:],
-        ],
-    }
-    change_payload = client.post(
-        "/risk/change-attribution",
-        json={
-            "previous_portfolio": portfolio,
-            "current_portfolio": bumped,
-            "metric": "var_99",
-            "methodology": "DELTA_GAMMA",
-        },
-    )
-    assert change_payload.status_code == 200
-    RiskChangeAttributionReport.model_validate(change_payload.json())
+        )
+        assert compare_payload.status_code == 200
+        HedgeComparisonReport.model_validate(compare_payload.json())
 
-    drill_payload = client.post(
-        "/risk/limits/drilldown",
-        json={
-            "portfolio": portfolio,
-            "metric": "var_99",
-            "breaches_only": False,
-            "top_n": 3,
-        },
-    )
-    assert drill_payload.status_code == 200
-    LimitDrilldownReport.model_validate(drill_payload.json())
+        # What-if: add a small equity clip
+        base_pos = next(p for p in portfolio["positions"] if p["type"] == "equity")
+        what_if_payload = client.post(
+            "/risk/what-if",
+            json={
+                "portfolio": portfolio,
+                "methodology": "DELTA_GAMMA",
+                "changes": [
+                    {
+                        "operation": "add",
+                        "position": {
+                            **base_pos,
+                            "id": "m73-whatif-eq",
+                            "quantity": 1.0,
+                        },
+                    }
+                ],
+            },
+        )
+        assert what_if_payload.status_code == 200
+        WhatIfReport.model_validate(what_if_payload.json())
 
-    # Dual-mount parity: v1 VaR also validates
-    v1_var = client.post("/api/v1/risk/var", json=portfolio)
-    assert v1_var.status_code == 200
-    VaRReport.model_validate(v1_var.json())
-    assert v1_var.json() == var_payload.json()
+        # Change attribution: bump first equity quantity
+        bumped = {
+            **portfolio,
+            "positions": [
+                {
+                    **portfolio["positions"][0],
+                    "quantity": float(portfolio["positions"][0]["quantity"]) * 1.1,
+                },
+                *portfolio["positions"][1:],
+            ],
+        }
+        change_payload = client.post(
+            "/risk/change-attribution",
+            json={
+                "previous_portfolio": portfolio,
+                "current_portfolio": bumped,
+                "metric": "var_99",
+                "methodology": "DELTA_GAMMA",
+            },
+        )
+        assert change_payload.status_code == 200
+        RiskChangeAttributionReport.model_validate(change_payload.json())
+
+        drill_payload = client.post(
+            "/risk/limits/drilldown",
+            json={
+                "portfolio": portfolio,
+                "metric": "var_99",
+                "breaches_only": False,
+                "top_n": 3,
+            },
+        )
+        assert drill_payload.status_code == 200
+        LimitDrilldownReport.model_validate(drill_payload.json())
+
+        # Dual-mount parity: v1 VaR also validates
+        v1_var = client.post("/api/v1/risk/var", json=portfolio)
+        assert v1_var.status_code == 200
+        VaRReport.model_validate(v1_var.json())
+        assert v1_var.json() == var_payload.json()

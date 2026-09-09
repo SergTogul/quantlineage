@@ -37,34 +37,34 @@ def test_service_what_if_returns_before_after_incremental_and_deltas():
         assert math.isclose(s.delta_pnl, s.after_pnl - s.before_pnl, abs_tol=_TOL)
 
 def test_what_if_api_add_trade():
-    client = TestClient(app)
-    portfolio = client.get('/portfolio').json()
-    body = {'portfolio': portfolio, 'methodology': 'DELTA_GAMMA', 'changes': [{'operation': 'add', 'position': {'type': 'equity', 'id': 'eq-whatif', 'symbol': 'SPY', 'quantity': 400, 'sector': 'ETF'}}]}
-    response = client.post('/risk/what-if', json=body)
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload['methodology'] == 'DELTA_GAMMA'
-    assert 'before' in payload and 'after' in payload and ('incremental' in payload)
-    assert math.isclose(payload['incremental']['var_99'], payload['after']['var_99'] - payload['before']['var_99'], abs_tol=_TOL)
-    assert 'changed_factor_exposures' in payload
-    assert 'changed_stress_losses' in payload
-    still = client.get('/portfolio').json()
-    assert all(p['id'] != 'eq-whatif' for p in still['positions'])
+    with TestClient(app) as client:
+        portfolio = client.get('/portfolio').json()
+        body = {'portfolio': portfolio, 'methodology': 'DELTA_GAMMA', 'changes': [{'operation': 'add', 'position': {'type': 'equity', 'id': 'eq-whatif', 'symbol': 'SPY', 'quantity': 400, 'sector': 'ETF'}}]}
+        response = client.post('/risk/what-if', json=body)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload['methodology'] == 'DELTA_GAMMA'
+        assert 'before' in payload and 'after' in payload and ('incremental' in payload)
+        assert math.isclose(payload['incremental']['var_99'], payload['after']['var_99'] - payload['before']['var_99'], abs_tol=_TOL)
+        assert 'changed_factor_exposures' in payload
+        assert 'changed_stress_losses' in payload
+        still = client.get('/portfolio').json()
+        assert all(p['id'] != 'eq-whatif' for p in still['positions'])
 
 def test_what_if_api_methodology_query_override():
-    client = TestClient(app)
-    portfolio = client.get('/portfolio').json()
-    body = {'portfolio': portfolio, 'methodology': 'DELTA_GAMMA', 'changes': [{'operation': 'remove', 'position_id': 'eq-spy'}]}
-    response = client.post('/risk/what-if?methodology=LINEAR', json=body)
-    assert response.status_code == 200
-    assert response.json()['methodology'] == 'LINEAR'
+    with TestClient(app) as client:
+        portfolio = client.get('/portfolio').json()
+        body = {'portfolio': portfolio, 'methodology': 'DELTA_GAMMA', 'changes': [{'operation': 'remove', 'position_id': 'eq-spy'}]}
+        response = client.post('/risk/what-if?methodology=LINEAR', json=body)
+        assert response.status_code == 200
+        assert response.json()['methodology'] == 'LINEAR'
 
 def test_what_if_api_rejects_bad_remove():
-    client = TestClient(app)
-    portfolio = client.get('/portfolio').json()
-    body = {'portfolio': portfolio, 'changes': [{'operation': 'remove', 'position_id': 'does-not-exist'}]}
-    response = client.post('/risk/what-if', json=body)
-    assert response.status_code == 400
+    with TestClient(app) as client:
+        portfolio = client.get('/portfolio').json()
+        body = {'portfolio': portfolio, 'changes': [{'operation': 'remove', 'position_id': 'does-not-exist'}]}
+        response = client.post('/risk/what-if', json=body)
+        assert response.status_code == 400
 
 def test_what_if_remove_matches_apply_helper():
     svc = PortfolioService(BuiltinPricingEngine(), HistoricalRiskEngine(seed=7, observations=_OBS))
