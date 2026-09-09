@@ -576,7 +576,7 @@ Interactive and worker calculations with the same run specification produce the 
 Priority: **P1**  
 Risk types: ARCHITECTURE, MAINTAINABILITY  
 Confidence: HIGH
-Status: **IN PROGRESS** (2026-09-09). R0.9.1 COMPLETE — HTTP `*Request` / `*Response` / RiskRun wire bodies live in `app.api.schemas`; domain package has no FastAPI / `app.api` imports. R0.9.2 COMPLETE — `RiskEngine.calculate` / `HistoricalRiskEngine.calculate` return domain `RiskSummary`. R0.9.3 COMPLETE — `PortfolioService` is constructed in FastAPI lifespan via `build_portfolio_service()`, stored on `app.state`, and shared with `RiskRunWorker`; `get_portfolio_service(request)` reads `app.state` and **fails closed (503)** when missing (same as `get_risk_run_worker`). No `_legacy_portfolio_service` / module-global HTTP cache; `app.main.service` aliases `app.state` only. No DI container. **Do not CLOSE:** dual-use engine/service inputs (`AttributionRequest`, `RiskChangeAttributionRequest`, `WhatIfRequest`) remain in domain. Evidence: `reviews/r0.9.1-split-transport-schemas-report.md`, `reviews/r0.9.2-typed-risk-results-report.md`, `reviews/r0.9.3-application-composition-report.md`.
+Status: **CLOSED** (2026-09-09). Independent review **APPROVE** (`reviews/sdd-briefs/task-18-rf010-composition-review.md`). R0.9.1 HTTP schemas in `app.api.schemas`; R0.9.2 `RiskEngine.calculate` returns `RiskSummary`; R0.9.3 `PortfolioService` constructed in FastAPI lifespan on `app.state`, shared with `RiskRunWorker`, HTTP Depends fail-closed 503 when missing. No DI container. **Named residual (not blocking close):** dual-use `AttributionRequest` / `RiskChangeAttributionRequest` / `WhatIfRequest` remain in domain.
 
 Source findings:
 
