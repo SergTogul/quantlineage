@@ -1,6 +1,6 @@
 """M2.2 historical scenario generation tests.
 
-Pipeline: FactorObservationSeries → AggregateFactorChange → MarketScenario → shocked MarketSnapshot.
+Pipeline: FactorObservationSeries → AggregateFactorChange → Scenario → shocked MarketSnapshot.
 
 Conventions / tolerances:
 - equity / FX: relative; vol: relative vol-level; rates: bp in observations, decimal in bump
@@ -13,20 +13,26 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from app.domain.models import MarketSnapshot, ScenarioKind
+from datetime import date
+
+from app.domain.models import MarketSnapshot
 from app.market.snapshot import shock_snapshot
 from app.pricing.builtin import BuiltinPricingEngine
+from app.risk.factor_panel import HistoricalFactorPanel
 from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero
 from app.risk.historical_data import (
     ArrayHistoricalDataset,
     FactorObservationSeries,
     SyntheticHistoricalDataset,
 )
+from app.risk.scenario_engine import apply_scenario
+from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory, scenario_to_market_scenario
 from app.risk.scenarios import (
     AggregateFactorChange,
     apply_market_scenario,
     expand_aggregate_change,
     historical_market_scenarios,
+    historical_market_scenarios_from_panel,
     historical_shocked_snapshots,
     iter_aggregate_changes,
     market_scenario_from_change,
@@ -143,8 +149,8 @@ def test_historical_scenarios_count_and_kind():
     base = _base_snapshot()
     scenarios = historical_market_scenarios(base, _series())
     assert len(scenarios) == 3
-    assert all(s.kind == ScenarioKind.HISTORICAL_STYLE for s in scenarios)
-    assert [s.observation_index for s in scenarios] == [0, 1, 2]
+    assert all(s.category == ScenarioCategory.HISTORICAL_REPLAY for s in scenarios)
+    assert [s.metadata["observation_index"] for s in scenarios] == [0, 1, 2]
 
 
 def test_shocked_snapshots_are_independent_not_cumulative():
@@ -209,3 +215,71 @@ def test_synthetic_pipeline_is_deterministic():
     b = historical_shocked_snapshots(base, ds)
     assert len(a) == 25
     assert [s.content_hash() for s in a] == [s.content_hash() for s in b]
+
+
+def test_historical_market_scenarios_yield_canonical_scenario_not_market_scenario():
+    """R0.4.2-G: generation stores/yields Scenario + FactorShock, not MarketScenario."""
+    base = _base_snapshot()
+    scenarios = historical_market_scenarios(base, _series())
+    assert scenarios
+    for scenario in scenarios:
+        assert type(scenario) is Scenario
+        assert all(isinstance(shock, FactorShock) for shock in scenario.shocks)
+        assert scenario.category == ScenarioCategory.HISTORICAL_REPLAY
+        assert "observation_index" in scenario.metadata
+
+
+def test_historical_scenario_apply_matches_market_scenario_adapter_identity():
+    """Canonical apply must match the MarketScenario adapter (snapshot + P&L)."""
+    book = SAMPLE_PORTFOLIO
+    market = demo_market_snapshot(book)
+    pricing = BuiltinPricingEngine()
+    series = _series()
+    scenarios = historical_market_scenarios(market, series)
+    base_mv = sum(pricing.value(p, market).market_value for p in book.positions)
+    for formal in scenarios:
+        adapted = scenario_to_market_scenario(formal)
+        via_formal = apply_scenario(market, formal)
+        via_adapter = apply_market_scenario(market, adapted)
+        assert via_formal.content_hash() == via_adapter.content_hash()
+        assert via_formal.id == via_adapter.id
+        formal_mv = sum(pricing.value(p, via_formal).market_value for p in book.positions)
+        adapter_mv = sum(pricing.value(p, via_adapter).market_value for p in book.positions)
+        assert formal_mv == pytest.approx(adapter_mv, abs=1e-12)
+        assert (formal_mv - base_mv) == pytest.approx(adapter_mv - base_mv, abs=1e-12)
+    # Live snapshot expansion: a name absent from demo still receives the aggregate.
+    live = MarketSnapshot(
+        id="live-hist",
+        equity_spots={"NEWEQ": 50.0, "SPY": 100.0},
+        equity_vols={"NEWEQ": 0.25},
+        rates={"USD": 0.04},
+    )
+    live_scenarios = historical_market_scenarios(live, series)
+    eq_symbols = {
+        shock.factor.symbol
+        for scenario in live_scenarios
+        for shock in scenario.shocks
+        if isinstance(shock.factor, EquitySpot)
+    }
+    assert "NEWEQ" in eq_symbols
+    assert "SPY" in eq_symbols
+
+
+def test_panel_historical_scenarios_yield_canonical_scenario():
+    panel = HistoricalFactorPanel.from_pairs(
+        dates=[date(2024, 1, 2)],
+        rows=[[(EquitySpot("AAA"), 0.10), (EquitySpot("BBB"), -0.20)]],
+    )
+    scenarios = historical_market_scenarios_from_panel(panel)
+    assert len(scenarios) == 1
+    scenario = scenarios[0]
+    assert type(scenario) is Scenario
+    assert all(isinstance(shock, FactorShock) for shock in scenario.shocks)
+    assert scenario.category == ScenarioCategory.HISTORICAL_REPLAY
+    amounts = {
+        shock.factor.symbol: shock.amount
+        for shock in scenario.shocks
+        if isinstance(shock.factor, EquitySpot)
+    }
+    assert amounts["AAA"] == pytest.approx(0.10)
+    assert amounts["BBB"] == pytest.approx(-0.20)

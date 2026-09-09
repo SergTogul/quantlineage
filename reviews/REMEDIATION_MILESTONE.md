@@ -413,9 +413,11 @@ R0.4.2-C COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-
 
 R0.4.2-D COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/r0.4.2-d-formal-post-wire-independent-review.md`). Primary UI POST path uses formal ScenarioWire (`/formal/evaluate/custom`, `/formal/custom`, `/formal/compare`); frontend `scenarioPayload` / `compareHedge` no longer call legacy StressScenario POSTs. Legacy custom/evaluate/compare routes retained as **deprecated** back-compat. **RF-004 CLOSED**; RF-011 stays IN PROGRESS (typed nesting + deprecated dual POST residual). Review Important deferred: parity tests use `stress_to_wire` expansion, not frontend builders.
 
-R0.4.2-E COMPLETE pending review (2026-09-09): Engine-facing `StressEngine.run` / `evaluate` / `contributions` / compare convert `StressScenario` once at the HTTP or engine boundary (`to_canonical_scenario`); internals apply typed `Scenario` only. Deprecated StressScenario POST routes retained as adapters (`stresses_to_scenarios`). RF-011 stays **IN PROGRESS** (library/persistence still StressScenario; historical/reverse dual). Evidence: `reviews/r0.4.2-e-scenario-only-engine-report.md`.
+R0.4.2-E COMPLETE pending review (2026-09-09): Engine-facing `StressEngine.run` / `evaluate` / `contributions` / compare convert `StressScenario` once at the HTTP or engine boundary (`to_canonical_scenario`); internals apply typed `Scenario` only. Deprecated StressScenario POST routes retained as adapters (`stresses_to_scenarios`). Evidence: `reviews/r0.4.2-e-scenario-only-engine-report.md`.
 
-R0.4.2-F COMPLETE pending review (2026-09-09): DEFAULT/THREAT in-code libraries are `BroadcastScenarioDefinition` templates expanded at apply time against the live `MarketSnapshot` (same pattern as `crisis_scenarios(base)`); `ScenarioDefinitionRepository` persists canonical `Scenario` as ScenarioWire JSON; HTTP DI returns `Scenario`. Broadcast macros are not frozen to demo equity names at import. Deprecated StressScenario POST routes retained. RF-011 stays **IN PROGRESS** (historical `MarketScenario` and reverse-stress factor-family solvers remain dual). Evidence: `reviews/r0.4.2-f-canonical-scenario-store-report.md`.
+R0.4.2-F COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/sdd-briefs/task-19-rf011-canonical-store-review.md`). DEFAULT/THREAT in-code libraries are `BroadcastScenarioDefinition` templates expanded at apply time against the live `MarketSnapshot` (same pattern as `crisis_scenarios(base)`); `ScenarioDefinitionRepository` persists canonical `Scenario` as ScenarioWire JSON; HTTP DI returns `Scenario`. Broadcast macros are not frozen to demo equity names at import. Deprecated StressScenario POST routes retained. Evidence: `reviews/r0.4.2-f-canonical-scenario-store-report.md`.
+
+R0.4.2-G COMPLETE pending review (2026-09-09): Historical replay generates/applies canonical `Scenario` + `FactorShock` (live-snapshot expansion; `MarketScenario` adapter only). Reverse-stress result carries the applied `Scenario`; `required_shock` wire units unchanged. **RF-011 CLOSED** with named residuals (deprecated StressScenario POSTs; MarketScenario adapter; one-factor-family reverse search; flat dict snapshot storage). Evidence: `reviews/r0.4.2-g-historical-reverse-scenario-report.md`.
 
 Converge:
 
@@ -460,14 +462,16 @@ Evidence: `reviews/r0.4.2-d-formal-post-wire-report.md`.
 
 R0.4.2-E COMPLETE pending review (2026-09-09): Engine-facing stress / attribution /
 threat take canonical `Scenario`; legacy HTTP `StressScenario` is adapter-only.
-RF-011 stays IN PROGRESS (libraries/persistence still StressScenario;
-historical/reverse dual). Evidence:
-`reviews/r0.4.2-e-scenario-only-engine-report.md`.
+Evidence: `reviews/r0.4.2-e-scenario-only-engine-report.md`.
 
-R0.4.2-F COMPLETE pending review (2026-09-09): libraries + persistence store
+R0.4.2-F COMPLETE (2026-09-09): Independent review **APPROVE** (`reviews/sdd-briefs/task-19-rf011-canonical-store-review.md`). libraries + persistence store
 canonical `Scenario` (in-code DEFAULT/THREAT are apply-time broadcast templates).
-RF-011 stays IN PROGRESS (historical `MarketScenario` / reverse-stress dual).
 Evidence: `reviews/r0.4.2-f-canonical-scenario-store-report.md`.
+
+R0.4.2-G COMPLETE pending review (2026-09-09): historical + reverse use canonical
+`Scenario`. **RF-011 CLOSED** (named residuals: deprecated StressScenario POSTs;
+MarketScenario adapter; reverse one-factor-family search). Evidence:
+`reviews/r0.4.2-g-historical-reverse-scenario-report.md`.
 
 ## R0.4.3 Explicit shock units
 
