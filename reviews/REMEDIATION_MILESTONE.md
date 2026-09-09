@@ -680,9 +680,9 @@ calculate persisted portfolio
 
 Do not upsert arbitrary stored portfolios because a request supplied the same ID.
 
-## R0.8.4 Typed run requests
+## R0.8.4 Typed run requests — COMPLETE (2026-09-08)
 
-Replace `dict[str, Any]` calculation request blobs with discriminated typed run-request schemas.
+Independent review **APPROVE** (`reviews/r0.8.4-typed-run-requests-independent-review.md`). Replaced opaque `request: dict` calculation blobs with per-`run_type` Pydantic schemas (`extra='forbid'`). Create DTO + worker submit validate the same typed body; validated JSON dump is persisted. `historical_dataset_id` rebinds the historical engine through shared factory helpers for both spec resolve and worker execution, or fails 400 if unsupported — never silently ignored. CSV identities use path-derived `file:<abspath>`. Residual Minor (execute from request blob vs persisted columns) deferred to R0.8.5. RF-009 stays open for R0.8.5.
 
 ## R0.8.5 Postgres integration tests
 

@@ -109,3 +109,45 @@ def test_build_portfolio_service_inherits_factory_panel(
     assert isinstance(service.risk, HistoricalRiskEngine)
     assert service.risk.factor_panel is not None
     assert service.risk.factor_panel.is_per_name_per_tenor_panel is True
+
+
+def test_demo_markets_cover_production_panel_rate_tenors():
+    """FULL_REVAL applies every panel RateZero via MarketSnapshot.apply.
+
+    Demo books must carry those pillars (incl. USD 0Y); otherwise /risk/es and
+    /risk/var with methodology=FULL_REVALUATION fail closed with KeyError → 500.
+    """
+    from app.sample import DEMO_PORTFOLIOS, demo_market_snapshot
+
+    panel_rate_tenors = {
+        f.tenor for f in DEFAULT_PRODUCTION_PANEL_FACTORS if isinstance(f, RateZero)
+    }
+    assert "0Y" in panel_rate_tenors
+    for book in DEMO_PORTFOLIOS:
+        market = demo_market_snapshot(book)
+        for factor in DEFAULT_PRODUCTION_PANEL_FACTORS:
+            if not isinstance(factor, RateZero):
+                continue
+            assert factor.currency in market.rates
+            pillars = market.key_rates.get(factor.currency) or {}
+            assert factor.tenor in pillars, (
+                f"{book.id} missing key_rates[{factor.currency!r}][{factor.tenor!r}] "
+                f"required by DEFAULT_PRODUCTION_PANEL_FACTORS"
+            )
+
+
+def test_production_full_revaluation_es_on_sample_book(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Regression: POST /risk/es?methodology=FULL_REVALUATION on global-macro."""
+    from app.domain.models import VaRMethodology
+    from app.sample import SAMPLE_PORTFOLIO
+
+    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    service = build_portfolio_service(observations=8, seed=7)
+    report = service.es_contributions(
+        SAMPLE_PORTFOLIO, methodology=VaRMethodology.FULL_REVALUATION
+    )
+    assert report.methodology is VaRMethodology.FULL_REVALUATION
+    assert report.portfolio_es >= 0.0
+    assert report.by_position

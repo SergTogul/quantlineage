@@ -134,6 +134,16 @@ class ArrayHistoricalDataset(_FourMacroDemoLabels):
         return self.series
 
 
+def file_csv_dataset_id(path: str | Path) -> str:
+    """Canonical identity for a CSV-backed historical dataset.
+
+    Demo / synthetic aliases stay as named constants; arbitrary CSVs use
+    ``file:`` + resolved absolute path so distinct paths never collapse to
+    the same id (R0.8.4).
+    """
+    return f"file:{Path(path).expanduser().resolve()}"
+
+
 @dataclass(frozen=True, slots=True)
 class FileHistoricalDataset(_FourMacroDemoLabels):
     """Factor observations loaded from a CSV (demo / replay / fixtures)."""
@@ -233,18 +243,28 @@ def load_factor_observations_csv(path: str | Path) -> FactorObservationSeries:
 def load_csv_historical_dataset(
     path: str | Path,
     *,
-    dataset_id: str = "file",
+    dataset_id: str | None = None,
     projection: HistoricalDatasetProjection = FOUR_MACRO_DEMO_PROJECTION,
 ) -> FileHistoricalDataset:
     """Wrap ``load_factor_observations_csv`` as a ``HistoricalMarketDataset``.
 
     Four-column CSVs are the ``four_macro_demo`` projection unless a future
     loader supplies a different label (R0.5.3 panel is not implemented here).
+
+    When ``dataset_id`` is omitted (or the legacy bare ``\"file\"``), identity is
+    the path-derived canonical form from :func:`file_csv_dataset_id`. Pass an
+    explicit id (e.g. ``DEMO_HISTORICAL_DATASET_ID``) for named fixtures.
     """
-    csv_path = Path(path).resolve()
+    csv_path = Path(path).expanduser().resolve()
+    if not csv_path.is_file():
+        raise ValueError(f"historical dataset CSV not found: {csv_path}")
+    if dataset_id is None or dataset_id == "file":
+        resolved_id = file_csv_dataset_id(csv_path)
+    else:
+        resolved_id = dataset_id
     return FileHistoricalDataset(
         series=load_factor_observations_csv(csv_path),
-        dataset_id=dataset_id,
+        dataset_id=resolved_id,
         source_path=str(csv_path),
         projection=projection,
     )
@@ -304,7 +324,11 @@ def create_historical_dataset(
     if key in {"synthetic", "rng", "random"}:
         return SyntheticHistoricalDataset(seed=seed, observations=observations)
     path = Path(resolved).expanduser()
+    if resolved.startswith("file:"):
+        path = Path(resolved[len("file:") :]).expanduser()
     if path.suffix.lower() == ".csv" or path.is_file():
+        if not path.is_file():
+            raise ValueError(f"historical dataset CSV not found: {path}")
         return load_csv_historical_dataset(path)
     raise ValueError(
         f"Unknown historical dataset source: {resolved!r}; "
@@ -326,6 +350,7 @@ __all__ = [
     "SyntheticHistoricalDataset",
     "create_historical_dataset",
     "demo_historical_dataset_path",
+    "file_csv_dataset_id",
     "load_csv_historical_dataset",
     "load_demo_historical_dataset",
     "load_factor_observations_csv",
