@@ -468,7 +468,7 @@ Structural factor×scenario evidence (monkeypatch counters, not wall-clock):
 multi-factor apply `model_copy` == 1 / freeze ∈ [1,2] for K≥5; `run` /
 `evaluate` apply count == S for P×S; contribution sum↔P&L + interaction residual
 cited from existing `test_scenario_attribution.py`. RF-006 **CLOSED**.
-Report: `reviews/r0.4.6-rf006-acceptance-report.md`. N×S full-reval cost is RF-007 (**CLOSED**; P1 benches).
+Report: `reviews/r0.4.6-rf006-acceptance-report.md`. N×S full-reval cost remains RF-007.
 
 ### Exit criteria
 
@@ -553,12 +553,12 @@ Two equities and two rate tenors can move independently in one historical observ
 Related findings:
 
 - RF-006
-- RF-007 (**CLOSED** 2026-09-09; P1 benches)
+- RF-007 (**IN PROGRESS**; close-gate KEEP OPEN)
 - RF-015
 
 ## R0.6.1 Baseline benchmark first — COMPLETE (2026-09-04)
 
-`benchmarks/run_full_reval_bench.py` + `backend/tests/test_full_reval_bench.py`. Identity is **1 trade × 120 obs** builtin vs `full_revaluation_pnl_series` (not N=10×S=100). `pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`; `wall_ms` recorded only. Not in nightly/PR-FULL. N=100/1k wall/RSS/scenarios-sec/builtin-vs-QuantLib/warm-vs-cold remain **P1** after RF-007 CLOSE.
+`benchmarks/run_full_reval_bench.py` + `backend/tests/test_full_reval_bench.py`. Identity is **1 trade × 120 obs** builtin vs `full_revaluation_pnl_series` (not N=10×S=100). `pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`; `wall_ms` recorded only. Not in nightly/PR-FULL. N=100/1k wall/RSS/scenarios-sec/builtin-vs-QuantLib/warm-vs-cold remain the close-gate residual. RF-007 stays open.
 
 Record current performance for:
 
@@ -577,7 +577,7 @@ Capture:
 
 ## R0.6.2 Stream/chunk shocked scenarios — COMPLETE (2026-09-04)
 
-`iter_shocked_snapshots` / `iter_historical_shocked_snapshots` yield one snapshot; list helpers wrap them. Full-reval loops consume the iterator. Joint N×S `value` remains the cost of full reval (explainable after CLOSE).
+`iter_shocked_snapshots` / `iter_historical_shocked_snapshots` yield one snapshot; list helpers wrap them. Full-reval loops consume the iterator. RF-007 stays open (still N×S pricing).
 
 ## R0.6.3 Reuse QuantLib structures where safe — COMPLETE (2026-09-09)
 
@@ -608,7 +608,7 @@ Independent review **APPROVE** (`reviews/sdd-briefs/task-4-r0.6.5-review.md`). C
 
 Partition independent scenario blocks across worker processes when profiling shows value.
 
-Option B: HEAVY full-reval already runs out-of-request-thread via RiskRun (`RF-015` CLOSED). Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP enqueues; Compose `worker` (`python -m app.worker`) is the OS-process QuantLib partition. `POST /risk/summary?methodology=FULL_REVALUATION` and `POST /risk/var` refuse inline when the gate is on (`details.use=/risk/runs`). No unused `ProcessPoolExecutor` / multiprocessing chunking: R0.6.1 identity bench (`pnl_checksum` `6602fa69…`, `wall_ms` recorded only) does not justify in-process scenario-block multiprocessing. In-process QuantLib stays serialized by `_QL_PROCESS_LOCK`. Evidence: `backend/tests/test_r065_process_partition.py`; focused brief suite; report `reviews/r0.6.5-process-parallelism-report.md`. Intra-run scenario-block multiprocessing remains a **P1** residual (not an SLA).
+Option B: HEAVY full-reval already runs out-of-request-thread via RiskRun (`RF-015` CLOSED). Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP enqueues; Compose `worker` (`python -m app.worker`) is the OS-process QuantLib partition. `POST /risk/summary?methodology=FULL_REVALUATION` and `POST /risk/var` refuse inline when the gate is on (`details.use=/risk/runs`). No unused `ProcessPoolExecutor` / multiprocessing chunking: R0.6.1 identity bench (`pnl_checksum` `6602fa69…`, `wall_ms` recorded only) does not justify in-process scenario-block multiprocessing. In-process QuantLib stays serialized by `_QL_PROCESS_LOCK`. Evidence: `backend/tests/test_r065_process_partition.py`; focused brief suite; report `reviews/r0.6.5-process-parallelism-report.md`. Intra-run scenario-block multiprocessing (option A) remains PARTIAL and may stay P1 after benches. RF-007 stays open pending acceptance benches.
 
 ## R0.6.6 Contribution reuse — COMPLETE (2026-09-09)
 
@@ -618,17 +618,19 @@ Avoid whole-book full revaluation once per factor family when the same trade/sce
 
 Full-reval ES factor contributions and scenario-attribution factor buckets reuse the already-computed joint trade/scenario P&L and attribute families from one base Δ-Γ Greek valuation. They do not apply family-isolated scenarios or reprice the book per family × observation. `interaction` = joint full-reval − sum(families). Bound: family path is O(N) base `value` calls, not O(N×S×F) extra books; scenario `apply_scenario` stays one full scenario (not × factor keys). Cash-equity family P&L matches LINEAR at abs `1e-12`; reconcile abs `1e-6` / rel `1e-8`. Evidence: `backend/tests/test_contribution_reuse.py`; focused suite including ES/VaR/attribution/anti-cache; report `reviews/r0.6.6-contribution-reuse-report.md`.
 
-## R0.6 close gate — COMPLETE (2026-09-09)
+## R0.6 close gate — KEEP OPEN / not complete (2026-09-09)
 
-QA close gate **CLOSE** with P1 residuals (`reviews/r0.6-rf007-close-gate-report.md`). **RF-007 CLOSED.**
+QA close gate **KEEP OPEN** (`reviews/r0.6-rf007-close-gate-report.md`; independent review KEEP OPEN). **RF-007 IN PROGRESS.**
 
 Required direction: 6 MET, 1 PARTIAL (option B job process, not intra-run chunks). Goldens/identity **69 passed**. Joint scaling is O(N×S) `value` + O(N) Greeks, bounded as a HEAVY RiskRun job. Interactive default remains DELTA_GAMMA. No SLA.
+
+Acceptance benches required for close: RSS, scenarios/sec, builtin vs QuantLib **UNMET**; N×S / wall / warm-cold only **PARTIAL** at 1×120 builtin. Record N=100/1k (and S=50/750/1k where practical) wall, peak RSS, scenarios/sec, builtin vs QuantLib, warm vs cold. Identity checksum stays. Do not invent a host SLA from recorded `wall_ms`.
 
 ### Exit criteria
 
 Full revaluation is still allowed to be expensive, but its scaling is explainable, benchmarked, bounded, and appropriate for a risk-run job.
 
-**Met** for close: explainable O(N×S) joint pricing; bounded as RiskRun / Compose `worker`; appropriate (LINEAR / DELTA_GAMMA stay the interactive default). **P1 residual:** benchmarked beyond 1×120 builtin identity + `wall_ms` (N=100/1k, RSS, scenarios/sec, builtin vs QuantLib, warm vs cold). Do not invent a host SLA from recorded `wall_ms`.
+Explainable **yes**; bounded **yes**; appropriate **yes**. **Benchmarked no** beyond 1×120 builtin identity + `wall_ms`. Close-gate **not complete**.
 
 ---
 
