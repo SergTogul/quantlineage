@@ -28,25 +28,36 @@ from app.domain.models import (
     ScenarioKind,
     StressEvaluation,
     StressResult,
-    StressScenario,
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
-from app.risk.crisis_library import CRISIS_STRESS_SCENARIOS
+from app.risk.crisis_library import CRISIS_LIBRARY, crisis_as_broadcast
 from app.risk.factors import RiskFactorEngine
 from app.risk.historical import HistoricalRiskEngine, require_explicit_market
 from app.risk.reverse_stress import ReverseStressEngine
 from app.risk.reverse_stress_multi import MultiFactorReverseStressEngine
 from app.risk.scenario_attribution import ScenarioAttributionEngine, ScenarioLike
 from app.risk.scenario_engine import ScenarioEngine, apply_scenario
-from app.risk.scenario_model import Scenario, category_to_kind, to_canonical_scenario, to_canonical_scenarios
+from app.risk.scenario_model import (
+    BroadcastScenarioDefinition,
+    BroadcastShockTemplate,
+    Scenario,
+    ScenarioCategory,
+    ScenarioThreshold,
+    category_to_kind,
+    expand_broadcast_definition,
+    to_canonical_scenario,
+    to_canonical_scenarios,
+)
 from app.sample import DemoAggregateMarketDataProvider
 
 __all__ = [
     "DEFAULT_SCENARIOS",
     "THREAT_SCENARIOS",
     "HYPOTHETICAL_THREAT_SCENARIOS",
+    "default_scenarios",
+    "threat_scenarios",
     "StressEngine",
     "ReverseStressEngine",
     "MultiFactorReverseStressEngine",
@@ -57,74 +68,88 @@ __all__ = [
 ]
 
 
-DEFAULT_SCENARIOS = [
-    StressScenario(
+DEFAULT_SCENARIOS: list[BroadcastScenarioDefinition] = [
+    BroadcastScenarioDefinition(
         id="eq_down_10",
         name="Equities -10%",
         description="Broad equity selloff with other factors unchanged.",
-        kind=ScenarioKind.FACTOR,
-        equity_shock=-0.10,
-        max_loss_pct=0.06,
+        category=ScenarioCategory.FACTOR,
+        shocks=BroadcastShockTemplate(equity_shock=-0.10),
+        threshold=ScenarioThreshold(max_loss_pct=0.06),
     ),
-    StressScenario(
+    BroadcastScenarioDefinition(
         id="rates_up_100",
         name="Rates +100bp",
         description="Parallel upward shift of the rates curve by 100bp.",
-        kind=ScenarioKind.FACTOR,
-        rates_shift_bps=100,
-        max_loss_pct=0.05,
+        category=ScenarioCategory.FACTOR,
+        shocks=BroadcastShockTemplate(rates_shift_bps=100),
+        threshold=ScenarioThreshold(max_loss_pct=0.05),
     ),
-    StressScenario(
+    BroadcastScenarioDefinition(
         id="vol_up_25",
         name="Vol +25%",
         description="Relative 25% increase in implied volatility.",
-        kind=ScenarioKind.FACTOR,
-        vol_shock=0.25,
-        max_loss_pct=0.04,
+        category=ScenarioCategory.FACTOR,
+        shocks=BroadcastShockTemplate(vol_shock=0.25),
+        threshold=ScenarioThreshold(max_loss_pct=0.04),
     ),
-    StressScenario(
+    BroadcastScenarioDefinition(
         id="eq_down_vol_up",
         name="Equities -15% / Vol +40%",
         description="Risk-off equity shock with a volatility spike.",
-        kind=ScenarioKind.MACRO,
-        equity_shock=-0.15,
-        vol_shock=0.40,
-        max_loss_pct=0.08,
+        category=ScenarioCategory.MACRO,
+        shocks=BroadcastShockTemplate(equity_shock=-0.15, vol_shock=0.40),
+        threshold=ScenarioThreshold(max_loss_pct=0.08),
     ),
-    StressScenario(
+    BroadcastScenarioDefinition(
         id="combined_crisis",
         name="Combined Crisis",
         description=(
             "Hypothetical multi-factor crisis (not a named historical episode): "
             "equity crash, volatility spike and higher rates occurring together."
         ),
-        kind=ScenarioKind.MACRO,
-        equity_shock=-0.20,
-        vol_shock=0.50,
-        rates_shift_bps=125,
-        max_loss_pct=0.10,
+        category=ScenarioCategory.MACRO,
+        shocks=BroadcastShockTemplate(
+            equity_shock=-0.20,
+            vol_shock=0.50,
+            rates_shift_bps=125,
+        ),
+        threshold=ScenarioThreshold(max_loss_pct=0.10),
     ),
 ]
 
 
 # Non-historical hypothetical / factor threats (kept separate from crisis library).
-HYPOTHETICAL_THREAT_SCENARIOS = [
-    StressScenario(
+HYPOTHETICAL_THREAT_SCENARIOS: list[BroadcastScenarioDefinition] = [
+    BroadcastScenarioDefinition(
         id="stagflation",
         name="Stagflation Shock",
         description="Hypothetical: equities fall while rates and volatility rise together.",
-        kind=ScenarioKind.MACRO,
-        equity_shock=-0.20,
-        vol_shock=0.60,
-        rates_shift_bps=200,
-        max_loss_pct=0.12,
+        category=ScenarioCategory.MACRO,
+        shocks=BroadcastShockTemplate(
+            equity_shock=-0.20,
+            vol_shock=0.60,
+            rates_shift_bps=200,
+        ),
+        threshold=ScenarioThreshold(max_loss_pct=0.12),
     ),
 ]
 
-# Crisis library first (HISTORICAL_APPROXIMATION via formal Scenario), then hypotheticals.
-# Wire shape remains StressScenario (kind=HISTORICAL_STYLE); honest labeling lives in
-# crisis_library descriptions / formal Scenario.category when expanded.
-THREAT_SCENARIOS = list(CRISIS_STRESS_SCENARIOS) + list(HYPOTHETICAL_THREAT_SCENARIOS)
+# Crisis library first (HISTORICAL_APPROXIMATION templates), then hypotheticals.
+# Expand at apply time via ``threat_scenarios(base)`` / ``to_canonical_scenario``.
+THREAT_SCENARIOS: list[BroadcastScenarioDefinition] = [
+    crisis_as_broadcast(defn) for defn in CRISIS_LIBRARY
+] + list(HYPOTHETICAL_THREAT_SCENARIOS)
+
+
+def default_scenarios(base: MarketSnapshot) -> list[Scenario]:
+    """Expand DEFAULT library templates against ``base`` (apply-time names)."""
+    return [expand_broadcast_definition(item, base) for item in DEFAULT_SCENARIOS]
+
+
+def threat_scenarios(base: MarketSnapshot) -> list[Scenario]:
+    """Expand THREAT library templates against ``base`` (apply-time names)."""
+    return [expand_broadcast_definition(item, base) for item in THREAT_SCENARIOS]
 
 
 def _threat_level(loss_pct_nav: float) -> str:

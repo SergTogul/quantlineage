@@ -30,9 +30,9 @@ from app.domain.models import (
     RiskSummary,
     ScenarioEvaluationReport,
     StressResult,
-    StressScenario,
     VaRReport,
 )
+from app.risk.scenario_model import Scenario
 from app.services.portfolio_service import PortfolioService
 
 router = APIRouter()
@@ -61,8 +61,8 @@ class DashboardBatchResponse(BaseModel):
 def risk_dashboard(
     portfolio: Annotated[Portfolio | None, Body()] = None,
     default_portfolio: Portfolio = Depends(get_default_portfolio),
-    baseline: list[StressScenario] = Depends(get_baseline_stress_scenarios),
-    threat_scenarios: list[StressScenario] = Depends(get_default_stress_scenarios),
+    baseline: list[Scenario] = Depends(get_baseline_stress_scenarios),
+    threat_scenarios: list[Scenario] = Depends(get_default_stress_scenarios),
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> DashboardBatchResponse:
     """Compute the demo dashboard slices in one request.

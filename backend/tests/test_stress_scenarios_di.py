@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.models import ScenarioKind, StressScenario
 from app.persistence.memory_repos import InMemoryScenarioDefinitionRepository
 from app.persistence.wiring import default_seed_scenarios
+from app.risk.factor_types import EquitySpot
+from app.risk.scenario_model import (
+    FactorShock,
+    Scenario,
+    ScenarioCategory,
+    ScenarioThreshold,
+    to_canonical_scenario,
+)
 from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
-from app.sample import SAMPLE_PORTFOLIO
+from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 
 
 @pytest.fixture
@@ -53,13 +62,13 @@ def test_get_stress_scenarios_reflects_repo_save(clear_db_url):
     """Saving into DI repo is visible on GET /risk/stress/scenarios."""
     from app.main import app
 
-    custom = StressScenario(
+    custom = Scenario(
         id="m59_custom_shock",
         name="M59 Custom",
         description="Injected via scenario_definition_repo",
-        kind=ScenarioKind.CUSTOM,
-        equity_shock=-0.33,
-        max_loss_pct=0.2,
+        category=ScenarioCategory.CUSTOM,
+        shocks=(FactorShock(EquitySpot("SPY"), -0.33),),
+        threshold=ScenarioThreshold(max_loss_pct=0.2),
     )
     with TestClient(app) as client:
         repo = client.app.state.scenario_definition_repo
@@ -97,13 +106,13 @@ def test_evaluate_defaults_use_di_scenarios(clear_db_url):
     """POST /risk/stress/evaluate uses DI scenario list (not hard-coded THREAT only)."""
     from app.main import app
 
-    custom = StressScenario(
+    custom = Scenario(
         id="m59_eval_only",
         name="M59 Eval Only",
         description="Must appear in default evaluate when DI-backed",
-        kind=ScenarioKind.CUSTOM,
-        equity_shock=-0.99,
-        max_loss_pct=0.5,
+        category=ScenarioCategory.CUSTOM,
+        shocks=(FactorShock(EquitySpot("SPY"), -0.99),),
+        threshold=ScenarioThreshold(max_loss_pct=0.5),
     )
     with TestClient(app) as client:
         client.app.state.scenario_definition_repo.save(custom)
@@ -121,11 +130,17 @@ def test_post_stress_uses_di_default_subset(clear_db_url):
     from app.main import app
 
     # Persist an override for a DEFAULT id — stress endpoint must pick it up.
-    overridden = DEFAULT_SCENARIOS[0].model_copy(
-        update={
-            "name": "M59 DI Equities Override",
-            "equity_shock": -0.42,
-        }
+    market = demo_market_snapshot(SAMPLE_PORTFOLIO)
+    base = to_canonical_scenario(DEFAULT_SCENARIOS[0], market)
+    overridden = replace(
+        base,
+        name="M59 DI Equities Override",
+        shocks=tuple(
+            FactorShock(shock.factor, -0.42)
+            if isinstance(shock.factor, EquitySpot)
+            else shock
+            for shock in base.shocks
+        ),
     )
     with TestClient(app) as client:
         client.app.state.scenario_definition_repo.save(overridden)

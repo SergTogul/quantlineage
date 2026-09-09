@@ -118,7 +118,7 @@ class MarketSnapshotRow(Base):
 
 
 class ScenarioDefinitionRow(Base):
-    """Persisted scenario / stress definition (formal or legacy wire shape)."""
+    """Persisted canonical Scenario definition (ScenarioWire JSON)."""
 
     __tablename__ = "scenario_definitions"
 
@@ -126,7 +126,7 @@ class ScenarioDefinitionRow(Base):
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     category: Mapped[str] = mapped_column(String(64), nullable=False, default="factor")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    # JSON definition: StressScenario model_dump and/or formal Scenario shocks.
+    # JSON definition: formal ScenarioWire (typed shocks).
     definition: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(

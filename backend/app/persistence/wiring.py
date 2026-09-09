@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.domain.models import MarketSnapshot, Portfolio, RiskLimit, StressScenario
+from app.domain.models import MarketSnapshot, Portfolio, RiskLimit
 
 # Import models so metadata is populated before create_all.
 from app.persistence import models as _models  # noqa: F401
@@ -38,6 +38,7 @@ from app.persistence.sqlalchemy_repos import (
 )
 from app.risk.limits import DEFAULT_LIMITS
 from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
+from app.risk.scenario_model import Scenario, to_canonical_scenario
 from app.sample import DEMO_PORTFOLIOS, SAMPLE_PORTFOLIO, demo_market_snapshot
 
 logger = logging.getLogger(__name__)
@@ -52,18 +53,22 @@ def default_sample_market_snapshot() -> MarketSnapshot:
     return snap.model_copy(update={"id": DEFAULT_MARKET_SNAPSHOT_ID})
 
 
-def default_seed_scenarios() -> list[StressScenario]:
-    """Demo scenario definitions: DEFAULT + THREAT, deduped by id."""
+def default_seed_scenarios(base: MarketSnapshot | None = None) -> list[Scenario]:
+    """Demo scenario definitions: DEFAULT + THREAT expanded against ``base``.
+
+    Expansion happens at seed time against the demo snapshot so persistence
+    stores canonical ``Scenario``. In-code libraries remain broadcast templates
+    and still expand at apply time for engine callers.
+    """
+    snap = base if base is not None else default_sample_market_snapshot()
     seen: set[str] = set()
-    out: list[StressScenario] = []
-    for scenario in list(DEFAULT_SCENARIOS) + list(THREAT_SCENARIOS):
-        sid = scenario.id or scenario.name
+    out: list[Scenario] = []
+    for template in list(DEFAULT_SCENARIOS) + list(THREAT_SCENARIOS):
+        sid = template.id
         if not sid or sid in seen:
             continue
         seen.add(sid)
-        if scenario.id is None:
-            scenario = scenario.model_copy(update={"id": sid})
-        out.append(scenario)
+        out.append(to_canonical_scenario(template, snap))
     return out
 
 

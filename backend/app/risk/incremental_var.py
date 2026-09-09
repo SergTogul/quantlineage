@@ -40,7 +40,6 @@ from app.domain.models import (
     RiskSummary,
     StressLossChange,
     StressResult,
-    StressScenario,
     VaRMethodology,
     WhatIfChange,
     WhatIfIncrementalRisk,
@@ -50,6 +49,7 @@ from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.risk.factors import RiskFactorEngine
 from app.risk.historical import HistoricalRiskEngine
+from app.risk.scenario_attribution import ScenarioLike
 from app.risk.stress import DEFAULT_SCENARIOS, StressEngine
 
 
@@ -235,7 +235,7 @@ def what_if_analysis(
     methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
     factor_engine: RiskFactorEngine | None = None,
     stress_engine: StressEngine | None = None,
-    scenarios: list[StressScenario] | None = None,
+    scenarios: list[ScenarioLike] | None = None,
     market: MarketSnapshot | None = None,
 ) -> WhatIfReport:
     """Full what-if: incremental VaR plus factor exposure and stress P&L diffs.

@@ -20,7 +20,10 @@ formal ``ScenarioWire`` (``/scenarios/formal`` is an identical alias); formal
 POST twins stay under ``/api/v1/risk/stress/formal/*`` (see
 ``app.api.scenario_wire``). R0.4.2-E: engine-facing stress / attribution /
 threat convert ``StressScenario`` once at the HTTP or engine boundary via
-``to_canonical_scenario``; internals apply typed ``Scenario`` only.
+``to_canonical_scenario``; internals apply typed ``Scenario`` only. R0.4.2-F:
+in-code DEFAULT/THREAT libraries are ``BroadcastScenarioDefinition`` templates
+expanded at apply time against the live ``MarketSnapshot`` (do not freeze demo
+names at import). Persistence stores canonical ``Scenario``.
 """
 
 from __future__ import annotations
@@ -72,6 +75,48 @@ class ScenarioThreshold:
     def __post_init__(self) -> None:
         if self.max_loss_pct is not None and self.max_loss_pct <= 0:
             raise ValueError("max_loss_pct must be > 0 when set")
+
+
+@dataclass(frozen=True, slots=True)
+class BroadcastShockTemplate:
+    """Aggregate scalar macros expanded onto factors present in a live snapshot.
+
+    Same units as ``StressScenario`` / ``CrisisShockTemplate``:
+    equity/FX relative, vol relative, rates in bp (converted at expand via
+    ``shock_units`` only).
+    """
+
+    equity_shock: float = 0.0
+    vol_shock: float = 0.0
+    rates_shift_bps: float = 0.0
+    fx_shock: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class BroadcastScenarioDefinition:
+    """In-code library template — not a stored ``Scenario``.
+
+    Broadcast macros expand at apply time via
+    :func:`expand_broadcast_definition` / :func:`to_canonical_scenario`
+    against the live ``MarketSnapshot`` (same walk as
+    ``crisis_scenarios(base)``). Demo equity names must not be frozen here.
+    """
+
+    id: str
+    name: str
+    description: str = ""
+    category: ScenarioCategory = ScenarioCategory.FACTOR
+    shocks: BroadcastShockTemplate = field(default_factory=BroadcastShockTemplate)
+    threshold: ScenarioThreshold = field(default_factory=ScenarioThreshold)
+    severity: ScenarioSeverity | None = None
+    metadata: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}))
+
+    def __post_init__(self) -> None:
+        if not self.id:
+            raise ValueError("BroadcastScenarioDefinition.id must be non-empty")
+        if not self.name:
+            raise ValueError("BroadcastScenarioDefinition.name must be non-empty")
+        object.__setattr__(self, "metadata", _freeze_metadata(dict(self.metadata)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,32 +248,47 @@ def apply_scenario(base: MarketSnapshot, scenario: Scenario) -> MarketSnapshot:
     return out.model_copy(update={"id": new_id})
 
 
-def _expand_stress_to_shocks(stress: StressScenario, base: MarketSnapshot) -> tuple[FactorShock, ...]:
-    """Expand legacy scalar/dict StressScenario fields onto factors in ``base``.
+def _expand_macro_to_shocks(
+    base: MarketSnapshot,
+    *,
+    equity_shock: float = 0.0,
+    vol_shock: float = 0.0,
+    rates_shift_bps: float = 0.0,
+    fx_shock: float = 0.0,
+    equity_shocks: Mapping[str, float] | None = None,
+    vol_shocks: Mapping[str, float] | None = None,
+    rate_shocks_bps: Mapping[str, float] | None = None,
+    fx_shocks: Mapping[str, float] | None = None,
+) -> tuple[FactorShock, ...]:
+    """Expand scalar/dict macros onto factors present in ``base``.
 
     Order matches ``shock_snapshot``: equity spots, equity vols, FX spots,
     FX vols, then parallel rates. Rate bp fields convert to decimal bump
     amounts via :func:`bps_to_decimal_rate` at this adapter boundary only.
     """
+    equity_named = equity_shocks or {}
+    vol_named = vol_shocks or {}
+    rate_named = rate_shocks_bps or {}
+    fx_named = fx_shocks or {}
     shocks: list[FactorShock] = []
     for sym in base.equity_spots:
-        amt = stress.equity_shocks.get(sym, stress.equity_shock)
+        amt = equity_named.get(sym, equity_shock)
         if amt:
             shocks.append(FactorShock(EquitySpot(sym), float(amt)))
     for sym in base.equity_vols:
-        amt = stress.vol_shocks.get(sym, stress.vol_shock)
+        amt = vol_named.get(sym, vol_shock)
         if amt:
             shocks.append(FactorShock(EquityVol(underlying=sym), float(amt)))
     for pair in base.fx_spots:
-        amt = stress.fx_shocks.get(pair, stress.fx_shock)
+        amt = fx_named.get(pair, fx_shock)
         if amt:
             shocks.append(FactorShock(FXSpot(pair), float(amt)))
     for pair in base.fx_vols:
-        amt = stress.vol_shocks.get(pair, stress.vol_shock)
+        amt = vol_named.get(pair, vol_shock)
         if amt:
             shocks.append(FactorShock(FXVol(pair=pair), float(amt)))
     for ccy in base.rates:
-        bps = stress.rate_shocks_bps.get(ccy, stress.rates_shift_bps)
+        bps = rate_named.get(ccy, rates_shift_bps)
         if bps:
             shocks.append(
                 FactorShock(RateZero(currency=ccy, tenor="ALL"), bps_to_decimal_rate(float(bps)))
@@ -236,25 +296,69 @@ def _expand_stress_to_shocks(stress: StressScenario, base: MarketSnapshot) -> tu
     return tuple(shocks)
 
 
-def to_canonical_scenario(scenario: Scenario | StressScenario, base: MarketSnapshot) -> Scenario:
-    """Adapt engine/HTTP input to canonical ``Scenario``.
+def _expand_stress_to_shocks(stress: StressScenario, base: MarketSnapshot) -> tuple[FactorShock, ...]:
+    """Expand legacy scalar/dict StressScenario fields onto factors in ``base``."""
+    return _expand_macro_to_shocks(
+        base,
+        equity_shock=float(stress.equity_shock),
+        vol_shock=float(stress.vol_shock),
+        rates_shift_bps=float(stress.rates_shift_bps),
+        fx_shock=float(stress.fx_shock),
+        equity_shocks=stress.equity_shocks,
+        vol_shocks=stress.vol_shocks,
+        rate_shocks_bps=stress.rate_shocks_bps,
+        fx_shocks=stress.fx_shocks,
+    )
 
-    Formal ``Scenario`` is returned unchanged. Legacy ``StressScenario`` is
+
+def expand_broadcast_definition(
+    definition: BroadcastScenarioDefinition, base: MarketSnapshot
+) -> Scenario:
+    """Expand a library template onto ``base`` as canonical ``Scenario``."""
+    macros = definition.shocks
+    return Scenario(
+        id=definition.id,
+        name=definition.name,
+        category=definition.category,
+        description=definition.description,
+        shocks=_expand_macro_to_shocks(
+            base,
+            equity_shock=macros.equity_shock,
+            vol_shock=macros.vol_shock,
+            rates_shift_bps=macros.rates_shift_bps,
+            fx_shock=macros.fx_shock,
+        ),
+        threshold=definition.threshold,
+        severity=definition.severity,
+        metadata=dict(definition.metadata),
+    )
+
+
+CanonicalScenarioInput = Scenario | BroadcastScenarioDefinition | StressScenario
+
+
+def to_canonical_scenario(scenario: CanonicalScenarioInput, base: MarketSnapshot) -> Scenario:
+    """Adapt engine/HTTP/library input to canonical ``Scenario``.
+
+    Formal ``Scenario`` is returned unchanged. ``BroadcastScenarioDefinition``
+    expands against ``base`` (apply-time names). Legacy ``StressScenario`` is
     expanded via :func:`scenario_from_stress` (rate bp→decimal only through
     ``shock_units``). Other types raise ``TypeError``.
     """
     if isinstance(scenario, Scenario):
         return scenario
+    if isinstance(scenario, BroadcastScenarioDefinition):
+        return expand_broadcast_definition(scenario, base)
     if isinstance(scenario, StressScenario):
         return scenario_from_stress(scenario, base)
     raise TypeError(f"unsupported engine scenario type: {type(scenario)!r}")
 
 
 def to_canonical_scenarios(
-    scenarios: Sequence[Scenario | StressScenario],
+    scenarios: Sequence[CanonicalScenarioInput],
     base: MarketSnapshot,
 ) -> list[Scenario]:
-    """Adapt a sequence of engine/HTTP inputs to canonical ``Scenario``."""
+    """Adapt a sequence of engine/HTTP/library inputs to canonical ``Scenario``."""
     return [to_canonical_scenario(s, base) for s in scenarios]
 
 
@@ -376,6 +480,9 @@ def compose_shocks(*groups: Sequence[FactorShock]) -> tuple[FactorShock, ...]:
 
 
 __all__ = [
+    "BroadcastScenarioDefinition",
+    "BroadcastShockTemplate",
+    "CanonicalScenarioInput",
     "FactorShock",
     "SEVERITY_HIGH_MIN",
     "SEVERITY_MODERATE_MIN",
@@ -388,6 +495,7 @@ __all__ = [
     "category_to_kind",
     "classify_severity",
     "compose_shocks",
+    "expand_broadcast_definition",
     "kind_to_category",
     "scenario_from_market_scenario",
     "scenario_from_stress",
