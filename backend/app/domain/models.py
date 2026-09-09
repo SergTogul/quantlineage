@@ -17,6 +17,7 @@ from pydantic import (
     TypeAdapter,
     computed_field,
     field_serializer,
+    field_validator,
     model_validator,
 )
 from pydantic_core import PydanticCustomError
@@ -1593,8 +1594,8 @@ class RiskRunRequestBody(BaseModel):
     """Shared typed calculation knobs for RiskRun ``request`` blobs (R0.8.4).
 
     Unknown keys are rejected. Per-``run_type`` aliases below share this shape;
-    ``summary`` / ``var`` / ``dashboard`` use methodology; other supported
-    types accept the same envelope even when they ignore unused fields today.
+    ``summary`` / ``var`` / ``dashboard`` use methodology; interactive HEAVY UI
+    types add typed fields (scenarios, reverse knobs, attribution books, …).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1628,6 +1629,96 @@ class GenericRiskRunRequest(RiskRunRequestBody):
     """Typed envelope for supported run types that ignore most request knobs."""
 
 
+def _coerce_scenario_wires(value: Any) -> list[Any]:
+    """Validate formal Scenario wire dicts (lazy import avoids domain↔api cycle)."""
+    from app.api.scenario_wire import ScenarioWire
+
+    if not isinstance(value, list):
+        raise ValueError("scenarios must be a list")
+    return [ScenarioWire.model_validate(item) for item in value]
+
+
+class StressEvaluateRiskRunRequest(RiskRunRequestBody):
+    """``run_type=stress_evaluate`` — formal Scenario wire list (UI evaluate)."""
+
+    scenarios: list[Any] = Field(min_length=1)
+
+    @field_validator("scenarios", mode="before")
+    @classmethod
+    def _scenarios_wire(cls, value: Any) -> list[Any]:
+        return _coerce_scenario_wires(value)
+
+
+class ReverseStressRiskRunRequest(RiskRunRequestBody):
+    """``run_type=reverse_stress`` — single-factor reverse stress knobs."""
+
+    target_loss_pct: FiniteFloat = Field(gt=0)
+    factor: Literal["equity", "rates", "vol", "fx"] = "equity"
+    max_shock: FiniteFloat = Field(default=0.80, gt=0)
+
+
+class ReverseStressMultiRiskRunRequest(RiskRunRequestBody):
+    """``run_type=reverse_stress_multi`` — multi-factor reverse stress knobs."""
+
+    target_loss_pct: FiniteFloat = Field(gt=0)
+    factors: list[Literal["equity", "rates", "vol", "fx"]] | None = None
+    weights: dict[str, FiniteFloat] | None = None
+    max_shocks: dict[str, FiniteFloat] | None = None
+    max_shock: FiniteFloat = Field(default=0.80, gt=0)
+
+
+class StressCompareRiskRunRequest(RiskRunRequestBody):
+    """``run_type=stress_compare`` — hedge compare with formal Scenario wires."""
+
+    hedged_portfolio: Portfolio
+    scenarios: list[Any] = Field(min_length=1)
+
+    @field_validator("scenarios", mode="before")
+    @classmethod
+    def _scenarios_wire(cls, value: Any) -> list[Any]:
+        return _coerce_scenario_wires(value)
+
+
+class QueryRiskRunRequest(RiskRunRequestBody):
+    """``run_type=query`` — NL risk query question."""
+
+    question: str = Field(min_length=1)
+
+
+class AttributionRiskRunRequest(RiskRunRequestBody):
+    """``run_type=attribution`` — P&L explain previous/current books."""
+
+    previous_portfolio: Portfolio
+    current_portfolio: Portfolio
+    previous_market: MarketSnapshot | None = None
+    current_market: MarketSnapshot | None = None
+    dt_years: FiniteFloat = 0.0
+
+
+class ChangeAttributionRiskRunRequest(RiskRunRequestBody):
+    """``run_type=change_attribution`` — risk-metric change waterfall."""
+
+    previous_portfolio: Portfolio
+    current_portfolio: Portfolio
+    previous_market: MarketSnapshot | None = None
+    current_market: MarketSnapshot | None = None
+    metric: Literal["var_99", "var_95", "expected_shortfall_99"] = "var_99"
+
+
+class EsRiskRunRequest(RiskRunRequestBody):
+    """``run_type=es`` — Expected Shortfall contributions (methodology on base)."""
+
+
+class VarCompareRiskRunRequest(RiskRunRequestBody):
+    """``run_type=var_compare`` — side-by-side VaR methodologies."""
+
+    observations: int | None = Field(default=None, ge=1, le=5000)
+
+
+class AttributionDemoRiskRunRequest(RiskRunRequestBody):
+    """``run_type=attribution_demo`` — illustrative market-move attribution."""
+
+
 RISK_RUN_REQUEST_SCHEMAS: Mapping[str, type[RiskRunRequestBody]] = MappingProxyType(
     {
         "summary": SummaryRiskRunRequest,
@@ -1638,6 +1729,16 @@ RISK_RUN_REQUEST_SCHEMAS: Mapping[str, type[RiskRunRequestBody]] = MappingProxyT
         "limits": GenericRiskRunRequest,
         "hierarchy": GenericRiskRunRequest,
         "contributors": GenericRiskRunRequest,
+        "stress_evaluate": StressEvaluateRiskRunRequest,
+        "reverse_stress": ReverseStressRiskRunRequest,
+        "reverse_stress_multi": ReverseStressMultiRiskRunRequest,
+        "stress_compare": StressCompareRiskRunRequest,
+        "query": QueryRiskRunRequest,
+        "attribution": AttributionRiskRunRequest,
+        "attribution_demo": AttributionDemoRiskRunRequest,
+        "change_attribution": ChangeAttributionRiskRunRequest,
+        "es": EsRiskRunRequest,
+        "var_compare": VarCompareRiskRunRequest,
     }
 )
 

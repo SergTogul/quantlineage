@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
-import { API_V1, loadDashboard } from './api.js'
+import {
+  API_V1,
+  evaluateCustomScenario,
+  explainPnL,
+  loadDashboard,
+  reverseStress,
+} from './api.js'
 import { API_BASE, server } from './test/mswServer.js'
 import { RISK_RUN_POLL_MS } from './lib/risk.mjs'
 
@@ -40,6 +46,38 @@ function refuseBody(route = `${API_V1}/risk/dashboard`) {
     message: 'Invalid request',
     details: { use: '/risk/runs', route },
   }
+}
+
+function mockRiskRunPoll({ runType, payload, runId = 'run-1' }) {
+  let polls = 0
+  return [
+    http.post(`${API_BASE}${API_V1}/risk/runs`, async ({ request }) => {
+      const body = await request.json()
+      expect(body.run_type).toBe(runType)
+      return HttpResponse.json(
+        { id: runId, status: 'QUEUED', run_type: runType, results: [] },
+        { status: 202 },
+      )
+    }),
+    http.get(`${API_BASE}${API_V1}/risk/runs/:id`, ({ params }) => {
+      polls += 1
+      if (polls === 1) {
+        return HttpResponse.json({
+          id: params.id,
+          status: 'RUNNING',
+          run_type: runType,
+          results: [],
+        })
+      }
+      return HttpResponse.json({
+        id: params.id,
+        status: 'COMPLETED',
+        run_type: runType,
+        error_message: null,
+        results: [{ result_type: runType, payload }],
+      })
+    }),
+  ]
 }
 
 afterEach(() => {
@@ -207,5 +245,125 @@ describe('loadDashboard', () => {
 
     await expect(loadDashboard()).rejects.toThrow('500')
     expect(calls).toEqual(['POST /risk/dashboard'])
+  })
+})
+
+describe('HEAVY UI RiskRun fallback', () => {
+  const scenario = {
+    id: 'eq-crash',
+    name: 'Equity crash',
+    category: 'factor',
+    shocks: [{ factor_type: 'equity', key: 'SPY', amount: -0.1, bucket: 'SPY' }],
+  }
+
+  it('evaluateCustomScenario falls back to stress_evaluate RiskRun on refuse', async () => {
+    const asyncPayload = { evaluations: [{ scenario_id: 'async-ok', pnl: -12 }] }
+    let syncHits = 0
+    let runBody = null
+
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/stress/formal/evaluate/custom`, () => {
+        syncHits += 1
+        return HttpResponse.json(
+          refuseBody(`${API_V1}/risk/stress/formal/evaluate/custom`),
+          { status: 400 },
+        )
+      }),
+      http.post(`${API_BASE}${API_V1}/risk/runs`, async ({ request }) => {
+        runBody = await request.json()
+        expect(runBody.run_type).toBe('stress_evaluate')
+        expect(runBody.portfolio).toEqual(DEMO_PORTFOLIO)
+        expect(runBody.request.scenarios).toEqual([scenario])
+        return HttpResponse.json(
+          { id: 'run-eval-1', status: 'QUEUED', run_type: 'stress_evaluate', results: [] },
+          { status: 202 },
+        )
+      }),
+      http.get(`${API_BASE}${API_V1}/risk/runs/:id`, ({ params }) =>
+        HttpResponse.json({
+          id: params.id,
+          status: 'COMPLETED',
+          run_type: 'stress_evaluate',
+          error_message: null,
+          results: [{ result_type: 'stress_evaluate', payload: asyncPayload }],
+        }),
+      ),
+    )
+
+    const data = await evaluateCustomScenario(DEMO_PORTFOLIO, scenario)
+
+    expect(syncHits).toBe(1)
+    expect(runBody.run_type).toBe('stress_evaluate')
+    expect(data).toEqual(asyncPayload)
+  })
+
+  it('evaluateCustomScenario keeps sync POST when gate is off', async () => {
+    const syncPayload = { evaluations: [{ scenario_id: 'gate-off' }] }
+    let runHits = 0
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/stress/formal/evaluate/custom`, () =>
+        HttpResponse.json(syncPayload),
+      ),
+      http.post(`${API_BASE}${API_V1}/risk/runs`, () => {
+        runHits += 1
+        return HttpResponse.json({ id: 'nope' }, { status: 202 })
+      }),
+    )
+
+    const data = await evaluateCustomScenario(DEMO_PORTFOLIO, scenario)
+    expect(data).toEqual(syncPayload)
+    expect(runHits).toBe(0)
+  })
+
+  it('explainPnL falls back to attribution RiskRun on refuse', async () => {
+    vi.useFakeTimers()
+    const attrRequest = {
+      previous_portfolio: DEMO_PORTFOLIO,
+      current_portfolio: { ...DEMO_PORTFOLIO, id: 'demo-scaled' },
+      dt_years: 0,
+    }
+    const asyncPayload = { items: [{ label: 'position', pnl: 1.5 }], total_pnl: 1.5 }
+
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/attribution`, () =>
+        HttpResponse.json(refuseBody(`${API_V1}/risk/attribution`), { status: 400 }),
+      ),
+      ...mockRiskRunPoll({
+        runType: 'attribution',
+        payload: asyncPayload,
+        runId: 'run-attr-1',
+      }),
+    )
+
+    const pending = explainPnL(attrRequest)
+    await vi.advanceTimersByTimeAsync(RISK_RUN_POLL_MS)
+    const data = await pending
+    expect(data).toEqual(asyncPayload)
+  })
+
+  it('reverseStress falls back to reverse_stress RiskRun on refuse', async () => {
+    vi.useFakeTimers()
+    const asyncPayload = {
+      factor: 'equity',
+      required_shock: -0.22,
+      target_loss_pct: 0.1,
+      converged: true,
+    }
+
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/stress/reverse`, () =>
+        HttpResponse.json(refuseBody(`${API_V1}/risk/stress/reverse`), { status: 400 }),
+      ),
+      ...mockRiskRunPoll({
+        runType: 'reverse_stress',
+        payload: asyncPayload,
+        runId: 'run-rev-1',
+      }),
+    )
+
+    const pending = reverseStress(DEMO_PORTFOLIO, 'equity', 0.1)
+    await vi.advanceTimersByTimeAsync(RISK_RUN_POLL_MS)
+    const data = await pending
+    expect(data).toEqual(asyncPayload)
   })
 })

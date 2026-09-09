@@ -317,9 +317,53 @@ DASHBOARD_BATCH_KEYS = {
 
 def test_execute_run_type_dispatch(tiny_portfolio):
     svc = PortfolioService(create_pricing_engine(), HistoricalRiskEngine(), market_data=FixedMarketProvider(equity_spot_market('NVDA', 190.0)))
+    hedged = tiny_portfolio.model_copy(deep=True)
+    scenario = {
+        "id": "eq-down",
+        "name": "Equity Down",
+        "category": "factor",
+        "shocks": [{"factor_type": "equity", "key": "NVDA", "amount": -0.1, "bucket": "NVDA"}],
+    }
+    requests_by_type = {
+        "stress_evaluate": {"scenarios": [scenario]},
+        "reverse_stress": {"target_loss_pct": 0.05, "factor": "equity"},
+        "reverse_stress_multi": {"target_loss_pct": 0.05, "factors": ["equity"]},
+        "stress_compare": {"hedged_portfolio": hedged.model_dump(mode="json"), "scenarios": [scenario]},
+        "query": {"question": "What is VaR?"},
+        "attribution": {
+            "previous_portfolio": tiny_portfolio.model_dump(mode="json"),
+            "current_portfolio": tiny_portfolio.model_dump(mode="json"),
+        },
+        "change_attribution": {
+            "previous_portfolio": tiny_portfolio.model_dump(mode="json"),
+            "current_portfolio": tiny_portfolio.model_dump(mode="json"),
+            "metric": "var_99",
+            "methodology": "DELTA_GAMMA",
+        },
+        "var_compare": {"observations": 50},
+    }
     for run_type in sorted(SUPPORTED_RUN_TYPES):
-        payload = execute_run_type(svc, run_type=run_type, portfolio=tiny_portfolio, request={'methodology': 'DELTA_GAMMA'})
+        request = {"methodology": "DELTA_GAMMA", **requests_by_type.get(run_type, {})}
+        payload = execute_run_type(
+            svc, run_type=run_type, portfolio=tiny_portfolio, request=request
+        )
         assert isinstance(payload, dict)
+
+
+def test_ui_heavy_run_types_in_supported():
+    for name in (
+        "stress_evaluate",
+        "reverse_stress",
+        "reverse_stress_multi",
+        "stress_compare",
+        "query",
+        "attribution",
+        "attribution_demo",
+        "change_attribution",
+        "es",
+        "var_compare",
+    ):
+        assert name in SUPPORTED_RUN_TYPES
 
 
 def test_dashboard_in_supported_run_types():
