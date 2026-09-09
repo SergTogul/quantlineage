@@ -71,10 +71,10 @@ def test_historical_engine_full_reval_is_not_the_linear_path():
     np.testing.assert_allclose(full_pnl, expected, atol=1e-12)
     linear = HistoricalRiskEngine(dataset=dataset).calculate(book, pricing, methodology=VaRMethodology.LINEAR, market=market)
     full = HistoricalRiskEngine(dataset=dataset).calculate(book, pricing, methodology=VaRMethodology.FULL_REVALUATION, market=market)
-    assert full['methodology'] == 'FULL_REVALUATION'
-    assert abs(full['var_99'] - linear['var_99']) > 1e-06
+    assert full.methodology == 'FULL_REVALUATION'
+    assert abs(full.var_99 - linear.var_99) > 1e-06
     losses = -full_pnl
-    assert full['var_99'] == pytest.approx(float(max(0.0, np.quantile(losses, 0.99))), abs=1e-12)
+    assert full.var_99 == pytest.approx(float(max(0.0, np.quantile(losses, 0.99))), abs=1e-12)
 
 def test_var_analytics_full_reval_position_pnl_is_shocked_minus_base():
     book, market = _equity_book()

@@ -122,8 +122,8 @@ def test_demo_dataset_feeds_historical_var_and_scenarios():
     engine = HistoricalRiskEngine(dataset=dataset)
     market = demo_market_snapshot(SAMPLE_PORTFOLIO)
     risk = engine.calculate(SAMPLE_PORTFOLIO, pricing, market=market)
-    assert risk["var_99"] >= risk["var_95"] >= 0.0
-    assert risk["expected_shortfall_99"] >= risk["var_99"]
+    assert risk.var_99 >= risk.var_95 >= 0.0
+    assert risk.expected_shortfall_99 >= risk.var_99
 
     report = VaRAnalytics(dataset=dataset).report(
         SAMPLE_PORTFOLIO, pricing, confidence=0.99, market=market

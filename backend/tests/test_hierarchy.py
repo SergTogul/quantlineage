@@ -319,10 +319,10 @@ def test_risk_at_matches_subset_var():
     assert node.id == "desk:Rates Desk"
     assert node.id == subset.id
     expected = risk.calculate(subset, pricing, market=market)
-    assert math.isclose(node.market_value, expected["market_value"], abs_tol=1e-9)
-    assert math.isclose(node.var_99, expected["var_99"], abs_tol=1e-9)
-    assert math.isclose(node.expected_shortfall_99, expected["expected_shortfall_99"], abs_tol=1e-9)
-    assert math.isclose(node.delta, expected["delta"], abs_tol=1e-9)
+    assert math.isclose(node.market_value, expected.market_value, abs_tol=1e-9)
+    assert math.isclose(node.var_99, expected.var_99, abs_tol=1e-9)
+    assert math.isclose(node.expected_shortfall_99, expected.expected_shortfall_99, abs_tol=1e-9)
+    assert math.isclose(node.delta, expected.delta, abs_tol=1e-9)
 
 
 def test_greeks_var_es_stress_limits_on_nodes():
@@ -348,12 +348,12 @@ def test_greeks_var_es_stress_limits_on_nodes():
     )
     desk_node = next(d for d in root.children[0].children if d.name == "Equity Desk")
     expected = risk.calculate(portfolio_at(pf, desk_ref), pricing, market=market)
-    assert math.isclose(desk_node.var_95, expected["var_95"], abs_tol=1e-9)
-    assert math.isclose(desk_node.var_99, expected["var_99"], abs_tol=1e-9)
-    assert math.isclose(desk_node.expected_shortfall_99, expected["expected_shortfall_99"], abs_tol=1e-9)
-    assert math.isclose(desk_node.vega, expected["vega"], abs_tol=1e-9)
-    assert math.isclose(desk_node.dv01, expected["dv01"], abs_tol=1e-9)
-    assert math.isclose(desk_node.fx_delta, expected["fx_delta"], abs_tol=1e-9)
+    assert math.isclose(desk_node.var_95, expected.var_95, abs_tol=1e-9)
+    assert math.isclose(desk_node.var_99, expected.var_99, abs_tol=1e-9)
+    assert math.isclose(desk_node.expected_shortfall_99, expected.expected_shortfall_99, abs_tol=1e-9)
+    assert math.isclose(desk_node.vega, expected.vega, abs_tol=1e-9)
+    assert math.isclose(desk_node.dv01, expected.dv01, abs_tol=1e-9)
+    assert math.isclose(desk_node.fx_delta, expected.fx_delta, abs_tol=1e-9)
 
 
 def test_risk_at_includes_stress_and_limits():

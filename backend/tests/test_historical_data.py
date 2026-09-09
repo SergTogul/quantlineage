@@ -76,8 +76,8 @@ def test_array_dataset_feeds_historical_engine():
     engine = HistoricalRiskEngine(dataset=ArrayHistoricalDataset(series))
     pricing = BuiltinPricingEngine()
     r = engine.calculate(SAMPLE_PORTFOLIO, pricing, market=SAMPLE_MARKET)
-    assert r["var_99"] >= r["var_95"] >= 0.0
-    assert r["expected_shortfall_99"] >= r["var_99"]
+    assert r.var_99 >= r.var_95 >= 0.0
+    assert r.expected_shortfall_99 >= r.var_99
 
 
 def test_historical_engine_default_matches_seeded_synthetic():

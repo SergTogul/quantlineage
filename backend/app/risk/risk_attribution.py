@@ -39,6 +39,7 @@ from app.domain.models import (
     RiskChangeAttributionReport,
     RiskChangeAttributionRequest,
     RiskChangeItem,
+    RiskSummary,
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
@@ -66,8 +67,8 @@ def _clone_portfolio(template: Portfolio, positions: list[Position], *, suffix: 
     )
 
 
-def _metric_value(risk: dict, metric: str) -> float:
-    return float(risk[metric])
+def _metric_value(risk: RiskSummary, metric: str) -> float:
+    return float(getattr(risk, metric))
 
 
 class RiskChangeAttributionEngine:

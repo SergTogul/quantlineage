@@ -330,13 +330,13 @@ def _risk_summary(
     market: MarketSnapshot | None = None,
 ) -> RiskSummary:
     if isinstance(risk_engine, HistoricalRiskEngine):
-        raw = risk_engine.calculate(
+        return risk_engine.calculate(
             portfolio, pricing_engine, methodology=methodology, market=market
         )
-    else:
-        raw = risk_engine.calculate(portfolio, pricing_engine)
-        raw = {**raw, "methodology": methodology.value}
-    return RiskSummary(portfolio_id=portfolio.id, **raw)
+    result = risk_engine.calculate(portfolio, pricing_engine)
+    if result.methodology == methodology:
+        return result
+    return result.model_copy(update={"methodology": methodology})
 
 
 class ScenarioComparisonEngine:

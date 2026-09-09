@@ -138,16 +138,16 @@ class PortfolioService:
     ) -> RiskSummary:
         market = self.market_snapshot(portfolio)
         if isinstance(self.risk, HistoricalRiskEngine):
-            r = self.risk.calculate(
+            return self.risk.calculate(
                 portfolio,
                 self.pricing,
                 methodology=methodology,
                 market=market,
             )
-        else:
-            r = self.risk.calculate(portfolio, self.pricing)
-            r = {**r, "methodology": methodology.value}
-        return RiskSummary(portfolio_id=portfolio.id, **r)
+        result = self.risk.calculate(portfolio, self.pricing)
+        if result.methodology == methodology:
+            return result
+        return result.model_copy(update={"methodology": methodology})
 
     def stresses(self, portfolio: Portfolio, scenarios: list[ScenarioLike] | None = None) -> list[StressResult]:
         market = self.market_snapshot(portfolio)
@@ -385,16 +385,16 @@ class PortfolioService:
         stress = self.stress_engine.run(
             portfolio, self.pricing, DEFAULT_SCENARIOS, market=market
         )
-        enriched = {
-            **risk,
+        extra = {
             "stress_loss": max(0.0, max((-float(s.pnl) for s in stress), default=0.0)),
         }
         return self.limit_engine.evaluate(
             portfolio,
             self.pricing,
-            enriched,
+            risk,
             DEFAULT_LIMITS,
             market=market,
+            extra=extra,
         )
 
     def limit_drilldown(

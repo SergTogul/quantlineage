@@ -72,7 +72,7 @@ def test_explicit_market_still_values() -> None:
     result = HistoricalRiskEngine(seed=1, observations=8).calculate(
         BOOK, PRICING, market=market
     )
-    assert result["market_value"] == pytest.approx(1.0)
+    assert result.market_value == pytest.approx(1.0)
     report = VaRAnalytics(seed=1, observations=8).report(BOOK, PRICING, market=market)
     assert report.portfolio_id == BOOK.id
     es = ESContributionAnalytics(seed=1, observations=8).report(

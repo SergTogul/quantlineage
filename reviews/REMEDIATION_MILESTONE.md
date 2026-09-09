@@ -833,15 +833,25 @@ Domain entities (`Position`, `Portfolio`, `MarketSnapshot`, `StressScenario`,
 risk *result* types, `RiskRun`) stay in `app.domain.models`. Domain does not
 import FastAPI or `app.api`. No DI container; no one-file-per-class split.
 
-**Do not CLOSE RF-010** — typed calculation results (R0.9.2) and lifespan
-composition (R0.9.3) remain. Dual-use engine inputs (`AttributionRequest`,
+**Do not CLOSE RF-010** — typed calculation results (R0.9.2, now complete) and
+lifespan composition (R0.9.3) remain. Dual-use engine inputs (`AttributionRequest`,
 `WhatIfRequest`, `RiskChangeAttributionRequest`) left in domain.
 
 Report: `reviews/r0.9.1-split-transport-schemas-report.md`.
 
-## R0.9.2 Typed risk results
+## R0.9.2 Typed risk results — COMPLETE (2026-09-09); RF-010 stays IN PROGRESS
 
-Replace generic result dictionaries where a stable typed domain/application result is appropriate.
+`RiskEngine.calculate` and `HistoricalRiskEngine.calculate` return domain
+`RiskSummary` (existing type; `portfolio_id` from `portfolio.id`). Callers
+(`PortfolioService`, hierarchy, limits, incremental VaR, var-compare, stress,
+risk-change attribution) use the typed object. Limit overlay metrics
+(`stress_loss`, `key_rate_dv01`) stay on an optional `extra` mapping, not on
+the engine contract. VaR/ES formulas and golden numbers are unchanged. No DI
+container; no FastAPI in `app.risk` / `app.domain`.
+
+**Do not CLOSE RF-010** — lifespan composition (R0.9.3) remains.
+
+Report: `reviews/r0.9.2-typed-risk-results-report.md`.
 
 ## R0.9.3 Explicit application composition
 

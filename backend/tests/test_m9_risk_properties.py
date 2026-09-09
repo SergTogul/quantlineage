@@ -70,9 +70,9 @@ def test_var_es_ordering_nonnegative(n, data, seed):
     """M9.3: ES99 ≥ VaR99 ≥ VaR95 ≥ 0 for random long-equity books."""
     book, market = _equity_book_and_market(n, data)
     r = HistoricalRiskEngine(seed=seed, observations=60).calculate(book, pricing, market=market)
-    assert r['var_95'] >= 0.0
-    assert r['var_99'] >= r['var_95']
-    assert r['expected_shortfall_99'] >= r['var_99']
+    assert r.var_95 >= 0.0
+    assert r.var_99 >= r.var_95
+    assert r.expected_shortfall_99 >= r.var_99
 
 @given(n=st.integers(min_value=1, max_value=5), data=st.data())
 @_PROP
@@ -81,7 +81,7 @@ def test_risk_market_value_equals_sum_of_position_mvs(n, data):
     book, market = _equity_book_and_market(n, data)
     r = HistoricalRiskEngine(seed=3, observations=40).calculate(book, pricing, market=market)
     expected = sum(v.market_value for v in pricing.value_portfolio(book, market))
-    assert r['market_value'] == pytest.approx(expected, abs=1e-09)
+    assert r.market_value == pytest.approx(expected, abs=1e-09)
 
 @given(qty_eq=_qty, price=_price, qty_opt=st.floats(min_value=-200.0, max_value=200.0, allow_nan=False, allow_infinity=False).filter(lambda q: abs(q) >= 5.0), strike_mult=st.floats(min_value=0.85, max_value=1.15, allow_nan=False, allow_infinity=False), vol=st.floats(min_value=0.15, max_value=0.45, allow_nan=False, allow_infinity=False))
 @_PROP
