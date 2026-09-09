@@ -292,7 +292,7 @@ This safety net must land **before** structural risk-engine changes.
 Priority: **P0**  
 Risk types: CORRECTNESS, ARCHITECTURE, TEST_GAP  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-08). R0.1.3 unit goldens; R0.4.3-A APPROVE — canonical `shock_units` helpers; R0.4.3-B COMPLETE — remaining risk-layer conversion call sites + reverse-stress magnitude heuristic removed; R0.4.2-A COMPLETE — scenario expand/collapse uses `shock_units` + stress↔formal parity golden; **R0.4.2-B APPROVE** (`reviews/r0.4.2-b-formal-scenario-engine-independent-review.md`) — StressEngine accepts formal `Scenario` natively; formal HTTP applies without `scenario_to_stress` collapse; R0.4.4 COMPLETE — one-pass `MarketSnapshot.apply` (freeze once); R0.4.5 COMPLETE — StressEngine scenario-once-price-many; R0.4.6 CLOSED RF-006 acceptance structural proofs; R0.4.1-A COMPLETE — typed sub-market views pinned + curve bp shifts via `bps_to_decimal_rate` (flat dict storage retained). Remaining: full R0.4.2 wire converge (formal default / retire dual list endpoints), further R0.4.1 typed nesting if needed. Do not close.
+Status: **IN PROGRESS** (2026-09-08). R0.1.3 unit goldens; R0.4.3-A APPROVE — canonical `shock_units` helpers; R0.4.3-B COMPLETE — remaining risk-layer conversion call sites + reverse-stress magnitude heuristic removed; R0.4.2-A COMPLETE — scenario expand/collapse uses `shock_units` + stress↔formal parity golden; **R0.4.2-B APPROVE** (`reviews/r0.4.2-b-formal-scenario-engine-independent-review.md`) — StressEngine accepts formal `Scenario` natively; formal HTTP applies without `scenario_to_stress` collapse; **R0.4.2-C APPROVE** (`reviews/r0.4.2-c-formal-default-wire-independent-review.md`) — `GET /risk/stress/scenarios` returns formal `ScenarioWire` by default; `/scenarios/formal` identical alias; R0.4.4 COMPLETE — one-pass `MarketSnapshot.apply` (freeze once); R0.4.5 COMPLETE — StressEngine scenario-once-price-many; R0.4.6 CLOSED RF-006 acceptance structural proofs; R0.4.1-A COMPLETE — typed sub-market views pinned + curve bp shifts via `bps_to_decimal_rate` (flat dict storage retained). Remaining residual: dual StressScenario POST bodies on `/stress/custom`, `/evaluate/custom`, `/compare` (UI `scenarioPayload` still legacy); further R0.4.1 typed nesting if needed. Do not close.
 
 Source findings:
 
@@ -617,7 +617,7 @@ Do not split files merely for aesthetics; split ownership and contracts.
 Priority: **P1**  
 Risk types: ARCHITECTURE, CORRECTNESS, MAINTAINABILITY  
 Confidence: HIGH
-Status: **IN PROGRESS** (2026-09-08). R0.4.1-A COMPLETE — `MarketSnapshot.equity` / `.rates_market` / `.vol` / `.fx` pinned as canonical typed views (`app.market.markets`); views wrap frozen MappingProxy fields; curve bp shifts use `shock_units.bps_to_decimal_rate`. Flat dict storage retained (no nested Pydantic rewrite). Remaining: broader typed curve/surface nesting, full Scenario converge (R0.4.2). Do not close.
+Status: **IN PROGRESS** (2026-09-08). R0.4.1-A COMPLETE — `MarketSnapshot.equity` / `.rates_market` / `.vol` / `.fx` pinned as canonical typed views (`app.market.markets`); views wrap frozen MappingProxy fields; curve bp shifts use `shock_units.bps_to_decimal_rate`. Flat dict storage retained (no nested Pydantic rewrite). R0.4.2-C APPROVE — HTTP list default is formal `ScenarioWire`; dual list endpoints retired via alias. Remaining: broader typed curve/surface nesting; dual StressScenario POST bodies still on custom/evaluate/compare. Do not close.
 
 Source findings:
 

@@ -365,11 +365,12 @@ def test_interactive_stress_scenarios_stay_sync_when_external_worker(
 ) -> None:
     monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
-        legacy = client.get("/api/v1/risk/stress/scenarios")
+        default = client.get("/api/v1/risk/stress/scenarios")
         formal = client.get("/api/v1/risk/stress/scenarios/formal")
-        assert legacy.status_code == 200, legacy.text
+        assert default.status_code == 200, default.text
         assert formal.status_code == 200, formal.text
-        assert len(formal.json()) == len(legacy.json())
+        assert formal.json() == default.json()
+        assert "shocks" in default.json()[0]
         # Legacy mount also stays interactive.
         assert client.get("/risk/stress/scenarios").status_code == 200
 
