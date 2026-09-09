@@ -33,7 +33,16 @@ from app.domain.models import (
     RiskRunStatus,
     VaRMethodology,
 )
-from app.persistence.memory_repos import InMemoryRiskRunRepository
+from app.persistence.memory_repos import (
+    InMemoryMarketSnapshotRepository,
+    InMemoryRiskRunRepository,
+)
+from app.persistence.session import session_scope
+from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyMarketSnapshotRepository,
+    SqlAlchemyPortfolioRepository,
+)
+from app.persistence.testing import make_sqlite_session_factory
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.risk_run_compare import (
@@ -597,19 +606,14 @@ def test_execute_caches_the_snapshot_actually_used() -> None:
 
 
 def test_bound_market_fails_closed_on_cache_miss_without_snapshot_id() -> None:
+    """Legacy COMPLETED runs with no stamped snapshot must not bind a live market."""
     worker = _worker_for_bind()
     t0_book = _tiny_book()
     try:
         t0 = worker.submit(portfolio=t0_book, run_type="summary", execute=False)
         t1 = worker.submit(portfolio=t0_book, run_type="summary", execute=False)
-        worker._execute(t0.id)
-        worker._portfolio_service.market_data = FixedMarketProvider(
-            equity_spots_market({"SPY": 400.0, "NVDA": 120.0}, vols={"SPY": 0.16, "NVDA": 0.35})
-        )
-        worker._execute(t1.id)
-        worker._portfolio_service.market_data = FixedMarketProvider(
-            equity_spots_market({"SPY": 1.0, "NVDA": 1.0}, vols={"SPY": 0.16, "NVDA": 0.35})
-        )
+        _finish(worker, t0.id)
+        _finish(worker, t1.id)
         with worker._portfolios_lock:
             worker._completed_markets.clear()
         with pytest.raises(ValueError, match="market"):
@@ -771,3 +775,148 @@ def test_trade_only_dv01_and_vega_residual_near_zero() -> None:
     assert vega.unit == "engine vega units"
     assert "loss-risk" not in vega.sign_convention.lower()
     assert_risk_change_reconciles(vega)
+
+
+def _spy_scaled_t1(book: Portfolio, *, scale: float = 1.5) -> Portfolio:
+    positions = []
+    for pos in book.positions:
+        if getattr(pos, "type", None) == "equity" and getattr(pos, "symbol", None) == "SPY":
+            positions.append(pos.model_copy(update={"quantity": float(pos.quantity) * scale}))
+        else:
+            positions.append(pos)
+    return book.model_copy(update={"id": f"{book.id}-t1-spy-x{scale}", "positions": positions})
+
+
+def test_durable_sqlite_t0_catalog_t1_spy_scale_compare_binds_without_cache(
+    tmp_path,
+) -> None:
+    """Compose/SQLAlchemy: T1 is a distinct book; catalog global-macro stays SPY 900.
+
+    Execute stamps market_snapshot_id and persists the snapshot so a cache-empty
+    worker (API vs Compose worker) can still compare. Does not upsert global-macro.
+    """
+    url = f"sqlite:///{tmp_path / 'cmp_t0t1.db'}"
+    factory = make_sqlite_session_factory(url)
+    catalog = _tiny_book(spy_qty=900.0).model_copy(
+        update={"id": "global-macro", "name": "Global Macro Demo"}
+    )
+    t1_book = _spy_scaled_t1(catalog, scale=1.5)
+    assert t1_book.id != "global-macro"
+    spy_t1 = next(p for p in t1_book.positions if p.symbol == "SPY" and p.type == "equity")
+    assert spy_t1.quantity == pytest.approx(1350.0)
+    with session_scope(factory) as session:
+        SqlAlchemyPortfolioRepository(session).create(catalog)
+
+    svc = PortfolioService(
+        BuiltinPricingEngine(),
+        HistoricalRiskEngine(seed=1, observations=8),
+        market_data=FixedMarketProvider(
+            equity_spots_market(
+                {"SPY": 500.0, "NVDA": 120.0},
+                vols={"SPY": 0.16, "NVDA": 0.35},
+                market_id="snap-execute",
+            )
+        ),
+    )
+    worker = RiskRunWorker(svc, session_factory=factory, max_workers=1)
+    try:
+        t0 = worker.submit(portfolio=catalog, run_type="summary", execute=False)
+        t1 = worker.submit(portfolio=t1_book, run_type="summary", execute=False)
+        assert t0.portfolio_id == "global-macro"
+        assert t1.portfolio_id == t1_book.id
+        worker._execute(t0.id)
+        worker._execute(t1.id)
+        done0 = worker.get(t0.id)
+        done1 = worker.get(t1.id)
+        assert done0.status == RiskRunStatus.COMPLETED, done0.error_message
+        assert done1.status == RiskRunStatus.COMPLETED, done1.error_message
+        assert done0.market_snapshot_id
+        assert done1.market_snapshot_id
+        _drop_bound_cache(worker)
+        report = worker.compare_runs(t0.id, t1.id)
+    finally:
+        worker.shutdown(wait=False)
+
+    assert report.total_change != 0
+    assert abs(report.portfolio_trade_change) > _ABS_TOL
+    assert_risk_change_reconciles(report)
+
+    with session_scope(factory) as session:
+        stored = SqlAlchemyPortfolioRepository(session).get("global-macro")
+        assert stored is not None
+        spy = next(p for p in stored.positions if p.symbol == "SPY" and p.type == "equity")
+        assert spy.quantity == pytest.approx(900.0)
+        t1_stored = SqlAlchemyPortfolioRepository(session).get(t1_book.id)
+        assert t1_stored is not None
+        spy_scaled = next(
+            p for p in t1_stored.positions if p.symbol == "SPY" and p.type == "equity"
+        )
+        assert spy_scaled.quantity == pytest.approx(1350.0)
+        snap = SqlAlchemyMarketSnapshotRepository(session).get(done0.market_snapshot_id)
+        assert snap is not None
+
+
+def test_execute_stamps_snapshot_and_compare_binds_without_in_memory_cache() -> None:
+    snaps = InMemoryMarketSnapshotRepository()
+    svc = PortfolioService(
+        BuiltinPricingEngine(),
+        HistoricalRiskEngine(seed=1, observations=8),
+        market_data=FixedMarketProvider(
+            equity_spots_market(
+                {"SPY": 500.0, "NVDA": 120.0}, vols={"SPY": 0.16, "NVDA": 0.35}
+            )
+        ),
+    )
+    worker = RiskRunWorker(
+        svc, repo=InMemoryRiskRunRepository(), market_snapshots=snaps, max_workers=1
+    )
+    t0_book = _tiny_book(spy_qty=100.0)
+    t1_book = _tiny_book(spy_qty=150.0).model_copy(update={"id": "cmp-book-t1"})
+    try:
+        t0 = worker.submit(portfolio=t0_book, run_type="summary", execute=False)
+        t1 = worker.submit(portfolio=t1_book, run_type="summary", execute=False)
+        worker._execute(t0.id)
+        worker._execute(t1.id)
+        done0 = worker.get(t0.id)
+        done1 = worker.get(t1.id)
+        assert done0.status == RiskRunStatus.COMPLETED, done0.error_message
+        assert done1.status == RiskRunStatus.COMPLETED, done1.error_message
+        assert done0.market_snapshot_id
+        assert done1.market_snapshot_id
+        assert snaps.get(done0.market_snapshot_id) is not None
+        with worker._portfolios_lock:
+            worker._completed_markets.clear()
+        report = worker.compare_runs(t0.id, t1.id)
+        assert report.total_change != 0
+        assert abs(report.portfolio_trade_change) > _ABS_TOL
+    finally:
+        worker.shutdown(wait=False)
+
+
+def test_bound_market_fails_closed_when_stamped_snapshot_row_is_gone() -> None:
+    snaps = InMemoryMarketSnapshotRepository()
+    svc = PortfolioService(
+        BuiltinPricingEngine(),
+        HistoricalRiskEngine(seed=1, observations=8),
+        market_data=FixedMarketProvider(
+            equity_spots_market(
+                {"SPY": 500.0, "NVDA": 120.0}, vols={"SPY": 0.16, "NVDA": 0.35}
+            )
+        ),
+    )
+    worker = RiskRunWorker(
+        svc, repo=InMemoryRiskRunRepository(), market_snapshots=snaps, max_workers=1
+    )
+    book = _tiny_book()
+    try:
+        view = worker.submit(portfolio=book, run_type="summary", execute=False)
+        worker._execute(view.id)
+        run = worker._with_service(lambda svc: svc.get(view.id))
+        assert run.market_snapshot_id
+        snaps._data.pop(run.market_snapshot_id, None)
+        snaps._meta.pop(run.market_snapshot_id, None)
+        _drop_bound_cache(worker)
+        with pytest.raises(ValueError, match="not found"):
+            worker._bound_market(run, book)
+    finally:
+        worker.shutdown(wait=False)

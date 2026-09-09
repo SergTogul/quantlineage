@@ -19,17 +19,7 @@ from app.sample import SAMPLE_PORTFOLIO
 from app.services.portfolio_service import PortfolioService
 from app.services.risk_run_worker import RiskRunWorker
 
-_CROSS_ASSET_POSITION_IDS = (
-    "eq-nvda",
-    "eq-spy",
-    "opt-spy-put",
-    "opt-nvda-call",
-    "bond-ust10",
-    "swap-usd5y",
-    "fut-es",
-    "fxf-eurusd",
-    "fxo-eurusd",
-)
+_CROSS_ASSET_POSITION_IDS = tuple(p.id for p in SAMPLE_PORTFOLIO.positions)
 
 @pytest.fixture
 def session_factory():

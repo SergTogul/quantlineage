@@ -716,6 +716,16 @@ export function spyScaledPortfolio(portfolio, scale = 1.5) {
 }
 
 /**
+ * Flagship Compare T0/T1 book: same SPY×scale economics as the waterfall helper,
+ * but a stable distinct id so durable attach-stored cannot clobber the catalog.
+ */
+export function t1SpyScaledPortfolio(portfolio, scale = 1.5) {
+  const scaled = spyScaledPortfolio(portfolio, scale)
+  if (!scaled) return null
+  return { ...scaled, id: `${portfolio.id}-t1-spy-x${scale}` }
+}
+
+/**
  * Demo RiskChangeAttributionRequest: previous = book, current = SPY×scale.
  * Markets omitted so the API builds snapshots (OpenAPI quantity_increase pattern).
  */

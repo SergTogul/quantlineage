@@ -9,7 +9,7 @@ import {
   hierarchyNodeMetrics, attributionSummary,
   isRiskRunTerminal, riskRunStatus, riskRunStatusClass, riskRunSummary, RISK_RUN_POLL_MS,
   demoChangeAttributionRequest, riskChangeAttributionSummary, riskChangeReportSummary, demoPnLAttributionRequest,
-  spyScaledPortfolio,
+  t1SpyScaledPortfolio,
   esContributionSummary, ES_CONTRIBUTION_DIMENSIONS, varCompareSummary,
   ratesShowcaseSummary, runProvenanceSummary,
 } from '../lib/risk.mjs'
@@ -601,17 +601,27 @@ export function RiskChangeAttribution({ portfolio }) {
     setError('')
     try {
       const t0 = await createRiskRun(portfolio, { run_type: 'summary', request: { methodology } })
-      const t1Book = spyScaledPortfolio(portfolio, 1.5)
-      const t1 = await createRiskRun(t1Book, { run_type: 'summary', request: { methodology } })
       let left = t0
-      let right = t1
-      while (!isRiskRunTerminal(left) || !isRiskRunTerminal(right)) {
+      while (!isRiskRunTerminal(left)) {
         await new Promise((resolve) => setTimeout(resolve, RISK_RUN_POLL_MS))
-        if (!isRiskRunTerminal(left)) left = await getRiskRun(left.id)
-        if (!isRiskRunTerminal(right)) right = await getRiskRun(right.id)
+        left = await getRiskRun(left.id)
       }
-      if (left.status !== 'COMPLETED' || right.status !== 'COMPLETED') {
-        throw new Error(left.error_message || right.error_message || 'Risk run failed')
+      if (left.status !== 'COMPLETED') {
+        throw new Error(left.error_message || 'Risk run failed')
+      }
+      const t1Book = t1SpyScaledPortfolio(portfolio, 1.5)
+      const t1 = await createRiskRun(t1Book, {
+        run_type: 'summary',
+        request: { methodology },
+        market_snapshot_id: left.market_snapshot_id ?? null,
+      })
+      let right = t1
+      while (!isRiskRunTerminal(right)) {
+        await new Promise((resolve) => setTimeout(resolve, RISK_RUN_POLL_MS))
+        right = await getRiskRun(right.id)
+      }
+      if (right.status !== 'COMPLETED') {
+        throw new Error(right.error_message || 'Risk run failed')
       }
       const report = await compareRiskRuns({
         t0_run_id: left.id,
@@ -638,7 +648,7 @@ export function RiskChangeAttribution({ portfolio }) {
         <BlockHelp id="risk-change-attribution" />
       </div>
       <div className="muted">
-        Why did risk change — two COMPLETED RiskRuns (POST /api/v1/risk/runs/compare) or SPY×1.5 waterfall.
+        Why did my risk change — two COMPLETED RiskRuns (POST /api/v1/risk/runs/compare) or SPY×1.5 waterfall.
         UI displays the backend payload only.
       </div>
       <div className="inline-form risk-run-form">

@@ -270,6 +270,14 @@ class SqlAlchemyRiskRunRepository(RiskRunRepository):
         self._session.flush()
         return row_to_risk_run(row)
 
+    def bind_market_snapshot(self, run_id: str, snapshot_id: str) -> RiskRun:
+        row = self._session.get(RiskRunRow, run_id)
+        if row is None:
+            raise KeyError(f"risk run not found: {run_id}")
+        row.market_snapshot_id = snapshot_id
+        self._session.flush()
+        return row_to_risk_run(row)
+
     def add_result(self, run_id: str, result_type: str, payload: dict[str, Any]) -> None:
         if self._session.get(RiskRunRow, run_id) is None:
             raise KeyError(f"risk run not found: {run_id}")

@@ -130,6 +130,10 @@ class RiskRunRepository(ABC):
         """Update lifecycle status; return the refreshed domain DTO."""
 
     @abstractmethod
+    def bind_market_snapshot(self, run_id: str, snapshot_id: str) -> RiskRun:
+        """Stamp ``market_snapshot_id`` on an existing run header."""
+
+    @abstractmethod
     def add_result(self, run_id: str, result_type: str, payload: dict[str, Any]) -> None:
         ...
 

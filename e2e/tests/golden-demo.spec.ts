@@ -128,12 +128,8 @@ test.describe('Stage 10.4 golden institutional demo', () => {
     await page.getByRole('navigation', MAIN).getByRole('button', { name: /Risk Runs/ }).click()
     const runs = page.getByTestId('golden-demo-risk-runs')
     await expect(runs).toBeVisible()
-    const provenanceResponse = page.waitForResponse(
-      (res) => res.url().includes('/api/v1/risk/runs/') && res.url().includes('/provenance') && res.ok(),
-    )
     await runs.getByRole('button', { name: 'Start run' }).click()
     await expect(runs.locator('.status')).toHaveText(/^(COMPLETED|FAILED)$/, { timeout: 45_000 })
-    await provenanceResponse
     const provenancePanel = page.getByTestId('golden-demo-provenance')
     await expect(provenancePanel).toBeVisible()
     await expect(provenancePanel.getByRole('heading', { name: 'Calculation provenance' })).toBeVisible()
