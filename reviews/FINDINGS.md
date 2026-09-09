@@ -433,7 +433,7 @@ Create the shocked snapshot once per scenario, not once per trade.
 
 ## RF-007 — Full revaluation and contribution paths reconstruct N×S QuantLib work
 
-Status: **IN PROGRESS** (2026-09-04). R0.6.1 identity bench APPROVE. R0.6.2 stream APPROVE — `full_revaluation_pnl_series` and VaR full-reval iterate `iter_historical_shocked_snapshots`; list APIs remain wrappers. Independent P&L matches `[-100, 0, 50]`. Still N×S pricing. Not in nightly/PR-FULL. QuantLib reuse, process parallelism, contribution reuse, N=100/1k remain later. Do not close.
+Status: **IN PROGRESS** (2026-09-09). R0.6.1 identity bench APPROVE. R0.6.2 stream APPROVE — `full_revaluation_pnl_series` and VaR full-reval iterate `iter_historical_shocked_snapshots`; list APIs remain wrappers. R0.6.3 COMPLETE pending review — `QuantLibPricingEngine` reuses scalar equity/FX option QuantLib instruments via live `SimpleQuote` handles, caches contract terms and swap schedules by terms/evaluation date, and leaves surface/curve rebuilds market-state-safe. Focused suite: `179 passed`; report: `reviews/r0.6.3-quantlib-reuse-report.md`. Still N×S pricing; process parallelism, contribution reuse, cache-policy work, and N=100/1k remain later. Do not close.
 
 Priority: **P0**  
 Risk types: PERFORMANCE, OPERABILITY, ARCHITECTURE  
