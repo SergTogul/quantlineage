@@ -824,9 +824,20 @@ Related findings:
 - RF-010
 - RF-013 (identity **IN PROGRESS** after R0.8.6 HTTP pin; remaining domain/API split is RF-010)
 
-## R0.9.1 Split transport schemas
+## R0.9.1 Split transport schemas — COMPLETE (2026-09-09); RF-010 stays IN PROGRESS
 
-Move HTTP request/response models into API schema modules.
+HTTP request/response bodies (`CustomStressRequest`, `RiskQueryRequest`,
+`RiskRunRequestBody` / `RiskRunCreateRequest` / `RiskRunView`, …) live in
+`backend/app/api/schemas/` (`transport.py`, re-exported from `__init__.py`).
+Domain entities (`Position`, `Portfolio`, `MarketSnapshot`, `StressScenario`,
+risk *result* types, `RiskRun`) stay in `app.domain.models`. Domain does not
+import FastAPI or `app.api`. No DI container; no one-file-per-class split.
+
+**Do not CLOSE RF-010** — typed calculation results (R0.9.2) and lifespan
+composition (R0.9.3) remain. Dual-use engine inputs (`AttributionRequest`,
+`WhatIfRequest`, `RiskChangeAttributionRequest`) left in domain.
+
+Report: `reviews/r0.9.1-split-transport-schemas-report.md`.
 
 ## R0.9.2 Typed risk results
 

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models import Portfolio, RiskQueryRequest
+from app.api.schemas import RiskQueryRequest
+from app.domain.models import Portfolio
 from app.main import app
 from app.risk.query import (
     RiskAssistantModelRequest,

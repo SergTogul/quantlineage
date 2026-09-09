@@ -17,12 +17,12 @@ import math
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.schemas import LimitDrilldownRequest
 from app.domain.models import (
     BondPosition,
     EquityPosition,
     HierarchyLevel,
     HierarchyRef,
-    LimitDrilldownRequest,
     MarketSnapshot,
     Portfolio,
     RiskLimit,

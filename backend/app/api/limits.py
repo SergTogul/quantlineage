@@ -10,7 +10,8 @@ from app.api.backpressure import reject_inline_heavy
 from app.api.deps import get_portfolio_service
 from app.api.errors import http_bad_request
 from app.api.openapi_examples import LIMITS_DRILLDOWN_BODY_EXAMPLES, RESP_LIMITS_DRILLDOWN
-from app.domain.models import LimitDrilldownReport, LimitDrilldownRequest, Portfolio
+from app.api.schemas import LimitDrilldownRequest
+from app.domain.models import LimitDrilldownReport, Portfolio
 from app.services.portfolio_service import PortfolioService
 
 router = APIRouter(prefix="/risk", tags=["limits"])

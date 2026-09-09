@@ -17,14 +17,16 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from app.api.schemas import (
+    RiskRunRequestBody,
+    dump_risk_run_request,
+    parse_risk_run_request,
+)
 from app.domain.models import (
     AsOfLabel,
     RiskRun,
     RiskRunCalculationConfig,
-    RiskRunRequestBody,
     as_of_wire,
-    dump_risk_run_request,
-    parse_risk_run_request,
 )
 from app.pricing.factory import create_pricing_engine
 from app.risk.factor_panel import create_synthetic_factor_panel

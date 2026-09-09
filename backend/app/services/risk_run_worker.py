@@ -32,16 +32,14 @@ from pydantic import BaseModel, ValidationError
 
 from app.api.errors import PUBLIC_RISK_RUN_FAILURE_MESSAGE
 from app.api.scenario_wire import ScenarioWire, wires_to_scenarios
+from app.api.schemas import RiskRunView, dump_risk_run_request, parse_risk_run_request
 from app.domain.models import (
     AttributionRequest,
     Portfolio,
     RiskChangeAttributionRequest,
     RiskRun,
     RiskRunStatus,
-    RiskRunView,
     VaRMethodology,
-    dump_risk_run_request,
-    parse_risk_run_request,
 )
 from app.persistence.config import external_worker_enabled
 from app.persistence.memory_repos import InMemoryRiskRunRepository

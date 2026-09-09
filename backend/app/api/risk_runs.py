@@ -16,7 +16,7 @@ from app.api.openapi_examples import (
     RESP_RISK_RUN_GET,
     RISK_RUN_CREATE_BODY_EXAMPLES,
 )
-from app.domain.models import RiskRunCreateRequest, RiskRunView
+from app.api.schemas import RiskRunCreateRequest, RiskRunView
 from app.services.risk_run_service import RiskRunNotFound
 from app.services.risk_run_worker import RiskRunWorker
 
