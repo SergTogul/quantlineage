@@ -511,7 +511,9 @@ The existing four-column synthetic dataset may remain as:
 
 It must not be presented as full multi-asset historical factor history.
 
-## R0.5.5 Contribution semantics
+## R0.5.5 Contribution semantics — COMPLETE (2026-09-09)
+
+`VaRAnalytics` / `ESContributionAnalytics` share `factor_panel` from `HistoricalRiskEngine` (via `PortfolioService` hist kwargs). When set, position and factor contributions use panel per-name/per-tenor paths (`approximate_position_pnls_from_panel` / panel shocked snapshots / panel factor isolation); missing required factors fail closed. `factor_panel=None` keeps four-macro `dataset.factor_observations()`. RF-005 stays CLOSED; residual contribution-trace closed here. Report: `reviews/r0.5.5-panel-contributions-report.md`.
 
 Ensure factor contributions are calculated against the factor-complete scenario representation.
 

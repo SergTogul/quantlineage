@@ -8,6 +8,10 @@ Risk-factor contributions:
 - ``LINEAR`` / ``DELTA_GAMMA``: additive Greek P&L terms (equity/vol/rate/fx)
 - ``FULL_REVALUATION``: factor-isolated full reval P&L plus an ``interaction``
   residual so contributions still reconcile to portfolio ES
+
+When ``factor_panel`` is set (R0.5.5), approximate and full-reval factor paths
+consume per-name / per-tenor panel columns instead of four-macro broadcast.
+Missing required panel factors fail closed (not silent zeros into interaction).
 """
 
 from __future__ import annotations
@@ -24,14 +28,24 @@ from app.domain.models import (
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
+from app.risk.factor_panel import HistoricalFactorPanel
+from app.risk.factor_types import EquitySpot, EquityVol, FXSpot, FXVol, RateZero, RiskFactor
 from app.risk.hierarchy_placement import resolve_desk, resolve_strategy
-from app.risk.historical import require_explicit_market
+from app.risk.historical import (
+    require_explicit_market,
+    require_panel_covers_portfolio,
+    required_factors_for_position,
+    _panel_linear_contribution,
+)
 from app.risk.historical_data import HistoricalMarketDataset, SyntheticHistoricalDataset
 from app.risk.shock_units import relative_vol_move_to_vol_points
 from app.risk.scenarios import (
     AggregateFactorChange,
+    FactorChange,
+    MarketScenario,
     apply_market_scenario,
     expand_aggregate_change,
+    factor_changes_from_panel_observation,
     iter_aggregate_changes,
     market_scenario_from_change,
 )
@@ -94,6 +108,18 @@ def _reconciliation_error(contributions: list[ESContribution], portfolio_es: flo
     return float(abs(sum(c.component_es for c in contributions) - portfolio_es))
 
 
+def _factor_family(factor: RiskFactor) -> str:
+    if isinstance(factor, EquitySpot):
+        return "equity"
+    if isinstance(factor, (EquityVol, FXVol)):
+        return "vol"
+    if isinstance(factor, RateZero):
+        return "rate"
+    if isinstance(factor, FXSpot):
+        return "fx"
+    raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
+
+
 def _aggregate_factor_pnl_linear(
     portfolio: Portfolio,
     pricing: PricingEngine,
@@ -115,6 +141,32 @@ def _aggregate_factor_pnl_linear(
         out["vol"] += v.vega * relative_vol_move_to_vol_points(vol_pct)
         out["rate"] += v.dv01 * rates_bps
         out["fx"] += v.fx_delta * fx_ret
+    return out
+
+
+def _aggregate_factor_pnl_from_panel(
+    portfolio: Portfolio,
+    pricing: PricingEngine,
+    market: MarketSnapshot,
+    panel: HistoricalFactorPanel,
+    methodology: VaRMethodology,
+) -> dict[str, np.ndarray]:
+    """Additive Greek factor P&L from per-name / per-tenor panel columns."""
+    require_panel_covers_portfolio(portfolio, panel)
+    vals = pricing.value_portfolio(portfolio, market)
+    if len(vals) != len(portfolio.positions):
+        raise ValueError("valuation count does not match portfolio positions")
+    position_factors = [required_factors_for_position(p) for p in portfolio.positions]
+    out = {k: np.zeros(panel.n_observations, dtype=float) for k in _FACTOR_KEYS}
+    use_gamma = methodology is VaRMethodology.DELTA_GAMMA
+    for i, observation in enumerate(panel.observations):
+        for factors, valuation in zip(position_factors, vals, strict=True):
+            for factor in factors:
+                move = observation.change(factor)
+                family = _factor_family(factor)
+                out[family][i] += _panel_linear_contribution(factor, valuation, move)
+                if use_gamma and isinstance(factor, EquitySpot):
+                    out[family][i] += 0.5 * float(valuation.gamma) * move * move
     return out
 
 
@@ -158,6 +210,52 @@ def _aggregate_factor_pnl_full_reval(
     return factor_pnl
 
 
+def _aggregate_factor_pnl_full_reval_from_panel(
+    portfolio: Portfolio,
+    pricing: PricingEngine,
+    base_market: MarketSnapshot,
+    panel: HistoricalFactorPanel,
+    total_pnl: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Panel factor-isolated full-reval P&L plus explicit interaction residual.
+
+    Required portfolio factors must exist on the panel (fail closed). Isolation
+    applies only that family's typed panel shocks — not four-macro broadcast.
+    """
+    require_panel_covers_portfolio(portfolio, panel)
+    n = panel.n_observations
+    factor_pnl = {k: np.zeros(n, dtype=float) for k in _FACTOR_KEYS}
+    base_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, base_market))
+
+    for i, observation in enumerate(panel.observations):
+        # Ensure the observation can resolve every required factor before isolating.
+        for factor in (
+            f for p in portfolio.positions for f in required_factors_for_position(p)
+        ):
+            observation.change(factor)
+        all_shocks = factor_changes_from_panel_observation(observation)
+        by_family: dict[str, list[FactorChange]] = {k: [] for k in _FACTOR_KEYS}
+        for shock in all_shocks:
+            by_family[_factor_family(shock.factor)].append(shock)
+        for key in _FACTOR_KEYS:
+            shocks = tuple(by_family[key])
+            if not shocks:
+                factor_pnl[key][i] = 0.0
+                continue
+            scenario = MarketScenario(
+                id=f"es_panel_{key}_{i}",
+                name=f"Panel {key} isolation {i}",
+                shocks=shocks,
+            )
+            snap = apply_market_scenario(base_market, scenario)
+            shocked_mv = sum(v.market_value for v in pricing.value_portfolio(portfolio, snap))
+            factor_pnl[key][i] = shocked_mv - base_mv
+
+    residual = total_pnl - sum(factor_pnl[k] for k in _FACTOR_KEYS)
+    factor_pnl["interaction"] = residual
+    return factor_pnl
+
+
 class ESContributionAnalytics:
     """Historical Expected Shortfall contributions by position / hierarchy / factor."""
 
@@ -167,6 +265,7 @@ class ESContributionAnalytics:
         observations: int = 750,
         dataset: HistoricalMarketDataset | None = None,
         methodology: VaRMethodology = VaRMethodology.DELTA_GAMMA,
+        factor_panel: HistoricalFactorPanel | None = None,
     ):
         self.seed = seed
         self.observations = observations
@@ -174,8 +273,13 @@ class ESContributionAnalytics:
             seed=seed, observations=observations
         )
         self.methodology = methodology
+        self.factor_panel = factor_panel
         self._var = VaRAnalytics(
-            seed=seed, observations=observations, dataset=self.dataset, methodology=methodology
+            seed=seed,
+            observations=observations,
+            dataset=self.dataset,
+            methodology=methodology,
+            factor_panel=factor_panel,
         )
 
     def report(
@@ -224,7 +328,16 @@ class ESContributionAnalytics:
         by_strategy = _contributions_from_pnl_map(dict(strategy_pnl), mask, portfolio_es)
         by_desk = _contributions_from_pnl_map(dict(desk_pnl), mask, portfolio_es)
 
-        if meth is VaRMethodology.FULL_REVALUATION:
+        if self.factor_panel is not None:
+            if meth is VaRMethodology.FULL_REVALUATION:
+                factor_pnl = _aggregate_factor_pnl_full_reval_from_panel(
+                    portfolio, pricing, base_market, self.factor_panel, total_pnl
+                )
+            else:
+                factor_pnl = _aggregate_factor_pnl_from_panel(
+                    portfolio, pricing, base_market, self.factor_panel, meth
+                )
+        elif meth is VaRMethodology.FULL_REVALUATION:
             factor_pnl = _aggregate_factor_pnl_full_reval(
                 portfolio, pricing, base_market, self.dataset, total_pnl
             )

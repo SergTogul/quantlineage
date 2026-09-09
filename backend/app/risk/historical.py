@@ -305,6 +305,51 @@ def _panel_linear_contribution(factor: RiskFactor, valuation: Valuation, move: f
     raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
 
 
+def approximate_position_pnls_from_panel(
+    portfolio: Portfolio,
+    pricing_engine: PricingEngine,
+    base_market: MarketSnapshot,
+    panel: HistoricalFactorPanel,
+    *,
+    methodology: VaRMethodology = VaRMethodology.LINEAR,
+) -> dict[str, np.ndarray]:
+    """Per-position LINEAR / DELTA_GAMMA P&L series from a ``HistoricalFactorPanel``.
+
+    Each position is shocked by its own typed column — two equities or two
+    rate tenors in one observation are not broadcast. Missing required factors
+    fail closed. Units match ``approximate_pnl_series``.
+    """
+    if methodology is VaRMethodology.FULL_REVALUATION:
+        raise ValueError(
+            "FULL_REVALUATION cannot use approximate_position_pnls_from_panel; "
+            "use full_revaluation_pnl_from_panel instead"
+        )
+    if methodology not in (VaRMethodology.LINEAR, VaRMethodology.DELTA_GAMMA):
+        raise ValueError(f"approximate_position_pnls_from_panel does not support {methodology!r}")
+    require_panel_covers_portfolio(portfolio, panel)
+    vals = pricing_engine.value_portfolio(portfolio, base_market)
+    if len(vals) != len(portfolio.positions):
+        raise ValueError("valuation count does not match portfolio positions")
+
+    position_factors = [required_factors_for_position(p) for p in portfolio.positions]
+    out: dict[str, np.ndarray] = {
+        p.id: np.zeros(panel.n_observations, dtype=float) for p in portfolio.positions
+    }
+    use_gamma = methodology is VaRMethodology.DELTA_GAMMA
+    for i, observation in enumerate(panel.observations):
+        for position, factors, valuation in zip(
+            portfolio.positions, position_factors, vals, strict=True
+        ):
+            total = 0.0
+            for factor in factors:
+                move = observation.change(factor)
+                total += _panel_linear_contribution(factor, valuation, move)
+                if use_gamma and isinstance(factor, EquitySpot):
+                    total += 0.5 * float(valuation.gamma) * move * move
+            out[position.id][i] = total
+    return out
+
+
 def approximate_pnl_from_panel(
     portfolio: Portfolio,
     pricing_engine: PricingEngine,
@@ -319,31 +364,16 @@ def approximate_pnl_from_panel(
     rate tenors in one observation are not broadcast. Units match
     ``approximate_pnl_series`` / ``FactorObservationSeries``.
     """
-    if methodology is VaRMethodology.FULL_REVALUATION:
-        raise ValueError(
-            "FULL_REVALUATION cannot use approximate_pnl_from_panel; "
-            "use full_revaluation_pnl_from_panel instead"
-        )
-    if methodology not in (VaRMethodology.LINEAR, VaRMethodology.DELTA_GAMMA):
-        raise ValueError(f"approximate_pnl_from_panel does not support {methodology!r}")
-    require_panel_covers_portfolio(portfolio, panel)
-    vals = pricing_engine.value_portfolio(portfolio, base_market)
-    if len(vals) != len(portfolio.positions):
-        raise ValueError("valuation count does not match portfolio positions")
-
-    position_factors = [required_factors_for_position(p) for p in portfolio.positions]
-    pnls = np.zeros(panel.n_observations, dtype=float)
-    use_gamma = methodology is VaRMethodology.DELTA_GAMMA
-    for i, observation in enumerate(panel.observations):
-        total = 0.0
-        for factors, valuation in zip(position_factors, vals, strict=True):
-            for factor in factors:
-                move = observation.change(factor)
-                total += _panel_linear_contribution(factor, valuation, move)
-                if use_gamma and isinstance(factor, EquitySpot):
-                    total += 0.5 * float(valuation.gamma) * move * move
-        pnls[i] = total
-    return pnls
+    by_position = approximate_position_pnls_from_panel(
+        portfolio,
+        pricing_engine,
+        base_market,
+        panel,
+        methodology=methodology,
+    )
+    if not by_position:
+        return np.zeros(panel.n_observations, dtype=float)
+    return sum(by_position.values(), start=np.zeros(panel.n_observations, dtype=float))
 
 
 def full_revaluation_pnl_from_panel(

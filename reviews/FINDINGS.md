@@ -339,7 +339,7 @@ Tests must fail for:
 
 ## RF-005 — Historical risk is a four-macro broadcast, not a factor-complete multi-asset model
 
-Status: **CLOSED** (2026-09-09). Production `build_historical_risk_engine()` wires seeded `HistoricalFactorPanel` (`create_synthetic_factor_panel`) with independent per-name/per-tenor columns (NVDA≠SPY, USD 2Y≠10Y). Bare `HistoricalRiskEngine()` / `factor_panel=None` and labeled File/Synthetic datasets remain explicit `four_macro_demo` fixtures. Evidence: `reviews/r0.5.3-default-panel-independent-review.md` APPROVE; factory tests. Residual (not reopening this finding): `VaRAnalytics` / ES contribution still consume four-macro dataset paths until **R0.5.5**; contribution-trace acceptance lives there.
+Status: **CLOSED** (2026-09-09). Production `build_historical_risk_engine()` wires seeded `HistoricalFactorPanel` (`create_synthetic_factor_panel`) with independent per-name/per-tenor columns (NVDA≠SPY, USD 2Y≠10Y). Bare `HistoricalRiskEngine()` / `factor_panel=None` and labeled File/Synthetic datasets remain explicit `four_macro_demo` fixtures. Evidence: `reviews/r0.5.3-default-panel-independent-review.md` APPROVE; factory tests. **R0.5.5 residual addressed (2026-09-09):** `VaRAnalytics` / `ESContributionAnalytics` accept shared `factor_panel` and attribute via panel histories (fail-closed on missing required factors); four-macro path unchanged when `factor_panel=None`. Evidence: `reviews/r0.5.5-panel-contributions-report.md`. Finding stays **CLOSED** (not reopened).
 
 Priority: **P0**  
 Risk types: CORRECTNESS, METHODOLOGY, ARCHITECTURE  
