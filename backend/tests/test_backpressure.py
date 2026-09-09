@@ -322,6 +322,31 @@ def test_stress_reverse_and_compare_refused_when_external_worker(
                 },
             )
         )
+        _assert_refused_inline(
+            client.post(
+                "/api/v1/risk/stress/formal/compare",
+                json={
+                    "portfolio": book,
+                    "hedged_portfolio": hedged,
+                    "scenarios": [
+                        {
+                            "id": "Equity -10%",
+                            "name": "Equity -10%",
+                            "category": "factor",
+                            "shocks": [
+                                {
+                                    "factor_type": "equity",
+                                    "key": "SPY",
+                                    "amount": -0.10,
+                                    "bucket": "SPY",
+                                }
+                            ],
+                        }
+                    ],
+                    "methodology": "DELTA_GAMMA",
+                },
+            )
+        )
 
 
 def test_attribution_routes_refused_when_external_worker(

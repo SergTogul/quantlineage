@@ -41,7 +41,7 @@ describe('ScenarioBuilder', () => {
 
   it('surfaces API errors from the evaluate endpoint', async () => {
     server.use(
-      http.post(`${API_BASE}${API_V1}/risk/stress/evaluate/custom`, () =>
+      http.post(`${API_BASE}${API_V1}/risk/stress/formal/evaluate/custom`, () =>
         HttpResponse.json({ detail: 'boom' }, { status: 500, statusText: 'Internal Server Error' })),
     )
     const user = userEvent.setup()

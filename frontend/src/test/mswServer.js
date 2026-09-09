@@ -10,7 +10,7 @@ import { API_V1 } from '../api.js'
 export const API_BASE = 'http://localhost:8000'
 
 export const handlers = [
-  http.post(`${API_BASE}${API_V1}/risk/stress/evaluate/custom`, async () =>
+  http.post(`${API_BASE}${API_V1}/risk/stress/formal/evaluate/custom`, async () =>
     HttpResponse.json({
       evaluations: [
         {

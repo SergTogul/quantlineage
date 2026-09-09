@@ -14,7 +14,7 @@ const HEDGE_METHODS = ['LINEAR', 'DELTA_GAMMA', 'FULL_REVALUATION']
 
 /**
  * M8.4: Scenario Builder — equity/rates/FX/vol shocks via stress evaluate API.
- * Display units → scenarioPayload; no client risk math.
+ * Display units → scenarioPayload (formal ScenarioWire); no client risk math.
  */
 export function ScenarioBuilder({ portfolio }) {
   const [form, setForm] = useState(defaultScenarioForm)
@@ -42,7 +42,7 @@ export function ScenarioBuilder({ portfolio }) {
     setLoading(true)
     setError('')
     try {
-      const r = await evaluateCustomScenario(portfolio, scenarioPayload(form))
+      const r = await evaluateCustomScenario(portfolio, scenarioPayload(form, portfolio))
       setResult(r.evaluations?.[0] ?? null)
       if (!r.evaluations?.length) setError('No evaluation returned')
     } catch (e) {
@@ -53,7 +53,11 @@ export function ScenarioBuilder({ portfolio }) {
     }
   }
 
-  const payloadPreview = validateScenarioForm(form).ok ? scenarioPayload(form) : null
+  const payloadPreview = validateScenarioForm(form).ok ? scenarioPayload(form, portfolio) : null
+  const equityAmt = payloadPreview?.shocks?.find((s) => s.factor_type === 'equity')?.amount
+  const volAmt = payloadPreview?.shocks?.find((s) => s.factor_type === 'vol')?.amount
+  const rateAmt = payloadPreview?.shocks?.find((s) => s.factor_type === 'rate')?.amount
+  const fxAmt = payloadPreview?.shocks?.find((s) => s.factor_type === 'fx')?.amount
 
   return (
     <div className="card wide">
@@ -62,7 +66,7 @@ export function ScenarioBuilder({ portfolio }) {
         <BlockHelp id="scenario-builder" />
       </div>
       <div className="muted">
-        Custom factor shocks → POST /api/v1/risk/stress/evaluate/custom (full reval on server)
+        Custom factor shocks → POST /api/v1/risk/stress/formal/evaluate/custom (full reval on server)
       </div>
       <div className="scenario-presets" role="group" aria-label="scenario presets">
         {SCENARIO_PRESETS.map((p) => (
@@ -110,9 +114,11 @@ export function ScenarioBuilder({ portfolio }) {
       </div>
       {payloadPreview && (
         <div className="muted foot scenario-payload-preview">
-          API shocks: equity {payloadPreview.equity_shock} · vol {payloadPreview.vol_shock}
-          {' · '}rates {payloadPreview.rates_shift_bps} bp · fx {payloadPreview.fx_shock}
+          API shocks: equity {equityAmt ?? '—'} · vol {volAmt ?? '—'}
+          {' · '}rates {rateAmt != null ? `${rateAmt} (decimal)` : '—'}
+          {' · '}fx {fxAmt ?? '—'}
           {' · '}max loss {percent(payloadPreview.max_loss_pct)}
+          {' · '}{payloadPreview.shocks.length} factor(s)
         </div>
       )}
       {error && <div className="error risk-run-error">{error}</div>}
@@ -371,7 +377,7 @@ export function HedgeCompare({ portfolio }) {
     setError('')
     try {
       const hedged = spyFlatHedgePortfolio(portfolio)
-      const report = await compareHedge(portfolio, hedged, defaultHedgeScenarios(), methodology)
+      const report = await compareHedge(portfolio, hedged, defaultHedgeScenarios(portfolio), methodology)
       setSummary(hedgeComparisonSummary(report))
     } catch (e) {
       setError(e.message || 'Hedge compare failed')

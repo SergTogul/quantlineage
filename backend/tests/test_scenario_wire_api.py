@@ -233,6 +233,100 @@ def test_legacy_custom_stress_unchanged():
     assert response.json()["evaluations"][0]["scenario"] == "Custom"
 
 
+def test_formal_ui_style_evaluate_matches_legacy_scalar_pnl():
+    """R0.4.2-D: UI-style formal expansion (all market factors) matches legacy scalars."""
+    portfolio = client.get("/api/v1/portfolio").json()
+    legacy_payload = {
+        "portfolio": portfolio,
+        "scenarios": [
+            {
+                "id": "ui_custom",
+                "name": "Custom Crash",
+                "kind": "custom",
+                "equity_shock": -0.2,
+                "vol_shock": 0.5,
+                "rates_shift_bps": 100,
+                "fx_shock": -0.05,
+                "max_loss_pct": 0.1,
+            }
+        ],
+    }
+    from app.api.scenario_wire import stress_to_wire
+    from app.domain.models import Portfolio, ScenarioKind, StressScenario
+    from app.sample import demo_market_snapshot
+
+    port = Portfolio.model_validate(portfolio)
+    market = demo_market_snapshot(port)
+    wire = stress_to_wire(
+        StressScenario(
+            id="ui_custom",
+            name="Custom Crash",
+            kind=ScenarioKind.CUSTOM,
+            equity_shock=-0.2,
+            vol_shock=0.5,
+            rates_shift_bps=100,
+            fx_shock=-0.05,
+            max_loss_pct=0.1,
+        ),
+        market,
+    )
+    formal_payload = {
+        "portfolio": portfolio,
+        "scenarios": [wire.model_dump(mode="json")],
+    }
+    legacy = client.post("/api/v1/risk/stress/evaluate/custom", json=legacy_payload)
+    formal = client.post(
+        "/api/v1/risk/stress/formal/evaluate/custom", json=formal_payload
+    )
+    assert legacy.status_code == 200
+    assert formal.status_code == 200
+    le = legacy.json()["evaluations"][0]
+    fe = formal.json()["evaluations"][0]
+    assert fe["scenario"] == "Custom Crash"
+    assert fe["pnl"] == pytest.approx(le["pnl"], rel=0, abs=1e-9)
+    assert fe["loss"] == pytest.approx(le["loss"], rel=0, abs=1e-9)
+    assert fe["threat_level"] == le["threat_level"]
+
+
+def test_formal_compare_api_matches_legacy_pnl():
+    """R0.4.2-D: POST /stress/formal/compare accepts ScenarioWire and matches legacy."""
+    portfolio = client.get("/api/v1/portfolio").json()
+    hedged = client.get("/api/v1/portfolio").json()
+    for p in hedged["positions"]:
+        if p.get("symbol") == "SPY" and p.get("type") == "equity":
+            p["quantity"] = 0
+            break
+    legacy_body = {
+        "portfolio": portfolio,
+        "hedged_portfolio": hedged,
+        "scenarios": [{"name": "Crash", "equity_shock": -0.2}],
+        "methodology": "DELTA_GAMMA",
+    }
+    from app.api.scenario_wire import stress_to_wire
+    from app.domain.models import Portfolio, StressScenario
+    from app.sample import demo_market_snapshot
+
+    market = demo_market_snapshot(Portfolio.model_validate(portfolio))
+    wire = stress_to_wire(StressScenario(name="Crash", equity_shock=-0.2), market)
+    formal_body = {
+        "portfolio": portfolio,
+        "hedged_portfolio": hedged,
+        "scenarios": [wire.model_dump(mode="json")],
+        "methodology": "DELTA_GAMMA",
+    }
+    legacy = client.post("/api/v1/risk/stress/compare", json=legacy_body)
+    formal = client.post("/api/v1/risk/stress/formal/compare", json=formal_body)
+    assert legacy.status_code == 200, legacy.text
+    assert formal.status_code == 200, formal.text
+    assert formal.json()["scenarios"][0]["scenario"] == "Crash"
+    assert formal.json()["scenarios"][0]["base_pnl"] == pytest.approx(
+        legacy.json()["scenarios"][0]["base_pnl"], rel=0, abs=1e-9
+    )
+    assert formal.json()["var_improvement"] == pytest.approx(
+        legacy.json()["var_improvement"], rel=0, abs=1e-9
+    )
+
+
 def test_wires_to_scenarios_preserves_formal_type():
     wire = ScenarioWire(
         id="native",

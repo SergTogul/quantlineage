@@ -6,7 +6,7 @@ import {
   hierarchySummary, hierarchyNodeAtPath, hierarchyChildRows, hierarchyNodeMetrics,
   hedgeComparisonSummary, reverseStressMultiSummary, scenarioPayload,
   attributionSummary, breachedLimits, limitDrilldownSummary, limitStatusCounts,
-  spyFlatHedgePortfolio, defaultHedgeScenarios,
+  spyFlatHedgePortfolio, defaultHedgeScenarios, stressFactorKeysFromPortfolio,
   riskRunStatus, riskRunStatusClass, isRiskRunTerminal, riskRunSummary, RISK_RUN_POLL_MS,
   spyScaledPortfolio, demoChangeAttributionRequest, riskChangeAttributionSummary,
   demoPnLAttributionRequest, overviewKpis, overviewCollage,
@@ -39,7 +39,35 @@ test('stress summary exposes worst scenario and counters',()=>{const report={sev
 test('factor helpers rank by absolute exposure',()=>assert.equal(topFactors([{factor:'a',exposure:-20},{factor:'b',exposure:10}])[0].factor,'a'))
 test('var method selects requested method',()=>assert.equal(varMethod({methods:[{method:'historical',var:1}]},'historical').var,1))
 test('hierarchy counts trade leaves',()=>assert.equal(hierarchyTradeCount({level:'portfolio',children:[{level:'trade',children:[]},{level:'book',children:[{level:'trade',children:[]}]}]}),2))
-test('scenario builder converts display units to API units',()=>{const x=scenarioPayload({name:'X',equity:-20,vol:50,rates:100,fx:-5,limit:10});assert.equal(x.equity_shock,-.2);assert.equal(x.vol_shock,.5);assert.equal(x.rates_shift_bps,100);assert.equal(x.fx_shock,-.05);assert.equal(x.max_loss_pct,.1)})
+test('scenario builder converts display units to formal ScenarioWire', () => {
+  const x = scenarioPayload({ name: 'X', equity: -20, vol: 50, rates: 100, fx: -5, limit: 10 })
+  assert.equal(x.id, 'ui_custom')
+  assert.equal(x.category, 'custom')
+  assert.equal(x.max_loss_pct, 0.1)
+  assert.ok(!('equity_shock' in x))
+  const byType = Object.fromEntries(
+    ['equity', 'vol', 'rate', 'fx'].map((t) => [t, x.shocks.filter((s) => s.factor_type === t)]),
+  )
+  assert.ok(byType.equity.every((s) => s.amount === -0.2))
+  assert.ok(byType.vol.every((s) => s.amount === 0.5))
+  assert.ok(byType.rate.every((s) => s.amount === 0.01))
+  assert.ok(byType.fx.every((s) => s.amount === -0.05))
+  assert.ok(byType.equity.some((s) => s.key === 'SPY'))
+  assert.ok(byType.rate.some((s) => s.key === 'USD:RATE' && s.bucket === 'ALL'))
+})
+
+test('stressFactorKeysFromPortfolio derives keys from positions', () => {
+  const keys = stressFactorKeysFromPortfolio({
+    positions: [
+      { type: 'equity', symbol: 'SPY' },
+      { type: 'fx_forward', pair: 'EURUSD' },
+      { type: 'bond', currency: 'USD' },
+    ],
+  })
+  assert.deepEqual(keys.equities, ['SPY'])
+  assert.deepEqual(keys.fxPairs, ['EURUSD'])
+  assert.deepEqual(keys.rateCcys, ['EUR', 'USD'])
+})
 
 const firmTree = {
   name: 'Acme Capital',
@@ -177,11 +205,13 @@ test('spyFlatHedgePortfolio zeros SPY equity qty only (request helper)', () => {
   assert.deepEqual(spyFlatHedgePortfolio({ id: 'x' }).positions, [])
 })
 
-test('defaultHedgeScenarios is Crash equity −20% request payload', () => {
+test('defaultHedgeScenarios is formal Crash equity −20% wire', () => {
   const s = defaultHedgeScenarios()
   assert.equal(s.length, 1)
   assert.equal(s[0].name, 'Crash')
-  assert.equal(s[0].equity_shock, -0.2)
+  assert.equal(s[0].category, 'factor')
+  assert.ok(s[0].shocks.every((sh) => sh.factor_type === 'equity' && sh.amount === -0.2))
+  assert.ok(s[0].shocks.some((sh) => sh.key === 'SPY'))
 })
 
 test('reverseStressMultiSummary parses multi-factor result', () => {
@@ -529,8 +559,9 @@ test('scenario presets and validation', () => {
   assert.equal(validateScenarioForm({ ...form, equity: 'x' }).ok, false)
   const crash = SCENARIO_PRESETS.find((p) => p.id === 'equity_crash')
   const payload = scenarioPayload(crash.form)
-  assert.equal(payload.equity_shock, -0.2)
-  assert.equal(payload.vol_shock, 0.5)
+  assert.equal(payload.category, 'custom')
+  assert.ok(payload.shocks.some((s) => s.factor_type === 'equity' && s.amount === -0.2))
+  assert.ok(payload.shocks.some((s) => s.factor_type === 'vol' && s.amount === 0.5))
 })
 
 test('overviewKpis and overviewCollage use API teasers', () => {

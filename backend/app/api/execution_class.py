@@ -36,6 +36,7 @@ METHODOLOGY_BEARING_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/risk/es"),
         ("POST", "/risk/what-if"),
         ("POST", "/risk/stress/compare"),
+        ("POST", "/risk/stress/formal/compare"),
     }
 )
 
@@ -85,6 +86,7 @@ ENDPOINT_EXECUTION_CLASS: Mapping[tuple[str, str], ExecutionClass] = {
     ("POST", "/risk/stress/reverse"): ExecutionClass.HEAVY,
     ("POST", "/risk/stress/reverse/multi"): ExecutionClass.HEAVY,
     ("POST", "/risk/stress/compare"): ExecutionClass.HEAVY,
+    ("POST", "/risk/stress/formal/compare"): ExecutionClass.HEAVY,
     ("POST", "/risk/attribution"): ExecutionClass.HEAVY,
     ("POST", "/risk/attribution/demo"): ExecutionClass.HEAVY,
     ("POST", "/risk/change-attribution"): ExecutionClass.HEAVY,
