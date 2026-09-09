@@ -5,9 +5,9 @@ Conventions:
 - VaR / ES: VaR/ES of the summed trade historical P&L vector (not sum of
   child VaRs). Matches ``HistoricalRiskEngine.calculate`` for LINEAR /
   DELTA_GAMMA without a factor panel (series is linear in Greeks).
-- Limits / stress: omitted on the default trade-artifact path (empty
-  stress maps; ``limits == []``). Explicit ``artifacts=`` with stress
-  keys still aggregate stress additively.
+- Limits: omitted on the default trade-artifact path (``limits == []``).
+  Stress: default producer fills ``DEFAULT_SCENARIOS`` once per run and
+  aggregates; empty books keep ``stress == []``.
 - Position desk/strategy None → inherit Portfolio defaults
 - Empty book → zero MV / zero risk metrics at every level
 """
@@ -224,7 +224,7 @@ def test_empty_portfolio_zero_risk_tree():
     assert root.var_99 == 0.0
     assert root.expected_shortfall_99 == 0.0
     assert root.delta == 0.0
-    # Default producer path leaves stress empty (same as PortfolioService).
+    # Empty book: no positions → no stress scenarios applied.
     assert root.stress == []
     assert root.limits == []
     assert root.children[0].market_value == 0.0
@@ -326,7 +326,7 @@ def test_risk_at_matches_subset_var():
 
 
 def test_greeks_var_es_stress_limits_on_nodes():
-    """M4.2: full additive set; VaR/ES match subset; stress/limits omitted."""
+    """M4.2: full additive set; VaR/ES match subset; stress filled; limits omitted."""
     pricing = BuiltinPricingEngine()
     risk = HistoricalRiskEngine(seed=1, observations=40)
     engine = HierarchyEngine(risk)
@@ -337,7 +337,8 @@ def test_greeks_var_es_stress_limits_on_nodes():
     _assert_additive_reconciles(root)
 
     assert root.limits == []
-    assert root.stress == []
+    assert {s.scenario for s in root.stress} == {s.id for s in engine.stress_scenarios}
+    assert any(s.pnl != 0.0 for s in root.stress)
 
     desk_ref = HierarchyRef(
         level=HierarchyLevel.DESK,
@@ -368,6 +369,5 @@ def test_risk_at_includes_stress_and_limits():
     )
     node = engine.risk_at(pf, pricing, ref, market=_multi_desk_market())
     assert node.level == "strategy"
-    # Default no-artifact path uses trade artifacts; stress/limits omitted.
-    assert node.stress == []
+    assert {s.scenario for s in node.stress} == {s.id for s in engine.stress_scenarios}
     assert node.limits == []
