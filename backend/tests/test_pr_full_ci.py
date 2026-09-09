@@ -77,3 +77,12 @@ def test_quantlib_hard_gate_still_requires_quantlib():
     assert "RISKFORGE_REQUIRE_QUANTLIB" in block
     assert "RISKFORGE_PRICING_ENGINE: quantlib" in block
     assert "requirements-no-ql" not in block
+
+
+def test_pr_full_echo_run_is_yaml_safe():
+    """Unquoted ``run: echo "PR-FULL: ...`` is invalid Actions YAML (colon-space)."""
+    block = _job_block(_workflow_text(), "pr-full")
+    assert not re.search(r'(?m)^\s+run:\s+echo\s+"PR-FULL:', block)
+    assert re.search(r"(?m)^\s+run:\s+\|", block)
+    assert "PR-FULL:" in block
+    assert "backend-quantlib" in block

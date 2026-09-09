@@ -389,4 +389,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Production-relevant jobs succeeded
-        run: echo "PR-FULL: backend, backend-quantlib, frontend, lint, e2e, postgres-smoke succeeded"
+        run: |
+          echo "PR-FULL: backend, backend-quantlib, frontend, lint, e2e, postgres-smoke succeeded"
