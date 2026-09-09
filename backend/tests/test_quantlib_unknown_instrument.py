@@ -57,3 +57,50 @@ def test_unknown_instrument_raises_when_market_is_supplied(engine, monkeypatch):
     message = str(excinfo.value)
     assert "QuantLib" in message
     assert "_UnknownPosition" in message
+
+
+def test_quantlib_value_consults_get_capability(engine, monkeypatch):
+    from app.domain.models import EquityPosition, MarketSnapshot
+
+    _forbid_builtin_fallback(monkeypatch)
+    monkeypatch.setattr(
+        "app.pricing.quantlib.get_capability",
+        lambda family: (_ for _ in ()).throw(AssertionError(f"wired:{family}")),
+        raising=False,
+    )
+    position = EquityPosition(type="equity", id="e", symbol="ABC", quantity=1)
+    market = MarketSnapshot(id="m", equity_spots={"ABC": 10.0}, rates={"USD": 0.04})
+    with pytest.raises(AssertionError, match="wired:equity"):
+        engine.value(position, market)
+
+
+def test_quantlib_snapshot_overlay_unknown_family_fails_closed(monkeypatch):
+    from app.domain.models import MarketSnapshot
+    from app.pricing.quantlib import _snapshot_marks_from_terms
+
+    _forbid_builtin_fallback(monkeypatch)
+
+    class _UnknownTerms:
+        type = "convertible_bond"
+        id = "mystery"
+
+    market = MarketSnapshot(id="m", as_of="t0", equity_spots={}, rates={})
+    with pytest.raises((KeyError, TypeError), match="unknown instrument family"):
+        _snapshot_marks_from_terms(_UnknownTerms(), market)  # type: ignore[arg-type]
+
+
+def test_quantlib_unregistered_terms_fail_closed_without_builtin(engine, monkeypatch):
+    from app.domain.models import MarketSnapshot
+
+    class _UnknownTerms:
+        type = "convertible_bond"
+        id = "mystery"
+
+        def model_dump(self):
+            return {"type": self.type, "id": self.id}
+
+    _forbid_builtin_fallback(monkeypatch)
+    monkeypatch.setattr(engine, "_terms_for_position", lambda position: _UnknownTerms())
+    market = MarketSnapshot(id="m", as_of="t0", equity_spots={}, rates={})
+    with pytest.raises((KeyError, TypeError), match="unknown instrument family"):
+        engine.value(_UnknownPosition(), market)  # type: ignore[arg-type]

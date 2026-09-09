@@ -1,9 +1,10 @@
-"""Static instrument capability registry (R0.5.1 / RF-005 leftover).
+"""Static instrument capability registry (R0.5.1 / RF-012 wire).
 
 Declares adapter identity, required factor kinds, produced sensitivities,
-and snapshot-map exposure for each production family. No invented risk
-numbers. Does not wire value() fail-closed (R0.5.2 already covers unknown
-QuantLib types).
+and snapshot-map exposure for each production family. Production pricing,
+snapshot overlay, cache identity, and typed factor extraction consult
+``get_capability`` so unknown families fail closed. Does not import
+pricing engines.
 """
 
 from __future__ import annotations
@@ -159,3 +160,70 @@ def test_registry_does_not_import_pricing_engines():
     assert "from app.pricing.builtin" not in source
     assert "from app.pricing.quantlib" not in source
     assert "import quantlib" not in source.lower()
+
+
+class _UnknownTerms:
+    type = "convertible_bond"
+    id = "mystery"
+
+
+class _UnknownPosition:
+    id = "mystery"
+    type = "convertible_bond"
+
+
+def _empty_market():
+    from app.domain.models import MarketSnapshot
+
+    return MarketSnapshot(id="m", as_of="t0", equity_spots={}, rates={})
+
+
+def test_builtin_value_consults_get_capability(monkeypatch):
+    from app.domain.models import EquityPosition, MarketSnapshot
+    from app.pricing.builtin import BuiltinPricingEngine
+
+    monkeypatch.setattr(
+        "app.pricing.builtin.get_capability",
+        lambda family: (_ for _ in ()).throw(AssertionError(f"wired:{family}")),
+        raising=False,
+    )
+    position = EquityPosition(type="equity", id="e", symbol="ABC", quantity=1)
+    market = MarketSnapshot(id="m", equity_spots={"ABC": 10.0}, rates={"USD": 0.04})
+    with pytest.raises(AssertionError, match="wired:equity"):
+        BuiltinPricingEngine().value(position, market)
+
+
+def test_builtin_snapshot_overlay_unknown_family_fails_closed():
+    from app.pricing.builtin import _snapshot_marks_from_terms
+
+    with pytest.raises((KeyError, TypeError), match="unknown instrument family"):
+        _snapshot_marks_from_terms(_UnknownTerms(), _empty_market())  # type: ignore[arg-type]
+
+
+def test_factor_extraction_unknown_family_fails_closed():
+    from types import SimpleNamespace
+
+    from app.domain.models import Valuation
+    from app.risk.factors import RiskFactorEngine
+
+    class _StubPricing:
+        def value(self, position, market=None):
+            return Valuation(position_id=position.id, market_value=1.0)
+
+    book = SimpleNamespace(positions=[_UnknownPosition()])
+    with pytest.raises((KeyError, TypeError), match="unknown instrument family"):
+        RiskFactorEngine().calculate_typed(book, _StubPricing(), _empty_market())  # type: ignore[arg-type]
+
+
+def test_trade_cache_key_consults_get_capability(monkeypatch):
+    from app.domain.models import EquityPosition
+    from app.pricing.cache import trade_cache_key
+
+    monkeypatch.setattr(
+        "app.pricing.cache.get_capability",
+        lambda family: (_ for _ in ()).throw(AssertionError(f"wired:{family}")),
+        raising=False,
+    )
+    position = EquityPosition(type="equity", id="e", symbol="ABC", quantity=1)
+    with pytest.raises(AssertionError, match="wired:equity"):
+        trade_cache_key(position)

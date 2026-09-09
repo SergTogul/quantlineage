@@ -8,10 +8,12 @@ Declares, for each production ``InstrumentTerms`` / ``trade_cache_key`` family:
 - sensitivity names already written onto ``Valuation`` today;
 - snapshot maps those families read (exposure mapping).
 
-This is a frozen lookup table, not a plugin framework. It is not wired into
-``value()`` fail-closed (R0.5.2 already raises on unknown QuantLib types).
-Unknown families fail closed here. Dividend yields and IR vols have no typed
-factor class yet; they appear only as snapshot maps.
+This is a frozen lookup table, not a plugin framework. Production pricing,
+snapshot overlay, cache identity, and typed factor extraction call
+:func:`get_capability` so unknown families fail closed. Per-family
+``isinstance`` adapters remain; this is not a plugin registry.
+Dividend yields and IR vols have no typed factor class yet; they appear
+only as snapshot maps.
 """
 
 from __future__ import annotations
