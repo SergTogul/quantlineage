@@ -779,7 +779,7 @@ Missing auth is not called a vulnerability for strict loopback use, but public e
 
 ## RF-015 — Interactive UI fans out redundant synchronous risk calculations
 
-Status: **IN PROGRESS** (2026-09-04). R0.10.1–R0.10.3 APPROVE including leftover `risk.py` HEAVY routes (`/var`, `/es`, `/var/compare`, `/what-if`, `/hierarchy`, `/query`, `/contributors`) refuse inline when the gate is on. LINEAR summary and `/factors` stay sync. Remaining: HEAVY stress / attribution / limits still inline; Compose `loadDashboard()` still POSTs dashboard and will 400. Do not close.
+Status: **IN PROGRESS** (2026-09-09). R0.10.1–R0.10.3 APPROVE including leftover `risk.py` HEAVY routes and HEAVY stress / attribution / limits POSTs refuse inline when the gate is on. INTERACTIVE scenario GETs, `/limits/drilldown`, LINEAR summary, and `/factors` stay sync. Remaining: Compose `loadDashboard()` still POSTs `/risk/dashboard` and will 400 when the gate is on. Do not close.
 
 Priority: **P1**  
 Risk types: PERFORMANCE, OPERABILITY, API  

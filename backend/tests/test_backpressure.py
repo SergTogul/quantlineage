@@ -3,7 +3,8 @@
 When Compose / production-shaped deploys set ``RISKFORGE_EXTERNAL_WORKER=1``
 (or ``RISKFORGE_HEAVY_INLINE=0``), HEAVY ``/risk/*`` handlers refuse
 request-thread compute and point clients at ``POST /risk/runs``.
-INTERACTIVE LINEAR / DELTA_GAMMA summary stays sync.
+INTERACTIVE LINEAR / DELTA_GAMMA summary, stress scenario GETs, and
+``/limits/drilldown`` stay sync.
 """
 
 from __future__ import annotations
@@ -194,3 +195,199 @@ def test_interactive_factors_stays_sync_when_external_worker(
         book = client.get("/api/v1/portfolio").json()
         response = client.post("/api/v1/risk/factors", json=book)
         assert response.status_code == 200, response.text
+
+
+# ---------------------------------------------------------------------------
+# HEAVY stress / attribution / limits leftovers (R0.10.3 slice)
+# ---------------------------------------------------------------------------
+
+_STRESS_ATTR_LIMITS_PORTFOLIO_PATHS = (
+    "/api/v1/risk/stress",
+    "/api/v1/risk/stress/evaluate",
+    "/api/v1/risk/attribution/demo",
+    "/api/v1/risk/limits",
+    "/risk/stress",
+    "/risk/limits",
+)
+
+
+@pytest.mark.parametrize("path", _STRESS_ATTR_LIMITS_PORTFOLIO_PATHS)
+def test_stress_attr_limits_portfolio_routes_refused_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        response = client.post(path, json=book)
+        _assert_refused_inline(response)
+
+
+def test_stress_custom_routes_refused_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    scenario = {
+        "name": "Custom",
+        "equity_shock": -0.1,
+        "vol_shock": 0.0,
+        "rates_shift_bps": 0.0,
+        "fx_shock": 0.0,
+        "max_loss_pct": 0.02,
+    }
+    formal_scenario = {
+        "id": "custom-formal",
+        "name": "Custom",
+        "category": "hypothetical",
+        "shocks": [
+            {
+                "factor_type": "equity",
+                "key": "SPY",
+                "amount": -0.10,
+                "bucket": "SPY",
+            }
+        ],
+        "max_loss_pct": 0.02,
+    }
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        legacy_body = {"portfolio": book, "scenarios": [scenario]}
+        formal_body = {"portfolio": book, "scenarios": [formal_scenario]}
+        for path in (
+            "/api/v1/risk/stress/custom",
+            "/api/v1/risk/stress/evaluate/custom",
+            "/risk/stress/custom",
+        ):
+            _assert_refused_inline(client.post(path, json=legacy_body))
+        for path in (
+            "/api/v1/risk/stress/formal/custom",
+            "/api/v1/risk/stress/formal/evaluate/custom",
+        ):
+            _assert_refused_inline(client.post(path, json=formal_body))
+
+
+def test_stress_reverse_and_compare_refused_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        hedged = {
+            **book,
+            "id": f"{book['id']}-hedged",
+            "positions": [
+                {
+                    **book["positions"][0],
+                    "quantity": float(book["positions"][0]["quantity"]) * 0.5,
+                },
+                *book["positions"][1:],
+            ],
+        }
+        _assert_refused_inline(
+            client.post(
+                "/api/v1/risk/stress/reverse",
+                json={
+                    "portfolio": book,
+                    "target_loss_pct": 0.05,
+                    "factor": "equity",
+                },
+            )
+        )
+        _assert_refused_inline(
+            client.post(
+                "/risk/stress/reverse/multi",
+                json={
+                    "portfolio": book,
+                    "target_loss_pct": 0.05,
+                    "factors": ["equity", "vol"],
+                },
+            )
+        )
+        _assert_refused_inline(
+            client.post(
+                "/api/v1/risk/stress/compare",
+                json={
+                    "portfolio": book,
+                    "hedged_portfolio": hedged,
+                    "scenarios": [
+                        {
+                            "name": "Equity -10%",
+                            "equity_shock": -0.10,
+                            "vol_shock": 0.0,
+                            "rates_shift_bps": 0.0,
+                            "fx_shock": 0.0,
+                        }
+                    ],
+                    "methodology": "DELTA_GAMMA",
+                },
+            )
+        )
+
+
+def test_attribution_routes_refused_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        _assert_refused_inline(
+            client.post(
+                "/api/v1/risk/attribution",
+                json={"previous_portfolio": book, "current_portfolio": book},
+            )
+        )
+        _assert_refused_inline(
+            client.post(
+                "/risk/change-attribution",
+                json={
+                    "previous_portfolio": book,
+                    "current_portfolio": book,
+                    "metric": "var_99",
+                    "methodology": "DELTA_GAMMA",
+                },
+            )
+        )
+
+
+def test_stress_attr_limits_refused_when_heavy_inline_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
+    monkeypatch.setenv("RISKFORGE_HEAVY_INLINE", "0")
+    with TestClient(app) as client:
+        book = client.get("/portfolio").json()
+        _assert_refused_inline(client.post("/risk/stress", json=book))
+        _assert_refused_inline(client.post("/api/v1/risk/limits", json=book))
+
+
+def test_interactive_stress_scenarios_stay_sync_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        legacy = client.get("/api/v1/risk/stress/scenarios")
+        formal = client.get("/api/v1/risk/stress/scenarios/formal")
+        assert legacy.status_code == 200, legacy.text
+        assert formal.status_code == 200, formal.text
+        assert len(formal.json()) == len(legacy.json())
+        # Legacy mount also stays interactive.
+        assert client.get("/risk/stress/scenarios").status_code == 200
+
+
+def test_interactive_limits_drilldown_stays_sync_when_external_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        payload = {
+            "portfolio": book,
+            "metric": "var_99",
+            "breaches_only": False,
+            "top_n": 2,
+        }
+        response = client.post("/api/v1/risk/limits/drilldown", json=payload)
+        assert response.status_code == 200, response.text
+        assert response.json()["portfolio_id"] == book["id"]
+        legacy = client.post("/risk/limits/drilldown", json=payload)
+        assert legacy.status_code == 200, legacy.text
