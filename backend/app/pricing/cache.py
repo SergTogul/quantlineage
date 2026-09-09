@@ -9,6 +9,11 @@ Cache keys bind:
 A market bump produces a new ``content_hash`` and therefore a miss — no separate
 invalidation registry is required for correctness. Callers may still ``clear()``
 when replacing an engine or resetting a worker.
+
+Unique-shock / FULL_REVALUATION loops must not consult this LRU: each shocked
+snapshot has a new identity, so get/put only add hash, lookup, and copy cost.
+Enter :func:`bypass_valuation_lru` (or ``shocked_value``) for that execution
+class. Repeated base-snapshot valuations still hit.
 """
 
 from __future__ import annotations
@@ -17,6 +22,9 @@ import hashlib
 import json
 import threading
 from collections import OrderedDict
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -25,6 +33,7 @@ from app.domain.instrument_terms import terms_from_position
 from app.domain.models import (
     MarketSnapshot,
     Position,
+    StressScenario,
     Valuation,
     calendar_as_of,
 )
@@ -45,6 +54,28 @@ _TRADE_CACHE_SCHEMAS: dict[str, str] = {
     "swaption": "swaption_terms_v1",
 }
 _EQUITY_FAMILY_TYPES = frozenset({"equity", "equity_future", "european_option"})
+_bypass_valuation_lru: ContextVar[bool] = ContextVar(
+    "riskforge_bypass_valuation_lru", default=False
+)
+
+
+@contextmanager
+def bypass_valuation_lru() -> Iterator[None]:
+    """Skip per-snapshot NPV LRU get/put (unique-shock / FULL_REVALUATION).
+
+    Inner engine still prices the current ``MarketSnapshot``; no stale NPV is
+    served. Repeated base valuations outside this context keep using the LRU.
+    """
+    token = _bypass_valuation_lru.set(True)
+    try:
+        yield
+    finally:
+        _bypass_valuation_lru.reset(token)
+
+
+def valuation_lru_bypassed() -> bool:
+    """True while :func:`bypass_valuation_lru` is active on this context."""
+    return _bypass_valuation_lru.get()
 
 
 def _stable_json_hash(payload: Any) -> str:
@@ -153,7 +184,9 @@ class CachedPricingEngine(PricingEngine):
     """LRU valuation cache in front of an inner ``PricingEngine``.
 
     Does not import or expose QuantLib. Scenario-invariant paths (same trade +
-    same base snapshot + same config) hit; shocked/bumped markets miss.
+    same base snapshot + same config) hit. Unique shocked markets must enter
+    :func:`bypass_valuation_lru` (or ``shocked_value``) so the LRU is not
+    consulted on a path that can only miss.
     """
 
     def __init__(
@@ -192,9 +225,20 @@ class CachedPricingEngine(PricingEngine):
         with self._lock:
             self._cache.clear()
 
+    def shocked_value(
+        self,
+        position: Position,
+        scenario: StressScenario,
+        market: MarketSnapshot | None = None,
+    ) -> float:
+        with bypass_valuation_lru():
+            return super().shocked_value(position, scenario, market)
+
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
         if market is None:
             raise ValueError("CachedPricingEngine requires an explicit MarketSnapshot")
+        if _bypass_valuation_lru.get():
+            return self._inner.value(position, market)
         key = valuation_cache_key(position, market, self._config)
         with self._lock:
             cached = self._cache.get(key)

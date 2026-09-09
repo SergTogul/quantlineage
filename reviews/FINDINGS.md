@@ -433,7 +433,7 @@ Create the shocked snapshot once per scenario, not once per trade.
 
 ## RF-007 — Full revaluation and contribution paths reconstruct N×S QuantLib work
 
-Status: **IN PROGRESS** (2026-09-09). R0.6.1 identity bench APPROVE. R0.6.2 stream APPROVE — `full_revaluation_pnl_series` and VaR full-reval iterate `iter_historical_shocked_snapshots`; list APIs remain wrappers. R0.6.3 COMPLETE pending review — `QuantLibPricingEngine` reuses scalar equity/FX option QuantLib instruments via live `SimpleQuote` handles, caches contract terms and swap schedules by terms/evaluation date, and leaves surface/curve rebuilds market-state-safe. Focused suite: `179 passed`; report: `reviews/r0.6.3-quantlib-reuse-report.md`. Still N×S pricing; process parallelism, contribution reuse, cache-policy work, and N=100/1k remain later. Do not close.
+Status: **IN PROGRESS** (2026-09-09). R0.6.1 identity bench APPROVE. R0.6.2 stream APPROVE — `full_revaluation_pnl_series` and VaR full-reval iterate `iter_historical_shocked_snapshots`; list APIs remain wrappers. R0.6.3 APPROVE — `QuantLibPricingEngine` reuses scalar equity/FX option QuantLib instruments via live `SimpleQuote` handles. R0.6.4 COMPLETE pending review — unique-shock FULL_REVALUATION enters `bypass_valuation_lru` so `CachedPricingEngine` does not hash/get/put per unique shocked snapshot; base-snapshot LRU hits remain; `shocked_value` also bypasses. Evidence: `backend/tests/test_pricing_anti_cache.py`; report: `reviews/r0.6.4-anti-cache-report.md`. Still N×S pricing; process parallelism, contribution reuse, and N=100/1k remain later. Do not close.
 
 Priority: **P0**  
 Risk types: PERFORMANCE, OPERABILITY, ARCHITECTURE  
