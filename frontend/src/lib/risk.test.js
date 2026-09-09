@@ -9,7 +9,7 @@ import {
   spyFlatHedgePortfolio, defaultHedgeScenarios, stressFactorKeysFromPortfolio,
   riskRunStatus, riskRunStatusClass, isRiskRunTerminal, riskRunSummary, RISK_RUN_POLL_MS,
   ratesShowcaseSummary, runProvenanceSummary,
-  spyScaledPortfolio, demoChangeAttributionRequest, riskChangeAttributionSummary,
+  spyScaledPortfolio, t1SpyScaledPortfolio, demoChangeAttributionRequest, riskChangeAttributionSummary,
   riskChangeReportSummary,
   demoPnLAttributionRequest, overviewKpis, overviewCollage,
   SCENARIO_PRESETS, defaultScenarioForm, validateScenarioForm,
@@ -500,6 +500,21 @@ test('spyScaledPortfolio scales SPY equity qty only (request helper)', () => {
   assert.equal(scaled.positions[2].quantity, 50)
   assert.equal(portfolio.positions[0].quantity, 100)
   assert.equal(spyScaledPortfolio(null), null)
+  assert.equal(scaled.id, 'demo')
+})
+
+test('t1SpyScaledPortfolio uses a stable id distinct from the catalog book', () => {
+  const portfolio = {
+    id: 'global-macro',
+    positions: [{ id: 'eq-spy', type: 'equity', symbol: 'SPY', quantity: 900 }],
+  }
+  const t1 = t1SpyScaledPortfolio(portfolio, 1.5)
+  assert.equal(t1.id, 'global-macro-t1-spy-x1.5')
+  assert.notEqual(t1.id, portfolio.id)
+  assert.equal(t1.positions[0].quantity, 1350)
+  assert.equal(portfolio.positions[0].quantity, 900)
+  assert.equal(spyScaledPortfolio(portfolio, 1.5).id, 'global-macro')
+  assert.equal(t1SpyScaledPortfolio(null), null)
 })
 
 test('demoChangeAttributionRequest builds previous→SPY×scale current', () => {

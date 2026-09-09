@@ -45,7 +45,7 @@ from app.domain.models import (
     VaRMethodology,
 )
 from app.persistence.config import external_worker_enabled
-from app.persistence.memory_repos import InMemoryRiskRunRepository
+from app.persistence.memory_repos import InMemoryMarketSnapshotRepository, InMemoryRiskRunRepository
 from app.persistence.repositories import MarketSnapshotRepository, RiskRunRepository
 from app.persistence.session import session_scope
 from app.persistence.sqlalchemy_repos import (
@@ -292,10 +292,13 @@ class RiskRunWorker:
             raise ValueError("provide either repo or session_factory, not both")
         self._portfolio_service = portfolio_service
         self._session_factory = session_factory
-        self._market_snapshots = market_snapshots
         self._memory_repo = repo
         if session_factory is None and self._memory_repo is None:
             self._memory_repo = InMemoryRiskRunRepository()
+        if session_factory is None and market_snapshots is None:
+            self._market_snapshots = InMemoryMarketSnapshotRepository()
+        else:
+            self._market_snapshots = market_snapshots
         self._max_workers = max_workers
         self._portfolios: dict[str, Portfolio] = {}
         self._completed_portfolios: dict[str, Portfolio] = {}
@@ -349,6 +352,21 @@ class RiskRunWorker:
         if self._market_snapshots is not None:
             return self._market_snapshots.get(snapshot_id)
         return None
+
+    def _persist_execute_market(self, market: MarketSnapshot) -> None:
+        """Save the execute-time snapshot if the repo does not already have it."""
+        if self._session_factory is not None:
+            with session_scope(self._session_factory) as session:
+                repo = SqlAlchemyMarketSnapshotRepository(session)
+                if repo.get(market.id) is None:
+                    repo.save(market)
+            return
+        if self._market_snapshots is not None and self._market_snapshots.get(market.id) is None:
+            self._market_snapshots.save(market)
+
+    def _stamp_execute_market(self, run_id: str, market: MarketSnapshot) -> None:
+        self._persist_execute_market(market)
+        self._with_service(lambda svc: svc.bind_market_snapshot(run_id, market.id))
 
     def _load_portfolio(self, portfolio_id: str) -> Portfolio | None:
         if self._session_factory is None:
@@ -694,6 +712,7 @@ class RiskRunWorker:
                     return
             else:
                 market = self._portfolio_service.market_snapshot(portfolio)
+                self._stamp_execute_market(run_id, market)
             with self._portfolios_lock:
                 self._completed_portfolios[run_id] = portfolio.model_copy(deep=True)
                 self._completed_markets[run_id] = _clone_snapshot(market)

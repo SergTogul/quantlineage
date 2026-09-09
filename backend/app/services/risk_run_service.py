@@ -154,6 +154,24 @@ class RiskRunService:
         """QUEUED → RUNNING; repository sets ``started_at``."""
         return self._transition(run_id, RiskRunStatus.RUNNING)
 
+    def bind_market_snapshot(self, run_id: str, snapshot_id: str) -> RiskRun:
+        """Record the execute-time snapshot id; do not rebind a different id."""
+        snap_id = (snapshot_id or "").strip()
+        if not snap_id:
+            raise ValueError("market_snapshot_id is required")
+        current = self._require(run_id)
+        if current.market_snapshot_id:
+            if current.market_snapshot_id != snap_id:
+                raise ValueError(
+                    f"cannot rebind run {run_id}: market_snapshot_id "
+                    f"{current.market_snapshot_id!r} != {snap_id!r}"
+                )
+            return current
+        try:
+            return self._repo.bind_market_snapshot(run_id, snap_id)
+        except KeyError as exc:
+            raise RiskRunNotFound(run_id) from exc
+
     def complete(
         self,
         run_id: str,

@@ -210,6 +210,15 @@ class InMemoryRiskRunRepository(RiskRunRepository):
             self._runs[run_id] = updated
             return updated.model_copy(deep=True)
 
+    def bind_market_snapshot(self, run_id: str, snapshot_id: str) -> RiskRun:
+        with self._lock:
+            row = self._runs.get(run_id)
+            if row is None:
+                raise KeyError(f"risk run not found: {run_id}")
+            updated = row.model_copy(update={"market_snapshot_id": snapshot_id})
+            self._runs[run_id] = updated
+            return updated.model_copy(deep=True)
+
     def add_result(self, run_id: str, result_type: str, payload: dict[str, Any]) -> None:
         with self._lock:
             row = self._runs.get(run_id)

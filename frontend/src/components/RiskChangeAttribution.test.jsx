@@ -91,13 +91,17 @@ describe('RiskChangeAttribution flagship card', () => {
 
     let compareBody = null
     let created = 0
+    const postedRuns = []
     server.use(
-      http.post(`${API_BASE}${API_V1}/risk/runs`, async () => {
+      http.post(`${API_BASE}${API_V1}/risk/runs`, async ({ request }) => {
         created += 1
+        const body = await request.json()
+        postedRuns.push(body)
         const id = created === 1 ? 'run-t0' : 'run-t1'
         return HttpResponse.json({
           id,
-          portfolio_id: 'demo',
+          portfolio_id: body.portfolio?.id ?? 'demo',
+          market_snapshot_id: created === 1 ? 'snap-t0' : body.market_snapshot_id,
           status: 'COMPLETED',
           run_type: 'summary',
           results: [{ result_type: 'summary', payload: { var_99: 1000 } }],
@@ -119,8 +123,15 @@ describe('RiskChangeAttribution flagship card', () => {
 
     const user = userEvent.setup()
     render(<RiskChangeAttribution portfolio={demoPortfolio} />)
+    expect(screen.getByText(/Why did my risk change/i)).toBeTruthy()
     await user.click(screen.getByRole('button', { name: /compare t0\/t1/i }))
     await waitFor(() => expect(compareBody).not.toBeNull())
+    expect(postedRuns).toHaveLength(2)
+    expect(postedRuns[0].portfolio.id).toBe('demo')
+    expect(postedRuns[1].portfolio.id).not.toBe('demo')
+    expect(postedRuns[1].portfolio.id).toBe('demo-t1-spy-x1.5')
+    expect(postedRuns[1].portfolio.positions[0].quantity).toBe(150)
+    expect(postedRuns[1].market_snapshot_id).toBe('snap-t0')
     expect(compareBody.t0_run_id).toBeTruthy()
     expect(compareBody.t1_run_id).toBeTruthy()
     expect(screen.getByText(/currency loss/i)).toBeTruthy()
