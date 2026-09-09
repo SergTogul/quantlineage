@@ -558,7 +558,7 @@ Related findings:
 
 ## R0.6.1 Baseline benchmark first — COMPLETE (2026-09-04)
 
-`benchmarks/run_full_reval_bench.py` + `backend/tests/test_full_reval_bench.py`. Identity is **1 trade × 120 obs** builtin vs `full_revaluation_pnl_series` (not N=10×S=100). `pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`; `wall_ms` recorded only. Not in nightly/PR-FULL. N=100/1k wall/RSS/scenarios-sec/builtin-vs-QuantLib/warm-vs-cold remain the close-gate residual. RF-007 stays open.
+`benchmarks/run_full_reval_bench.py` + `backend/tests/test_full_reval_bench.py`. Identity remains **1 trade × 120 obs** builtin vs `full_revaluation_pnl_series`. `pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`; `wall_ms` recorded only. Not in nightly/PR-FULL. R0.6.7 extends the same harness with a PR-safe **10×50** acceptance payload (RSS / scenarios/sec / builtin vs QuantLib / warm vs cold). N=100/1k remain operator CLI, not the default PR test. RF-007 stays open.
 
 Record current performance for:
 
@@ -618,19 +618,23 @@ Avoid whole-book full revaluation once per factor family when the same trade/sce
 
 Full-reval ES factor contributions and scenario-attribution factor buckets reuse the already-computed joint trade/scenario P&L and attribute families from one base Δ-Γ Greek valuation. They do not apply family-isolated scenarios or reprice the book per family × observation. `interaction` = joint full-reval − sum(families). Bound: family path is O(N) base `value` calls, not O(N×S×F) extra books; scenario `apply_scenario` stays one full scenario (not × factor keys). Cash-equity family P&L matches LINEAR at abs `1e-12`; reconcile abs `1e-6` / rel `1e-8`. Evidence: `backend/tests/test_contribution_reuse.py`; focused suite including ES/VaR/attribution/anti-cache; report `reviews/r0.6.6-contribution-reuse-report.md`.
 
+## R0.6.7 Acceptance benches — COMPLETE pending review (2026-09-09)
+
+`benchmarks/run_full_reval_bench.py --json` now includes an `acceptance` object. PR-safe default **N=10 × S=50** (above 1×120). Each engine row records `wall_ms`, `wall_ms_cold`, `wall_ms_warm`, `peak_rss_kib`, `scenarios_per_sec` as finite numbers — pytest asserts presence/finiteness, **not** a floor. Builtin vs QuantLib at the same N×S; QuantLib skip-or-run (`RISKFORGE_REQUIRE_QUANTLIB=1` fail-closed). Identity: R0.6.1 `6602fa69…` (1×120) and `a28cf4ee6199bf40da3f2598f4241fc85fa4adc4f86bccbbd97e4938047d7537` (10×50). No `throughput` key; `check_m6_sla.py` not invoked. Not added to nightly/PR-FULL. Evidence: `backend/tests/test_full_reval_bench.py`; report `reviews/r0.6.7-acceptance-benches-report.md`. RF-007 stays **IN PROGRESS**.
+
 ## R0.6 close gate — KEEP OPEN / not complete (2026-09-09)
 
 QA close gate **KEEP OPEN** (`reviews/r0.6-rf007-close-gate-report.md`; independent review KEEP OPEN). **RF-007 IN PROGRESS.**
 
 Required direction: 6 MET, 1 PARTIAL (option B job process, not intra-run chunks). Goldens/identity **69 passed**. Joint scaling is O(N×S) `value` + O(N) Greeks, bounded as a HEAVY RiskRun job. Interactive default remains DELTA_GAMMA. No SLA.
 
-Acceptance benches required for close: RSS, scenarios/sec, builtin vs QuantLib **UNMET**; N×S / wall / warm-cold only **PARTIAL** at 1×120 builtin. Record N=100/1k (and S=50/750/1k where practical) wall, peak RSS, scenarios/sec, builtin vs QuantLib, warm vs cold. Identity checksum stays. Do not invent a host SLA from recorded `wall_ms`.
+Acceptance benches: PR-safe 10×50 records wall, peak RSS, scenarios/sec, builtin vs QuantLib, warm vs cold. Identity checksums stay. N=100/1k (and S=750/1k) are not in the default PR test. Do not invent a host SLA from recorded `wall_ms`. Task 7 close re-gate still owns CLOSED vs KEEP OPEN.
 
 ### Exit criteria
 
 Full revaluation is still allowed to be expensive, but its scaling is explainable, benchmarked, bounded, and appropriate for a risk-run job.
 
-Explainable **yes**; bounded **yes**; appropriate **yes**. **Benchmarked no** beyond 1×120 builtin identity + `wall_ms`. Close-gate **not complete**.
+Explainable **yes**; bounded **yes**; appropriate **yes**. **Benchmarked** at PR-safe 10×50 (plus 1×120 identity); N=100/1k not default-PR. Close-gate **not complete**.
 
 ---
 

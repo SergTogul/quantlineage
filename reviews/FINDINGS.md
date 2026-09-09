@@ -433,7 +433,7 @@ Create the shocked snapshot once per scenario, not once per trade.
 
 ## RF-007 — Full revaluation and contribution paths reconstruct N×S QuantLib work
 
-Status: **IN PROGRESS** (2026-09-09). R0.6.1–R0.6.6 APPROVE (architecture in place: `reviews/sdd-briefs/task-1-r0.6.3-review.md`, `task-2-r0.6.4-review.md`, `task-3-r0.6.6-review.md`, `task-4-r0.6.5-review.md`): stream shocked snapshots; one-pass scenario market (RF-006); QuantLib scalar-option reuse via live `SimpleQuote` handles; unique-shock valuation LRU bypass; factor contributions reuse joint P&L + O(N) Δ-Γ (not O(N×S×F) extra books); HEAVY `FULL_REVALUATION` is a RiskRun / Compose `worker` OS-process job (option B; no in-process QuantLib threads). Interactive default remains `DELTA_GAMMA`. Close-gate **KEEP OPEN** (`reviews/r0.6-rf007-close-gate-report.md`). Residual: acceptance benches UNMET/PARTIAL — peak RSS, scenarios/sec, builtin vs QuantLib **UNMET**; N trades × S scenarios, wall time, and warm vs cold only **PARTIAL** at 1×120 builtin identity + `wall_ms` (`pnl_checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`). Record N=100/1k (and S=50/750/1k where practical) wall, peak RSS, scenarios/sec, builtin vs QuantLib, warm vs cold; identity checksum stays; no SLA. Option A intra-run scenario-block multiprocessing remains PARTIAL (may stay P1 after benches). Do not close.
+Status: **IN PROGRESS** (2026-09-09). R0.6.1–R0.6.6 APPROVE (architecture in place: `reviews/sdd-briefs/task-1-r0.6.3-review.md`, `task-2-r0.6.4-review.md`, `task-3-r0.6.6-review.md`, `task-4-r0.6.5-review.md`): stream shocked snapshots; one-pass scenario market (RF-006); QuantLib scalar-option reuse via live `SimpleQuote` handles; unique-shock valuation LRU bypass; factor contributions reuse joint P&L + O(N) Δ-Γ (not O(N×S×F) extra books); HEAVY `FULL_REVALUATION` is a RiskRun / Compose `worker` OS-process job (option B; no in-process QuantLib threads). Interactive default remains `DELTA_GAMMA`. Close-gate **KEEP OPEN** (`reviews/r0.6-rf007-close-gate-report.md`). Residual: R0.6.7 recorded PR-safe **10×50** acceptance (above 1×120): `wall_ms` / `wall_ms_cold` / `wall_ms_warm`, `peak_rss_kib`, `scenarios_per_sec`, builtin vs QuantLib at the same N×S (skip-or-run; hard-gate when `RISKFORGE_REQUIRE_QUANTLIB=1`). Identity checksums `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f` (1×120) and `a28cf4ee6199bf40da3f2598f4241fc85fa4adc4f86bccbbd97e4938047d7537` (10×50). No SLA. N=100/1k and S=750/1k are **not** in the default PR test (CLI `--acceptance-n` / `--acceptance-s` only). Option A intra-run scenario-block multiprocessing remains PARTIAL (may stay P1). Do not close.
 
 Priority: **P0**  
 Risk types: PERFORMANCE, OPERABILITY, ARCHITECTURE  
@@ -480,7 +480,7 @@ Benchmark and record:
 
 Do not set a fake universal SLA until benchmark environments are controlled.
 
-Close-gate (2026-09-09): required direction 6 MET, 1 PARTIAL (option B job process, not intra-run chunks). Numerical identity **met**. Acceptance benches required for close remain UNMET/PARTIAL (RSS / scenarios/sec / builtin vs QuantLib UNMET; N×S / wall / warm-cold PARTIAL at 1×120 builtin). No SLA. **KEEP OPEN.**
+Close-gate (2026-09-09): required direction 6 MET, 1 PARTIAL (option B job process, not intra-run chunks). Numerical identity **met**. R0.6.7 PR-safe 10×50 records wall, peak RSS, scenarios/sec, builtin vs QuantLib, warm vs cold (**MET** at that size; no SLA). N=100/1k / S=750/1k still not default-PR. **KEEP OPEN.**
 
 ---
 
