@@ -1,8 +1,8 @@
 # Milestone R0 — Core Remediation & Trustworthiness
 
-Status: **IN PROGRESS** (2026-09-09 leftover wave)
+Status: **COMPLETE** (2026-09-09)
 
-Current phase: **leftovers** — SLA runner still missing. RF-014 shared ACLs/TLS/secrets CLOSED as MET. RF-017 ABI, RF-018 contracts, and RF-019 tool evals CLOSED as MET.  
+Current phase: **exit** — labeled-runner SLA-K1/K2 is **post-R0** (still not MET). RF-014 shared ACLs/TLS/secrets CLOSED as MET. RF-017 ABI, RF-018 contracts, and RF-019 tool evals CLOSED as MET.  
 Branch: `r0-core-remediation`  
 Date: 2026-09-09
 
@@ -20,10 +20,10 @@ Source of truth:
 Milestone R0 is **COMPLETE** (2026-09-09):
 
 1. every P0 root finding in `FINDINGS.md` is CLOSED;
-2. every P1 root finding is CLOSED, with accepted residuals named **not MET** (RF-016 labeled-runner SLA); RF-014 shared ACLs/TLS/secrets are **MET**;
-3. the final exit checklist distinguishes MET (`[x]`) vs accepted residual (`[~]`).
+2. every P1 root finding is CLOSED (RF-014 shared ACLs/TLS/secrets are **MET**; RF-016 PR/NIGHTLY CI cells **MET**);
+3. labeled-runner SLA-K1/K2 is **post-R0** (still not MET) — not an R0 leftover.
 
-P2 RF-017 is **CLOSED** as **MET** for ABI (product Historical VaR stays python/NumPy by design). RF-018 is **CLOSED** as **MET** (OpenAPI snapshot + request-boundary units; not a TypeScript rewrite). RF-019 is **CLOSED** as **MET** (JSON-schema allowlist + evals). Do not treat `[~]` items as MET. Do not restore Milestone R0 COMPLETE while leftovers remain.
+P2 RF-017 is **CLOSED** as **MET** for ABI (product Historical VaR stays python/NumPy by design). RF-018 is **CLOSED** as **MET** (OpenAPI snapshot + request-boundary units; not a TypeScript rewrite). RF-019 is **CLOSED** as **MET**. Do not treat post-R0 SLA as MET.
 
 ---
 
@@ -1065,7 +1065,7 @@ Evidence: `reviews/r0.11.7-rf014-close-gate-report.md`; focused suite 87 passed.
 
 ## R0.11.8 shared ACLs / TLS / secrets — MET (2026-09-09)
 
-RF-014 shared leftovers **MET** (`reviews/r0.11.8-rf014-shared-acls-tls-report.md`). Object ACLs (Bearer `principal:token` map; IDOR 403); `docker-compose.shared.yml` Caddy TLS on 443 (API unpublished to host); `${POSTGRES_PASSWORD:?}` + `.env.shared.example`. Local `docker-compose.yml` unchanged (loopback, unauthenticated, demo DB password allowed). Not OIDC. HTTP enqueue queue-depth remains a named leftover, not MET. Labeled-runner SLA remains RF-016, not MET. Do not restore Milestone R0 COMPLETE.
+RF-014 shared leftovers **MET** (`reviews/r0.11.8-rf014-shared-acls-tls-report.md`). Object ACLs (Bearer `principal:token` map; IDOR 403); `docker-compose.shared.yml` Caddy TLS on 443 (API unpublished to host); `${POSTGRES_PASSWORD:?}` + `.env.shared.example`. Local `docker-compose.yml` unchanged (loopback, unauthenticated, demo DB password allowed). Not OIDC. HTTP enqueue queue-depth remains a named leftover, not MET. Labeled-runner SLA-K1/K2 is **post-R0** (still not MET).
 
 ---
 
@@ -1127,21 +1127,21 @@ Capture/assert request units where percent/bp conversion matters.
 - hierarchy benchmark — COMPLETE (nightly identity, `reviews/r0.12-hierarchy-bench-independent-review.md`);
 - optional QuantLib E2E — COMPLETE (`reviews/r0.12-ql-e2e-independent-review.md`; nightly job only).
 
-## R0.12.6 Labeled-runner SLA-K1/K2 (honest residual)
+## R0.12.6 Labeled-runner SLA-K1/K2 (post-R0)
 
-RF-016 leftover. No self-hosted runner is registered (`actions/runners total_count=0`, 2026-09-09). Do **not** run `benchmarks/check_m6_sla.py` on `ubuntu-latest`. Harness + `docs/performance.md` + `benchmarks/RESULTS.md` exist; CI does not enforce host floors. Score **PARTIAL**. Evidence: `reviews/r0.12.6-rf016-sla-k-report.md`. Close disposition is R0.12.7.
+**Out of R0** (Lead Architect, 2026-09-09). Still **not MET**. No self-hosted runner is registered (`actions/runners total_count=0`, 2026-09-09). Do **not** run `benchmarks/check_m6_sla.py` on `ubuntu-latest`. Harness + `docs/performance.md` + `benchmarks/RESULTS.md` exist; CI does not enforce host floors. Evidence: `reviews/r0.12.6-rf016-sla-k-report.md`.
 
 ## R0.12.7 RF-016 close gate — COMPLETE (2026-09-09)
 
 Independent review **APPROVE** (`reviews/sdd-briefs/task-26-rf016-close-gate-review.md`). QA close gate **CLOSE** (`reviews/r0.12.7-rf016-close-gate-report.md`). **RF-016 CLOSED**.
 
-Required PR-FAST / PR-FULL (QuantLib cannot be skipped) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. Labeled-runner SLA-K1/K2 is an **accepted residual** (not MET): no labeled runner; SLA-K1/K2 not CI-enforced; do not run `check_m6_sla.py` on `ubuntu-latest`. QA-024 demo-artifact range check remains a leftover residual (not MET). Do not invent host floors.
+Required PR-FAST / PR-FULL (QuantLib cannot be skipped) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. Labeled-runner SLA-K1/K2 is **post-R0** (still not MET): no labeled runner; SLA-K1/K2 not CI-enforced; do not run `check_m6_sla.py` on `ubuntu-latest`. QA-024 demo-artifact range check remains a leftover residual (not MET). Do not invent host floors.
 
 Evidence: `reviews/r0.12.7-rf016-close-gate-report.md`.
 
 ## R0.12.8 QA-024 QuantLib demo-artifact range — MET (2026-09-09)
 
-QA-024 demo-artifact range check is **MET**. Nightly `quantlib-e2e` runs `tests/test_qa024_ql_demo_range.py`: QuantLib prices the demo books and compares `var_99`, `market_value`, and named stress P&Ls to `data/demo_risk_artifact.json` bands (market value / stress P&L relative 25% with $1 abs floor; `var_99` in `[0.25×, 4×]` of builtin because swap DV01 differs). Not byte-equality. Skip-unless-QuantLib locally; nightly fail-closes. Labeled-runner SLA-K1/K2 remains **not MET**: no labeled runner; SLA-K1/K2 not CI-enforced; do not run `check_m6_sla.py` on `ubuntu-latest`. Leftover wave stays IN PROGRESS.
+QA-024 demo-artifact range check is **MET**. Nightly `quantlib-e2e` runs `tests/test_qa024_ql_demo_range.py`: QuantLib prices the demo books and compares `var_99`, `market_value`, and named stress P&Ls to `data/demo_risk_artifact.json` bands (market value / stress P&L relative 25% with $1 abs floor; `var_99` in `[0.25×, 4×]` of builtin because swap DV01 differs). Not byte-equality. Skip-unless-QuantLib locally; nightly fail-closes. Labeled-runner SLA-K1/K2 is **post-R0** (still **not MET**). Do not run `check_m6_sla.py` on `ubuntu-latest`.
 
 Evidence: `reviews/r0.12.8-qa024-ql-range-report.md`.
 
@@ -1157,7 +1157,7 @@ A "green full CI" means the production-relevant QuantLib, native, frontend build
 
 **RF-017 CLOSED** as **MET** for ABI. On disk: ABI version, status/error return, length validation, contiguous `pnl_from_arrays`, serial-below-4096. QA-025 mismatch is pinned in `kernel_test.cpp` and the Python ctypes wrapper. Default Historical VaR remains python/NumPy **by design** (Decision: do not move VaR/QuantLib into C++). That named residual is not an open ABI gap and is not ACCEPTED / DEFERRED. No C++ VaR or QuantLib kernels added.
 
-Evidence: `reviews/r0.12.9-rf017-abi-close-report.md`. Leftover wave stays **IN PROGRESS** (do not restore Milestone R0 COMPLETE).
+Evidence: `reviews/r0.12.9-rf017-abi-close-report.md`.
 
 ---
 
@@ -1216,6 +1216,10 @@ Related: RF-019 — **CLOSED** as **MET** (JSON-schema allowlist, arg validation
 
 Deferred until deterministic tools are stable.
 
+## Labeled-runner SLA-K1/K2
+
+**Post-R0.** Related: RF-016. Still **not MET**. Needs a registered `self-hosted, riskforge-sla` runner. Do not run `check_m6_sla.py` on `ubuntu-latest`. Not an R0 leftover.
+
 ---
 
 # R0 Final Exit Checklist
@@ -1273,7 +1277,6 @@ Milestone R0 is **COMPLETE** (2026-09-09). `[x]` = MET. `[~]` = accepted residua
 - [x] Postgres integration passes
 - [x] critical E2E workflow passes
 - [x] static analysis passes at documented strictness
-- [~] labeled-runner SLA-K1/K2 — accepted residual (not MET): RF-016; no labeled runner; SLA-K1/K2 not CI-enforced
 - [x] QA-024 demo-artifact range check — **MET** (QuantLib vs builtin bands; nightly `test_qa024_ql_demo_range.py`)
 
 ## Documentation
@@ -1285,4 +1288,4 @@ Milestone R0 is **COMPLETE** (2026-09-09). `[x]` = MET. `[~]` = accepted residua
 
 P2 RF-017 is **CLOSED** as **MET** for ABI (named residual: python/NumPy Historical VaR by design). RF-018 is **CLOSED** as **MET** (not a TypeScript rewrite). RF-019 is **CLOSED** as **MET**.
 
-Leftover-wave net-new feature development stays paused. Do not treat `[~]` items as MET. Do not restore Milestone R0 COMPLETE while leftovers remain.
+Labeled-runner SLA-K1/K2 is **post-R0** (still not MET). Net-new feature development may resume. Do not treat post-R0 SLA as MET.

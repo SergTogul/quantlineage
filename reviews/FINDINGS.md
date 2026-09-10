@@ -1,7 +1,7 @@
 # RiskForge Consolidated Engineering Findings
 
 Date: 2026-09-09  
-Status: leftover wave IN PROGRESS (2026-09-09) — P0/P1 code CLOSED. RF-014 shared ACLs/TLS/secrets are CLOSED as MET. Remaining not MET: RF-016 labeled-runner SLA (needs a runner). RF-019 tool schemas/evals are CLOSED as MET. RF-018 frontend contracts are CLOSED as MET (not a TypeScript rewrite). RF-017 ABI is CLOSED as MET (product Historical VaR stays python/NumPy by design).  
+Status: **Milestone R0 COMPLETE** (2026-09-09) — all P0/P1 CLOSED. RF-014 shared ACLs/TLS/secrets **MET**. RF-017 ABI, RF-018 frontend contracts, RF-019 tool schemas/evals, QA-024 range **MET**. Labeled-runner SLA-K1/K2 is **post-R0** (still not MET; not an R0 leftover).  
 
 Inputs:
 
@@ -48,9 +48,9 @@ Important but not allowed to distract from P0/P1 remediation. These can be compl
 
 ## Recommended engineering decision
 
-**Milestone R0 leftover wave is IN PROGRESS** (2026-09-09). “Accepted residual” is not done.
+**Milestone R0 is COMPLETE** (2026-09-09). Labeled-runner SLA-K1/K2 is **post-R0** (still not MET; Lead Architect moved it out of R0). It is not an R0 leftover.
 
-P0/P1 code paths stay CLOSED. RF-014 shared ACLs/TLS/secrets are **CLOSED** as **MET**. QA-024 QuantLib demo-artifact range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are **CLOSED** as **MET**. RF-016 labeled-runner SLA still needs a self-hosted runner (cannot fake ubuntu-latest floors).
+P0/P1 code paths stay CLOSED. RF-014 shared ACLs/TLS/secrets are **CLOSED** as **MET**. QA-024 QuantLib demo-artifact range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are **CLOSED** as **MET**.
 
 The current repository is a strong MVP with unusually broad test coverage, real QuantLib integration, deterministic demo data, a credible pricing seam, native parity tests, and good separation of the native numerical kernel from business logic.
 
@@ -841,7 +841,7 @@ A dashboard load does not execute redundant full valuations of the same book and
 Priority: **P1**  
 Risk types: TEST_GAP, CI, OPERABILITY  
 Confidence: HIGH  
-Status: **CLOSED** (2026-09-09). Independent review **APPROVE** (`reviews/sdd-briefs/task-26-rf016-close-gate-review.md`). QA close gate (`reviews/r0.12.7-rf016-close-gate-report.md`). R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Required PR-FAST / PR-FULL (including QuantLib hard-gate) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. Labeled-runner SLA-K1/K2 is an **accepted residual** (not MET): no labeled runner; SLA-K1/K2 not CI-enforced (`actions/runners total_count=0`; do not run `check_m6_sla.py` on `ubuntu-latest`). QA-024 demo-artifact range check is **MET** (R0.12.8; nightly QuantLib vs `data/demo_risk_artifact.json` bands, not byte-equality). Not a production SLA rollout.
+Status: **CLOSED** (2026-09-09). Independent review **APPROVE** (`reviews/sdd-briefs/task-26-rf016-close-gate-review.md`). QA close gate (`reviews/r0.12.7-rf016-close-gate-report.md`). R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Required PR-FAST / PR-FULL (including QuantLib hard-gate) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. QA-024 demo-artifact range check is **MET** (R0.12.8). Labeled-runner SLA-K1/K2 is **post-R0** (still not MET; no labeled runner; do not run `check_m6_sla.py` on `ubuntu-latest`). Not a production SLA rollout. Not an R0 leftover.
 
 Source findings:
 
@@ -879,11 +879,11 @@ Deterministic core unit/golden/property tests.
 - benchmark/SLA on labeled runner;
 - optional QuantLib E2E/demo range check.
 
-Close-gate scoring (R0.12.7): PR-FAST **MET**; PR-FULL QuantLib hard-gate / native compile-parity / frontend / semantic API / Playwright **MET**. NIGHTLY Postgres two-worker **MET**; larger full-reval samples **MET** (sample + N=100 identity, not host SLA); QuantLib E2E **MET** (nightly only). Labeled-runner SLA-K1/K2 (`check_m6_sla.py`) **PARTIAL** / **accepted residual** — harness and reference-host evidence exist; no labeled runner is registered; SLA-K1/K2 not CI-enforced; do not invent `ubuntu-latest` floors. R0.12.8: QA-024 demo-artifact range check is **MET** (`tests/test_qa024_ql_demo_range.py` on nightly `quantlib-e2e`).
+Close-gate scoring (R0.12.7): PR-FAST **MET**; PR-FULL QuantLib hard-gate / native compile-parity / frontend / semantic API / Playwright **MET**. NIGHTLY Postgres two-worker **MET**; larger full-reval samples **MET** (sample + N=100 identity, not host SLA); QuantLib E2E **MET** (nightly only). Labeled-runner SLA-K1/K2 (`check_m6_sla.py`) is **post-R0** (still not MET) — harness and reference-host evidence exist; no labeled runner is registered; SLA-K1/K2 not CI-enforced; do not invent `ubuntu-latest` floors. R0.12.8: QA-024 demo-artifact range check is **MET** (`tests/test_qa024_ql_demo_range.py` on nightly `quantlib-e2e`).
 
 ### Acceptance evidence
 
-A broken QuantLib installation cannot produce a green "full" CI run. — **MET** (R0.1.6 `backend-quantlib-hard-gate` is a required `pr-full` need; `RISKFORGE_REQUIRE_QUANTLIB`; no `requirements-no-ql` fallback; no `continue-on-error`). Labeled-runner SLA-K1/K2 remains a named residual, not MET. QA-024 demo-artifact range check is **MET**.
+A broken QuantLib installation cannot produce a green "full" CI run. — **MET** (R0.1.6 `backend-quantlib-hard-gate` is a required `pr-full` need; `RISKFORGE_REQUIRE_QUANTLIB`; no `requirements-no-ql` fallback; no `continue-on-error`). Labeled-runner SLA-K1/K2 is **post-R0** (still not MET). QA-024 demo-artifact range check is **MET**.
 
 ---
 
@@ -1005,7 +1005,7 @@ AI remains orchestration-only after deterministic risk remediation. No live LLM 
 Priority: **P2**  
 Risk types: DOCUMENTATION, PROCESS  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-09). Prior COMPLETE stamp was dishonest while leftovers were unmet. FINDINGS remains the backlog.
+Status: **CLOSED** (2026-09-09). Milestone R0 COMPLETE. FINDINGS remains the backlog. Labeled-runner SLA-K1/K2 is **post-R0** (still not MET), not an R0 leftover.
 
 Source findings:
 
@@ -1121,7 +1121,7 @@ Do not use the review as justification to add:
 
 # Release / Development Gate
 
-**Milestone R0 leftover wave IN PROGRESS** (2026-09-09). RF-014 shared ACLs/TLS/secrets are CLOSED as MET. QA-024 range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are CLOSED as MET. Labeled-runner SLA still needs a self-hosted runner. Do not restore Milestone R0 COMPLETE while that SLA is not MET.
+**Milestone R0 COMPLETE** (2026-09-09). RF-014 shared ACLs/TLS/secrets are CLOSED as MET. QA-024 range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are CLOSED as MET. Labeled-runner SLA-K1/K2 is **post-R0** (still not MET; not an R0 leftover).
 
 R0 required, and now records:
 

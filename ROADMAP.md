@@ -4,7 +4,7 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent**; do not recreate
 
 ## Current gate
 
-Milestone R0 leftover wave is **IN PROGRESS** (2026-09-09) on branch `r0-core-remediation`. RF-014 shared ACLs/TLS/secrets are CLOSED as MET. QA-024 QuantLib range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are CLOSED as MET. Labeled-runner SLA still needs a self-hosted runner (not MET). Do not restore Milestone R0 COMPLETE. `reviews/FINDINGS.md` remains the authoritative record.
+Milestone R0 is **COMPLETE** (2026-09-09). Labeled-runner SLA-K1/K2 is **post-R0** (still not MET; needs a self-hosted runner). RF-014 shared ACLs/TLS/secrets, QA-024 QuantLib range, RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are **MET**. `reviews/FINDINGS.md` remains the authoritative record.
 
 ### Recorded Phase A baseline (2026-09-03; not re-run)
 
