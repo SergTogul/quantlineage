@@ -3,8 +3,8 @@
 Conventions
 - Units: currency P&L (same as ``approximate_pnl_series`` / HistoricalRiskEngine)
 - Sign: positive P&L = gain; VaR uses loss = -P&L
-- Kernel ABI: equity/FX relative returns; vol in *points* (relative × 100);
-  rates in bp × DV01
+- Kernel ABI: equity/FX relative returns; vol in *points*
+  (``base_vol * relative * 100``); rates in bp × DV01
 - Tolerances: ``KERNEL_PNL_ABS_TOL`` / ``KERNEL_PNL_REL_TOL`` (``app.compute.kernel``)
 - FULL_REVALUATION must not use the scenario kernel (pricing revaluation only)
 """
@@ -38,6 +38,7 @@ from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSe
 from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 
 SAMPLE_MARKET = demo_market_snapshot(SAMPLE_PORTFOLIO)
+_BASE_VOL = 0.20
 
 def _factor_series() -> FactorObservationSeries:
     eq = np.array([-0.12, -0.04, 0.0, 0.03, 0.08, -0.15, 0.02, 0.05], dtype=float)
@@ -103,6 +104,7 @@ def test_numpy_matches_python_scenario_kernel_reference():
         vol_pct=series.vol_moves,
         rates_bps=series.rate_moves_bps,
         fx_ret=series.fx_returns,
+        base_vol=_BASE_VOL,
     )
     for meth in (VaRMethodology.LINEAR, VaRMethodology.DELTA_GAMMA):
         numpy_pnl = approximate_pnl_series(methodology=meth, scenario_backend="python", **kwargs)
@@ -120,7 +122,7 @@ def test_numpy_matches_python_scenario_kernel_reference():
             [
                 Shock(
                     equity_return=float(series.equity_returns[i]),
-                    vol_points=float(series.vol_moves[i] * 100.0),
+                    vol_points=float(series.vol_moves[i] * _BASE_VOL * 100.0),
                     rates_bps=float(series.rate_moves_bps[i]),
                     fx_return=float(series.fx_returns[i]),
                 )
@@ -143,6 +145,7 @@ def test_native_approximate_pnl_matches_numpy(native_scenario_lib):
         vol_pct=series.vol_moves,
         rates_bps=series.rate_moves_bps,
         fx_ret=series.fx_returns,
+        base_vol=_BASE_VOL,
     )
     for meth in (VaRMethodology.LINEAR, VaRMethodology.DELTA_GAMMA):
         ref = approximate_pnl_series(methodology=meth, scenario_backend="python", **kwargs)
@@ -193,6 +196,7 @@ def test_env_native_backend_loads_lib(native_scenario_lib, monkeypatch):
         fx_ret=series.fx_returns,
         methodology=VaRMethodology.DELTA_GAMMA,
         scenario_backend="python",
+        base_vol=_BASE_VOL,
     )
     via_env = approximate_pnl_series(
         delta=100.0,
@@ -205,6 +209,7 @@ def test_env_native_backend_loads_lib(native_scenario_lib, monkeypatch):
         rates_bps=series.rate_moves_bps,
         fx_ret=series.fx_returns,
         methodology=VaRMethodology.DELTA_GAMMA,
+        base_vol=_BASE_VOL,
     )
     _assert_pnl_close(via_env, ref)
 
@@ -247,6 +252,7 @@ def test_empty_observations_native(native_scenario_lib):
         fx_ret=z,
         methodology=VaRMethodology.DELTA_GAMMA,
         scenario_kernel=NativeScenarioKernel(lib),
+        base_vol=_BASE_VOL,
     )
     assert out.shape == (0,)
 
@@ -281,6 +287,7 @@ def test_native_historical_uses_pnl_from_arrays_not_object_pack(native_scenario_
         fx_ret=series.fx_returns,
         methodology=VaRMethodology.DELTA_GAMMA,
         scenario_kernel=native,
+        base_vol=_BASE_VOL,
     )
     actual = approximate_pnl_series(**kwargs)
     assert [kind for kind, _e, _s in captured] == ["arrays"]
@@ -302,6 +309,7 @@ def test_native_historical_uses_pnl_from_arrays_not_object_pack(native_scenario_
         fx_ret=series.fx_returns,
         methodology=VaRMethodology.DELTA_GAMMA,
         scenario_backend="python",
+        base_vol=_BASE_VOL,
     )
     _assert_pnl_close(actual, ref)
 
@@ -324,6 +332,7 @@ def test_native_historical_mismatched_factor_lengths_fail_closed(native_scenario
             fx_ret=series.fx_returns,
             methodology=VaRMethodology.LINEAR,
             scenario_kernel=native,
+            base_vol=_BASE_VOL,
         )
 
 def test_native_historical_non_1d_factor_fails_closed(native_scenario_lib):
@@ -345,4 +354,5 @@ def test_native_historical_non_1d_factor_fails_closed(native_scenario_lib):
             fx_ret=series.fx_returns,
             methodology=VaRMethodology.LINEAR,
             scenario_kernel=native,
+            base_vol=_BASE_VOL,
         )

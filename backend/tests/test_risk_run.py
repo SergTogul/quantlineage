@@ -129,6 +129,79 @@ def test_risk_run_repository_domain_round_trip(session_factory):
         assert payloads is not None
         assert payloads['summary']['var_99'] == pytest.approx(1234.5)
 
+
+def test_risk_run_executes_against_persisted_market_snapshot_id():
+    """Review Test C: queued run must price the stored snapshot, not process default."""
+    import time
+
+    from app.market.snapshot import FixedMarketDataProvider
+    from app.persistence.memory_repos import InMemoryMarketSnapshotRepository
+    from app.services.portfolio_service import PortfolioService
+    from app.services.risk_factories import build_portfolio_service
+    from app.services.risk_run_worker import RiskRunWorker
+
+    book = Portfolio(
+        id="snap-lineage-book",
+        name="Snapshot lineage",
+        positions=[
+            EquityPosition(type="equity", id="eq-1", symbol="NVDA", quantity=100),
+        ],
+    )
+    snap_a = MarketSnapshot(
+        id="snap-a",
+        equity_spots={"NVDA": 100.0},
+        rates={"USD": 0.04},
+    )
+    snap_b = MarketSnapshot(
+        id="snap-b",
+        equity_spots={"NVDA": 400.0},
+        equity_vols={"NVDA": 0.55},
+        rates={"USD": 0.04},
+    )
+    snaps = InMemoryMarketSnapshotRepository()
+    snaps.save(snap_a)
+    snaps.save(snap_b)
+
+    base = build_portfolio_service(
+        observations=20,
+        seed=7,
+        market_data=FixedMarketDataProvider(snap_a),
+    )
+    worker = RiskRunWorker(base, market_snapshots=snaps, max_workers=1)
+    try:
+        accepted = worker.submit(
+            portfolio=book,
+            run_type="summary",
+            market_snapshot_id=snap_b.id,
+            execute=True,
+        )
+        deadline = time.time() + 30.0
+        done = None
+        while time.time() < deadline:
+            done = worker.get(accepted.id)
+            if done.status in {RiskRunStatus.COMPLETED, RiskRunStatus.FAILED}:
+                break
+            time.sleep(0.05)
+    finally:
+        worker.shutdown(wait=True)
+
+    assert done is not None
+    assert done.status == RiskRunStatus.COMPLETED, done.error_message
+    assert done.market_snapshot_id == snap_b.id
+    payload = done.results[0].payload
+
+    direct_b = PortfolioService(
+        base.pricing, base.risk, market_data=FixedMarketDataProvider(snap_b)
+    ).summary(book)
+    direct_a = PortfolioService(
+        base.pricing, base.risk, market_data=FixedMarketDataProvider(snap_a)
+    ).summary(book)
+    assert payload["market_value"] == pytest.approx(direct_b.market_value)
+    assert payload["var_99"] == pytest.approx(direct_b.var_99)
+    assert payload["expected_shortfall_99"] == pytest.approx(direct_b.expected_shortfall_99)
+    assert payload["market_value"] != pytest.approx(direct_a.market_value)
+    assert payload["var_99"] != pytest.approx(direct_a.var_99)
+
 def test_risk_run_repository_failed_requires_error(session_factory):
     portfolio = Portfolio(id='p-fail', name='Fail Book', positions=[EquityPosition(type='equity', id='eq-1', symbol='AAPL', quantity=1)])
     with session_scope(session_factory) as session:

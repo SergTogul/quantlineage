@@ -1,6 +1,5 @@
 from types import MappingProxyType
 
-from app.api.schemas import LimitDrilldownRequest
 from app.domain.models import (
     Contributor,
     ESContributionReport,
@@ -22,7 +21,7 @@ from app.domain.models import (
 )
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
-from app.market.snapshot import MarketDataProvider
+from app.market.snapshot import FixedMarketDataProvider, MarketDataProvider
 from app.pricing.instrument_capabilities import get_capability
 from app.risk.attribution import AttributionEngine
 from app.risk.es import ESContributionAnalytics
@@ -290,10 +289,12 @@ class PortfolioService:
         from app.risk.var_compare import compare_methodologies
 
         if isinstance(self.risk, HistoricalRiskEngine):
-            if observations is not None and observations != self.risk.observations:
-                engine = HistoricalRiskEngine(seed=self.risk.seed, observations=observations)
-            else:
+            from app.services.risk_factories import resize_historical_risk_engine
+
+            if observations is None:
                 engine = self.risk
+            else:
+                engine = resize_historical_risk_engine(self.risk, observations)
         else:
             engine = HistoricalRiskEngine(observations=observations or 750)
         return compare_methodologies(
@@ -333,7 +334,7 @@ class PortfolioService:
         Delegates to ``HierarchyEngine.build`` without a pre-built map so the
         engine default path values each position once, attaches historical
         P&L, fills default-scenario stress (scenario-once / price-many), and
-        aggregates. Limits stay omitted on that path.
+        aggregates. Limits are evaluated from the artifact RiskSummary.
         """
         market = self.market_snapshot(portfolio)
         return self.hierarchy_engine.build(
@@ -380,21 +381,26 @@ class PortfolioService:
     ) -> dict:
         """One sequential pass of existing dashboard methods (R0.10.2).
 
-        Does not share a market snapshot across methods (market-required
-        semantics on each method stay unchanged). The HTTP batch is one
-        request; each method still snapshots as it does today.
+        Resolves a single market snapshot and runs every slice on a temporary
+        service bound to that snapshot. Does not mutate ``self.market_data``.
         """
+        market = self.market_snapshot(portfolio)
+        bound = PortfolioService(
+            self.pricing,
+            self.risk,
+            market_data=FixedMarketDataProvider(market),
+        )
         return {
             "portfolio": portfolio,
-            "summary": self.summary(portfolio),
-            "stress": self.stresses(portfolio, scenarios),
-            "threats": self.threat_evaluation(portfolio, threat_scenarios),
-            "contributors": self.contributors(portfolio),
-            "limits": self.limits(portfolio),
-            "factors": self.factors(portfolio),
-            "varReport": self.var_report(portfolio),
-            "hierarchy": self.hierarchy(portfolio),
-            "attribution": self.demo_attribution(portfolio),
+            "summary": bound.summary(portfolio),
+            "stress": bound.stresses(portfolio, scenarios),
+            "threats": bound.threat_evaluation(portfolio, threat_scenarios),
+            "contributors": bound.contributors(portfolio),
+            "limits": bound.limits(portfolio),
+            "factors": bound.factors(portfolio),
+            "varReport": bound.var_report(portfolio),
+            "hierarchy": bound.hierarchy(portfolio),
+            "attribution": bound.demo_attribution(portfolio),
         }
 
     def contributors(self, portfolio: Portfolio) -> list[Contributor]:
@@ -438,7 +444,6 @@ class PortfolioService:
 
     def limit_drilldown(
         self,
-        request: LimitDrilldownRequest | None = None,
         *,
         portfolio: Portfolio | None = None,
         metric: LimitMetric | None = None,
@@ -448,13 +453,6 @@ class PortfolioService:
         breaches_only: bool = True,
     ) -> LimitDrilldownReport:
         """Hierarchy-scoped limit drill-down with top contributors (M4.6)."""
-        if request is not None:
-            portfolio = request.portfolio
-            metric = request.metric
-            hierarchy = request.hierarchy
-            limits = request.limits
-            top_n = request.top_n
-            breaches_only = request.breaches_only
         if portfolio is None:
             raise ValueError("portfolio is required")
         market = self.market_snapshot(portfolio)

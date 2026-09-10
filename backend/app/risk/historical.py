@@ -38,6 +38,32 @@ from app.risk.scenarios import iter_historical_shocked_snapshots, iter_panel_sho
 from app.risk.shock_units import relative_vol_move_to_vol_points
 
 
+def representative_base_vol(market: MarketSnapshot) -> float:
+    """First nonzero equity then FX vol on ``market``; 0 if none (vol P&L stays 0)."""
+    for vol in market.equity_vols.values():
+        if vol:
+            return float(vol)
+    for vol in market.fx_vols.values():
+        if vol:
+            return float(vol)
+    return 0.0
+
+
+def base_vol_for_factor(market: MarketSnapshot, factor: RiskFactor) -> float:
+    """Snapshot vol level for an EquityVol / FXVol factor (fail closed if missing)."""
+    if isinstance(factor, EquityVol):
+        try:
+            return float(market.equity_vols[factor.underlying])
+        except KeyError as exc:
+            raise KeyError(f"equity vol not in snapshot: {factor.underlying}") from exc
+    if isinstance(factor, FXVol):
+        try:
+            return float(market.fx_vols[factor.pair])
+        except KeyError as exc:
+            raise KeyError(f"fx vol not in snapshot: {factor.pair}") from exc
+    raise TypeError(f"base vol is not defined for {type(factor)!r}")
+
+
 def require_explicit_market(market: MarketSnapshot | None) -> MarketSnapshot:
     """Fail closed: production risk methods must receive a snapshot."""
     if market is None:
@@ -170,12 +196,14 @@ def approximate_pnl_series(
     methodology: VaRMethodology,
     scenario_kernel: ScenarioKernel | None = None,
     scenario_backend: str | None = None,
+    base_vol: float = 0.0,
 ) -> np.ndarray:
     """First-order (LINEAR) or delta-gamma (DELTA_GAMMA) P&L path.
 
     Units match ``FactorObservationSeries`` / legacy Δ-Γ VaR:
     - equity / FX: relative returns × cash delta / fx_delta
-    - vol: relative vol move × vega, with vega quoted per 1 vol point (×100)
+    - vol: relative vol move × vega; vega per 1 vol point;
+      ``vol_points = base_vol × relative × 100`` (default ``base_vol=0`` → 0 vol P&L)
     - rates: parallel bp moves × DV01
 
     Kernel backend (M6.3): default NumPy (``RISKFORGE_SCENARIO_KERNEL=python``).
@@ -199,7 +227,9 @@ def approximate_pnl_series(
 
     # LINEAR zeros γ so the same kernel ABI serves both approximate modes.
     gamma_eff = 0.0 if methodology is VaRMethodology.LINEAR else float(gamma)
-    vol_points = relative_vol_move_to_vol_points(np.asarray(vol_pct, dtype=float))
+    vol_points = relative_vol_move_to_vol_points(
+        np.asarray(vol_pct, dtype=float), base_vol=base_vol
+    )
     equity_ret = np.asarray(equity_ret, dtype=float)
     rates_bps = np.asarray(rates_bps, dtype=float)
     fx_ret = np.asarray(fx_ret, dtype=float)
@@ -236,6 +266,8 @@ def approximate_pnl_series(
 def historical_pnl_for_valuation(
     risk: RiskEngine,
     valuation: Valuation,
+    *,
+    market: MarketSnapshot | None = None,
 ) -> tuple[float, ...] | None:
     """One historical P&L series from already-valued Greeks (no reprice).
 
@@ -244,9 +276,9 @@ def historical_pnl_for_valuation(
     ``approximate_pnl_series`` (LINEAR / DELTA_GAMMA). One series per trade,
     shared factor observations so lengths match.
 
-    FULL_REVALUATION and an opt-in ``factor_panel`` are omitted (``None``):
-    those paths would call ``value`` again. Non-``HistoricalRiskEngine``
-    risk engines also return ``None``.
+    FULL_REVALUATION is omitted (``None``). A ``factor_panel`` is omitted here
+    (use :func:`approximate_position_pnls_from_panel` for the whole book).
+    Non-``HistoricalRiskEngine`` risk engines also return ``None``.
     """
     if not isinstance(risk, HistoricalRiskEngine):
         return None
@@ -255,6 +287,7 @@ def historical_pnl_for_valuation(
     if risk.factor_panel is not None:
         return None
     observations = risk.dataset.factor_observations()
+    base_vol = representative_base_vol(market) if market is not None else 0.0
     series = approximate_pnl_series(
         delta=valuation.delta,
         gamma=valuation.gamma,
@@ -268,6 +301,7 @@ def historical_pnl_for_valuation(
         methodology=risk.methodology,
         scenario_kernel=risk.scenario_kernel,
         scenario_backend=risk.scenario_backend,
+        base_vol=base_vol,
     )
     if series.size == 0:
         return None
@@ -315,13 +349,23 @@ def require_panel_covers_portfolio(portfolio: Portfolio, panel: HistoricalFactor
         raise ValueError(f"panel missing required factor(s): {identities}")
 
 
-def _panel_linear_contribution(factor: RiskFactor, valuation: Valuation, move: float) -> float:
+def _panel_linear_contribution(
+    factor: RiskFactor,
+    valuation: Valuation,
+    move: float,
+    *,
+    base_market: MarketSnapshot | None = None,
+) -> float:
     if isinstance(factor, EquitySpot):
         return float(valuation.delta) * move
     if isinstance(factor, FXSpot):
         return float(valuation.fx_delta) * move
     if isinstance(factor, (EquityVol, FXVol)):
-        return float(valuation.vega) * relative_vol_move_to_vol_points(move)
+        if base_market is None:
+            raise ValueError("base_market is required to convert relative vol shocks")
+        return float(valuation.vega) * relative_vol_move_to_vol_points(
+            move, base_vol=base_vol_for_factor(base_market, factor)
+        )
     if isinstance(factor, RateZero):
         return float(valuation.dv01) * move
     raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
@@ -365,7 +409,9 @@ def approximate_position_pnls_from_panel(
             total = 0.0
             for factor in factors:
                 move = observation.change(factor)
-                total += _panel_linear_contribution(factor, valuation, move)
+                total += _panel_linear_contribution(
+                    factor, valuation, move, base_market=base_market
+                )
                 if use_gamma and isinstance(factor, EquitySpot):
                     total += 0.5 * float(valuation.gamma) * move * move
             out[position.id][i] = total
@@ -529,6 +575,7 @@ class HistoricalRiskEngine(RiskEngine):
                 methodology=meth,
                 scenario_kernel=self.scenario_kernel,
                 scenario_backend=self.scenario_backend,
+                base_vol=representative_base_vol(base_market),
             )
 
         losses = -pnl

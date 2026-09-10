@@ -31,6 +31,7 @@ from app.pricing.surface_vol import (
     required_fx_option_vol,
     required_ir_option_vol,
 )
+from app.risk.factor_types import RateZero
 from app.risk.historical import require_explicit_market
 
 _pricing_view = pricing_view
@@ -120,28 +121,39 @@ class BuiltinPricingEngine(PricingEngine):
             fx_delta=p.notional_base * s,
         )
 
-    def _bond(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
+    def _bond_pv(self, p: SimpleNamespace, market: MarketSnapshot) -> float:
         df = discount_factor(
             market, p.currency, p.maturity_years, fallback_yield=p.yield_rate
         )
         if df is not None:
             # Curve path: continuous DF at domain ``maturity_years`` (pillar T).
-            pv = p.face_value * p.quantity * df
-        else:
-            # Scalar path: continuous Actual365Fixed (QL ZeroCouponBond parity).
-            y = required_continuous_zero(market, p.currency, p.maturity_years)
-            t = _act365_fixed_years(p.maturity_years)
-            pv = p.face_value * p.quantity * math.exp(-y * t)
-        return Valuation(position_id=p.id, market_value=pv, dv01=-p.duration * pv * 0.0001)
+            return p.face_value * p.quantity * df
+        # Scalar path: continuous Actual365Fixed (QL ZeroCouponBond parity).
+        y = required_continuous_zero(market, p.currency, p.maturity_years)
+        t = _act365_fixed_years(p.maturity_years)
+        return p.face_value * p.quantity * math.exp(-y * t)
 
-    def _swap(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
+    def _bond(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
+        pv = self._bond_pv(p, market)
+        bumped = self._bond_pv(
+            p, market.bump(RateZero(p.currency, "PARALLEL"), 0.0001)
+        )
+        return Valuation(position_id=p.id, market_value=pv, dv01=bumped - pv)
+
+    def _swap_pv(self, p: SimpleNamespace, market: MarketSnapshot) -> float:
         # pay_fixed=True → standard payer: PV rises when the market swap rate rises.
         # Curve / key-rate zeros at maturity mark the floating/par rate when attached.
         m = required_continuous_zero(market, p.currency, p.maturity_years)
         sign = 1.0 if p.pay_fixed else -1.0
         annuity = p.notional * p.duration
-        pv = sign * (m - p.fixed_rate) * annuity
-        return Valuation(position_id=p.id, market_value=pv, dv01=sign * annuity * 0.0001)
+        return sign * (m - p.fixed_rate) * annuity
+
+    def _swap(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
+        pv = self._swap_pv(p, market)
+        bumped = self._swap_pv(
+            p, market.bump(RateZero(p.currency, "PARALLEL"), 0.0001)
+        )
+        return Valuation(position_id=p.id, market_value=pv, dv01=bumped - pv)
 
     def _equity_option(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         s = _required_equity_spot(market, p.symbol)

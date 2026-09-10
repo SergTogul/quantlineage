@@ -10,11 +10,12 @@ and per-tenor rate zeros with independent numeric moves. It is **not** the
 four-macro demo projection (``projection != "four_macro_demo"``) and
 ``is_per_name_per_tenor_panel`` is True.
 
-Production API/worker wiring (``build_historical_risk_engine``) passes a
-seeded synthetic panel from :func:`create_synthetic_factor_panel`. Bare
-``HistoricalRiskEngine()`` / explicit ``factor_panel=None`` still uses the
-labeled ``four_macro_demo`` dataset path. Demo/synthetic CSV datasets remain
-``projection="four_macro_demo"`` fixtures (R0.5.4).
+Production API/worker wiring (``build_historical_risk_engine``) builds the
+panel from the selected historical dataset via :func:`factor_panel_from_dataset`.
+Bare ``HistoricalRiskEngine()`` / explicit ``factor_panel=None`` still uses the
+labeled ``four_macro_demo`` dataset path. Demo/file CSV datasets remain
+``projection="four_macro_demo"`` fixtures (R0.5.4) whose four columns are
+broadcast onto typed factor families.
 
 Units (match ``historical_data.py`` / ``FactorObservationSeries``):
 
@@ -47,6 +48,10 @@ from app.risk.factor_types import (
     RateZero,
     RiskFactor,
     factor_sort_key,
+)
+from app.risk.historical_data import (
+    FactorObservationSeries,
+    SyntheticHistoricalDataset,
 )
 
 PER_FACTOR_PANEL_PROJECTION = "per_factor"
@@ -306,6 +311,86 @@ def create_synthetic_factor_panel(
     return HistoricalFactorPanel.from_columns(dates, changes)
 
 
+def truncate_factor_panel(
+    panel: HistoricalFactorPanel,
+    observations: int,
+) -> HistoricalFactorPanel:
+    """Keep the first ``observations`` dates of an existing panel."""
+    if observations < 1:
+        raise ValueError("observations must be >= 1")
+    if observations > panel.n_observations:
+        raise ValueError(
+            f"observations {observations} exceeds panel length {panel.n_observations}"
+        )
+    if observations == panel.n_observations:
+        return panel
+    return HistoricalFactorPanel.from_pairs(
+        dates=panel.dates[:observations],
+        rows=[
+            [(factor, obs.change(factor)) for factor in panel.factors]
+            for obs in panel.observations[:observations]
+        ],
+    )
+
+
+def _series_for_factor(factor: RiskFactor, series: FactorObservationSeries) -> Sequence[float]:
+    if isinstance(factor, EquitySpot):
+        return series.equity_returns
+    if isinstance(factor, (EquityVol, FXVol)):
+        return series.vol_moves
+    if isinstance(factor, RateZero):
+        return series.rate_moves_bps
+    if isinstance(factor, FXSpot):
+        return series.fx_returns
+    raise TypeError(f"unsupported risk factor type: {type(factor)!r}")
+
+
+def factor_panel_from_dataset(
+    dataset: object,
+    *,
+    factors: Sequence[RiskFactor] | None = None,
+    observations: int | None = None,
+    seed: int | None = None,
+) -> HistoricalFactorPanel:
+    """Build a typed panel owned by ``dataset`` (synthetic streams vs four-macro map).
+
+    ``SyntheticHistoricalDataset`` keeps independent per-name / per-tenor RNG
+    streams. File / array / four-macro demo sources broadcast each of the four
+    CSV columns onto every typed factor of that family. ``observations`` smaller
+    than the source truncates; larger than a file source raises (no invented rows).
+    """
+    column_factors = tuple(factors) if factors is not None else DEFAULT_PRODUCTION_PANEL_FACTORS
+    if isinstance(dataset, SyntheticHistoricalDataset):
+        obs = dataset.observations if observations is None else observations
+        panel_seed = dataset.seed if seed is None else seed
+        return create_synthetic_factor_panel(
+            seed=panel_seed,
+            observations=obs,
+            factors=column_factors,
+        )
+
+    series = dataset.factor_observations()  # type: ignore[attr-defined]
+    source_len = int(series.n_observations)
+    if observations is None:
+        n = source_len
+    else:
+        if observations < 1:
+            raise ValueError("observations must be >= 1")
+        if observations > source_len:
+            raise ValueError(
+                f"observations {observations} exceeds historical dataset length {source_len}"
+            )
+        n = observations
+    if not column_factors:
+        raise ValueError("empty factor panel: at least one factor column is required")
+    start = date(2022, 1, 3)
+    dates = tuple(start + timedelta(days=i) for i in range(n))
+    changes: dict[RiskFactor, Sequence[float]] = {
+        factor: _series_for_factor(factor, series)[:n] for factor in column_factors
+    }
+    return HistoricalFactorPanel.from_columns(dates, changes)
+
+
 __all__ = [
     "DEFAULT_PRODUCTION_PANEL_FACTORS",
     "EQUITY_CHANGE_UNIT",
@@ -317,5 +402,7 @@ __all__ = [
     "HistoricalFactorPanel",
     "change_unit",
     "create_synthetic_factor_panel",
+    "factor_panel_from_dataset",
     "panel_factor_identity",
+    "truncate_factor_panel",
 ]

@@ -6,9 +6,10 @@ Additive metrics (parent == sum children within abs 1e-9):
   market_value, delta, gamma, vega, dv01, fx_delta, stress scenario P&L.
 
 Node-level metrics (from summed trade historical P&L, not summed VaR):
-  var_95, var_99, expected_shortfall_99. Limits stay omitted on the
-  artifact aggregation path (concentration / key-rate still need per-node
-  pricing or an artifact-aware LimitEngine — R0.7.6 residual).
+  var_95, var_99, expected_shortfall_99. Limits are evaluated from the
+  artifact-derived RiskSummary plus artifact PVs (concentration) and
+  parallel DV01 (key-rate shortcut). Concentration / tenor KR still use
+  LimitEngine pricing on the live ``_node`` path.
 
 When ``artifacts`` is supplied to ``build`` / ``risk_at``, additive fields
 are summed from ``TradeCalculationArtifact`` and pricing is not invoked.
@@ -48,6 +49,7 @@ from app.domain.models import (
     Portfolio,
     RiskSummary,
     StressResult,
+    VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
@@ -60,6 +62,7 @@ from app.risk.hierarchy_placement import (
 )
 from app.risk.historical import (
     HistoricalRiskEngine,
+    approximate_position_pnls_from_panel,
     historical_pnl_for_valuation,
     require_explicit_market,
 )
@@ -129,6 +132,25 @@ def _require_complete_artifacts(
     missing = sorted({p.id for p in positions} - set(artifacts))
     if missing:
         raise ValueError(f"incomplete artifact set; missing trade ids: {missing}")
+
+
+def _artifact_limit_extra(
+    positions: Sequence,
+    artifacts: Mapping[str, TradeCalculationArtifact],
+    risk: RiskSummary,
+) -> dict[str, float]:
+    """Concentration from artifact PVs; KR limit uses artifact parallel DV01.
+
+    Avoids per-node LimitEngine repricing on the artifact aggregation path.
+    True tenor key-rate still needs SensitivityEngine (live ``_node`` path).
+    """
+    values = [abs(float(artifacts[position.id].pv)) for position in positions]
+    gross = sum(values) or 1.0
+    concentration = (max(values) / gross * 100.0) if values else 0.0
+    return {
+        "single_position_pct": concentration,
+        "key_rate_dv01": abs(float(risk.dv01)),
+    }
 
 
 def _sum_artifacts(
@@ -263,10 +285,11 @@ class HierarchyEngine:
         risk: RiskSummary,
         market: MarketSnapshot,
         stress: Sequence[StressResult] | None = None,
+        extra: dict[str, float] | None = None,
     ) -> list[LimitResult]:
-        extra: dict[str, float] = {}
+        payload: dict[str, float] = dict(extra or {})
         if stress is not None:
-            extra["stress_loss"] = max(
+            payload["stress_loss"] = max(
                 0.0, max((-float(s.pnl) for s in stress), default=0.0)
             )
         return self.limit_engine.evaluate(
@@ -275,7 +298,7 @@ class HierarchyEngine:
             risk,
             DEFAULT_LIMITS,
             market=market,
-            extra=extra or None,
+            extra=payload or None,
         )
 
     def _trade_artifacts(
@@ -287,7 +310,9 @@ class HierarchyEngine:
         """Value each trade once; attach historical + default stress P&L.
 
         Base PV / Greeks: one ``pricing.value`` per position on ``market``.
-        Historical vector: ``historical_pnl_for_valuation`` (no extra value).
+        Historical vector: panel LINEAR/Δ-Γ via
+        ``approximate_position_pnls_from_panel``, else
+        ``historical_pnl_for_valuation`` (no extra value on the four-macro path).
         Stress: each entry in ``self.stress_scenarios`` (default
         ``DEFAULT_SCENARIOS``) is applied once via ``apply_scenario``, then
         every position is valued on that shocked snapshot (RF-006 / R0.4.5
@@ -311,12 +336,31 @@ class HierarchyEngine:
                         shocked_mv - valuations[position.id].market_value
                     )
         artifacts: dict[str, TradeCalculationArtifact] = {}
+        panel_pnls = None
+        if (
+            isinstance(self.risk, HistoricalRiskEngine)
+            and self.risk.factor_panel is not None
+            and self.risk.methodology is not VaRMethodology.FULL_REVALUATION
+        ):
+            panel_pnls = approximate_position_pnls_from_panel(
+                portfolio,
+                pricing,
+                market,
+                self.risk.factor_panel,
+                methodology=self.risk.methodology,
+            )
         for position in portfolio.positions:
             valuation = valuations[position.id]
+            if panel_pnls is not None:
+                historical_pnl = tuple(float(point) for point in panel_pnls[position.id])
+            else:
+                historical_pnl = historical_pnl_for_valuation(
+                    self.risk, valuation, market=market
+                )
             artifacts[position.id] = TradeCalculationArtifact.from_valuation(
                 valuation,
                 trade_id=_artifact_trade_id(position.id),
-                historical_pnl=historical_pnl_for_valuation(self.risk, valuation),
+                historical_pnl=historical_pnl,
                 stress_pnl=stress_by_trade[position.id],
             )
         return artifacts
@@ -342,6 +386,8 @@ class HierarchyEngine:
                 path,
                 portfolio,
                 children,
+                pricing=pricing,
+                market=market,
                 node_id=node_id,
                 artifacts=artifacts,
                 scenario_ids=scenario_ids,
@@ -375,6 +421,8 @@ class HierarchyEngine:
         portfolio: Portfolio,
         children: Sequence[HierarchyNode] | None,
         *,
+        pricing: PricingEngine,
+        market: MarketSnapshot,
         node_id: str,
         artifacts: Mapping[str, TradeCalculationArtifact],
         scenario_ids: Sequence[str],
@@ -383,11 +431,11 @@ class HierarchyEngine:
         var_95, var_99, es_99 = _var_es_from_historical_pnl(
             None if summed is None else summed.historical_pnl
         )
-        return HierarchyNode(
-            id=node_id,
-            name=name,
-            level=level,  # type: ignore[arg-type]
-            path=path,
+        stress = _stress_from_artifacts(
+            summed, portfolio.positions, artifacts, scenario_ids
+        )
+        risk = RiskSummary(
+            portfolio_id=portfolio.id,
             market_value=0.0 if summed is None else float(summed.pv),
             delta=0.0 if summed is None else float(summed.delta),
             gamma=0.0 if summed is None else float(summed.gamma),
@@ -397,10 +445,30 @@ class HierarchyEngine:
             var_95=var_95,
             var_99=var_99,
             expected_shortfall_99=es_99,
-            stress=_stress_from_artifacts(
-                summed, portfolio.positions, artifacts, scenario_ids
+        )
+        return HierarchyNode(
+            id=node_id,
+            name=name,
+            level=level,  # type: ignore[arg-type]
+            path=path,
+            market_value=risk.market_value,
+            delta=risk.delta,
+            gamma=risk.gamma,
+            vega=risk.vega,
+            dv01=risk.dv01,
+            fx_delta=risk.fx_delta,
+            var_95=var_95,
+            var_99=var_99,
+            expected_shortfall_99=es_99,
+            stress=stress,
+            limits=self._limits(
+                portfolio,
+                pricing,
+                risk,
+                market,
+                stress,
+                extra=_artifact_limit_extra(portfolio.positions, artifacts, risk),
             ),
-            limits=[],
             children=list(children or []),
         )
 

@@ -104,3 +104,20 @@ def test_moved_http_bodies_keep_forbid_and_json_field_names() -> None:
     }
     assert RiskRunCreateRequest.model_config.get("extra") == "forbid"
     assert RiskRunRequestBody.model_config.get("extra") == "forbid"
+
+
+def test_portfolio_service_does_not_import_api_schemas() -> None:
+    """Finding 13: PortfolioService must not import HTTP transport bodies."""
+    path = Path(__file__).resolve().parents[1] / "app" / "services" / "portfolio_service.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        modules: list[str] = []
+        if isinstance(node, ast.Import):
+            modules.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            modules.append(node.module)
+        for module in modules:
+            if module == "app.api.schemas" or module.startswith("app.api.schemas."):
+                offenders.append(module)
+    assert not offenders, f"portfolio_service must not import api.schemas: {offenders}"

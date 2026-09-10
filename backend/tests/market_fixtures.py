@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.domain.models import MarketSnapshot
+from app.market.snapshot import FixedMarketDataProvider as FixedMarketProvider
 
 
 def equity_spot_market(
@@ -22,16 +23,6 @@ def equity_spot_market(
         rates={"USD": rate},
         dividend_yields={symbol: dividend_yield},
     )
-
-
-class FixedMarketProvider:
-    """Test/helper provider that always returns one explicit snapshot."""
-
-    def __init__(self, market: MarketSnapshot):
-        self._market = market
-
-    def snapshot(self, portfolio) -> MarketSnapshot:  # noqa: ARG002
-        return self._market
 
 
 def equity_spots_market(

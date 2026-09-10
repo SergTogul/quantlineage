@@ -23,10 +23,12 @@ from app.market.vol_surfaces import vol_surface_from_dict
 from app.pricing.curve_rates import (
     continuous_zero,
     has_curve_or_key_rates,
+    required_continuous_zero,
     select_yield_curve,
 )
 from app.pricing.instrument_capabilities import get_capability
 from app.pricing.snapshot_overlay import pricing_view, snapshot_marks_from_terms
+from app.risk.factor_types import RateZero
 from app.risk.historical import require_explicit_market
 
 _pricing_view = pricing_view
@@ -462,10 +464,18 @@ class QuantLibPricingEngine(PricingEngine):
         return p.quantity * bond.NPV()
 
     def _bond(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
+        market = require_explicit_market(market)
         curve = self._curve_handle(market, p.currency, p.yield_rate)
         pv = self._bond_npv(p, p.yield_rate, curve)
-        # Analytic 1bp parallel on the trade yield for DV01 reporting
-        bumped = self._bond_npv(p, p.yield_rate + 0.0001)
+        bumped_market = market.bump(RateZero(p.currency, "PARALLEL"), 0.0001)
+        bumped_yield = required_continuous_zero(
+            bumped_market, p.currency, p.maturity_years
+        )
+        bumped = self._bond_npv(
+            p,
+            bumped_yield,
+            self._curve_handle(bumped_market, p.currency, bumped_yield),
+        )
         return Valuation(position_id=p.id, market_value=pv, dv01=bumped - pv)
 
 
@@ -534,9 +544,18 @@ class QuantLibPricingEngine(PricingEngine):
         return swap.NPV()
 
     def _swap(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:
+        market = require_explicit_market(market)
         curve = self._curve_handle(market, p.currency, p.market_swap_rate)
         pv = self._swap_npv(p, p.market_swap_rate, curve)
-        bumped = self._swap_npv(p, p.market_swap_rate + 0.0001)
+        bumped_market = market.bump(RateZero(p.currency, "PARALLEL"), 0.0001)
+        bumped_rate = required_continuous_zero(
+            bumped_market, p.currency, p.maturity_years
+        )
+        bumped = self._swap_npv(
+            p,
+            bumped_rate,
+            self._curve_handle(bumped_market, p.currency, bumped_rate),
+        )
         return Valuation(position_id=p.id, market_value=pv, dv01=bumped - pv)
 
     def _equity_future(self, p: SimpleNamespace, market: MarketSnapshot | None = None) -> Valuation:

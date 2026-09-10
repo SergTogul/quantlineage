@@ -36,6 +36,7 @@ from app.api.scenario_wire import ScenarioWire, wires_to_scenarios
 from app.api.schemas import RiskRunView, dump_risk_run_request, parse_risk_run_request
 from app.domain.models import (
     AttributionRequest,
+    MarketSnapshot,
     Portfolio,
     RiskChangeAttributionRequest,
     RiskRun,
@@ -44,9 +45,10 @@ from app.domain.models import (
 )
 from app.persistence.config import external_worker_enabled
 from app.persistence.memory_repos import InMemoryRiskRunRepository
-from app.persistence.repositories import RiskRunRepository
+from app.persistence.repositories import MarketSnapshotRepository, RiskRunRepository
 from app.persistence.session import session_scope
 from app.persistence.sqlalchemy_repos import (
+    SqlAlchemyMarketSnapshotRepository,
     SqlAlchemyPortfolioRepository,
     SqlAlchemyRiskRunRepository,
 )
@@ -275,11 +277,13 @@ class RiskRunWorker:
         repo: RiskRunRepository | None = None,
         session_factory: Any | None = None,
         max_workers: int = 2,
+        market_snapshots: MarketSnapshotRepository | None = None,
     ) -> None:
         if repo is not None and session_factory is not None:
             raise ValueError("provide either repo or session_factory, not both")
         self._portfolio_service = portfolio_service
         self._session_factory = session_factory
+        self._market_snapshots = market_snapshots
         self._memory_repo = repo
         if session_factory is None and self._memory_repo is None:
             self._memory_repo = InMemoryRiskRunRepository()
@@ -326,6 +330,14 @@ class RiskRunWorker:
                 return SqlAlchemyRiskRunRepository(session).claim_queued(limit=limit)
         assert self._memory_repo is not None
         return self._memory_repo.claim_queued(limit=limit)
+
+    def _load_market_snapshot(self, snapshot_id: str) -> MarketSnapshot | None:
+        if self._session_factory is not None:
+            with session_scope(self._session_factory) as session:
+                return SqlAlchemyMarketSnapshotRepository(session).get(snapshot_id)
+        if self._market_snapshots is not None:
+            return self._market_snapshots.get(snapshot_id)
+        return None
 
     def _load_portfolio(self, portfolio_id: str) -> Portfolio | None:
         if self._session_factory is None:
@@ -509,7 +521,20 @@ class RiskRunWorker:
                 header,
                 risk_engine=engine if isinstance(engine, HistoricalRiskEngine) else None,
             )
-            run_service = portfolio_service_for_spec(self._portfolio_service, spec)
+            market = None
+            if header.market_snapshot_id:
+                market = self._load_market_snapshot(header.market_snapshot_id)
+                if market is None:
+                    self._with_service(
+                        lambda svc: svc.fail(
+                            run_id,
+                            f"market snapshot {header.market_snapshot_id!r} not found",
+                        )
+                    )
+                    return
+            run_service = portfolio_service_for_spec(
+                self._portfolio_service, spec, market=market
+            )
             payload = execute_run_type(
                 run_service,
                 run_type=header.run_type,

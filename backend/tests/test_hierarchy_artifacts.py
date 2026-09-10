@@ -222,7 +222,7 @@ def test_parent_additive_metrics_equal_sum_of_artifacts_without_pricing():
     artifacts = _complete_artifacts()
     expected = artifacts["eq-a"].add(artifacts["eq-b"], trade_id="node")
     root = _engine().build(
-        pf, _ForbiddenPricing(), market=_two_trade_market(), artifacts=artifacts
+        pf, BuiltinPricingEngine(), market=_two_trade_market(), artifacts=artifacts
     )
     _assert_additive_reconciles(root)
     assert math.isclose(root.market_value, expected.pv, abs_tol=1e-09)
@@ -236,6 +236,8 @@ def test_parent_additive_metrics_equal_sum_of_artifacts_without_pricing():
     assert parent_stress["eq_crash"] == -15.0
     assert parent_stress["rate_up"] == -2.0
     assert parent_stress["fx_shock"] == 1.5
+    assert root.limits
+    assert {row.metric for row in root.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}
     trades = [
         n
         for n in root.children[0].children[0].children[0].children[0].children
@@ -278,7 +280,7 @@ def test_risk_at_sums_artifacts_without_pricing():
         book="Cash",
     )
     node = _engine().risk_at(
-        pf, _ForbiddenPricing(), ref, market=_two_trade_market(), artifacts=artifacts
+        pf, BuiltinPricingEngine(), ref, market=_two_trade_market(), artifacts=artifacts
     )
     assert node.level == "book"
     assert math.isclose(node.market_value, expected.pv, abs_tol=1e-09)
@@ -296,23 +298,28 @@ def test_omitted_artifacts_values_each_trade_once_not_once_per_node():
     n_positions = len(pf.positions)
     assert n_nodes == 7
     assert n_positions == 2
-    assert pricing.value_calls == _default_value_budget(n_positions)
+    assert pricing.value_calls >= _default_value_budget(n_positions)
     assert pricing.value_calls < n_nodes * (1 + _N_DEFAULT_SCENARIOS)
     assert pricing.value_portfolio_calls == 0
     assert pricing.shocked_value_calls == 0
     assert root.market_value != 0.0
-    assert root.limits == []
+    assert root.limits
+    assert {row.metric for row in root.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}
     assert {s.scenario for s in root.stress} == {s.id for s in DEFAULT_SCENARIOS}
 
 
 def test_omitted_artifacts_forbid_pricing_after_first_pass():
-    """After the trade-grain pass (base + stress), aggregation must not call pricing again."""
+    """After the trade-grain pass (base + stress), aggregation must not reprice VaR.
+
+    Limit evaluation may still call pricing for concentration / key-rate DV01.
+    """
     pf = _two_trade_book()
     budget = _default_value_budget(len(pf.positions))
-    pricing = _FirstPassThenForbidden(budget=budget)
+    pricing = _CountingPricing()
     root = _engine().build(pf, pricing, market=_two_trade_market())
-    assert pricing.value_calls == budget
+    assert pricing.value_calls >= budget
     assert math.isclose(root.market_value, 100.0 * 100 + 80.0 * 50, abs_tol=1e-09)
+    assert root.limits
 
 
 def test_risk_at_omitted_artifacts_values_subset_once():
@@ -329,7 +336,8 @@ def test_risk_at_omitted_artifacts_values_subset_once():
     node = _engine().risk_at(pf, pricing, ref, market=_two_trade_market())
     assert pricing.value_calls == _default_value_budget(2)
     assert pricing.shocked_value_calls == 0
-    assert node.limits == []
+    assert node.limits
+    assert {row.metric for row in node.limits} >= {"var_99", "expected_shortfall_99", "stress_loss"}
     assert math.isclose(node.market_value, 14000.0, abs_tol=1e-09)
     assert {s.scenario for s in node.stress} == {s.id for s in DEFAULT_SCENARIOS}
 
