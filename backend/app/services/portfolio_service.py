@@ -1,15 +1,10 @@
+from types import MappingProxyType
+
 from app.api.schemas import LimitDrilldownRequest
 from app.domain.models import (
-    BondPosition,
     Contributor,
-    EquityFuturePosition,
-    EquityPosition,
     ESContributionReport,
-    EuropeanOptionPosition,
-    FXForwardPosition,
-    FXOptionPosition,
     HierarchyRef,
-    InterestRateFuturePosition,
     LimitDrilldownReport,
     LimitMetric,
     Portfolio,
@@ -20,7 +15,6 @@ from app.domain.models import (
     RiskSummary,
     ScenarioEvaluationReport,
     StressResult,
-    SwapPosition,
     VaRMethodology,
     VaRMethodologyComparison,
     WhatIfReport,
@@ -29,6 +23,7 @@ from app.domain.models import (
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.market.snapshot import MarketDataProvider
+from app.pricing.instrument_capabilities import get_capability
 from app.risk.attribution import AttributionEngine
 from app.risk.es import ESContributionAnalytics
 from app.risk.factors import RiskFactorEngine
@@ -51,30 +46,72 @@ from app.risk.var import VaRAnalytics
 from app.sample import DemoPortfolioMarketDataProvider
 
 
+def _label_equity(position: Position) -> str:
+    return f"{position.symbol} equity"
+
+
+def _label_equity_future(position: Position) -> str:
+    return f"{position.symbol} future"
+
+
+def _label_european_option(position: Position) -> str:
+    return f"{position.symbol} {position.option_type}"
+
+
+def _label_bond(position: Position) -> str:
+    return position.issuer
+
+
+def _label_swap(position: Position) -> str:
+    tenor = (
+        f"{int(position.maturity_years)}Y"
+        if position.maturity_years == int(position.maturity_years)
+        else f"{position.maturity_years}Y"
+    )
+    return f"{position.currency} {tenor} swap"
+
+
+def _label_fx_forward(position: Position) -> str:
+    return f"{position.pair} fwd"
+
+
+def _label_fx_option(position: Position) -> str:
+    return f"{position.pair} {position.option_type}"
+
+
+def _label_ir_future(position: Position) -> str:
+    return f"{position.currency} IR future"
+
+
+def _label_by_id(position: Position) -> str:
+    return position.id
+
+
+_LABEL_HANDLERS = MappingProxyType(
+    {
+        "equity": _label_equity,
+        "equity_future": _label_equity_future,
+        "european_option": _label_european_option,
+        "bond": _label_bond,
+        "swap": _label_swap,
+        "fx_forward": _label_fx_forward,
+        "fx_option": _label_fx_option,
+        "ir_future": _label_ir_future,
+        "cap_floor": _label_by_id,
+        "swaption": _label_by_id,
+    }
+)
+
+
 def position_label(position: Position) -> str:
     """Human-readable trade label that distinguishes instrument type."""
-    if isinstance(position, EquityPosition):
-        return f"{position.symbol} equity"
-    if isinstance(position, EquityFuturePosition):
-        return f"{position.symbol} future"
-    if isinstance(position, EuropeanOptionPosition):
-        return f"{position.symbol} {position.option_type}"
-    if isinstance(position, BondPosition):
-        return position.issuer
-    if isinstance(position, SwapPosition):
-        tenor = (
-            f"{int(position.maturity_years)}Y"
-            if position.maturity_years == int(position.maturity_years)
-            else f"{position.maturity_years}Y"
-        )
-        return f"{position.currency} {tenor} swap"
-    if isinstance(position, FXForwardPosition):
-        return f"{position.pair} fwd"
-    if isinstance(position, FXOptionPosition):
-        return f"{position.pair} {position.option_type}"
-    if isinstance(position, InterestRateFuturePosition):
-        return f"{position.currency} IR future"
-    return position.id
+    family = getattr(position, "type", None)
+    get_capability(family)
+    try:
+        handler = _LABEL_HANDLERS[family]
+    except KeyError:
+        raise TypeError(f"unknown instrument family: {family!r}") from None
+    return handler(position)
 
 
 class PortfolioService:

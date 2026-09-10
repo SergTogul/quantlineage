@@ -76,7 +76,7 @@ def test_quantlib_value_consults_get_capability(engine, monkeypatch):
 
 def test_quantlib_snapshot_overlay_unknown_family_fails_closed(monkeypatch):
     from app.domain.models import MarketSnapshot
-    from app.pricing.quantlib import _snapshot_marks_from_terms
+    from app.pricing.snapshot_overlay import snapshot_marks_from_terms
 
     _forbid_builtin_fallback(monkeypatch)
 
@@ -86,7 +86,7 @@ def test_quantlib_snapshot_overlay_unknown_family_fails_closed(monkeypatch):
 
     market = MarketSnapshot(id="m", as_of="t0", equity_spots={}, rates={})
     with pytest.raises((KeyError, TypeError), match="unknown instrument family"):
-        _snapshot_marks_from_terms(_UnknownTerms(), market)  # type: ignore[arg-type]
+        snapshot_marks_from_terms(_UnknownTerms(), market)  # type: ignore[arg-type]
 
 
 def test_quantlib_unregistered_terms_fail_closed_without_builtin(engine, monkeypatch):

@@ -587,7 +587,11 @@ Do not allow an omitted factor to disappear into `interaction` without a reconci
 
 ## R0.5.7 Remaining capability ladders — COMPLETE (slice, 2026-09-09)
 
-`named_risk_factors` drives `calculate_typed` and `required_factors_for_position` from the registry (cap/floor/swaption → `RateZero` at `round(maturity_years)Y` / swaption `option_maturity_years`; unknown families fail closed). `trade_cache_schema` lives on each capability row; `_TRADE_CACHE_SCHEMAS` removed from `cache.py`. Cache hashes and pricing goldens unchanged. **RF-012 stays IN PROGRESS:** Builtin/QuantLib `value()` isinstance ladders and overlay still require a parallel edit per family. Report: `reviews/r0.5.7-rf012-remaining-ladders-report.md`.
+`named_risk_factors` drives `calculate_typed` and `required_factors_for_position` from the registry (cap/floor/swaption → `RateZero` at `round(maturity_years)Y` / swaption `option_maturity_years`; unknown families fail closed). `trade_cache_schema` lives on each capability row; `_TRADE_CACHE_SCHEMAS` removed from `cache.py`. Cache hashes and pricing goldens unchanged. Report: `reviews/r0.5.7-rf012-remaining-ladders-report.md`.
+
+## R0.5.8 Family-keyed dispatch + shared overlay — COMPLETE (2026-09-09)
+
+Builtin/QuantLib `value()` dispatch by frozen `terms.type` handler maps after `get_capability`. One overlay module (`app.pricing.snapshot_overlay`) serves both working views; unknown families fail closed. `position_label` is family-keyed via `get_capability` (existing labels unchanged). **RF-012 CLOSED** with named residual: discriminated Position/Terms unions in `domain/`. Report: `reviews/r0.5.8-rf012-family-dispatch-report.md`.
 
 ### Exit criteria
 
