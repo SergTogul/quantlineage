@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.api.schemas import RiskQueryResponse
 from app.domain.models import Portfolio
@@ -37,7 +37,8 @@ class RiskAssistantModelRequest(BaseModel):
 
 
 class RiskAssistantModelResponse(BaseModel):
-    tool_name: RiskToolName | None = None
+    tool_name: str | None = None
+    tool_args: dict[str, Any] = Field(default_factory=dict)
     intent: str | None = None
     requires_clarification: bool = False
     clarification: str | None = None
@@ -58,6 +59,19 @@ class RiskQueryPlan(BaseModel):
     tool_name: RiskToolName | None = None
     needs_clarification: bool = False
     clarification: str | None = None
+
+
+class RiskToolArgs(BaseModel):
+    """Model-bindable tool arguments. Portfolio is bound by RiskForge, never the LLM."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ToolCallValidation(BaseModel):
+    allowed: bool
+    tool_name: RiskToolName | None = None
+    args: dict[str, Any] = Field(default_factory=dict)
+    refusal: str | None = None
 
 
 TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
@@ -103,13 +117,75 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
     ),
 }
 
+TOOL_ARG_MODELS: dict[RiskToolName, type[BaseModel]] = {
+    name: RiskToolArgs for name in TOOL_CONTRACTS
+}
+
+SAFE_UNGROUNDED_ANSWER = (
+    "I cannot ignore deterministic tools or invent VaR, Greeks, P&L, prices, "
+    "stress losses, or limit values. Ask a supported portfolio risk question: "
+    "VaR/ES, limits, contributors, worst stress, or portfolio summary."
+)
+
+_INJECTION_MARKERS = (
+    "ignore tools",
+    "ignore the tools",
+    "invent var",
+    "invent a var",
+    "disregard tools",
+    "forget the tools",
+    "ignore previous",
+)
+
+
+def tool_json_schemas() -> dict[str, dict[str, Any]]:
+    """Pydantic JSON Schema for each allowlisted RiskToolName (TOOL_CONTRACTS keys only)."""
+    return {
+        name.value: TOOL_ARG_MODELS[name].model_json_schema()
+        for name in TOOL_CONTRACTS
+    }
+
 
 def tool_contract_schemas() -> list[dict[str, Any]]:
     """Serializable deterministic tool contracts for the future LLM layer."""
+    json_schemas = tool_json_schemas()
     return [
-        contract.model_dump(mode="json")
+        {**contract.model_dump(mode="json"), "json_schema": json_schemas[contract.name.value]}
         for contract in TOOL_CONTRACTS.values()
     ]
+
+
+def validate_tool_call(
+    tool_name: str | RiskToolName | None,
+    args: dict[str, Any] | None = None,
+) -> ToolCallValidation:
+    """Allowlist tool names to TOOL_CONTRACTS keys and validate args against JSON Schema."""
+    if tool_name is None or tool_name == "":
+        return ToolCallValidation(
+            allowed=False,
+            refusal="No allowlisted RiskForge tool was selected.",
+        )
+    raw = tool_name.value if isinstance(tool_name, RiskToolName) else str(tool_name)
+    try:
+        name = RiskToolName(raw)
+    except ValueError:
+        return ToolCallValidation(
+            allowed=False,
+            refusal="Unknown tool is not in the RiskForge allowlist.",
+        )
+    if name not in TOOL_CONTRACTS:
+        return ToolCallValidation(
+            allowed=False,
+            refusal="Unknown tool is not in the RiskForge allowlist.",
+        )
+    try:
+        parsed = TOOL_ARG_MODELS[name].model_validate(args or {})
+    except ValidationError:
+        return ToolCallValidation(
+            allowed=False,
+            refusal="Tool arguments failed JSON-schema validation.",
+        )
+    return ToolCallValidation(allowed=True, tool_name=name, args=parsed.model_dump())
 
 
 class DeterministicRiskAssistantModel:
@@ -140,6 +216,8 @@ class RiskQueryEngine:
                 "Ask a supported portfolio risk question: VaR/ES, limits, contributors, "
                 "worst stress, or portfolio summary.",
             )
+        if _is_prompt_injection(q):
+            return _clarification_plan("unsupported", SAFE_UNGROUNDED_ANSWER)
         if _mentions(q, "worst", "largest") and _mentions(q, "stress", "scenario", "threat"):
             return RiskQueryPlan(
                 intent="worst_scenario",
@@ -186,8 +264,21 @@ class RiskQueryEngine:
                 requires_clarification=True,
             )
 
-        contract = TOOL_CONTRACTS[plan.tool_name]
-        payload = _execute_tool(plan.tool_name, portfolio, service)
+        checked = validate_tool_call(plan.tool_name, {})
+        if not checked.allowed or checked.tool_name is None:
+            return RiskQueryResponse(
+                intent="unsupported",
+                answer=_safe_ungrounded_text(checked.refusal, fallback=SAFE_UNGROUNDED_ANSWER),
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+        contract = TOOL_CONTRACTS[checked.tool_name]
+        payload = _execute_tool(checked.tool_name, portfolio, service)
         data = {
             "tool_contract": contract.model_dump(mode="json"),
             "tool_result": payload,
@@ -212,6 +303,10 @@ class RiskQueryEngine:
         )
         model_response = model.complete(request)
         model_data = model_response.model_dump(mode="json")
+        default_clarification = (
+            "Please choose a deterministic risk view: VaR/ES, limits, contributors, "
+            "worst stress, or portfolio summary."
+        )
         if (
             model_response.refusal
             or model_response.requires_clarification
@@ -220,11 +315,10 @@ class RiskQueryEngine:
             return RiskQueryResponse(
                 intent=model_response.intent
                 or ("unsupported" if model_response.refusal else "ambiguous"),
-                answer=model_response.refusal
-                or model_response.clarification
-                or (
-                    "Please choose a deterministic risk view: VaR/ES, limits, contributors, "
-                    "worst stress, or portfolio summary."
+                answer=_safe_ungrounded_text(
+                    model_response.refusal,
+                    model_response.clarification,
+                    fallback=default_clarification,
                 ),
                 data={
                     "tool_contract": None,
@@ -236,17 +330,34 @@ class RiskQueryEngine:
                 requires_clarification=True,
             )
 
-        contract = TOOL_CONTRACTS[model_response.tool_name]
-        payload = _execute_tool(model_response.tool_name, portfolio, service)
+        checked = validate_tool_call(model_response.tool_name, model_response.tool_args)
+        if not checked.allowed or checked.tool_name is None:
+            return RiskQueryResponse(
+                intent="unsupported",
+                answer=_safe_ungrounded_text(
+                    checked.refusal, fallback=SAFE_UNGROUNDED_ANSWER
+                ),
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    "model": model_data,
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+
+        contract = TOOL_CONTRACTS[checked.tool_name]
+        payload = _execute_tool(checked.tool_name, portfolio, service)
         return RiskQueryResponse(
-            intent=model_response.intent or _intent_for_tool(model_response.tool_name),
-            answer=_format_answer(model_response.tool_name, payload),
+            intent=model_response.intent or _intent_for_tool(checked.tool_name),
+            answer=_format_answer(checked.tool_name, payload),
             data={
                 "tool_contract": contract.model_dump(mode="json"),
                 "tool_result": payload,
                 "model": model_data,
             },
-            tool_name=model_response.tool_name.value,
+            tool_name=checked.tool_name.value,
         )
 
 
@@ -333,6 +444,23 @@ def _fmt(value: Any) -> str:
 
 def _mentions(question: str, *terms: str) -> bool:
     return any(term in question for term in terms)
+
+
+def _is_prompt_injection(question: str) -> bool:
+    return any(marker in question for marker in _INJECTION_MARKERS)
+
+
+def _contains_ungrounded_number(text: str) -> bool:
+    return any(ch.isdigit() for ch in text)
+
+
+def _safe_ungrounded_text(*candidates: str | None, fallback: str) -> str:
+    for text in candidates:
+        if text and not _contains_ungrounded_number(text):
+            return text
+    if fallback and not _contains_ungrounded_number(fallback):
+        return fallback
+    return SAFE_UNGROUNDED_ANSWER
 
 
 def _clarification_plan(intent: str, message: str) -> RiskQueryPlan:
