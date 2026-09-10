@@ -333,7 +333,7 @@ def truncate_factor_panel(
     )
 
 
-def _series_for_factor(factor: RiskFactor, series: FactorObservationSeries) -> Sequence[float]:
+def _series_for_factor(factor: RiskFactor, series: FactorObservationSeries) -> np.ndarray:
     if isinstance(factor, EquitySpot):
         return series.equity_returns
     if isinstance(factor, (EquityVol, FXVol)):
