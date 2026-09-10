@@ -27,6 +27,30 @@ describe('ReverseStressMulti', () => {
     expect(screen.queryByText('Converged')).not.toBeInTheDocument()
   })
 
+  it('POSTs target loss 5% and max shock 80% as 0.05 / 0.8 fractions', async () => {
+    let body = null
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/stress/reverse/multi`, async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json({
+          target_loss_pct: 0.05,
+          converged: true,
+          shocks: [],
+          factors: ['equity', 'vol'],
+          assumptions: [],
+        })
+      }),
+    )
+    const user = userEvent.setup()
+    render(<ReverseStressMulti portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Solve multi-factor' }))
+    await waitFor(() => expect(body).not.toBeNull())
+    expect(body.target_loss_pct).toBe(0.05)
+    expect(body.max_shock).toBe(0.8)
+    expect(body.target_loss_pct).not.toBe(5)
+    expect(body.max_shock).not.toBe(80)
+  })
+
   it('loads multi-factor result from MSW fixture (no client risk math)', async () => {
     const user = userEvent.setup()
     render(<ReverseStressMulti portfolio={demoPortfolio} />)

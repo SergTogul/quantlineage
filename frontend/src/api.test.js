@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import {
   API_V1,
+  compareHedge,
   evaluateCustomScenario,
   explainPnL,
   loadDashboard,
   reverseStress,
+  reverseStressMulti,
 } from './api.js'
 import { API_BASE, server } from './test/mswServer.js'
 import { RISK_RUN_POLL_MS } from './lib/risk.mjs'
@@ -245,6 +247,61 @@ describe('loadDashboard', () => {
 
     await expect(loadDashboard()).rejects.toThrow('500')
     expect(calls).toEqual(['POST /risk/dashboard'])
+  })
+})
+
+describe('request-boundary ScenarioWire units', () => {
+  it('evaluateCustomScenario rejects display-percent equity −20 on the wire', () => {
+    expect(() =>
+      evaluateCustomScenario(DEMO_PORTFOLIO, {
+        id: 'eq-crash',
+        name: 'Equity crash',
+        category: 'factor',
+        shocks: [{ factor_type: 'equity', key: 'SPY', amount: -20, bucket: 'SPY' }],
+      }),
+    ).toThrow(/display|fraction|wire/i)
+  })
+
+  it('evaluateCustomScenario POSTs fraction amounts, not display percent', async () => {
+    let body = null
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/stress/formal/evaluate/custom`, async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json({ evaluations: [] })
+      }),
+    )
+    await evaluateCustomScenario(DEMO_PORTFOLIO, {
+      id: 'eq-crash',
+      name: 'Equity crash',
+      category: 'factor',
+      shocks: [
+        { factor_type: 'equity', key: 'SPY', amount: -0.2, bucket: 'SPY' },
+        { factor_type: 'rate', key: 'USD:RATE', amount: 0.01, bucket: 'ALL' },
+      ],
+    })
+    const shocks = body.scenarios[0].shocks
+    expect(shocks.find((s) => s.factor_type === 'equity').amount).toBe(-0.2)
+    expect(shocks.find((s) => s.factor_type === 'rate').amount).toBe(0.01)
+    expect(shocks.some((s) => s.amount === -20 || s.amount === 100)).toBe(false)
+  })
+
+  it('compareHedge rejects a −20 equity shock as display units', () => {
+    expect(() =>
+      compareHedge(DEMO_PORTFOLIO, DEMO_PORTFOLIO, [
+        {
+          id: 'Crash',
+          name: 'Crash',
+          category: 'factor',
+          shocks: [{ factor_type: 'equity', key: 'SPY', amount: -20, bucket: 'SPY' }],
+        },
+      ]),
+    ).toThrow(/display|fraction|wire/i)
+  })
+
+  it('reverseStressMulti rejects display-percent target loss 5', () => {
+    expect(() => reverseStressMulti(DEMO_PORTFOLIO, 5, { max_shock: 80 })).toThrow(
+      /display|fraction|wire/i,
+    )
   })
 })
 

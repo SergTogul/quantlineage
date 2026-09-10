@@ -933,7 +933,7 @@ ABI version, status/error, length/null, contiguous `pnl_from_arrays`, and serial
 Priority: **P2**  
 Risk types: MAINTAINABILITY, SUPPLY_CHAIN, UI_CORRECTNESS  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-09). `npm ci` and version pins exist; leftover is request-boundary percent/bp assertions and a centralized OpenAPI contract. Not a TypeScript rewrite.
+Status: **CLOSED** (2026-09-09). Request-boundary percent/bp assertions, committed OpenAPI scenario snapshot, and `npm ci` / no-`"latest"` pins are **MET**. Not a TypeScript rewrite.
 
 Source findings:
 
