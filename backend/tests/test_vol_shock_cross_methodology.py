@@ -83,7 +83,7 @@ def test_linear_delta_gamma_vega_term_uses_two_vol_points_not_ten():
     zeros = np.array([0.0])
     expected = val.vega * _VOL_POINTS
     wrong_ten_points = val.vega * (_RELATIVE_MOVE * 100.0)
-    assert _VOL_POINTS == pytest.approx(2.0, abs=1e-12)
+    assert pytest.approx(2.0, abs=1e-12) == _VOL_POINTS
     assert expected != pytest.approx(wrong_ten_points, abs=1e-9)
 
     for meth in (VaRMethodology.LINEAR, VaRMethodology.DELTA_GAMMA):
