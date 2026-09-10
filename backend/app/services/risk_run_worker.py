@@ -30,6 +30,7 @@ from typing import Any, Callable
 
 from pydantic import BaseModel, ValidationError
 
+from app.api.acl import PortfolioAccessDenied, allow_read, allow_run_read
 from app.api.errors import PUBLIC_RISK_RUN_FAILURE_MESSAGE
 from app.api.scenario_wire import ScenarioWire, wires_to_scenarios
 from app.api.schemas import RiskRunView, dump_risk_run_request, parse_risk_run_request
@@ -332,7 +333,7 @@ class RiskRunWorker:
         with session_scope(self._session_factory) as session:
             return SqlAlchemyPortfolioRepository(session).get(portfolio_id)
 
-    def _book_for_run(self, portfolio: Portfolio) -> Portfolio:
+    def _book_for_run(self, portfolio: Portfolio, *, principal: str | None) -> Portfolio:
         """Create-if-absent; attach the stored book when the id already exists."""
         if self._session_factory is None:
             return portfolio
@@ -340,8 +341,11 @@ class RiskRunWorker:
             repo = SqlAlchemyPortfolioRepository(session)
             stored = repo.get(portfolio.id)
             if stored is not None:
+                owner = repo.get_owner(portfolio.id)
+                if not allow_read(owner, principal):
+                    raise PortfolioAccessDenied(portfolio.id)
                 return stored
-            return repo.create(portfolio)
+            return repo.create(portfolio, owner=principal)
 
     def _to_view(self, run: RiskRun) -> RiskRunView:
         payloads = self._with_service(lambda svc: svc.get_result_payloads(run.id))
@@ -373,6 +377,7 @@ class RiskRunWorker:
         market_snapshot_id: str | None = None,
         run_id: str | None = None,
         execute: bool | None = None,
+        owner: str | None = None,
     ) -> RiskRunView:
         """Create a QUEUED run; optionally schedule background execution.
 
@@ -406,13 +411,14 @@ class RiskRunWorker:
         except ValidationError as exc:
             raise ValueError(f"invalid risk run request: {exc}") from exc
 
-        book = self._book_for_run(portfolio)
+        book = self._book_for_run(portfolio, principal=owner)
 
         def _enqueue(svc: RiskRunService) -> RiskRun:
             return svc.enqueue(
                 run_id=rid,
                 portfolio_id=book.id,
                 portfolio_version=book.version,
+                owner=owner,
                 run_type=run_type,
                 request=req,
                 market_snapshot_id=market_snapshot_id,
@@ -432,8 +438,10 @@ class RiskRunWorker:
             self._schedule(rid)
         return RiskRunView.from_risk_run(run)
 
-    def get(self, run_id: str) -> RiskRunView:
+    def get(self, run_id: str, *, principal: str | None = None) -> RiskRunView:
         run = self._with_service(lambda svc: svc.get(run_id))
+        if not allow_run_read(run.owner, principal):
+            raise PortfolioAccessDenied(run.portfolio_id)
         return self._to_view(run)
 
     def poll_once(self, *, limit: int = 10) -> int:

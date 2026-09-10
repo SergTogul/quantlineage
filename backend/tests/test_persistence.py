@@ -46,8 +46,10 @@ def test_schema_has_expected_tables():
     assert {'portfolios', 'trades', 'market_snapshots', 'scenario_definitions', 'risk_runs', 'risk_results', 'limit_definitions'} <= names
     port_cols = {c['name'] for c in inspect(engine).get_columns('portfolios')}
     assert 'version' in port_cols
+    assert 'owner' in port_cols
     run_cols = {c['name'] for c in inspect(engine).get_columns('risk_runs')}
     assert 'portfolio_version' in run_cols
+    assert 'owner' in run_cols
 
 def test_portfolio_and_trades_round_trip(session_factory):
     portfolio = Portfolio(id='p-persist', name='Persist Book', desk='Rates Desk', positions=[EquityPosition(type='equity', id='eq-1', symbol='SPY', quantity=10, desk='Equity Desk', book='Equity')])
@@ -167,12 +169,13 @@ def test_alembic_upgrade_on_sqlite_file(tmp_path: Path):
     assert 'portfolios' in tables
     assert 'alembic_version' in tables
     columns = {c['name'] for c in inspect(engine).get_columns('risk_runs')}
-    assert {'historical_dataset_id', 'historical_dataset_version', 'as_of', 'calculation_config', 'portfolio_version'}.issubset(columns)
+    assert {'historical_dataset_id', 'historical_dataset_version', 'as_of', 'calculation_config', 'portfolio_version', 'owner'}.issubset(columns)
     port_cols = {c['name'] for c in inspect(engine).get_columns('portfolios')}
     assert 'version' in port_cols
+    assert 'owner' in port_cols
     with engine.connect() as conn:
         ver = conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one()
-    assert ver == '004_portfolio_version'
+    assert ver == '005_object_owner'
 
 def test_no_quantlib_types_in_orm_modules():
     """Guard: persistence package must not import QuantLib."""

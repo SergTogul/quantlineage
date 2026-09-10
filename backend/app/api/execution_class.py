@@ -63,6 +63,7 @@ ENDPOINT_EXECUTION_CLASS: Mapping[tuple[str, str], ExecutionClass] = {
     ("GET", "/portfolio"): ExecutionClass.INTERACTIVE,
     ("GET", "/portfolios"): ExecutionClass.INTERACTIVE,
     ("GET", "/portfolios/{portfolio_id}"): ExecutionClass.INTERACTIVE,
+    ("PUT", "/portfolios/{portfolio_id}"): ExecutionClass.INTERACTIVE,
     ("GET", "/risk/runs/{run_id}"): ExecutionClass.INTERACTIVE,
     ("GET", "/risk/stress/scenarios"): ExecutionClass.INTERACTIVE,
     ("GET", "/risk/stress/scenarios/formal"): ExecutionClass.INTERACTIVE,

@@ -1,7 +1,7 @@
 # RiskForge Consolidated Engineering Findings
 
 Date: 2026-09-09  
-Status: leftover wave IN PROGRESS (2026-09-09) — P0/P1 code CLOSED; user rejected “accepted residual” as done. Remaining MET work: RF-014 shared ACLs/TLS/secrets, RF-016 labeled-runner SLA (needs a runner). RF-019 tool schemas/evals are CLOSED as MET. RF-018 frontend contracts are CLOSED as MET (not a TypeScript rewrite). RF-017 ABI is CLOSED as MET (product Historical VaR stays python/NumPy by design).  
+Status: leftover wave IN PROGRESS (2026-09-09) — P0/P1 code CLOSED. RF-014 shared ACLs/TLS/secrets are CLOSED as MET. Remaining not MET: RF-016 labeled-runner SLA (needs a runner). RF-019 tool schemas/evals are CLOSED as MET. RF-018 frontend contracts are CLOSED as MET (not a TypeScript rewrite). RF-017 ABI is CLOSED as MET (product Historical VaR stays python/NumPy by design).  
 
 Inputs:
 
@@ -50,7 +50,7 @@ Important but not allowed to distract from P0/P1 remediation. These can be compl
 
 **Milestone R0 leftover wave is IN PROGRESS** (2026-09-09). “Accepted residual” is not done.
 
-P0/P1 code paths stay CLOSED except RF-014 shared ACLs/TLS/secrets (reopened). QA-024 QuantLib demo-artifact range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are **CLOSED** as **MET**. RF-016 labeled-runner SLA still needs a self-hosted runner (cannot fake ubuntu-latest floors).
+P0/P1 code paths stay CLOSED. RF-014 shared ACLs/TLS/secrets are **CLOSED** as **MET**. QA-024 QuantLib demo-artifact range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are **CLOSED** as **MET**. RF-016 labeled-runner SLA still needs a self-hosted runner (cannot fake ubuntu-latest floors).
 
 The current repository is a strong MVP with unusually broad test coverage, real QuantLib integration, deterministic demo data, a credible pricing seam, native parity tests, and good separation of the native numerical kernel from business logic.
 
@@ -735,7 +735,7 @@ Keep an explicit inline/debug calculation endpoint only for tests/demo tooling.
 Priority: **P1**  
 Risk types: SECURITY, AVAILABILITY, OPERABILITY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-09). Local-demo required direction remains MET. Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** were papered as accepted residuals — reopened to MET them. Not production OIDC.
+Status: **CLOSED** (2026-09-09). Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** are **MET**. Local demo stays unauthenticated and loopback. Not production OIDC. Report: `reviews/r0.11.8-rf014-shared-acls-tls-report.md`.
 
 Source findings:
 
@@ -785,7 +785,7 @@ production-like deployment
 
 Missing auth is not called a vulnerability for strict loopback use, but public exposure is blocked by configuration and documentation.
 
-Close-gate scores (2026-09-09, `reviews/r0.11.7-rf014-close-gate-report.md`): local-demo loopback / finite numbers / payload caps / sanitization **MET**; shared-token gate **MET** for authentication only. Object ACLs / TLS / secrets **UNMET** — accepted R0 residuals, not MET. HTTP enqueue queue-depth and Compose demo DB password remain named leftovers, not MET.
+Close-gate scores (2026-09-09, R0.11.7 local-demo + R0.11.8 shared leftovers): local-demo loopback / finite numbers / payload caps / sanitization **MET**; shared-token gate **MET**. Object ACLs **MET** (Bearer principal map, IDOR 403 on stored books/runs; seed/demo catalog owned by principal `demo`). TLS/reverse-proxy **MET** (`docker-compose.shared.yml` Caddy terminator publishes 443; backend stays internal). Secret management **MET** for the shared profile (`${POSTGRES_PASSWORD:?}` + `.env.shared.example`; local Compose may keep demo `riskforge`). Not OIDC/SSO. Named leftover (not blocking close): HTTP enqueue queue-depth. Labeled-runner SLA remains RF-016, not MET.
 
 ---
 
@@ -1121,7 +1121,7 @@ Do not use the review as justification to add:
 
 # Release / Development Gate
 
-**Milestone R0 leftover wave IN PROGRESS** (2026-09-09). Net-new feature development stays paused until RF-014 shared ACLs/TLS/secrets is MET. QA-024 range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are CLOSED as MET. Labeled-runner SLA still needs a self-hosted runner.
+**Milestone R0 leftover wave IN PROGRESS** (2026-09-09). RF-014 shared ACLs/TLS/secrets are CLOSED as MET. QA-024 range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are CLOSED as MET. Labeled-runner SLA still needs a self-hosted runner. Do not restore Milestone R0 COMPLETE while that SLA is not MET.
 
 R0 required, and now records:
 

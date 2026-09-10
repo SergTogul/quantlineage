@@ -57,10 +57,10 @@ class SqlAlchemyPortfolioRepository(PortfolioRepository):
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def create(self, portfolio: Portfolio) -> Portfolio:
+    def create(self, portfolio: Portfolio, *, owner: str | None = None) -> Portfolio:
         if self._session.get(PortfolioRow, portfolio.id) is not None:
             raise PortfolioAlreadyExists(portfolio.id)
-        row = PortfolioRow(id=portfolio.id, version=1)
+        row = PortfolioRow(id=portfolio.id, version=1, owner=owner)
         self._session.add(row)
         return self._write(row, portfolio, version=1)
 
@@ -77,13 +77,20 @@ class SqlAlchemyPortfolioRepository(PortfolioRepository):
         """Legacy upsert for seed/callers that have not switched to create/update.
 
         Insert starts at version 1. Overwrite bumps version without CAS.
+        New rows default owner to ``demo`` (seed/demo catalog).
         """
         row = self._session.get(PortfolioRow, portfolio.id)
         if row is None:
-            row = PortfolioRow(id=portfolio.id, version=1)
+            row = PortfolioRow(id=portfolio.id, version=1, owner="demo")
             self._session.add(row)
             return self._write(row, portfolio, version=1)
         return self._write(row, portfolio, version=row.version + 1)
+
+    def get_owner(self, portfolio_id: str) -> str | None:
+        row = self._session.get(PortfolioRow, portfolio_id)
+        if row is None:
+            return None
+        return row.owner
 
     def _write(self, row: PortfolioRow, portfolio: Portfolio, *, version: int) -> Portfolio:
         row.name = portfolio.name

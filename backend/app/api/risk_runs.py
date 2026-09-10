@@ -7,10 +7,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 
+from app.api.acl import PortfolioAccessDenied, request_principal
 from app.api.deps import get_risk_run_worker
-from app.api.errors import http_bad_request
+from app.api.errors import http_bad_request, http_forbidden
 from app.api.openapi_examples import (
     RESP_RISK_RUN_CREATE,
     RESP_RISK_RUN_GET,
@@ -36,6 +37,7 @@ def create_risk_run(
         RiskRunCreateRequest,
         Body(openapi_examples=RISK_RUN_CREATE_BODY_EXAMPLES),
     ],
+    request: Request,
     worker: RiskRunWorker = Depends(get_risk_run_worker),
 ) -> RiskRunView:
     """Create a QUEUED risk run and execute it on an in-process worker thread.
@@ -44,6 +46,7 @@ def create_risk_run(
     Persistence: in-memory by default; SQLAlchemy when RISKFORGE_DATABASE_URL
     is set at app lifespan (M5.6). When RISKFORGE_EXTERNAL_WORKER=1 (Compose
     backend), the run stays QUEUED until ``python -m app.worker`` polls it (M5.7).
+    Shared profile stamps the Bearer principal as run owner (RF-014).
     """
     try:
         return worker.submit(
@@ -51,7 +54,10 @@ def create_risk_run(
             run_type=body.run_type,
             request=body.request,
             market_snapshot_id=body.market_snapshot_id,
+            owner=request_principal(request),
         )
+    except PortfolioAccessDenied as exc:
+        raise http_forbidden() from exc
     except ValueError as exc:
         raise http_bad_request(exc) from exc
 
@@ -64,10 +70,13 @@ def create_risk_run(
 )
 def get_risk_run(
     run_id: str,
+    request: Request,
     worker: RiskRunWorker = Depends(get_risk_run_worker),
 ) -> RiskRunView:
     try:
-        return worker.get(run_id)
+        return worker.get(run_id, principal=request_principal(request))
+    except PortfolioAccessDenied as exc:
+        raise http_forbidden() from exc
     except RiskRunNotFound as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

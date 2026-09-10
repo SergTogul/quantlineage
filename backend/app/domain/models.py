@@ -1496,6 +1496,8 @@ class RiskRun(BaseModel):
       (Alembic ``003_risk_run_spec_fields``); omitted remains valid for old rows.
     - ``portfolio_version`` is captured from the stored book at submit
       (Alembic ``004_portfolio_version``); omitted remains valid for old rows.
+    - ``owner`` is the submitting shared-profile principal (Alembic
+      ``005_object_owner``); omitted remains valid for old rows.
     - ``run_type`` / ``request`` remain the generic envelope for M5.3/M5.4.
     """
 
@@ -1504,6 +1506,7 @@ class RiskRun(BaseModel):
     id: str = Field(min_length=1)
     portfolio_id: str = Field(min_length=1)
     portfolio_version: int | None = Field(default=None, ge=1)
+    owner: str | None = None
     market_snapshot_id: str | None = None
     created_at: datetime = Field(default_factory=_utcnow_domain)
     started_at: datetime | None = None
