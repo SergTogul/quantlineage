@@ -16,9 +16,9 @@ from app.domain.models import EquityPosition, MarketSnapshot, Portfolio, StressS
 from app.main import app
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk import scenario_attribution as attr_mod
+from app.risk import scenario_model as scenario_model_mod
 from app.risk import stress as stress_mod
 from app.risk.scenario_attribution import ScenarioAttributionEngine
-from app.risk import scenario_model as scenario_model_mod
 from app.risk.scenario_model import (
     FactorShock,
     Scenario,

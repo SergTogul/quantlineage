@@ -37,8 +37,8 @@ from app.persistence.sqlalchemy_repos import (
     SqlAlchemyScenarioDefinitionRepository,
 )
 from app.risk.limits import DEFAULT_LIMITS
-from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
 from app.risk.scenario_model import Scenario, to_canonical_scenario
+from app.risk.stress import DEFAULT_SCENARIOS, THREAT_SCENARIOS
 from app.sample import DEMO_PORTFOLIOS, SAMPLE_PORTFOLIO, demo_market_snapshot
 
 logger = logging.getLogger(__name__)
