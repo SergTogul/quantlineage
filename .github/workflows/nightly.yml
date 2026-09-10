@@ -25,7 +25,8 @@
 #
 # QuantLib E2E (quantlib-e2e) is nightly-only. Do not add it to PR-FULL needs
 # or to pull_request. If QuantLib cannot be installed, the job fails
-# (RISKFORGE_NIGHTLY=1; no skip-green / no-ql fallback).
+# (RISKFORGE_NIGHTLY=1; no skip-green / no-ql fallback). QA-024 range pytest
+# runs in this job (not byte-equality; not check_m6_sla.py).
 #
 # Hierarchy job is checksum / node-count / MV identity, not a host SLA.
 # Do not run benchmarks/check_m6_sla.py or invent a host throughput floor.
@@ -191,8 +192,8 @@ jobs:
           RISKFORGE_NIGHTLY: "1"
         run: pytest -q --tb=short tests/test_nightly_full_reval_sample.py
 
-  # RF-016 leftover: optional QuantLib-priced critical E2E. Sibling nightly only.
-  # Mandatory QuantLib install + import. No requirements-no-ql fallback.
+  # RF-016 leftover: optional QuantLib-priced critical E2E + QA-024 demo range.
+  # Sibling nightly only. Mandatory QuantLib install + import. No requirements-no-ql fallback.
   quantlib-e2e:
     name: nightly-quantlib-e2e
     runs-on: ubuntu-latest
@@ -231,6 +232,19 @@ jobs:
         run: |
           python -c "import QuantLib as ql; print('QuantLib', ql.__version__)"
           python -c "from tests.quantlib_gate import require_quantlib_for_nightly; require_quantlib_for_nightly()"
+
+      - name: QuantLib demo-artifact range (QA-024)
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          RISKFORGE_NIGHTLY: "1"
+          RISKFORGE_PRICING_ENGINE: quantlib
+          RISKFORGE_REQUIRE_QUANTLIB: "1"
+          RISKFORGE_PRICING_CACHE: "0"
+          RISKFORGE_CURVE_CACHE: "0"
+          RISKFORGE_SCENARIO_CACHE: "0"
+          RISKFORGE_SCENARIO_KERNEL: python
+        run: pytest -q --tb=short tests/test_qa024_ql_demo_range.py
 
       - name: Install frontend dependencies
         working-directory: frontend

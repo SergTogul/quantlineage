@@ -1,7 +1,7 @@
 # RiskForge Consolidated Engineering Findings
 
 Date: 2026-09-09  
-Status: leftover wave IN PROGRESS (2026-09-09) — P0/P1 code CLOSED; user rejected “accepted residual” as done. Remaining MET work: RF-014 shared ACLs/TLS/secrets, QA-024 QuantLib demo range, RF-016 labeled-runner SLA (needs a runner), RF-017 ABI close-as-MET or remaining kernel, RF-018 contracts, RF-019 tool evals.  
+Status: leftover wave IN PROGRESS (2026-09-09) — P0/P1 code CLOSED; user rejected “accepted residual” as done. Remaining MET work: RF-014 shared ACLs/TLS/secrets, RF-016 labeled-runner SLA (needs a runner), RF-019 tool evals. RF-018 frontend contracts are CLOSED as MET (not a TypeScript rewrite). RF-017 ABI is CLOSED as MET (product Historical VaR stays python/NumPy by design).  
 
 Inputs:
 
@@ -50,7 +50,7 @@ Important but not allowed to distract from P0/P1 remediation. These can be compl
 
 **Milestone R0 leftover wave is IN PROGRESS** (2026-09-09). “Accepted residual” is not done.
 
-P0/P1 code paths stay CLOSED except RF-014 shared ACLs/TLS/secrets (reopened). QA-024 QuantLib demo range, RF-017 ABI close, RF-018 frontend contracts, and RF-019 tool evals are **IN PROGRESS**. RF-016 labeled-runner SLA still needs a self-hosted runner (cannot fake ubuntu-latest floors).
+P0/P1 code paths stay CLOSED except RF-014 shared ACLs/TLS/secrets (reopened). QA-024 QuantLib demo-artifact range is **MET**. RF-019 tool schemas/evals are **CLOSED** as **MET**. RF-017 ABI and RF-018 frontend contracts are **CLOSED** as **MET**. RF-016 labeled-runner SLA still needs a self-hosted runner (cannot fake ubuntu-latest floors).
 
 The current repository is a strong MVP with unusually broad test coverage, real QuantLib integration, deterministic demo data, a credible pricing seam, native parity tests, and good separation of the native numerical kernel from business logic.
 
@@ -841,7 +841,7 @@ A dashboard load does not execute redundant full valuations of the same book and
 Priority: **P1**  
 Risk types: TEST_GAP, CI, OPERABILITY  
 Confidence: HIGH  
-Status: **CLOSED** (2026-09-09). Independent review **APPROVE** (`reviews/sdd-briefs/task-26-rf016-close-gate-review.md`). QA close gate (`reviews/r0.12.7-rf016-close-gate-report.md`). R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Required PR-FAST / PR-FULL (including QuantLib hard-gate) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. Labeled-runner SLA-K1/K2 is an **accepted residual** (not MET): no labeled runner; SLA-K1/K2 not CI-enforced (`actions/runners total_count=0`; do not run `check_m6_sla.py` on `ubuntu-latest`). QA-024 demo-artifact range check remains a leftover residual (not MET). Not a production SLA rollout.
+Status: **CLOSED** (2026-09-09). Independent review **APPROVE** (`reviews/sdd-briefs/task-26-rf016-close-gate-review.md`). QA close gate (`reviews/r0.12.7-rf016-close-gate-report.md`). R0.1.6 QuantLib hard-gate; R0.12.1–R0.12.5 APPROVE; nightly QuantLib E2E + hierarchy identity APPROVE. Required PR-FAST / PR-FULL (including QuantLib hard-gate) / NIGHTLY Postgres two-worker / larger full-reval / QuantLib E2E are **MET**. Labeled-runner SLA-K1/K2 is an **accepted residual** (not MET): no labeled runner; SLA-K1/K2 not CI-enforced (`actions/runners total_count=0`; do not run `check_m6_sla.py` on `ubuntu-latest`). QA-024 demo-artifact range check is **MET** (R0.12.8; nightly QuantLib vs `data/demo_risk_artifact.json` bands, not byte-equality). Not a production SLA rollout.
 
 Source findings:
 
@@ -879,11 +879,11 @@ Deterministic core unit/golden/property tests.
 - benchmark/SLA on labeled runner;
 - optional QuantLib E2E/demo range check.
 
-Close-gate scoring (R0.12.7): PR-FAST **MET**; PR-FULL QuantLib hard-gate / native compile-parity / frontend / semantic API / Playwright **MET**. NIGHTLY Postgres two-worker **MET**; larger full-reval samples **MET** (sample + N=100 identity, not host SLA); QuantLib E2E **MET** (nightly only). Labeled-runner SLA-K1/K2 (`check_m6_sla.py`) **PARTIAL** / **accepted residual** — harness and reference-host evidence exist; no labeled runner is registered; SLA-K1/K2 not CI-enforced; do not invent `ubuntu-latest` floors. QA-024 demo-artifact range check remains a leftover residual (not MET).
+Close-gate scoring (R0.12.7): PR-FAST **MET**; PR-FULL QuantLib hard-gate / native compile-parity / frontend / semantic API / Playwright **MET**. NIGHTLY Postgres two-worker **MET**; larger full-reval samples **MET** (sample + N=100 identity, not host SLA); QuantLib E2E **MET** (nightly only). Labeled-runner SLA-K1/K2 (`check_m6_sla.py`) **PARTIAL** / **accepted residual** — harness and reference-host evidence exist; no labeled runner is registered; SLA-K1/K2 not CI-enforced; do not invent `ubuntu-latest` floors. R0.12.8: QA-024 demo-artifact range check is **MET** (`tests/test_qa024_ql_demo_range.py` on nightly `quantlib-e2e`).
 
 ### Acceptance evidence
 
-A broken QuantLib installation cannot produce a green "full" CI run. — **MET** (R0.1.6 `backend-quantlib-hard-gate` is a required `pr-full` need; `RISKFORGE_REQUIRE_QUANTLIB`; no `requirements-no-ql` fallback; no `continue-on-error`). Labeled-runner SLA-K1/K2 and QA-024 range remain named residuals, not MET.
+A broken QuantLib installation cannot produce a green "full" CI run. — **MET** (R0.1.6 `backend-quantlib-hard-gate` is a required `pr-full` need; `RISKFORGE_REQUIRE_QUANTLIB`; no `requirements-no-ql` fallback; no `continue-on-error`). Labeled-runner SLA-K1/K2 remains a named residual, not MET. QA-024 demo-artifact range check is **MET**.
 
 ---
 
@@ -892,7 +892,7 @@ A broken QuantLib installation cannot produce a green "full" CI run. — **MET**
 Priority: **P2**  
 Risk types: PERFORMANCE, MAINTAINABILITY, NATIVE_SAFETY  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-09). ABI work landed; leftover wave will CLOSE only when ABI/validation/contiguous buffers are scored MET (not “deferred because we refused C++ VaR”).
+Status: **CLOSED** (2026-09-09). ABI/validation/contiguous buffers are **MET** (R0.12.5 + R0.17 + this close gate). Named residual: product Historical VaR stays python/NumPy **by design** (Decision: do not move VaR or QuantLib into C++). That residual is not an open ABI gap.
 
 Source findings:
 
@@ -905,22 +905,26 @@ Source findings:
 
 ### Root cause
 
-The C API lacks an explicit version/error channel and trusts caller lengths. Some thread setup/object packing overhead exists.
+The C API lacked an explicit version/error channel and trusted caller lengths. Some thread setup/object packing overhead existed.
 
 At the same time, the reviews agree that the native kernel is not the dominant bottleneck for current product Historical VaR.
 
 ### Required direction
 
-- ABI version;
-- status/error return;
-- explicit shape/length validation;
-- direct contiguous NumPy buffer path if native remains useful;
-- avoid per-call thread creation for tiny workloads;
-- only extend the native kernel after the per-factor historical model is defined and profiling shows value.
+- ABI version — **MET** (`RISKFORGE_KERNEL_ABI` / `riskforge_kernel_abi_version`, Python `KERNEL_ABI_VERSION`);
+- status/error return — **MET** (`KERNEL_OK` / `KERNEL_ERR_ABI` / `KERNEL_ERR_NULL` / `KERNEL_ERR_LENGTH`);
+- explicit shape/length validation — **MET** (fail-closed before any buffer walk; QA-025 mismatch in `kernel_test.cpp` and Python ctypes wrapper);
+- direct contiguous NumPy buffer path — **MET** (`NativeScenarioKernel.pnl_from_arrays`);
+- avoid per-call thread creation for tiny workloads — **MET** (serial when `E×S < 4096`);
+- only extend the native kernel after the per-factor historical model is defined and profiling shows value — **MET** as the Decision below (no C++ VaR/QuantLib kernels).
 
 ### Decision
 
-**Do not move VaR business logic or QuantLib pricing into C++ merely to chase speed.**
+**Do not move VaR business logic or QuantLib pricing into C++ merely to chase speed.** Default `RISKFORGE_SCENARIO_KERNEL=python` remains the product Historical VaR path.
+
+### Acceptance evidence
+
+ABI version, status/error, length/null, contiguous `pnl_from_arrays`, and serial-below-4096 are on disk and tested (`backend/tests/test_native_kernel.py`, `backend/native/tests/kernel_test.cpp`). Default kernel remaining python/NumPy is the Decision, not an ABI hole.
 
 ---
 
@@ -929,7 +933,7 @@ At the same time, the reviews agree that the native kernel is not the dominant b
 Priority: **P2**  
 Risk types: MAINTAINABILITY, SUPPLY_CHAIN, UI_CORRECTNESS  
 Confidence: HIGH  
-Status: **IN PROGRESS** (2026-09-09). `npm ci` and version pins exist; leftover is request-boundary percent/bp assertions and a centralized OpenAPI contract. Not a TypeScript rewrite.
+Status: **CLOSED** (2026-09-09). Request-boundary percent/bp assertions, committed OpenAPI scenario snapshot, and `npm ci` / no-`"latest"` pins are **MET**. Not a TypeScript rewrite.
 
 Source findings:
 
@@ -944,11 +948,19 @@ The frontend is untyped JavaScript, API request shaping is manual, and runtime d
 
 ### Required direction
 
-- pin runtime/build dependencies consistent with lockfile;
-- use deterministic `npm ci` for builds;
-- add generated or centralized API contracts after API schemas stabilize;
-- add request-body assertions for percent/bp conversions;
-- consider TypeScript only if it materially improves maintained API contracts—do not migrate solely for appearance.
+- pin runtime/build dependencies consistent with lockfile — **MET** (`frontend/package.json` exact runtime pins; no `"latest"`; `frontend/src/contracts/deps.test.js` + `backend/tests/test_container_hardening.py`);
+- use deterministic `npm ci` for builds — **MET** (frontend Dockerfile `RUN npm ci`; CI `npm ci`; tests reject `npm install`);
+- add generated or centralized API contracts after API schemas stabilize — **MET** (committed `frontend/src/contracts/openapi-scenario.json` consumed by `scenarioApi.js`; backend snapshot drift pin). Not a TypeScript rewrite;
+- add request-body assertions for percent/bp conversions — **MET** (click/request-boundary tests + `assertFormalScenarioShocks` / `assertReverseMultiFractions` before POST);
+- consider TypeScript only if it materially improves maintained API contracts—do not migrate solely for appearance — **MET** as the Decision (JS retained).
+
+### Decision
+
+Do not migrate the UI to TypeScript solely for optics. Centralized OpenAPI path/schema pins plus request-boundary unit assertions close RF-018.
+
+### Acceptance evidence
+
+Display −20% equity / 100 bp rates POST as −0.20 / 0.01 on formal ScenarioWire (`ScenarioBuilder`, hedge compare, reverse-multi). Sending −20 as a shock amount fails at the API boundary. Snapshot tracks `app.openapi()` for `/api/v1/risk/stress/formal/evaluate/custom`, `/formal/compare`, and `/reverse/multi`.
 
 ---
 
@@ -975,16 +987,16 @@ Do not work on this during R0 unless a remediation change breaks the interface.
 
 When the deterministic risk APIs stabilize:
 
-- explicit tool schemas;
-- robust intent parsing;
-- parameter validation;
-- tool allowlisting;
-- no generated financial arithmetic;
-- evaluation cases for ambiguity and injection.
+- explicit tool schemas — **MET** (`tool_json_schemas()` / Pydantic `RiskToolArgs` JSON Schema, `extra='forbid'`);
+- robust intent parsing — **MET** for current allowlist plus injection/ambiguity/advisory refusals (keyword router + model-path validation; no live LLM);
+- parameter validation — **MET** (`validate_tool_call` against the published schema);
+- tool allowlisting — **MET** (unknown names refuse; keys = `TOOL_CONTRACTS` only);
+- no generated financial arithmetic — **MET** (answers grounded in `tool_result` or digit-free canned refusal);
+- evaluation cases for ambiguity and injection — **MET** (`test_rf019_eval_*`).
 
 ### Decision
 
-AI remains **after** deterministic risk remediation.
+AI remains orchestration-only after deterministic risk remediation. No live LLM provider. Broader-charter tools (hedge compare, P&L explain, factor risk, risk-run lookup) stay future scope and do not block this close.
 
 ---
 
@@ -1109,7 +1121,7 @@ Do not use the review as justification to add:
 
 # Release / Development Gate
 
-**Milestone R0 leftover wave IN PROGRESS** (2026-09-09). Net-new feature development stays paused until RF-014 shared ACLs/TLS/secrets, QA-024 range, RF-017/018/019 are MET. Labeled-runner SLA still needs a self-hosted runner.
+**Milestone R0 leftover wave IN PROGRESS** (2026-09-09). Net-new feature development stays paused until RF-014 shared ACLs/TLS/secrets is MET. QA-024 range is **MET**. RF-017 ABI, RF-018 frontend contracts, and RF-019 tool schemas/evals are CLOSED as MET. Labeled-runner SLA still needs a self-hosted runner.
 
 R0 required, and now records:
 

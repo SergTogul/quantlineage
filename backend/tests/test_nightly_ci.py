@@ -153,6 +153,7 @@ def test_nightly_runs_quantlib_critical_e2e():
     assert "continue-on-error" not in block
     assert "echo-only" not in block.lower()
     assert "check_m6_sla.py" not in block
+    assert "tests/test_qa024_ql_demo_range.py" in block
 
 
 def test_playwright_config_honors_pricing_engine_env():

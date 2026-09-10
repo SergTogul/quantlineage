@@ -1072,7 +1072,7 @@ M0 Domain
 Severity: LOW
 Confidence: HIGH
 Category: QA
-Status: OPEN
+Status: CLOSED (MET, 2026-09-09). Nightly QuantLib range gate vs `data/demo_risk_artifact.json` (`tests/test_qa024_ql_demo_range.py`).
 
 Affected capability:
 E2E / production adapter
