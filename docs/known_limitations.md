@@ -67,20 +67,30 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - Default Compose binds published Postgres (`5432`), API (`8000`), and frontend (`5173`) ports to loopback (`127.0.0.1`). The local/demo profile is still unauthenticated and is not internet-ready; it must not be treated as a production security or IAM deployment (RF-014).
 - A shared / non-loopback profile (`RISKFORGE_SHARED_DEPLOYMENT=1` or non-loopback `RISKFORGE_BIND`) fails closed without `RISKFORGE_API_TOKEN` and requires Bearer auth on API routes. That single shared-token gate is not OIDC, object authorization, TLS, or production IAM. See `BUILD_NOTES.md` (R0.11.5).
+- Shared-profile object ACLs, TLS/reverse-proxy, and secret management are **not MET** (RF-014 accepted residuals).
 
 ## Frontend
 
 - The React terminal is a demo-quality risk workflow UI.
 - It displays API responses and helper formatting only; it does not duplicate pricing, VaR, stress, or optimization formulas.
 - Screenshots in the demo docs represent a deterministic local app capture, not hosted production availability.
+- TypeScript rewrite and generated/centralized API contracts are **ACCEPTED / DEFERRED** (RF-018); not MET.
 
 ## AI Assistant
 
 - The implemented AI slice is deterministic risk-query orchestration with explicit tool contracts.
 - No full external LLM runtime, prompt stack, or model tool-calling loop is claimed as complete.
 - The assistant must refuse unsupported advisory requests and ask clarification for ambiguous prompts rather than inventing risk values.
+- Broader AI routing maturity is **ACCEPTED / DEFERRED** (RF-019) until after deterministic APIs; not MET.
+
+## Native kernel (RF-017)
+
+- ABI fail-closed, contiguous array P&L, and serial-below-threshold paths landed. Default Historical VaR remains python/NumPy. Expanding native VaR or QuantLib into C++ is **ACCEPTED / DEFERRED** (RF-017); not MET.
 
 ## CI And Verification
 
 - Repository docs record specific local and GitHub Actions verification evidence where available.
 - This limitations catalog is not a live CI badge. Before claiming a branch is merge-ready, rerun the relevant local checks and verify required CI is green.
+- Suite counts in `ROADMAP.md` Current gate are the recorded Phase A baseline (**not a live** re-run).
+- Labeled-runner SLA-K1 and SLA-K2 are **not MET** (RF-016 accepted residual): no labeled runner; SLA-K1/K2 not CI-enforced; do not run `check_m6_sla.py` on `ubuntu-latest`.
+- QA-024 demo-artifact range check against QuantLib E2E is **not MET** (leftover residual; not a CI range gate).

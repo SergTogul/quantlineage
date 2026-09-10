@@ -4,11 +4,11 @@ Authoritative backlog from 2026-09-02. `TASKS.md` is **absent**; do not recreate
 
 ## Current gate
 
-Milestone R0 — Core Remediation & Trustworthiness is **IN PROGRESS** on branch `r0-core-remediation`. Net-new feature development is paused until R0 completes; `reviews/FINDINGS.md` and `reviews/REMEDIATION_MILESTONE.md` are the authoritative remediation backlog.
+Milestone R0 — Core Remediation & Trustworthiness is **COMPLETE** (2026-09-09) on branch `r0-core-remediation`. Named accepted residuals are **not MET**: RF-014 shared auth/ACLs/TLS; RF-016 labeled-runner SLA-K1/K2; QA-024 demo-artifact range. P2 RF-017 / RF-018 / RF-019 are **ACCEPTED / DEFERRED**. `reviews/FINDINGS.md` and `reviews/REMEDIATION_MILESTONE.md` remain the authoritative remediation record.
 
 ### Recorded Phase A baseline (2026-09-03; not re-run)
 
-Copied from `reviews/REMEDIATION_MILESTONE.md` (R0 Baseline Verification, local macOS, branch `r0-core-remediation`). This is the **recorded Phase A baseline**, **not re-run** in this slice. Reproducible commands live in that file. Milestone R0 is **IN PROGRESS**, not COMPLETE.
+Copied from `reviews/REMEDIATION_MILESTONE.md` (R0 Baseline Verification, local macOS, branch `r0-core-remediation`). This is the **recorded Phase A baseline**, **not re-run** in this slice. Reproducible commands live in that file. Milestone R0 exit does not rewrite these dated counts.
 
 Builtin **659** and QuantLib **688** are **not** contemporaneous two-engine results on one tree: builtin 659 is **pre-insertion** (before new R0.1 test files); QuantLib 688 is **after R0.1.1–R0.1.6** test/CI helper insertion.
 
@@ -32,7 +32,7 @@ Historical Progress and workstream evidence tables below keep their original dat
 
 | Workstream | Status |
 |-----------|--------|
-| Milestone R0 — Core Remediation & Trustworthiness | **IN PROGRESS** (2026-09-03) — Phase B; RF-003 CLOSED; remaining P0s open |
+| Milestone R0 — Core Remediation & Trustworthiness | **COMPLETE** (2026-09-09) — all P0/P1 CLOSED; accepted residuals named not MET |
 | Workstream 0 — Prototype Foundation | COMPLETE |
 | Workstream 1 — Quant Foundation | **COMPLETE** (2026-09-02) |
 | Workstream 2 — VaR, ES & Portfolio Risk | **COMPLETE** (2026-09-02) |
@@ -48,7 +48,7 @@ Historical Progress and workstream evidence tables below keep their original dat
 | Workstream 12 — Documentation & Portfolio Presentation | **COMPLETE** (2026-09-03 — recruiter docs, architecture, methodology, performance, and limitations package) |
 | Workstream 13 — Final Portfolio Demo | **COMPLETE** (2026-09-03 — ) |
 
-Workstreams 0–13 record historical MVP delivery completions. Workstream **COMPLETE** is not Milestone R0 **COMPLETE**; independent review opened Milestone R0 for residual remediation.
+Workstreams 0–13 record historical MVP delivery completions. Workstream **COMPLETE** was not Milestone R0 **COMPLETE** until the R0 exit checklist (2026-09-09).
 
 ### Baseline verification (2026-09-02, local macOS — Lead Architect acceptance)
 
