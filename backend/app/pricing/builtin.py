@@ -80,10 +80,10 @@ class BuiltinPricingEngine(PricingEngine):
         # Snapshot is the sole mark authority; working view never reads Position marks.
         working = _pricing_view(position, terms, market)
         try:
-            handler = self._VALUE_HANDLERS[terms.type]
+            handler_name = self._VALUE_HANDLERS[terms.type]
         except KeyError as exc:
             raise TypeError(f"Unsupported position: {type(position)!r}") from exc
-        return handler(self, working, market)
+        return getattr(self, handler_name)(working, market)
 
     def _equity(self, p: SimpleNamespace, market: MarketSnapshot) -> Valuation:
         return Valuation(
@@ -324,15 +324,15 @@ class BuiltinPricingEngine(PricingEngine):
 
 BuiltinPricingEngine._VALUE_HANDLERS = MappingProxyType(
     {
-        "equity": BuiltinPricingEngine._equity,
-        "equity_future": BuiltinPricingEngine._equity_future,
-        "european_option": BuiltinPricingEngine._equity_option,
-        "bond": BuiltinPricingEngine._bond,
-        "swap": BuiltinPricingEngine._swap,
-        "fx_forward": BuiltinPricingEngine._fx_forward,
-        "fx_option": BuiltinPricingEngine._fx_option,
-        "ir_future": BuiltinPricingEngine._ir_future,
-        "cap_floor": BuiltinPricingEngine._cap_floor,
-        "swaption": BuiltinPricingEngine._swaption,
+        "equity": "_equity",
+        "equity_future": "_equity_future",
+        "european_option": "_equity_option",
+        "bond": "_bond",
+        "swap": "_swap",
+        "fx_forward": "_fx_forward",
+        "fx_option": "_fx_option",
+        "ir_future": "_ir_future",
+        "cap_floor": "_cap_floor",
+        "swaption": "_swaption",
     }
 )

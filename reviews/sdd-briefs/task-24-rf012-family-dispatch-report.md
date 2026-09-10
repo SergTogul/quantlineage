@@ -125,3 +125,27 @@ TDD red result: **8 failed** as expected (no overlay module; `value()` Terms isi
 - Owner: independent reviewer (Task 24 review), then Lead Architect / controller
 - Requested action: CLOSE RF-012; named residual as written
 - Blocking?: no
+
+## Review fix — unbound `value()` handlers (Important)
+
+Task 24 review: `_VALUE_HANDLERS` stored class-captured unbound methods (`QuantLibPricingEngine._bond` at definition time). `value()` called `handler(self, working, market)`, so instance overrides such as `engine._bond = spy` never ran. Production numerical identity was unchanged; process-state spies (`observed`) stayed empty.
+
+Fix (no RF-012 scope reopen): keep the frozen family map, store method **names**, resolve on the instance via `getattr(self, handler_name)(working, market)`. Same pattern in Builtin and QuantLib. Dispatch remains family-keyed (no Terms isinstance). Overlay stays one module. RF-012 status left as the implementer left it (CLOSE in this report; FINDINGS not re-stamped).
+
+### Commands executed
+
+```bash
+cd /Users/user/src/riskforge-mvp/backend
+PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
+  tests/test_quantlib_process_state.py \
+  tests/test_quantlib_process_parallelism.py \
+  tests/test_instrument_capabilities.py \
+  tests/test_quantlib_unknown_instrument.py \
+  tests/test_builtin_pricing.py tests/test_quantlib_pricing.py
+```
+
+### Results
+
+- **145 passed** in 9.40s. No skips. No unexplained failures.
+- Spies now fire: `test_snapshot_as_of_drives_quantlib_evaluation_date`, `test_unparseable_as_of_keeps_engine_evaluation_date`, `test_typed_date_as_of_drives_quantlib_evaluation_date`, `test_thread_pool_value_calls_remain_serialized_by_process_lock` assert non-empty `observed` and passed.
+- RF-012 status: unchanged from implementer CLOSE above. FINDINGS not re-stamped.
