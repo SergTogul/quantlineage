@@ -121,6 +121,21 @@ def _risk_abs(
     return abs(float(getattr(risk, name, default)))
 
 
+def _has_tenor_rate_structure(market: MarketSnapshot | None) -> bool:
+    """Whether the snapshot can support true tenor-isolated key-rate DV01."""
+    if market is None:
+        return False
+    if any(bool(tenors) for tenors in market.key_rates.values()):
+        return True
+    for payload in market.curves.values():
+        if not isinstance(payload, Mapping):
+            continue
+        zeros = payload.get("zeros") or {}
+        if isinstance(zeros, Mapping) and bool(zeros):
+            return True
+    return False
+
+
 def _key_rate_dv01_abs(
     portfolio: Portfolio,
     pricing_engine: PricingEngine,
@@ -128,8 +143,18 @@ def _key_rate_dv01_abs(
     market: MarketSnapshot | None = None,
     extra: Mapping[str, float] | None = None,
 ) -> float:
-    if extra is not None and "key_rate_dv01" in extra:
+    # ``HierarchyEngine`` historically supplied parallel DV01 as a shortcut in
+    # ``extra``. That is valid only when the market has no tenor structure. If
+    # actual key-rate pillars/curve nodes exist, recompute the true tenor-isolated
+    # sensitivities and take the worst absolute bucket so concentration cannot be
+    # understated by a parallel-DV01 proxy.
+    if (
+        extra is not None
+        and "key_rate_dv01" in extra
+        and not _has_tenor_rate_structure(market)
+    ):
         return abs(float(extra["key_rate_dv01"]))
+
     # Lazy: avoid importing sensitivities at module load for light callers.
     from app.risk.sensitivities import SensitivityEngine
 
