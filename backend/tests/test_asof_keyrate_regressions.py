@@ -8,8 +8,8 @@ import pytest
 
 from app.domain.models import BondPosition, MarketSnapshot, Portfolio, RiskSummary
 from app.pricing.builtin import BuiltinPricingEngine
-from app.risk.sensitivities import SensitivityEngine
 from app.risk.limits import LimitEngine
+from app.risk.sensitivities import SensitivityEngine
 from app.services.risk_factories import (
     ResolvedRiskRunSpec,
     build_portfolio_service,
