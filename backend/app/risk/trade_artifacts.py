@@ -5,6 +5,7 @@ A risk run should be able to produce and reuse, per stable trade id:
 - trade PV;
 - additive sensitivities already treated as parent == sum(children) by
   ``HierarchyEngine`` (delta, gamma, vega, dv01, fx_delta);
+- tenor-bucket key-rate DV01 contributions;
 - stress P&L keyed by scenario id;
 - an optional historical P&L vector.
 
@@ -19,7 +20,8 @@ Units / signs match ``Valuation`` / ``HierarchyNode``:
 - ``delta`` / ``fx_delta`` — cash delta;
 - ``gamma`` — dollar gamma;
 - ``vega`` — P&L per 1 absolute vol point;
-- ``dv01`` — P&L for a +1bp rate move;
+- ``dv01`` — P&L for a +1bp parallel rate move;
+- ``key_rate_dv01`` — mapping of stable currency/tenor bucket id to P&L for a +1bp tenor move;
 - ``stress_pnl`` / ``historical_pnl`` — currency P&L.
 
 All stored numbers must be finite. ``historical_pnl`` is omitted as ``None``;
@@ -52,17 +54,30 @@ def _require_trade_id(trade_id: str) -> str:
     return trade_id
 
 
-def _freeze_stress_pnl(stress_pnl: Mapping[str, float] | None) -> Mapping[str, float]:
-    if stress_pnl is None:
+def _freeze_numeric_mapping(
+    name: str,
+    values: Mapping[str, float] | None,
+) -> Mapping[str, float]:
+    if values is None:
         return MappingProxyType({})
-    if isinstance(stress_pnl, str) or not isinstance(stress_pnl, Mapping):
-        raise ValueError("stress_pnl must be a mapping of scenario id to P&L")
+    if isinstance(values, str) or not isinstance(values, Mapping):
+        raise ValueError(f"{name} must be a mapping of non-empty string keys to finite values")
     frozen: dict[str, float] = {}
-    for raw_key, raw_value in stress_pnl.items():
+    for raw_key, raw_value in values.items():
         if not isinstance(raw_key, str) or not raw_key.strip():
-            raise ValueError("stress_pnl scenario keys must be non-empty strings")
-        frozen[raw_key] = _require_finite(f"stress_pnl[{raw_key!r}]", raw_value)
+            raise ValueError(f"{name} keys must be non-empty strings")
+        frozen[raw_key] = _require_finite(f"{name}[{raw_key!r}]", raw_value)
     return MappingProxyType(frozen)
+
+
+def _freeze_stress_pnl(stress_pnl: Mapping[str, float] | None) -> Mapping[str, float]:
+    return _freeze_numeric_mapping("stress_pnl", stress_pnl)
+
+
+def _freeze_key_rate_dv01(
+    key_rate_dv01: Mapping[str, float] | None,
+) -> Mapping[str, float]:
+    return _freeze_numeric_mapping("key_rate_dv01", key_rate_dv01)
 
 
 def _freeze_historical_pnl(
@@ -80,7 +95,7 @@ def _freeze_historical_pnl(
     )
 
 
-def _merge_stress(
+def _merge_numeric_mapping(
     left: Mapping[str, float],
     right: Mapping[str, float],
 ) -> dict[str, float]:
@@ -88,6 +103,13 @@ def _merge_stress(
     for key, value in right.items():
         merged[key] = merged.get(key, 0.0) + value
     return merged
+
+
+def _merge_stress(
+    left: Mapping[str, float],
+    right: Mapping[str, float],
+) -> dict[str, float]:
+    return _merge_numeric_mapping(left, right)
 
 
 def _add_historical(
@@ -109,7 +131,7 @@ def _add_historical(
 
 @dataclass(frozen=True, slots=True)
 class TradeCalculationArtifact:
-    """Frozen per-trade PV, additive Greeks, stress P&L, optional historical P&L."""
+    """Frozen per-trade PV, Greeks, key-rate buckets, stress, and historical P&L."""
 
     trade_id: str
     pv: float
@@ -118,6 +140,7 @@ class TradeCalculationArtifact:
     vega: float = 0.0
     dv01: float = 0.0
     fx_delta: float = 0.0
+    key_rate_dv01: Mapping[str, float] = field(default_factory=dict)
     stress_pnl: Mapping[str, float] = field(default_factory=dict)
     historical_pnl: Sequence[float] | None = None
 
@@ -126,6 +149,7 @@ class TradeCalculationArtifact:
         object.__setattr__(self, "pv", _require_finite("pv", self.pv))
         for name in _ADDITIVE_GREEKS:
             object.__setattr__(self, name, _require_finite(name, getattr(self, name)))
+        object.__setattr__(self, "key_rate_dv01", _freeze_key_rate_dv01(self.key_rate_dv01))
         object.__setattr__(self, "stress_pnl", _freeze_stress_pnl(self.stress_pnl))
         object.__setattr__(self, "historical_pnl", _freeze_historical_pnl(self.historical_pnl))
 
@@ -140,6 +164,7 @@ class TradeCalculationArtifact:
         vega: float = 0.0,
         dv01: float = 0.0,
         fx_delta: float = 0.0,
+        key_rate_dv01: Mapping[str, float] | None = None,
         stress_pnl: Mapping[str, float] | None = None,
         historical_pnl: Sequence[float] | None = None,
     ) -> TradeCalculationArtifact:
@@ -152,6 +177,7 @@ class TradeCalculationArtifact:
             vega=vega,
             dv01=dv01,
             fx_delta=fx_delta,
+            key_rate_dv01=key_rate_dv01 or {},
             stress_pnl=stress_pnl or {},
             historical_pnl=historical_pnl,
         )
@@ -161,6 +187,7 @@ class TradeCalculationArtifact:
         cls,
         valuation: Valuation,
         *,
+        key_rate_dv01: Mapping[str, float] | None = None,
         stress_pnl: Mapping[str, float] | None = None,
         historical_pnl: Sequence[float] | None = None,
         trade_id: str | None = None,
@@ -174,6 +201,7 @@ class TradeCalculationArtifact:
             vega=valuation.vega,
             dv01=valuation.dv01,
             fx_delta=valuation.fx_delta,
+            key_rate_dv01=key_rate_dv01,
             stress_pnl=stress_pnl,
             historical_pnl=historical_pnl,
         )
@@ -184,7 +212,7 @@ class TradeCalculationArtifact:
         *,
         trade_id: str | None = None,
     ) -> TradeCalculationArtifact:
-        """Sum PV, additive Greeks, merge stress by scenario, add historical P&L."""
+        """Sum additive measures and merge bucket/scenario vectors by key."""
         if not isinstance(other, TradeCalculationArtifact):
             raise TypeError(f"can only add TradeCalculationArtifact, got {type(other)!r}")
         result_id = self.trade_id if trade_id is None else trade_id
@@ -196,6 +224,7 @@ class TradeCalculationArtifact:
             vega=self.vega + other.vega,
             dv01=self.dv01 + other.dv01,
             fx_delta=self.fx_delta + other.fx_delta,
+            key_rate_dv01=_merge_numeric_mapping(self.key_rate_dv01, other.key_rate_dv01),
             stress_pnl=_merge_stress(self.stress_pnl, other.stress_pnl),
             historical_pnl=_add_historical(self.historical_pnl, other.historical_pnl),
         )
