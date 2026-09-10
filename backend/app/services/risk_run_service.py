@@ -120,6 +120,7 @@ class RiskRunService:
         run_type: str = "summary",
         request: dict[str, Any] | None = None,
         market_snapshot_id: str | None = None,
+        portfolio_version: int | None = None,
         pricing_engine_version: str | None = None,
         methodology: VaRMethodology | None = None,
         scenario_set: list[str] | None = None,
@@ -132,6 +133,7 @@ class RiskRunService:
         run = RiskRun(
             id=run_id,
             portfolio_id=portfolio_id,
+            portfolio_version=portfolio_version,
             market_snapshot_id=market_snapshot_id,
             pricing_engine_version=pricing_engine_version,
             methodology=methodology,

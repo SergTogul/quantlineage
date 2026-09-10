@@ -33,6 +33,7 @@ from app.persistence.repositories import (
     PortfolioAlreadyExists,
     PortfolioNotFound,
     PortfolioRepository,
+    PortfolioVersionConflict,
     RiskRunRepository,
     ScenarioDefinitionRepository,
 )
@@ -59,29 +60,37 @@ class SqlAlchemyPortfolioRepository(PortfolioRepository):
     def create(self, portfolio: Portfolio) -> Portfolio:
         if self._session.get(PortfolioRow, portfolio.id) is not None:
             raise PortfolioAlreadyExists(portfolio.id)
-        row = PortfolioRow(id=portfolio.id)
+        row = PortfolioRow(id=portfolio.id, version=1)
         self._session.add(row)
-        return self._write(row, portfolio)
+        return self._write(row, portfolio, version=1)
 
     def update(self, portfolio: Portfolio) -> Portfolio:
         row = self._session.get(PortfolioRow, portfolio.id)
         if row is None:
             raise PortfolioNotFound(portfolio.id)
-        return self._write(row, portfolio)
+        expected = portfolio.version
+        if row.version != expected:
+            raise PortfolioVersionConflict(portfolio.id, expected, row.version)
+        return self._write(row, portfolio, version=row.version + 1)
 
     def save(self, portfolio: Portfolio) -> Portfolio:
-        """Legacy upsert for seed/callers that have not switched to create/update."""
+        """Legacy upsert for seed/callers that have not switched to create/update.
+
+        Insert starts at version 1. Overwrite bumps version without CAS.
+        """
         row = self._session.get(PortfolioRow, portfolio.id)
         if row is None:
-            row = PortfolioRow(id=portfolio.id)
+            row = PortfolioRow(id=portfolio.id, version=1)
             self._session.add(row)
-        return self._write(row, portfolio)
+            return self._write(row, portfolio, version=1)
+        return self._write(row, portfolio, version=row.version + 1)
 
-    def _write(self, row: PortfolioRow, portfolio: Portfolio) -> Portfolio:
+    def _write(self, row: PortfolioRow, portfolio: Portfolio, *, version: int) -> Portfolio:
         row.name = portfolio.name
         row.firm = portfolio.firm
         row.desk = portfolio.desk
         row.strategy = portfolio.strategy
+        row.version = version
         row.updated_at = _utcnow()
         # Replace trades wholesale so deleted positions disappear.
         row.trades.clear()
@@ -100,7 +109,15 @@ class SqlAlchemyPortfolioRepository(PortfolioRepository):
                 )
             )
         self._session.flush()
-        return portfolio
+        return Portfolio(
+            id=row.id,
+            name=row.name,
+            firm=row.firm,
+            desk=row.desk,
+            strategy=row.strategy,
+            version=row.version,
+            positions=list(portfolio.positions),
+        )
 
     def get(self, portfolio_id: str) -> Portfolio | None:
         row = self._session.get(PortfolioRow, portfolio_id)
@@ -113,6 +130,7 @@ class SqlAlchemyPortfolioRepository(PortfolioRepository):
             firm=row.firm,
             desk=row.desk,
             strategy=row.strategy,
+            version=row.version,
             positions=positions,
         )
 
