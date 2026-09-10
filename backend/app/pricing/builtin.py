@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from statistics import NormalDist
 from types import MappingProxyType, SimpleNamespace
+from typing import ClassVar
 
 from app.domain.instrument_terms import terms_from_position
 from app.domain.models import (
@@ -68,6 +69,8 @@ class BuiltinPricingEngine(PricingEngine):
     curve) uses continuous compounding on Actual365Fixed year fraction —
     same convention as QuantLib ``FlatForward`` + ``ZeroCouponBond``.
     """
+
+    _VALUE_HANDLERS: ClassVar[MappingProxyType[str, str]]
 
     def value(self, position: Position, market: MarketSnapshot | None = None) -> Valuation:
         market = require_explicit_market(market)

@@ -107,6 +107,8 @@ def position_label(position: Position) -> str:
     """Human-readable trade label that distinguishes instrument type."""
     family = getattr(position, "type", None)
     get_capability(family)
+    if not isinstance(family, str):
+        raise TypeError(f"unknown instrument family: {family!r}")
     try:
         handler = _LABEL_HANDLERS[family]
     except KeyError:
