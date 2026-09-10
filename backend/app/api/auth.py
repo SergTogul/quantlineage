@@ -102,8 +102,14 @@ def api_token() -> str | None:
 
 
 def configured_principals() -> list[tuple[str, str]]:
-    """Return ``(principal, token)`` pairs from env. Later pairs win on match."""
+    """Return ``(principal, token)`` pairs from env. First match wins.
+
+    ``RISKFORGE_API_TOKENS`` is consulted first. ``RISKFORGE_API_TOKEN`` is
+    appended only when that secret is not already in the map, so filling
+    both with the same value cannot remap Alice to principal ``shared``.
+    """
     pairs: list[tuple[str, str]] = []
+    seen_tokens: set[str] = set()
     raw_map = os.environ.get(ENV_API_TOKENS, "")
     for part in raw_map.split(","):
         item = part.strip()
@@ -111,10 +117,11 @@ def configured_principals() -> list[tuple[str, str]]:
             continue
         name, token = item.split(":", 1)
         name, token = name.strip(), token.strip()
-        if name and token:
+        if name and token and token not in seen_tokens:
             pairs.append((name, token))
+            seen_tokens.add(token)
     single = api_token()
-    if single:
+    if single and single not in seen_tokens:
         principal = os.environ.get(ENV_API_PRINCIPAL, DEFAULT_PRINCIPAL).strip()
         pairs.append((principal or DEFAULT_PRINCIPAL, single))
     return pairs
@@ -130,11 +137,10 @@ def principal_for_bearer(header: str | None) -> str | None:
     presented = _extract_bearer(header)
     if presented is None:
         return None
-    matched: str | None = None
     for name, token in configured_principals():
         if _token_matches(presented, token):
-            matched = name
-    return matched
+            return name
+    return None
 
 
 def require_shared_auth_configured() -> None:

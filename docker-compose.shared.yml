@@ -29,7 +29,8 @@ services:
       RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:${POSTGRES_PASSWORD:?}@postgres:5432/riskforge
       RISKFORGE_EXTERNAL_WORKER: "1"
       RISKFORGE_SHARED_DEPLOYMENT: "1"
-      RISKFORGE_API_TOKEN: ${RISKFORGE_API_TOKEN:?}
+      # TOKEN is optional when TOKENS is set; boot fails closed if both empty.
+      RISKFORGE_API_TOKEN: ${RISKFORGE_API_TOKEN:-}
       RISKFORGE_API_TOKENS: ${RISKFORGE_API_TOKENS:-}
     expose:
       - "8000"
@@ -46,13 +47,17 @@ services:
       RISKFORGE_WORKER_POLL_INTERVAL: "2"
       RISKFORGE_WORKER_POLL_BATCH: "10"
       RISKFORGE_SHARED_DEPLOYMENT: "1"
-      RISKFORGE_API_TOKEN: ${RISKFORGE_API_TOKEN:?}
+      RISKFORGE_API_TOKEN: ${RISKFORGE_API_TOKEN:-}
+      RISKFORGE_API_TOKENS: ${RISKFORGE_API_TOKENS:-}
     depends_on:
       postgres:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: same-origin
     expose:
       - "80"
     depends_on: [backend]

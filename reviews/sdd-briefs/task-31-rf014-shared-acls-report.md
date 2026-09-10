@@ -121,7 +121,9 @@ The three reopened shared cells are on disk with fail-closed HTTP tests. Calling
 - HTTP queued-run depth still uncapped
 - `docker run -p 8000:8000` without the shared flag still serves unauthenticated API (not default Compose)
 
-## Follow-up / next owner
-- Owner: independent reviewer (Task 31 review)
-- Requested action: APPROVE CLOSE; do not restore Milestone R0 COMPLETE while labeled-runner SLA is not MET
-- Blocking?: no
+## Follow-up after independent review
+Important items fixed: overlapping `RISKFORGE_API_TOKEN` no longer remaps a `TOKENS` principal; `test_shared_null_owner_is_fail_closed`; shared frontend `VITE_API_BASE_URL=same-origin`.
+
+## Next owner
+- Labeled-runner SLA (RF-016) still **not MET** — needs a registered `self-hosted, riskforge-sla` runner. Do not restore Milestone R0 COMPLETE until then.
+
