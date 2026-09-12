@@ -6,6 +6,14 @@ from app.market.history.freeze import (
     MissingRequiredFactorError,
     freeze_public_history,
 )
+from app.market.history.snapshot import (
+    PublicSnapshotBuild,
+    StalePublicSnapshotError,
+    UnsavedPublicSnapshotError,
+    bind_risk_run_to_saved_snapshot,
+    build_public_snapshot,
+    persist_public_snapshot,
+)
 from app.market.history.spec import (
     WAVE_A_DATASET_ID,
     WAVE_A_FACTOR_MAPPINGS,
@@ -30,9 +38,15 @@ __all__ = [
     "FrozenHistoryArtifact",
     "MissingRequiredFactorError",
     "PublicHistoryDatasetSpec",
+    "PublicSnapshotBuild",
+    "StalePublicSnapshotError",
+    "UnsavedPublicSnapshotError",
+    "bind_risk_run_to_saved_snapshot",
+    "build_public_snapshot",
     "equity_relative_return",
     "freeze_public_history",
     "percent_level_move_to_bps",
     "percent_level_to_decimal",
+    "persist_public_snapshot",
     "resolve_public_history_csv",
 ]
