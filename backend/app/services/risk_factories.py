@@ -30,6 +30,8 @@ from app.domain.models import (
     as_of_wire,
 )
 from app.interfaces.pricing import PricingEngine
+from app.market.history.artifact import resolve_public_history_csv
+from app.market.history.spec import WAVE_A_DATASET_ID
 from app.market.snapshot import FixedMarketDataProvider
 from app.pricing.factory import create_pricing_engine
 from app.risk.factor_panel import factor_panel_from_dataset, truncate_factor_panel
@@ -96,6 +98,8 @@ def resolve_dataset_source(historical_dataset_id: str) -> str:
     aliased = _DATASET_SOURCE_BY_ID.get(raw) or _DATASET_SOURCE_BY_ID.get(raw.lower())
     if aliased is not None:
         return aliased
+    if raw == WAVE_A_DATASET_ID or raw.lower() == WAVE_A_DATASET_ID:
+        return str(resolve_public_history_csv())
     path_raw = raw
     if raw.startswith("file:"):
         path_raw = raw[len("file:") :]
@@ -112,7 +116,8 @@ def resolve_dataset_source(historical_dataset_id: str) -> str:
     raise ValueError(
         f"unsupported historical_dataset_id: {historical_dataset_id!r}; "
         f"use {DEMO_MULTI_FACTOR_DATASET_ID!r}, {DEMO_HISTORICAL_DATASET_ID!r}, "
-        f"{SYNTHETIC_HISTORICAL_DATASET_ID!r}, or a path to a factor CSV"
+        f"{SYNTHETIC_HISTORICAL_DATASET_ID!r}, {WAVE_A_DATASET_ID!r}, "
+        f"or a path to a factor CSV"
     )
 
 

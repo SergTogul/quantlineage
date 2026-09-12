@@ -1,0 +1,70 @@
+# QuantLineage Wave A Tracker
+
+Status values:
+`NOT_STARTED`, `IN_PROGRESS`, `BLOCKED`, `REVIEW`, `DONE`
+
+Do not mark DONE without gate evidence.
+
+| ID | Task | Status | Evidence / commit / tests | Blocker |
+|---|---|---|---|---|
+| A0.1 | Read decisions + inspect repo | DONE | Branch `feat/quantlineage-wave-a` @ `974798e`. Inspected MarketSnapshot, HistoricalMarketDataset/create_historical_dataset, HistoricalFactorPanel, RiskRun lineage, persistence, API errors, provenance, frontend api.js, CI. | |
+| A0.2 | Record integration map | DONE | `docs/expantion/quantlineage_wave_a/A0_INTEGRATION_MAP.md` | |
+| A1.1 | Inspect current boundaries | DONE | `docs/expantion/quantlineage_wave_a/A0_INTEGRATION_MAP.md` | |
+| A1.2 | Normalized models | DONE | `eb134cb` `backend/app/market/ingestion/models.py` | |
+| A1.3 | Provider protocols | DONE | `eb134cb` `backend/app/market/ingestion/protocols.py` | |
+| A1.4 | Select equity/ETF provider | DONE | Yahoo public JSON + FRED. `docs/data_sources.md` | |
+| A1.5 | Equity/ETF + FRED adapters | DONE | `yahoo.py` / `fred.py`; HTTP only in adapters + `http.py` | |
+| A1.6 | Mock/fixture adapter tests | DONE | 42 passed `pytest tests/test_ingestion_*.py` (MockTransport) | |
+| G1 | Provider/normalization gate | DONE | commit `eb134cb`; review PASS `.superpowers/sdd/task-g1-review.md`; no Critical/Important | |
+| A2.1 | Canonical catalog model | DONE | `21d4c5d` `backend/app/market/catalog/` | |
+| A2.2 | Curated supported universe | DONE | AAPL/MSFT/NVDA/SPY + DGS2/5/10; EURUSD omitted | |
+| A2.3 | Catalog/search service | DONE | curated identity wins; unsupported caps false | |
+| A2.4 | Instrument search API | DONE | `GET /api/v1/instruments/search`; empty → 200 `[]` | |
+| A2.5 | Search UI | DONE | nav `market-data`; `MarketData.jsx` | |
+| A2.6 | Search/capability tests | DONE | backend 27 + frontend 30 mocked | |
+| G2 | Search gate | DONE | commit `21d4c5d`; review PASS `.superpowers/sdd/task-g2-review.md` | |
+| A3.1 | Quality/lineage models | DONE | `1621251` `app.market.quality` | |
+| A3.2 | Validation rules | DONE | unsorted/dup/non-finite/price/unit/min=5 | |
+| A3.3 | Alignment policy | DONE | date intersection, no ffill | |
+| A3.4 | Deterministic hashing | DONE | SHA-256 excludes retrieved_at | |
+| A3.5 | Quality API/UI | DONE | `GET .../quality` + Inspect quality | |
+| G3 | Quality/lineage gate | DONE | commit `1621251`; review PASS `.superpowers/sdd/task-g3-review.md` | |
+| A4.1 | Dataset build spec | DONE | `real:public:wave-a`; mappings AAPL/MSFT/NVDA/SPY + DGS2/5/10; min aligned returns=5; `wave-a-v1` | |
+| A4.2 | Equity level→return transform | DONE | `equity_relative_return`; 100→101 = +0.01 | |
+| A4.3 | Rate percent→decimal/bp transforms | DONE | `percent_level_to_decimal` 4.25→0.0425; `percent_level_move_to_bps` 4.25→4.30 = +5 bp via `decimal_rate_to_bps` | |
+| A4.4 | Freeze/materialization service | DONE | `freeze_public_history` → per-factor CSV + sidecar; G3 validate/align/hash; fakes only | |
+| A4.5 | Existing dataset factory integration | DONE | `resolve_dataset_source` / `create_historical_dataset` load frozen CSV by id; demo remains default | |
+| A4.6 | RiskRun dataset lineage | DONE | `dataset_identity` / `resolve_run_spec` persist sidecar id+content-hash version | |
+| A4.7 | Quant mutation/regression tests | DONE | `tests/test_public_history_dataset.py` | |
+| G4 | Public history gate | REVIEW | Waiting independent review | |
+| A5.1 | Snapshot build spec | NOT_STARTED | | |
+| A5.2 | Public snapshot builder | NOT_STARTED | | |
+| A5.3 | 2Y/5Y/10Y rate mapping | NOT_STARTED | | |
+| A5.4 | Holiday/stale semantics | NOT_STARTED | | |
+| A5.5 | Persist/bind snapshot | NOT_STARTED | | |
+| G5 | Public snapshot gate | NOT_STARTED | | |
+| A6.1 | API contracts | NOT_STARTED | | |
+| A6.2 | History/data UI | NOT_STARTED | | |
+| A6.3 | Error UX | NOT_STARTED | | |
+| A6.4 | API/frontend tests | NOT_STARTED | | |
+| G6 | API/UI gate | NOT_STARTED | | |
+| A7.1 | Demo materialization command | NOT_STARTED | | |
+| A7.2 | Optional data-mode integration | NOT_STARTED | | |
+| A7.3 | Public demo docs | NOT_STARTED | | |
+| A7.4 | Optional T0/T1 real-date demo | NOT_STARTED | | |
+| G7 | Public demo gate | NOT_STARTED | | |
+| A8.1 | Unit/date/missing attacks | NOT_STARTED | | |
+| A8.2 | Lineage/repro attacks | NOT_STARTED | | |
+| A8.3 | Provider/security attacks | NOT_STARTED | | |
+| A8.4 | Full regression/CI | NOT_STARTED | | |
+| A8.5 | Final hostile review | NOT_STARTED | | |
+| G8 | Wave A final gate | NOT_STARTED | | |
+
+## Completion summary
+- Overall: `IN_PROGRESS` (G1–G3 DONE; G4 implementer complete, pending review)
+- Latest verified commit: G4 freeze (see task-g4-report)
+- Latest green CI:
+- Public providers chosen: Yahoo Finance public JSON (equity/ETF) + FRED (USD rates/macro)
+- Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`)
+- Public snapshot id/as_of:
+- Hostile review verdict:

@@ -345,20 +345,24 @@ def load_per_factor_csv_dataset(
     dataset_version: str = DEMO_MULTI_FACTOR_DATASET_VERSION,
 ) -> PerFactorFileHistoricalDataset:
     """Load a wide per-factor CSV as ``projection="per_factor"``."""
+    from app.market.history.artifact import sidecar_identity
+
     csv_path = Path(path).expanduser().resolve()
     if not csv_path.is_file():
         raise ValueError(f"historical dataset CSV not found: {csv_path}")
     dates, columns = load_per_factor_observations_csv(csv_path)
+    sidecar_id, sidecar_version = sidecar_identity(csv_path)
     if dataset_id is None or dataset_id == "file":
-        resolved_id = file_csv_dataset_id(csv_path)
+        resolved_id = sidecar_id or file_csv_dataset_id(csv_path)
     else:
         resolved_id = dataset_id
+    resolved_version = sidecar_version or dataset_version
     return PerFactorFileHistoricalDataset(
         dates=dates,
         columns=columns,
         dataset_id=resolved_id,
         source_path=str(csv_path),
-        dataset_version=dataset_version,
+        dataset_version=resolved_version,
         projection=PER_FACTOR_PROJECTION,
     )
 
@@ -479,10 +483,13 @@ def create_historical_dataset(
     - unset / ``demo-multi-factor-history`` — packaged per-factor demo panel
     - ``demo`` / ``demo-historical-factors`` — labeled four-macro fixture CSV
     - ``synthetic`` — seeded four-macro RNG (``SyntheticHistoricalDataset``)
+    - ``real:public:wave-a`` — frozen public CSV (env ``QUANTLINEAGE_PUBLIC_HISTORY_CSV``)
     - path to a ``.csv`` file (four-macro or per-factor headers)
 
     ``HistoricalRiskEngine()`` with ``dataset=None`` still defaults to
     ``SyntheticHistoricalDataset`` for backward-compatible ctor behavior.
+    Default ``create_historical_dataset()`` stays the demo panel; public history
+    is opt-in by id and never fetches HTTP.
     """
     default = DEFAULT_HISTORICAL_DATASET_SOURCE
     raw = source if source is not None else os.getenv(HISTORICAL_DATASET_ENV, default)
@@ -499,6 +506,12 @@ def create_historical_dataset(
         return load_demo_historical_dataset()
     if key in {"synthetic", "rng", "random"}:
         return SyntheticHistoricalDataset(seed=seed, observations=observations)
+    from app.market.history.artifact import resolve_public_history_csv
+    from app.market.history.spec import WAVE_A_DATASET_ID
+
+    if resolved == WAVE_A_DATASET_ID or key == WAVE_A_DATASET_ID:
+        csv_path = resolve_public_history_csv()
+        return load_per_factor_csv_dataset(csv_path, dataset_id=WAVE_A_DATASET_ID)
     path = Path(resolved).expanduser()
     if resolved.startswith("file:"):
         path = Path(resolved[len("file:") :]).expanduser()
@@ -508,7 +521,8 @@ def create_historical_dataset(
         return load_csv_historical_dataset(path)
     raise ValueError(
         f"Unknown historical dataset source: {resolved!r}; "
-        f"use {DEMO_MULTI_FACTOR_DATASET_ID!r}, 'demo', 'synthetic', or a path to a factor CSV"
+        f"use {DEMO_MULTI_FACTOR_DATASET_ID!r}, 'demo', 'synthetic', "
+        f"{WAVE_A_DATASET_ID!r}, or a path to a factor CSV"
     )
 
 
