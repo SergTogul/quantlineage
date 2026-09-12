@@ -36,13 +36,13 @@ Do not mark DONE without gate evidence.
 | A4.5 | Existing dataset factory integration | DONE | `resolve_dataset_source` / `create_historical_dataset` load frozen CSV by id; demo remains default | |
 | A4.6 | RiskRun dataset lineage | DONE | `dataset_identity` / `resolve_run_spec` persist sidecar id+content-hash version | |
 | A4.7 | Quant mutation/regression tests | DONE | `tests/test_public_history_dataset.py` | |
-| G4 | Public history gate | REVIEW | Waiting independent review | |
-| A5.1 | Snapshot build spec | NOT_STARTED | | |
-| A5.2 | Public snapshot builder | NOT_STARTED | | |
-| A5.3 | 2Y/5Y/10Y rate mapping | NOT_STARTED | | |
-| A5.4 | Holiday/stale semantics | NOT_STARTED | | |
-| A5.5 | Persist/bind snapshot | NOT_STARTED | | |
-| G5 | Public snapshot gate | NOT_STARTED | | |
+| G4 | Public history gate | DONE | commit `0230c99`; review PASS `.superpowers/sdd/task-g4-review.md`; focused `calculate()` probe with adapters unloaded | |
+| A5.1 | Snapshot build spec | DONE | `real:public:wave-a:{as_of ISO}`; AAPL/MSFT/NVDA/SPY spots; DGS2/5/10 → USD 2Y/5Y/10Y; `rates[USD]`=DGS10 decimal; no public vol | |
+| A5.2 | Public snapshot builder | DONE | `build_public_snapshot`; latest obs ≤ as_of; injected providers; lineage in persist meta | |
+| A5.3 | 2Y/5Y/10Y rate mapping | DONE | `percent_level_to_decimal` 4.25→0.0425 on `key_rates`/`rates`; not bp | |
+| A5.4 | Holiday/stale semantics | DONE | Monday as_of keeps Friday `source_observation_date`; `is_stale` fail-closed at 7 days | |
+| A5.5 | Persist/bind snapshot | DONE | `persist_public_snapshot` then `bind_risk_run_to_saved_snapshot`; unsaved id refused | |
+| G5 | Public snapshot gate | REVIEW | Waiting independent review | |
 | A6.1 | API contracts | NOT_STARTED | | |
 | A6.2 | History/data UI | NOT_STARTED | | |
 | A6.3 | Error UX | NOT_STARTED | | |
@@ -61,10 +61,10 @@ Do not mark DONE without gate evidence.
 | G8 | Wave A final gate | NOT_STARTED | | |
 
 ## Completion summary
-- Overall: `IN_PROGRESS` (G1–G3 DONE; G4 implementer complete, pending review)
-- Latest verified commit: G4 freeze (see task-g4-report)
+- Overall: `IN_PROGRESS` (G1–G4 DONE; G5 implementer complete, pending review)
+- Latest verified commit: G5 snapshot (see task-g5-report)
 - Latest green CI:
 - Public providers chosen: Yahoo Finance public JSON (equity/ETF) + FRED (USD rates/macro)
 - Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`)
-- Public snapshot id/as_of:
+- Public snapshot id/as_of: `real:public:wave-a:{as_of ISO}`; snapshot `as_of` is the requested date; lineage `source_observation_date` is last print ≤ as_of
 - Hostile review verdict:
