@@ -53,7 +53,7 @@ Do not mark DONE without gate evidence.
 | A7.2 | Optional data-mode integration | REVIEW | `QUANTLINEAGE_DATA_MODE`; Compose unset; missing CSV fails closed naming freeze script | |
 | A7.3 | Public demo docs | REVIEW | `docs/public_data_demo.md`; known_limitations + README pointer | |
 | A7.4 | Optional T0/T1 real-date demo | REVIEW | `--t0/--t1` prints two snapshot ids + Friday lineage; existing `/risk/runs/compare` | |
-| G7 | Public demo gate | REVIEW | `tests/test_public_data_demo.py` (8); waiting independent review | |
+| G7 | Public demo gate | REVIEW | commit `fd78bde`; `tests/test_public_data_demo.py` (8); waiting independent review | |
 | A8.1 | Unit/date/missing attacks | NOT_STARTED | | |
 | A8.2 | Lineage/repro attacks | NOT_STARTED | | |
 | A8.3 | Provider/security attacks | NOT_STARTED | | |
@@ -63,7 +63,7 @@ Do not mark DONE without gate evidence.
 
 ## Completion summary
 - Overall: `IN_PROGRESS` (G1–G6 DONE, G7 REVIEW)
-- Latest verified commit: `22be31a`
+- Latest verified commit: `fd78bde`
 - Latest green CI:
 - Public providers chosen: Yahoo Finance public JSON (equity/ETF) + FRED (USD rates/macro)
 - Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`)
