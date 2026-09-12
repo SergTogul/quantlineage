@@ -14,7 +14,8 @@ import {
 import {
   FactorExposureHeatmap, HierarchyRiskHeatmap, LimitUtilizationHeatmap, StressPnlHeatmap,
 } from './components/Heatmaps'
-import { hashForSection, navSectionById, sectionFromHash } from './lib/nav.mjs'
+import { applyTheme, persistTheme, readStoredTheme } from './lib/theme.mjs'
+import { hashForOverviewLayout, hashForSection, navSectionById, parseRoute } from './lib/nav.mjs'
 import BlockHelp from './components/BlockHelp'
 import './styles.css'
 
@@ -34,16 +35,22 @@ function SectionFrame({ id, children }) {
 export default function App() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
-  const [section, setSection] = useState(() =>
-    typeof window !== 'undefined' ? sectionFromHash(window.location.hash) : 'overview',
+  const [route, setRoute] = useState(() =>
+    typeof window !== 'undefined'
+      ? parseRoute(window.location.hash)
+      : { section: 'overview', layout: 'status' },
   )
+  const [theme, setTheme] = useState(() =>
+    typeof window !== 'undefined' ? applyTheme(readStoredTheme()) : 'dark',
+  )
+  const section = route.section
 
   useEffect(() => {
     loadDashboard().then(setData).catch((e) => setError(e.message))
   }, [])
 
   useEffect(() => {
-    const onHash = () => setSection(sectionFromHash(window.location.hash))
+    const onHash = () => setRoute(parseRoute(window.location.hash))
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
@@ -51,13 +58,25 @@ export default function App() {
   const selectSection = (id) => {
     const next = hashForSection(id)
     if (window.location.hash !== next) window.location.hash = next
-    else setSection(sectionFromHash(next))
+    else setRoute(parseRoute(next))
+  }
+
+  const selectLayout = (layout) => {
+    const next = hashForOverviewLayout(layout)
+    if (window.location.hash !== next) window.location.hash = next
+    else setRoute(parseRoute(next))
+  }
+
+  const selectTheme = (next) => {
+    const applied = applyTheme(next)
+    persistTheme(applied)
+    setTheme(applied)
   }
 
   if (error) {
     return (
       <div className="app-shell">
-        <AppNav active={section} onSelect={selectSection} />
+        <AppNav active={section} onSelect={selectSection} theme={theme} onThemeChange={selectTheme} />
         <main>
           <h1>RiskForge</h1>
           <div className="error">API error: {error}</div>
@@ -68,10 +87,11 @@ export default function App() {
   if (!data) {
     return (
       <div className="app-shell">
-        <AppNav active={section} onSelect={selectSection} />
+        <AppNav active={section} onSelect={selectSection} theme={theme} onThemeChange={selectTheme} />
         <main>
           <h1>RiskForge</h1>
           <div className="muted">Loading portfolio risk…</div>
+          <div className="skel-strip" aria-hidden="true" />
         </main>
       </div>
     )
@@ -207,6 +227,9 @@ export default function App() {
             hierarchy={hierarchy}
             stress={stress}
             factors={factors}
+            portfolio={portfolio}
+            layout={route.layout}
+            onLayoutChange={selectLayout}
             onNavigate={selectSection}
           />
         </SectionFrame>
@@ -215,14 +238,13 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <AppNav active={section} onSelect={selectSection} />
+      <AppNav active={section} onSelect={selectSection} theme={theme} onThemeChange={selectTheme} />
       <main>
         <header>
           <div>
-            <span className="eyebrow">RISKFORGE</span>
             <h1>{portfolio.name}</h1>
+            <div className="muted">Institutional Portfolio & Derivatives Risk</div>
           </div>
-          <div className="muted">Institutional Portfolio & Derivatives Risk</div>
         </header>
         {body}
       </main>

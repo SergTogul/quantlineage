@@ -1,7 +1,9 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import {
-  NAV_SECTIONS, DEFAULT_SECTION_ID, sectionFromHash, hashForSection, isNavSection, navSectionById,
+  NAV_SECTIONS, DEFAULT_SECTION_ID, DEFAULT_OVERVIEW_LAYOUT, OVERVIEW_LAYOUTS,
+  sectionFromHash, hashForSection, isNavSection, navSectionById,
+  parseRoute, hashForOverviewLayout, overviewLayoutFromHash,
 } from './nav.mjs'
 
 test('NAV_SECTIONS covers terminal target areas in order', () => {
@@ -42,4 +44,31 @@ test('isNavSection and navSectionById', () => {
   assert.equal(isNavSection('heatmap'), false)
   assert.equal(navSectionById('limits').label, 'Limits')
   assert.equal(navSectionById('missing').id, 'overview')
+})
+
+test('OVERVIEW_LAYOUTS are eight named compositions', () => {
+  assert.deepEqual(OVERVIEW_LAYOUTS.map((s) => s.id), [
+    'status', 'desk', 'queue', 'mosaic', 'command', 'hierarchy', 'tape', 'keys',
+  ])
+  assert.equal(DEFAULT_OVERVIEW_LAYOUT, 'status')
+})
+
+test('parseRoute keeps #overview as the shipped status blotter', () => {
+  assert.deepEqual(parseRoute('#overview'), { section: 'overview', layout: 'status' })
+  assert.deepEqual(parseRoute(''), { section: 'overview', layout: 'status' })
+  assert.equal(sectionFromHash('#overview/desk'), 'overview')
+})
+
+test('parseRoute reads overview layout from the hash path', () => {
+  assert.deepEqual(parseRoute('#overview/desk'), { section: 'overview', layout: 'desk' })
+  assert.deepEqual(parseRoute('#overview/nope'), { section: 'overview', layout: 'status' })
+  assert.deepEqual(parseRoute('#limits'), { section: 'limits', layout: 'status' })
+})
+
+test('hashForOverviewLayout and overviewLayoutFromHash round-trip', () => {
+  assert.equal(hashForOverviewLayout('status'), '#overview')
+  assert.equal(hashForOverviewLayout('tape'), '#overview/tape')
+  assert.equal(hashForOverviewLayout('bogus'), '#overview')
+  assert.equal(overviewLayoutFromHash('#overview/mosaic'), 'mosaic')
+  assert.equal(overviewLayoutFromHash('#var-es'), 'status')
 })

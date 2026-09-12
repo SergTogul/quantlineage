@@ -11,7 +11,8 @@ import {
   ratesShowcaseSummary, runProvenanceSummary,
   spyScaledPortfolio, t1SpyScaledPortfolio, demoChangeAttributionRequest, riskChangeAttributionSummary,
   riskChangeReportSummary,
-  demoPnLAttributionRequest, overviewKpis, overviewCollage,
+  demoPnLAttributionRequest, overviewKpis, overviewCollage, overviewBookStatus, overviewExceptions,
+  overviewTapeRows,
   SCENARIO_PRESETS, defaultScenarioForm, validateScenarioForm,
   esContributionSummary, ES_CONTRIBUTION_DIMENSIONS, varCompareSummary,
   defaultReverseMultiForm, validateReverseMultiForm, reverseMultiRequestBody,
@@ -710,6 +711,88 @@ test('overviewKpis and overviewCollage use API teasers', () => {
   assert.match(cards[0].teaser, /desks/)
   assert.match(cards[6].teaser, /1 breach/)
   assert.equal(cards[2].id, 'var-es')
+})
+
+test('overviewBookStatus is Breach when limits or threats breach', () => {
+  const limits = [
+    { metric: 'var_99', label: '99% VaR', status: 'BREACH', breached: true, utilization_pct: 110 },
+    { metric: 'vega', label: 'Vega', status: 'OK', breached: false, utilization_pct: 40 },
+  ]
+  const threats = { severe_count: 1, breach_count: 2, evaluations: [{ scenario: 'Crash', loss: 12_000 }] }
+  const s = overviewBookStatus({ limits, threats })
+  assert.equal(s.tone, 'breach')
+  assert.equal(s.label, 'Breach')
+  assert.match(s.reason, /1 limit breach/)
+  assert.match(s.reason, /2 threat breaches/)
+  assert.equal(s.drill.id, 'limits')
+})
+
+test('overviewBookStatus is Watch when only warnings, Clear when none', () => {
+  const watch = overviewBookStatus({
+    limits: [{ metric: 'dv01', status: 'WARNING', breached: false, utilization_pct: 85 }],
+    threats: { severe_count: 0, breach_count: 0, evaluations: [{ scenario: 'Mild', loss: 1 }] },
+  })
+  assert.equal(watch.tone, 'warn')
+  assert.equal(watch.label, 'Watch')
+  assert.equal(watch.drill.id, 'limits')
+
+  const clear = overviewBookStatus({
+    limits: [{ metric: 'dv01', status: 'OK', breached: false, utilization_pct: 40 }],
+    threats: { severe_count: 0, breach_count: 0, evaluations: [{ scenario: 'Mild', loss: 1 }] },
+  })
+  assert.equal(clear.tone, 'ok')
+  assert.equal(clear.label, 'Clear')
+  assert.equal(clear.drill.id, 'var-es')
+})
+
+test('overviewExceptions lists breached limits then worst threat from API fields', () => {
+  const rows = overviewExceptions({
+    limits: [
+      { metric: 'var_99', label: '99% VaR', status: 'BREACH', breached: true, utilization_pct: 110 },
+      { metric: 'vega', label: 'Vega', status: 'OK', breached: false, utilization_pct: 40 },
+    ],
+    threats: { severe_count: 1, breach_count: 1, evaluations: [{ scenario: 'Crash', loss: 12_000 }] },
+  })
+  assert.equal(rows[0].section, 'limits')
+  assert.equal(rows[0].title, '99% VaR')
+  assert.match(rows[0].detail, /110/)
+  assert.equal(rows[1].section, 'stress')
+  assert.equal(rows[1].title, 'Crash')
+  assert.deepEqual(overviewExceptions({}), [])
+})
+
+test('overviewExceptions ranks limit breaches by utilization then the worst threat', () => {
+  const rows = overviewExceptions({
+    limits: [
+      { metric: 'single_position_pct', label: 'Concentration', status: 'BREACH', breached: true, utilization_pct: 128, value: 44.8, limit: 35 },
+      { metric: 'fx_delta', label: 'FX exposure', status: 'BREACH', breached: true, utilization_pct: 2440, value: 1_220_007, limit: 50_000 },
+      { metric: 'vega', label: 'Vega', status: 'OK', breached: false, utilization_pct: 5 },
+    ],
+    threats: { severe_count: 3, breach_count: 5, evaluations: [{ scenario: 'Crash', loss: 664_358 }] },
+  })
+  assert.equal(rows[0].title, 'FX exposure')
+  assert.equal(rows[0].lead, true)
+  assert.match(rows[0].detail, /2440/)
+  assert.equal(rows[1].title, 'Concentration')
+  assert.equal(rows[1].lead, false)
+  assert.match(rows[1].detail, /128/)
+  assert.match(rows[1].detail, /pct/)
+  assert.equal(rows[2].title, 'Crash')
+  assert.equal(rows[2].section, 'stress')
+})
+
+test('overviewTapeRows lead with the loaded dashboard then API exceptions', () => {
+  const rows = overviewTapeRows({
+    summary: { market_value: 1e6, var_99: 50_000, expected_shortfall_99: 70_000 },
+    limits: [
+      { metric: 'var_99', label: '99% VaR', status: 'BREACH', breached: true, utilization_pct: 110 },
+    ],
+    threats: { severe_count: 1, breach_count: 1, evaluations: [{ scenario: 'Crash', loss: 12_000 }] },
+  })
+  assert.equal(rows[0].title, 'Loaded dashboard')
+  assert.match(rows[0].detail, /NAV/)
+  assert.equal(rows[1].title, '99% VaR')
+  assert.equal(rows[2].title, 'Crash')
 })
 
 test('limitStatusCounts tallies OK/WARNING/BREACH', () => {

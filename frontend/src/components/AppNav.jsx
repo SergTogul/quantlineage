@@ -1,11 +1,12 @@
 import { NAV_SECTIONS } from '../lib/nav.mjs'
+import ThemeSwitch from './ThemeSwitch.jsx'
 
-export default function AppNav({ active, onSelect }) {
+export default function AppNav({ active, onSelect, theme = 'dark', onThemeChange }) {
   return (
     <nav className="app-nav" aria-label="Main">
       <div className="app-nav-brand">
-        <span className="eyebrow">RISKFORGE</span>
-        <strong>Risk Terminal</strong>
+        <strong>RISKFORGE</strong>
+        <span>Risk Terminal</span>
       </div>
       <ul className="app-nav-list">
         {NAV_SECTIONS.map((s) => {
@@ -25,6 +26,7 @@ export default function AppNav({ active, onSelect }) {
           )
         })}
       </ul>
+      <ThemeSwitch theme={theme} onChange={onThemeChange} />
     </nav>
   )
 }

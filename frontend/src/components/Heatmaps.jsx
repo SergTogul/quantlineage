@@ -4,6 +4,7 @@ import BlockHelp from './BlockHelp'
 import {
   cellStyle, domainMaxAbs, divergingColor, sequentialColor, utilizationColor,
   hierarchyMetricCells, factorExposureMatrix, stressPnlCells, limitUtilizationCells,
+  readHeatmapPalette,
 } from '../lib/heatmap.mjs'
 
 const HIER_METRICS = [
@@ -18,15 +19,15 @@ const HIER_LEVELS = [
   { id: 'book', label: 'Book' },
 ]
 
-function HeatLegend({ kind }) {
+function HeatLegend({ kind, colors }) {
   if (kind === 'diverging') {
     return (
       <div className="heatmap-legend" aria-hidden="true">
-        <span className="heatmap-swatch" style={{ background: divergingColor(-1, 1) }} />
+        <span className="heatmap-swatch" style={{ background: divergingColor(-1, 1, colors) }} />
         <span>loss</span>
-        <span className="heatmap-swatch" style={{ background: divergingColor(0, 1) }} />
+        <span className="heatmap-swatch" style={{ background: divergingColor(0, 1, colors) }} />
         <span>0</span>
-        <span className="heatmap-swatch" style={{ background: divergingColor(1, 1) }} />
+        <span className="heatmap-swatch" style={{ background: divergingColor(1, 1, colors) }} />
         <span>gain</span>
       </div>
     )
@@ -34,20 +35,20 @@ function HeatLegend({ kind }) {
   if (kind === 'utilization') {
     return (
       <div className="heatmap-legend" aria-hidden="true">
-        <span className="heatmap-swatch" style={{ background: utilizationColor(20) }} />
+        <span className="heatmap-swatch" style={{ background: utilizationColor(20, colors) }} />
         <span>low</span>
-        <span className="heatmap-swatch" style={{ background: utilizationColor(85) }} />
+        <span className="heatmap-swatch" style={{ background: utilizationColor(85, colors) }} />
         <span>warn</span>
-        <span className="heatmap-swatch" style={{ background: utilizationColor(110) }} />
+        <span className="heatmap-swatch" style={{ background: utilizationColor(110, colors) }} />
         <span>breach</span>
       </div>
     )
   }
   return (
     <div className="heatmap-legend" aria-hidden="true">
-      <span className="heatmap-swatch" style={{ background: sequentialColor(0, 1) }} />
+      <span className="heatmap-swatch" style={{ background: sequentialColor(0, 1, colors) }} />
       <span>low</span>
-      <span className="heatmap-swatch" style={{ background: sequentialColor(1, 1) }} />
+      <span className="heatmap-swatch" style={{ background: sequentialColor(1, 1, colors) }} />
       <span>high |API|</span>
     </div>
   )
@@ -57,6 +58,7 @@ function HeatLegend({ kind }) {
  * Hierarchy VaR / ES / NAV tiles — colors from API node metrics only.
  */
 export function HierarchyRiskHeatmap({ node }) {
+  const colors = readHeatmapPalette()
   const [metric, setMetric] = useState('var_99')
   const [level, setLevel] = useState('desk')
   const cells = hierarchyMetricCells(node, { levels: [level], metric })
@@ -75,7 +77,7 @@ export function HierarchyRiskHeatmap({ node }) {
             Color scale of API {metricLabel} by {level} — POST /api/v1/risk/hierarchy (display only)
           </div>
         </div>
-        <HeatLegend kind="sequential" />
+        <HeatLegend kind="sequential" colors={colors} />
       </div>
       <div className="inline-form risk-run-form heatmap-controls">
         <label>
@@ -96,7 +98,7 @@ export function HierarchyRiskHeatmap({ node }) {
         : (
           <div className="heatmap-tiles" role="list">
             {cells.map((c) => {
-              const bg = sequentialColor(c.value, maxAbs)
+              const bg = sequentialColor(c.value, maxAbs, colors)
               return (
                 <div key={c.id} className="heatmap-tile" style={cellStyle(bg)} role="listitem" title={c.path}>
                   <span className="heatmap-tile-label">{c.label}</span>
@@ -115,6 +117,7 @@ export function HierarchyRiskHeatmap({ node }) {
  * Factor × bucket exposure matrix — cell values are API exposures.
  */
 export function FactorExposureHeatmap({ items }) {
+  const colors = readHeatmapPalette()
   const matrix = factorExposureMatrix(items)
   if (!matrix.rows.length) {
     return (
@@ -140,7 +143,7 @@ export function FactorExposureHeatmap({ items }) {
             Factor × bucket grid from POST /api/v1/risk/factors — colors map API exposure (display only)
           </div>
         </div>
-        <HeatLegend kind="diverging" />
+        <HeatLegend kind="diverging" colors={colors} />
       </div>
       <div className="heatmap-scroll">
         <table className="heatmap-matrix">
@@ -160,7 +163,7 @@ export function FactorExposureHeatmap({ items }) {
                   if (v == null) {
                     return <td key={col} className="heatmap-empty">—</td>
                   }
-                  const bg = divergingColor(v, matrix.maxAbs)
+                  const bg = divergingColor(v, matrix.maxAbs, colors)
                   return (
                     <td key={col} className="heatmap-cell" style={cellStyle(bg)} title={`${row} · ${col}`}>
                       {money(v)}
@@ -180,6 +183,7 @@ export function FactorExposureHeatmap({ items }) {
  * Stress scenario P&L tiles — API pnl only.
  */
 export function StressPnlHeatmap({ items }) {
+  const colors = readHeatmapPalette()
   const cells = stressPnlCells(items)
   const maxAbs = domainMaxAbs(cells.map((c) => c.value))
 
@@ -195,14 +199,14 @@ export function StressPnlHeatmap({ items }) {
             Scenario P&amp;L from POST /api/v1/risk/stress — diverging color on API pnl (display only)
           </div>
         </div>
-        <HeatLegend kind="diverging" />
+        <HeatLegend kind="diverging" colors={colors} />
       </div>
       {cells.length === 0
         ? <div className="muted foot">No stress scenarios</div>
         : (
           <div className="heatmap-tiles" role="list">
             {cells.map((c) => {
-              const bg = divergingColor(c.value, maxAbs)
+              const bg = divergingColor(c.value, maxAbs, colors)
               return (
                 <div key={c.id} className="heatmap-tile" style={cellStyle(bg)} role="listitem">
                   <span className="heatmap-tile-label">{c.label}</span>
@@ -220,6 +224,7 @@ export function StressPnlHeatmap({ items }) {
  * Limit utilization tiles — API utilization_pct bands.
  */
 export function LimitUtilizationHeatmap({ items }) {
+  const colors = readHeatmapPalette()
   const cells = limitUtilizationCells(items)
 
   return (
@@ -234,14 +239,14 @@ export function LimitUtilizationHeatmap({ items }) {
             Utilization from POST /api/v1/risk/limits — color bands on API utilization_pct (display only)
           </div>
         </div>
-        <HeatLegend kind="utilization" />
+        <HeatLegend kind="utilization" colors={colors} />
       </div>
       {cells.length === 0
         ? <div className="muted foot">No limits returned</div>
         : (
           <div className="heatmap-tiles" role="list">
             {cells.map((c) => {
-              const bg = utilizationColor(c.value)
+              const bg = utilizationColor(c.value, colors)
               return (
                 <div key={c.id} className="heatmap-tile" style={cellStyle(bg)} role="listitem">
                   <span className="heatmap-tile-label">{c.label}</span>

@@ -3,12 +3,51 @@
  * Maps API-returned numbers onto CSS colors — does not compute VaR, ES, or other risk.
  */
 
-const DEFAULT_NEG = '#c45c5c'
-const DEFAULT_MID = '#1a2431'
-const DEFAULT_POS = '#3d9b6e'
-const DEFAULT_LOW = '#151d28'
-const DEFAULT_HIGH = '#c45c5c'
-const DEFAULT_WARN = '#c9a227'
+export const HEATMAP_PALETTES = Object.freeze({
+  dark: Object.freeze({
+    neg: '#c45c5c',
+    mid: '#1a2431',
+    pos: '#3d9b6e',
+    low: '#151d28',
+    high: '#c45c5c',
+    warn: '#c9a227',
+  }),
+  light: Object.freeze({
+    neg: '#e07a7a',
+    mid: '#f3f3ed',
+    pos: '#5cba86',
+    low: '#f3f3ed',
+    high: '#e07a7a',
+    warn: '#e0c36a',
+  }),
+})
+
+const DEFAULT_NEG = HEATMAP_PALETTES.dark.neg
+const DEFAULT_MID = HEATMAP_PALETTES.dark.mid
+const DEFAULT_POS = HEATMAP_PALETTES.dark.pos
+const DEFAULT_LOW = HEATMAP_PALETTES.dark.low
+const DEFAULT_HIGH = HEATMAP_PALETTES.dark.high
+const DEFAULT_WARN = HEATMAP_PALETTES.dark.warn
+
+/** Display palette for the active theme — not a risk measure. */
+export function heatmapColors(theme) {
+  const named = theme === 'light' ? 'light' : 'dark'
+  const p = HEATMAP_PALETTES[named]
+  return {
+    neg: p.neg,
+    mid: p.mid,
+    pos: p.pos,
+    low: p.low,
+    high: p.high,
+    warn: p.warn,
+    ok: p.pos,
+    breach: p.neg,
+  }
+}
+
+export function readHeatmapPalette(root = globalThis.document?.documentElement) {
+  return heatmapColors(root?.dataset?.theme)
+}
 
 export function clamp(n, lo, hi) {
   const x = Number(n)
