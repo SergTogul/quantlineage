@@ -21,4 +21,12 @@ describe('AppNav', () => {
     await user.click(screen.getByRole('button', { name: (n) => n.startsWith('Limits') }))
     expect(onSelect).toHaveBeenCalledWith('limits')
   })
+
+  it('reports a theme change from the Dark / Light switch', async () => {
+    const user = userEvent.setup()
+    const onThemeChange = vi.fn()
+    render(<AppNav active="overview" onSelect={() => {}} theme="dark" onThemeChange={onThemeChange} />)
+    await user.click(screen.getByRole('button', { name: 'Light' }))
+    expect(onThemeChange).toHaveBeenCalledWith('light')
+  })
 })

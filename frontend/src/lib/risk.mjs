@@ -519,6 +519,114 @@ export function overviewKpis(summary, threats) {
   }
 }
 
+function pluralCount(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+/** Display value/limit from LimitResult — percents stay percents, not dollars. */
+function limitValueLimit(item) {
+  if (item.metric === 'single_position_pct') {
+    return `${Number(item.value).toFixed(1)} / ${Number(item.limit).toFixed(1)} pct`
+  }
+  return `${money(item.value)} / ${money(item.limit)}`
+}
+
+/**
+ * Book condition from loaded limit + threat payloads only (no client risk math).
+ * Drill target is the first specialist section that can resolve the condition.
+ */
+export function overviewBookStatus({ limits, threats } = {}) {
+  const lim = limitStatusCounts(limits)
+  const ts = stressSummary(threats)
+  const limitBreaches = lim.BREACH || 0
+  const warnings = lim.WARNING || 0
+  const threatBreaches = ts.breaches ?? 0
+
+  let tone = 'ok'
+  let label = 'Clear'
+  if (limitBreaches > 0 || threatBreaches > 0) {
+    tone = 'breach'
+    label = 'Breach'
+  } else if (warnings > 0) {
+    tone = 'warn'
+    label = 'Watch'
+  }
+
+  const parts = []
+  if (limitBreaches) parts.push(pluralCount(limitBreaches, 'limit breach', 'limit breaches'))
+  if (threatBreaches) parts.push(pluralCount(threatBreaches, 'threat breach', 'threat breaches'))
+  if (!parts.length && warnings) parts.push(pluralCount(warnings, 'limit warning', 'limit warnings'))
+  if (!parts.length) parts.push('No limit or threat breaches on loaded payloads')
+
+  let drill = { id: 'var-es', label: 'Open VaR & ES' }
+  if (limitBreaches > 0) drill = { id: 'limits', label: 'Open limit breaches' }
+  else if (threatBreaches > 0) drill = { id: 'stress', label: 'Open worst threat' }
+  else if (warnings > 0) drill = { id: 'limits', label: 'Open limits' }
+
+  return { tone, label, reason: parts.join(' · '), drill, limitBreaches, threatBreaches, warnings }
+}
+
+/**
+ * Actionable exception rows from API limit breaches + worst threat evaluation.
+ */
+export function overviewExceptions({ limits, threats } = {}) {
+  const limitRows = []
+  for (const item of breachedLimits(limits)) {
+    const util = Number(item.utilization_pct)
+    const bits = []
+    if (Number.isFinite(util)) bits.push(`${util.toFixed(0)}% util`)
+    if (item.value != null && item.limit != null) {
+      bits.push(limitValueLimit(item))
+    }
+    limitRows.push({
+      key: `limit-${item.metric || item.label}`,
+      section: 'limits',
+      title: item.label || item.metric || 'Limit',
+      detail: bits.join(' · '),
+      utilization_pct: Number.isFinite(util) ? util : 0,
+      tone: 'breach',
+      lead: false,
+    })
+  }
+  limitRows.sort((a, b) => b.utilization_pct - a.utilization_pct)
+
+  const rows = [...limitRows]
+  const ts = stressSummary(threats)
+  if (ts.worst?.scenario) {
+    const loss = ts.worst.loss
+    rows.push({
+      key: 'threat-worst',
+      section: 'stress',
+      title: ts.worst.scenario,
+      detail: Number.isFinite(Number(loss)) ? money(loss) : '',
+      utilization_pct: 0,
+      tone: (ts.breaches ?? 0) > 0 ? 'breach' : 'warn',
+      lead: false,
+    })
+  }
+  if (rows[0]) rows[0] = { ...rows[0], lead: true }
+  return rows
+}
+
+/**
+ * Overnight-tape rows from the loaded dashboard only (no invented run history).
+ * Latest print is the current batch; exception rows follow.
+ */
+export function overviewTapeRows({ summary, threats, limits } = {}) {
+  const status = overviewBookStatus({ limits, threats })
+  const kpis = overviewKpis(summary, threats)
+  const nav = kpis.market_value != null ? `NAV ${money(kpis.market_value)}` : ''
+  const var99 = kpis.var_99 != null ? `99% VaR ${money(kpis.var_99)}` : ''
+  const head = {
+    key: 'dashboard-load',
+    section: 'risk-runs',
+    title: 'Loaded dashboard',
+    detail: [nav, var99].filter(Boolean).join(' · '),
+    tone: status.tone,
+  }
+  return [head, ...overviewExceptions({ limits, threats })]
+}
+
 /**
  * Section collage / entry points for Overview — teaser stats from loaded API payloads.
  * No risk math; navigation ids match NAV_SECTIONS.

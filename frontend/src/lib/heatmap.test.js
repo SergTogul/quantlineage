@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   clamp, lerp, parseHex, mixHex, normalizeToUnit, domainMaxAbs,
   divergingColor, sequentialColor, utilizationColor, contrastText, cellStyle,
-  hierarchyMetricCells, factorExposureCells, factorExposureMatrix,
+  heatmapColors, hierarchyMetricCells, factorExposureCells, factorExposureMatrix,
   stressPnlCells, limitUtilizationCells,
 } from './heatmap.mjs'
 
@@ -60,6 +60,21 @@ test('contrastText picks light on dark bg', () => {
   assert.equal(contrastText('#0b0f14'), '#e7edf5')
   assert.equal(contrastText('#f5f5f5'), '#0b0f14')
   assert.equal(cellStyle('#0b0f14').color, '#e7edf5')
+})
+
+test('light heatmap fills stay pale with dark type', () => {
+  const light = heatmapColors('light')
+  assert.equal(light.mid, '#f3f3ed')
+  assert.equal(light.low, '#f3f3ed')
+  assert.notEqual(light.mid, heatmapColors('dark').mid)
+  assert.equal(divergingColor(0, 100, light), light.mid)
+  assert.equal(sequentialColor(0, 100, light), light.low)
+  assert.equal(contrastText(light.mid), '#0b0f14')
+  assert.equal(contrastText(divergingColor(100, 100, light)), '#0b0f14')
+  assert.equal(contrastText(divergingColor(-100, 100, light)), '#0b0f14')
+  assert.equal(contrastText(sequentialColor(100, 100, light)), '#0b0f14')
+  assert.equal(contrastText(utilizationColor(20, light)), '#0b0f14')
+  assert.equal(contrastText(utilizationColor(110, light)), '#0b0f14')
 })
 
 test('hierarchyMetricCells reads API metric at levels only', () => {
