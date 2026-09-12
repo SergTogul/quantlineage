@@ -18,8 +18,11 @@ from app.market.history.artifact import sidecar_path_for_csv, write_sidecar
 from app.market.history.spec import (
     WAVE_A_SPEC,
     WAVE_A_TRANSFORM_CONFIG,
+    CanonicalMappingError,
     FactorMapping,
     PublicHistoryDatasetSpec,
+    assert_canonical_mappings,
+    assert_series_matches_mapping,
 )
 from app.market.history.transforms import equity_relative_return, percent_level_move_to_bps
 from app.market.ingestion.errors import NotFoundError
@@ -66,6 +69,10 @@ def freeze_public_history(
     spec: PublicHistoryDatasetSpec = WAVE_A_SPEC,
 ) -> FrozenHistoryArtifact:
     """Fetch → validate → align levels → transform → persist CSV + sidecar."""
+    try:
+        assert_canonical_mappings(spec)
+    except CanonicalMappingError as exc:
+        raise FreezeError(str(exc)) from exc
     series_by_id = _fetch_required_series(
         spec, history_provider=history_provider, macro_provider=macro_provider
     )
@@ -167,6 +174,14 @@ def _fetch_required_series(
             ) from exc
         if series is None:
             raise MissingRequiredFactorError(f"missing required factor {mapping.instrument_id}")
+        try:
+            assert_series_matches_mapping(series, mapping)
+        except CanonicalMappingError as exc:
+            raise FreezeError(str(exc)) from exc
+        if not any(point.observation_date <= spec.end for point in series.points):
+            raise MissingRequiredFactorError(
+                f"no observation on or before {spec.end.isoformat()} for {mapping.instrument_id}"
+            )
         series_by_id[mapping.instrument_id] = series
     missing = [
         item.instrument_id for item in spec.factor_mappings if item.instrument_id not in series_by_id

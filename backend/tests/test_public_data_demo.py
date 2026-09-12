@@ -142,6 +142,19 @@ def test_script_with_fakes_prints_dataset_id_version_snapshot_and_coverage(
     assert "--live" in shim or "live" in shim
 
 
+def test_explicit_synthetic_data_mode_keeps_demo_dataset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("QUANTLINEAGE_DATA_MODE", "synthetic")
+    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", raising=False)
+    _drop_adapter_modules()
+    dataset = create_historical_dataset()
+    assert dataset.dataset_id == DEMO_MULTI_FACTOR_DATASET_ID
+    loaded = [name for name in FORBIDDEN_ADAPTERS if name in sys.modules]
+    assert loaded == [], f"synthetic mode loaded adapters: {loaded}"
+
+
 def test_default_data_mode_unset_does_not_import_or_call_yahoo(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

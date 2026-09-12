@@ -12,7 +12,15 @@ from datetime import date, timedelta
 from typing import Any
 
 from app.domain.models import MarketSnapshot, RiskRun, as_of_wire
-from app.market.history.spec import WAVE_A_SPEC, FactorMapping, PublicHistoryDatasetSpec
+from app.market.history.spec import (
+    WAVE_A_DATASET_ID,
+    WAVE_A_SPEC,
+    CanonicalMappingError,
+    FactorMapping,
+    PublicHistoryDatasetSpec,
+    assert_canonical_mappings,
+    assert_series_matches_mapping,
+)
 from app.market.history.transforms import percent_level_to_decimal
 from app.market.ingestion.errors import NotFoundError
 from app.market.ingestion.models import (
@@ -50,6 +58,10 @@ class UnsavedPublicSnapshotError(PublicSnapshotError):
     code = "unsaved_snapshot"
 
 
+class MismatchedPublicSnapshotIdentityError(PublicSnapshotError):
+    code = "snapshot_id_as_of_mismatch"
+
+
 @dataclass(frozen=True, slots=True)
 class PublicSnapshotBuild:
     snapshot: MarketSnapshot
@@ -65,6 +77,10 @@ def build_public_snapshot(
     lookback_days: int = SNAPSHOT_LOOKBACK_DAYS,
 ) -> PublicSnapshotBuild:
     """Latest valid observation ≤ as_of for each Wave A mapping; fail closed if stale."""
+    try:
+        assert_canonical_mappings(spec)
+    except CanonicalMappingError as exc:
+        raise PublicSnapshotError(str(exc)) from exc
     start = as_of - timedelta(days=lookback_days)
     equity_spots: dict[str, float] = {}
     key_rates_usd: dict[str, float] = {}
@@ -80,6 +96,10 @@ def build_public_snapshot(
             history_provider=history_provider,
             macro_provider=macro_provider,
         )
+        try:
+            assert_series_matches_mapping(series, mapping)
+        except CanonicalMappingError as exc:
+            raise PublicSnapshotError(str(exc)) from exc
         point = _latest_on_or_before(series.points, as_of)
         if point is None:
             raise MissingPublicSnapshotMarkError(
@@ -124,6 +144,7 @@ def build_public_snapshot(
         rates={"USD": usd_discount},
         key_rates={"USD": key_rates_usd},
     )
+    _assert_snapshot_id_matches_as_of(snapshot, dataset_id=spec.dataset_id)
     lineage = {
         "dataset_id": spec.dataset_id,
         "as_of": as_of_wire(as_of),
@@ -137,6 +158,7 @@ def persist_public_snapshot(
     repo: MarketSnapshotRepository, built: PublicSnapshotBuild
 ) -> str:
     """Write the frozen snapshot before any RiskRun may bind its id."""
+    _assert_snapshot_id_matches_as_of(built.snapshot)
     return repo.save(built.snapshot, meta=built.lineage)
 
 
@@ -151,6 +173,7 @@ def bind_risk_run_to_saved_snapshot(
     stored = market_repo.get(snapshot_id)
     if stored is None:
         raise UnsavedPublicSnapshotError(f"snapshot not persisted: {snapshot_id}")
+    _assert_snapshot_id_matches_as_of(stored)
     bound = run.model_copy(
         update={
             "market_snapshot_id": stored.id,
@@ -158,6 +181,21 @@ def bind_risk_run_to_saved_snapshot(
         }
     )
     return run_repo.create(bound)
+
+
+def _assert_snapshot_id_matches_as_of(
+    snapshot: MarketSnapshot, *, dataset_id: str = WAVE_A_DATASET_ID
+) -> None:
+    as_of = snapshot.as_of
+    if not isinstance(as_of, date):
+        raise MismatchedPublicSnapshotIdentityError(
+            f"snapshot {snapshot.id} as_of is not a calendar date"
+        )
+    expected = f"{dataset_id}:{as_of.isoformat()}"
+    if snapshot.id != expected:
+        raise MismatchedPublicSnapshotIdentityError(
+            f"snapshot id {snapshot.id} does not match as_of {as_of.isoformat()}"
+        )
 
 
 def _snapshot_value(mapping: FactorMapping, raw: float) -> float:
