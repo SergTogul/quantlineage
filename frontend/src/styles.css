@@ -224,4 +224,6 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
 .block-help-popover p{margin:0;font-size:12px;line-height:1.45;color:var(--chip);font-weight:500}
 .market-data-search{margin-bottom:12px}
 .market-data-search label{display:grid;gap:4px;font-size:11px;color:var(--meta);flex:1}
+.market-data-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:0 0 12px}
+.market-data-actions label{display:grid;gap:4px;font-size:11px;color:var(--meta)}
 .market-data table td:last-child,.market-data table th:last-child{text-align:left}

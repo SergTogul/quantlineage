@@ -64,9 +64,6 @@ describe('MarketData', () => {
     expect(within(aaplRow).getByText('USD')).toBeInTheDocument()
     expect(within(aaplRow).getByRole('button', { name: /load history/i })).toBeEnabled()
     expect(within(tslaRow).getByRole('button', { name: /load history/i })).toBeDisabled()
-
-    await user.click(within(aaplRow).getByRole('button', { name: /load history/i }))
-    expect(screen.getByText(/history load is not available yet/i)).toBeInTheDocument()
   })
 
   it('inspects quality and renders source, coverage, stale, missing, and hash', async () => {
@@ -127,6 +124,134 @@ describe('MarketData', () => {
     expect(within(panel).getByText('2')).toBeInTheDocument()
     expect(within(panel).getByText('deadbeefcafebabe')).toBeInTheDocument()
     expect(within(panel).getByText('wave-a-v1')).toBeInTheDocument()
+  })
+
+  it('loads history from the API and renders dates and values', async () => {
+    const user = userEvent.setup()
+    const historyCalls = []
+    server.use(
+      http.get(`${API_BASE}${API_V1}/instruments/search`, () => HttpResponse.json([AAPL, TSLA])),
+      http.get(`${API_BASE}${API_V1}/market/history/:instrumentId`, ({ request, params }) => {
+        const url = new URL(request.url)
+        historyCalls.push({
+          instrumentId: params.instrumentId,
+          start: url.searchParams.get('start'),
+          end: url.searchParams.get('end'),
+        })
+        return HttpResponse.json({
+          source: 'yahoo',
+          source_symbol: 'AAPL',
+          instrument_id: 'equity:US:AAPL',
+          unit: 'price',
+          content_hash: 'hist-hash',
+          points: [
+            { observation_date: '2021-01-04', value: 129.41 },
+            { observation_date: '2021-01-05', value: 130.12 },
+          ],
+        })
+      }),
+    )
+
+    render(<MarketData />)
+    await user.type(screen.getByLabelText(/instrument search/i), 'Apple')
+    await user.click(screen.getByRole('button', { name: /^search$/i }))
+    await waitFor(() => expect(screen.getByText('equity:US:AAPL')).toBeInTheDocument())
+    await user.type(screen.getByLabelText(/start date/i), '2021-01-04')
+    await user.type(screen.getByLabelText(/end date/i), '2021-01-08')
+
+    const aaplRow = screen.getByText('equity:US:AAPL').closest('tr')
+    await user.click(within(aaplRow).getByRole('button', { name: /load history/i }))
+    const table = await screen.findByRole('table', { name: /history/i })
+    expect(historyCalls).toEqual([
+      { instrumentId: 'equity:US:AAPL', start: '2021-01-04', end: '2021-01-08' },
+    ])
+    expect(within(table).getByText('2021-01-04')).toBeInTheDocument()
+    expect(within(table).getByText('129.41')).toBeInTheDocument()
+    expect(within(table).getByText('2021-01-05')).toBeInTheDocument()
+    expect(within(table).getByText('130.12')).toBeInTheDocument()
+  })
+
+  it('freezes a dataset and builds a snapshot via Wave A actions', async () => {
+    const user = userEvent.setup()
+    const freezeBodies = []
+    const snapshotBodies = []
+    server.use(
+      http.get(`${API_BASE}${API_V1}/instruments/search`, () => HttpResponse.json([AAPL, TSLA])),
+      http.post(`${API_BASE}${API_V1}/data/datasets`, async ({ request }) => {
+        freezeBodies.push(await request.json())
+        return HttpResponse.json({
+          dataset_id: 'real:public:wave-a',
+          dataset_version: 'dataset-hash',
+          csv_path: 'real_public_wave_a.csv',
+        })
+      }),
+      http.post(`${API_BASE}${API_V1}/market/snapshots/from-public-data`, async ({ request }) => {
+        snapshotBodies.push(await request.json())
+        return HttpResponse.json({
+          id: 'real:public:wave-a:2024-01-08',
+          as_of: '2024-01-08',
+          content_hash: 'snap-hash',
+          lineage: {},
+        })
+      }),
+    )
+
+    render(<MarketData />)
+    await user.type(screen.getByLabelText(/start date/i), '2021-01-04')
+    await user.type(screen.getByLabelText(/end date/i), '2021-01-11')
+    await user.type(screen.getByLabelText(/as of/i), '2024-01-08')
+    await user.click(screen.getByRole('button', { name: /freeze dataset/i }))
+    expect(await screen.findByText(/real:public:wave-a/)).toBeInTheDocument()
+    expect(screen.getByText(/dataset-hash/)).toBeInTheDocument()
+    expect(freezeBodies).toEqual([{ start: '2021-01-04', end: '2021-01-11' }])
+
+    await user.click(screen.getByRole('button', { name: /build snapshot/i }))
+    expect(await screen.findByText(/real:public:wave-a:2024-01-08/)).toBeInTheDocument()
+    expect(screen.getByText(/snap-hash/)).toBeInTheDocument()
+    expect(snapshotBodies).toEqual([{ as_of: '2024-01-08' }])
+  })
+
+  it('shows provider-down, rate-limited, and stale error banners from API codes', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.get(`${API_BASE}${API_V1}/instruments/search`, () => HttpResponse.json([AAPL])),
+      http.get(`${API_BASE}${API_V1}/market/history/:instrumentId`, () =>
+        HttpResponse.json(
+          { code: 'unavailable', message: 'Provider unavailable', details: null },
+          { status: 503 },
+        ),
+      ),
+      http.post(`${API_BASE}${API_V1}/market/snapshots/from-public-data`, () =>
+        HttpResponse.json(
+          { code: 'stale_observation', message: 'Stale observation', details: null },
+          { status: 400 },
+        ),
+      ),
+      http.post(`${API_BASE}${API_V1}/data/datasets`, () =>
+        HttpResponse.json(
+          { code: 'rate_limited', message: 'Provider rate limited', details: null },
+          { status: 429 },
+        ),
+      ),
+    )
+
+    render(<MarketData />)
+    await user.type(screen.getByLabelText(/instrument search/i), 'Apple')
+    await user.click(screen.getByRole('button', { name: /^search$/i }))
+    await waitFor(() => expect(screen.getByText('equity:US:AAPL')).toBeInTheDocument())
+    await user.type(screen.getByLabelText(/start date/i), '2021-01-04')
+    await user.type(screen.getByLabelText(/end date/i), '2021-01-08')
+    await user.type(screen.getByLabelText(/as of/i), '2024-01-22')
+
+    await user.click(within(screen.getByText('equity:US:AAPL').closest('tr')).getByRole('button', { name: /load history/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/unavailable/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/provider unavailable/i)
+
+    await user.click(screen.getByRole('button', { name: /build snapshot/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/stale/i)
+
+    await user.click(screen.getByRole('button', { name: /freeze dataset/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/rate_limited/i)
   })
 
   it('does not call Yahoo or FRED URLs from the browser', async () => {

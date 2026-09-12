@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { getInstrumentQuality, searchInstruments } from '../api.js'
+import {
+  buildPublicSnapshot,
+  freezePublicDataset,
+  getInstrumentHistory,
+  getInstrumentQuality,
+  searchInstruments,
+} from '../api.js'
 
 function capabilityLabel(row) {
   const badges = []
@@ -14,14 +20,24 @@ function coverageText(quality) {
   return `${quality.first_observation} – ${quality.last_observation} (${quality.observation_count})`
 }
 
+function apiErrorText(err, fallback) {
+  const code = err?.body?.code
+  const message = err?.body?.message || err?.message || fallback
+  return code ? `${code}: ${message}` : message
+}
+
 export default function MarketData() {
   const [query, setQuery] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
+  const [asOf, setAsOf] = useState('')
   const [rows, setRows] = useState([])
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
   const [quality, setQuality] = useState(null)
+  const [history, setHistory] = useState(null)
+  const [dataset, setDataset] = useState(null)
+  const [snapshot, setSnapshot] = useState(null)
   const [busy, setBusy] = useState(false)
 
   const onSearch = async (event) => {
@@ -30,20 +46,32 @@ export default function MarketData() {
     setError('')
     setStatus('')
     setQuality(null)
+    setHistory(null)
     try {
       const hits = await searchInstruments(query)
       setRows(Array.isArray(hits) ? hits : [])
     } catch (err) {
       setRows([])
-      setError(err?.body?.message || err.message || 'Search failed')
+      setError(apiErrorText(err, 'Search failed'))
     } finally {
       setBusy(false)
     }
   }
 
-  const onLoadHistory = (row) => {
+  const onLoadHistory = async (row) => {
     if (!row.supported_for_history) return
-    setStatus('History load is not available yet')
+    setBusy(true)
+    setError('')
+    setStatus('')
+    setHistory(null)
+    try {
+      const result = await getInstrumentHistory(row.instrument_id, start, end)
+      setHistory(result)
+    } catch (err) {
+      setError(apiErrorText(err, 'History load failed'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const onInspectQuality = async (row) => {
@@ -56,7 +84,37 @@ export default function MarketData() {
       const result = await getInstrumentQuality(row.instrument_id, start, end)
       setQuality(result)
     } catch (err) {
-      setError(err?.body?.message || err.message || 'Quality inspect failed')
+      setError(apiErrorText(err, 'Quality inspect failed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onFreeze = async () => {
+    setBusy(true)
+    setError('')
+    setStatus('')
+    setDataset(null)
+    try {
+      const result = await freezePublicDataset(start, end)
+      setDataset(result)
+    } catch (err) {
+      setError(apiErrorText(err, 'Freeze dataset failed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onBuildSnapshot = async () => {
+    setBusy(true)
+    setError('')
+    setStatus('')
+    setSnapshot(null)
+    try {
+      const result = await buildPublicSnapshot(asOf)
+      setSnapshot(result)
+    } catch (err) {
+      setError(apiErrorText(err, 'Build snapshot failed'))
     } finally {
       setBusy(false)
     }
@@ -93,6 +151,22 @@ export default function MarketData() {
         </label>
         <button type="submit" disabled={busy}>Search</button>
       </form>
+      <div className="market-data-actions">
+        <label>
+          As of
+          <input
+            type="date"
+            value={asOf}
+            onChange={(e) => setAsOf(e.target.value)}
+          />
+        </label>
+        <button type="button" disabled={busy || !start || !end} onClick={onFreeze}>
+          Freeze dataset
+        </button>
+        <button type="button" disabled={busy || !asOf} onClick={onBuildSnapshot}>
+          Build snapshot
+        </button>
+      </div>
       {error ? <div className="error" role="alert">{error}</div> : null}
       {status ? <p className="muted">{status}</p> : null}
       {rows.length === 0 && !error && !busy ? (
@@ -126,7 +200,7 @@ export default function MarketData() {
                 <td>
                   <button
                     type="button"
-                    disabled={!row.supported_for_history}
+                    disabled={!row.supported_for_history || busy}
                     onClick={() => onLoadHistory(row)}
                   >
                     Load History
@@ -145,6 +219,26 @@ export default function MarketData() {
             ))}
           </tbody>
         </table>
+      ) : null}
+      {history?.points?.length ? (
+        <section aria-label="Series history">
+          <table aria-label="History">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.points.map((point) => (
+                <tr key={point.observation_date}>
+                  <td>{point.observation_date}</td>
+                  <td>{point.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
       ) : null}
       {quality ? (
         <section aria-label="Series quality">
@@ -176,6 +270,44 @@ export default function MarketData() {
             <div>
               <dt>Normalization version</dt>
               <dd>{quality.normalization_version}</dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
+      {dataset ? (
+        <section aria-label="Frozen dataset">
+          <dl>
+            <div>
+              <dt>Dataset id</dt>
+              <dd>{dataset.dataset_id}</dd>
+            </div>
+            <div>
+              <dt>Dataset version</dt>
+              <dd>{dataset.dataset_version}</dd>
+            </div>
+            {dataset.csv_path ? (
+              <div>
+                <dt>CSV</dt>
+                <dd>{dataset.csv_path}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </section>
+      ) : null}
+      {snapshot ? (
+        <section aria-label="Public snapshot">
+          <dl>
+            <div>
+              <dt>Snapshot id</dt>
+              <dd>{snapshot.id}</dd>
+            </div>
+            <div>
+              <dt>As of</dt>
+              <dd>{snapshot.as_of}</dd>
+            </div>
+            <div>
+              <dt>Content hash</dt>
+              <dd>{snapshot.content_hash}</dd>
             </div>
           </dl>
         </section>

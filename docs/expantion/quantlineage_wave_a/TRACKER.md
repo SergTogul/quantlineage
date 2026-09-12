@@ -42,12 +42,13 @@ Do not mark DONE without gate evidence.
 | A5.3 | 2Y/5Y/10Y rate mapping | DONE | `percent_level_to_decimal` 4.25→0.0425 on `key_rates`/`rates`; not bp | |
 | A5.4 | Holiday/stale semantics | DONE | Monday as_of keeps Friday `source_observation_date`; `is_stale` fail-closed at 7 days | |
 | A5.5 | Persist/bind snapshot | DONE | `persist_public_snapshot` then `bind_risk_run_to_saved_snapshot`; unsaved id refused | |
-| G5 | Public snapshot gate | REVIEW | Waiting independent review | |
-| A6.1 | API contracts | NOT_STARTED | | |
-| A6.2 | History/data UI | NOT_STARTED | | |
-| A6.3 | Error UX | NOT_STARTED | | |
-| A6.4 | API/frontend tests | NOT_STARTED | | |
-| G6 | API/UI gate | NOT_STARTED | | |
+| G5 | Public snapshot gate | DONE | commit `4af0135`; review PASS `.superpowers/sdd/task-g5-review.md`; cash AAPL+MSFT priced from persisted Friday marks | |
+| A6.1 | API contracts | DONE | history/datasets/snapshots dual-mounted; 1826-day bound; ErrorBody; no secrets | |
+| A6.2 | History/data UI | DONE | Load History table + Freeze dataset + Build snapshot on Market Data (Wave A, not TSLA-only) | |
+| A6.3 | Error UX | DONE | `err.body.code` + `err.body.message`; unavailable / rate_limited / stale / not_found / insufficient | |
+| A6.4 | API/frontend tests | DONE | `tests/test_quantlineage_product_api.py` + MarketData/App vitest; fake providers; no live network | |
+| A6.5 | Contract tests | DONE | search/history/quality/freeze/snapshot/failure covered with TestClient + MSW | |
+| G6 | API/UI gate | REVIEW | Waiting independent review | |
 | A7.1 | Demo materialization command | NOT_STARTED | | |
 | A7.2 | Optional data-mode integration | NOT_STARTED | | |
 | A7.3 | Public demo docs | NOT_STARTED | | |
@@ -61,8 +62,8 @@ Do not mark DONE without gate evidence.
 | G8 | Wave A final gate | NOT_STARTED | | |
 
 ## Completion summary
-- Overall: `IN_PROGRESS` (G1–G4 DONE; G5 implementer complete, pending review)
-- Latest verified commit: G5 snapshot (see task-g5-report)
+- Overall: `IN_PROGRESS` (G1–G5 DONE; G6 implementer complete, pending review)
+- Latest verified commit: `4af0135`
 - Latest green CI:
 - Public providers chosen: Yahoo Finance public JSON (equity/ETF) + FRED (USD rates/macro)
 - Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`)

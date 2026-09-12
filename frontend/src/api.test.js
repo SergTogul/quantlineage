@@ -9,7 +9,12 @@ import {
   resolveApiBase,
   reverseStress,
   reverseStressMulti,
+  getInstrumentHistory,
   getInstrumentQuality,
+  freezePublicDataset,
+  buildPublicSnapshot,
+  getMarketSnapshot,
+  getPublicDataset,
   searchInstruments,
 } from './api.js'
 import { API_BASE, server } from './test/mswServer.js'
@@ -508,5 +513,92 @@ describe('getInstrumentQuality', () => {
     })
     expect(row.content_hash).toBe('abc123')
     expect(row.stale).toBe(false)
+  })
+})
+
+describe('getInstrumentHistory', () => {
+  it('GETs /api/v1/market/history/{id} with start and end', async () => {
+    let seen = null
+    server.use(
+      http.get(`${API_BASE}${API_V1}/market/history/:instrumentId`, ({ request, params }) => {
+        const url = new URL(request.url)
+        seen = {
+          instrumentId: params.instrumentId,
+          start: url.searchParams.get('start'),
+          end: url.searchParams.get('end'),
+        }
+        return HttpResponse.json({
+          source: 'yahoo',
+          instrument_id: 'equity:US:AAPL',
+          unit: 'price',
+          content_hash: 'hist-hash',
+          points: [{ observation_date: '2021-01-04', value: 129.41 }],
+        })
+      }),
+    )
+    const row = await getInstrumentHistory('equity:US:AAPL', '2021-01-04', '2021-01-08')
+    expect(seen).toEqual({
+      instrumentId: 'equity:US:AAPL',
+      start: '2021-01-04',
+      end: '2021-01-08',
+    })
+    expect(row.points[0].value).toBe(129.41)
+    expect(row.content_hash).toBe('hist-hash')
+  })
+})
+
+describe('freezePublicDataset', () => {
+  it('POSTs /api/v1/data/datasets with start and end', async () => {
+    let seen = null
+    server.use(
+      http.post(`${API_BASE}${API_V1}/data/datasets`, async ({ request }) => {
+        seen = await request.json()
+        return HttpResponse.json({
+          dataset_id: 'real:public:wave-a',
+          dataset_version: 'abc',
+          csv_path: 'real_public_wave_a.csv',
+        })
+      }),
+    )
+    const row = await freezePublicDataset('2021-01-04', '2021-01-11')
+    expect(seen).toEqual({ start: '2021-01-04', end: '2021-01-11' })
+    expect(row.dataset_id).toBe('real:public:wave-a')
+  })
+})
+
+describe('buildPublicSnapshot', () => {
+  it('POSTs /api/v1/market/snapshots/from-public-data with as_of', async () => {
+    let seen = null
+    server.use(
+      http.post(`${API_BASE}${API_V1}/market/snapshots/from-public-data`, async ({ request }) => {
+        seen = await request.json()
+        return HttpResponse.json({
+          id: 'real:public:wave-a:2024-01-08',
+          as_of: '2024-01-08',
+          content_hash: 'snap-hash',
+          lineage: {},
+        })
+      }),
+    )
+    const row = await buildPublicSnapshot('2024-01-08')
+    expect(seen).toEqual({ as_of: '2024-01-08' })
+    expect(row.content_hash).toBe('snap-hash')
+  })
+})
+
+describe('getPublicDataset / getMarketSnapshot', () => {
+  it('GETs dataset and snapshot by id', async () => {
+    server.use(
+      http.get(`${API_BASE}${API_V1}/data/datasets/:datasetId`, ({ params }) =>
+        HttpResponse.json({ dataset_id: params.datasetId, dataset_version: 'v1' }),
+      ),
+      http.get(`${API_BASE}${API_V1}/market/snapshots/:snapshotId`, ({ params }) =>
+        HttpResponse.json({ id: params.snapshotId, equity_spots: { AAPL: 185 } }),
+      ),
+    )
+    const dataset = await getPublicDataset('real:public:wave-a')
+    const snapshot = await getMarketSnapshot('real:public:wave-a:2024-01-08')
+    expect(dataset.dataset_id).toBe('real:public:wave-a')
+    expect(snapshot.equity_spots.AAPL).toBe(185)
   })
 })

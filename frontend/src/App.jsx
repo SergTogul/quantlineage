@@ -73,6 +73,27 @@ export default function App() {
     setTheme(applied)
   }
 
+  if (section === 'market-data') {
+    return (
+      <div className="app-shell">
+        <AppNav active={section} onSelect={selectSection} theme={theme} onThemeChange={selectTheme} />
+        <main>
+          <header>
+            <div>
+              <h1>{data?.portfolio?.name || 'RiskForge'}</h1>
+              <div className="muted">Institutional Portfolio & Derivatives Risk</div>
+            </div>
+          </header>
+          <SectionFrame id="market-data">
+            <div className="grid">
+              <MarketData />
+            </div>
+          </SectionFrame>
+        </main>
+      </div>
+    )
+  }
+
   if (error) {
     return (
       <div className="app-shell">
@@ -205,15 +226,6 @@ export default function App() {
       body = (
         <SectionFrame id="risk-runs">
           <div className="grid"><RiskRuns portfolio={portfolio} /></div>
-        </SectionFrame>
-      )
-      break
-    case 'market-data':
-      body = (
-        <SectionFrame id="market-data">
-          <div className="grid">
-            <MarketData />
-          </div>
         </SectionFrame>
       )
       break
