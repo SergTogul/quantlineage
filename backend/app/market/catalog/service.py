@@ -15,6 +15,18 @@ from app.market.ingestion.protocols import InstrumentSearchProvider
 _EQUITY_ETF_TYPES = frozenset({"equity", "etf"})
 
 
+def get_catalog_record(
+    instrument_id: str,
+    *,
+    universe: tuple[CatalogRecord, ...] = WAVE_A_UNIVERSE,
+) -> CatalogRecord | None:
+    """Return the curated record for a canonical id, or None if unknown."""
+    for record in universe:
+        if record.instrument_id == instrument_id:
+            return record
+    return None
+
+
 def search_catalog(
     query: str,
     *,

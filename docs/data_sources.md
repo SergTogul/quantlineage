@@ -52,6 +52,29 @@ them. HTTP is injected (`httpx.Client`) so CI stays offline.
   subject to FRED terms of use. This is still **public data**, not a paid terminal.
 - **Testability:** Fixture JSON + MockTransport. CI does not call `api.stlouisfed.org`.
 
+## Quality, stale rule, and content hash
+
+Validation, alignment, and hashing live in `backend/app/market/quality/` (no FastAPI,
+no QuantLib/risk imports). `DataQualitySummary` from ingestion is reused.
+
+- **Stale:** `STALE_AFTER_DAYS = 7` calendar days in `app.market.ingestion.normalize`.
+  `is_stale` compares last observation to `requested_end` (or `retrieved_at.date()` when
+  the request end is in the future). Exactly 7 days is not stale; 8 days is.
+- **Minimum observations:** library default `MIN_OBSERVATIONS = 5`. Alignment uses the
+  same floor unless the caller passes a higher `min_aligned` / `min_observations`.
+- **Units:** Wave A allows only `price` and `percent`. Non-positive values fail only
+  when `unit == "price"`. Missing FRED `"."` tokens stay gaps (`missing_count`); no
+  interpolation.
+- **Alignment:** date intersection of required series, no forward-fill, dropped dates
+  reported per series, factor order sorted by `instrument_id`.
+- **Content hash:** SHA-256 hex of canonical JSON (`sort_keys`, compact separators).
+  Payload includes identity, unit, frequency, currency, adjustment,
+  `normalization_version`, ordered `(date, value)` points, and `transform_config` when
+  provided. **`retrieved_at` is excluded.**
+- **Inspect API:** `GET /api/v1/instruments/{instrument_id}/quality?start=YYYY-MM-DD&end=YYYY-MM-DD`
+  (dual-mounted). Curated catalog 404s unknown ids. Tests inject fake providers; no live
+  Yahoo/FRED in CI.
+
 ## Honest non-claims
 
 - Not a vendor market-data platform, not streaming, not a global security master.
