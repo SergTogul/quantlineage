@@ -9,6 +9,7 @@ export const NAV_SECTIONS = Object.freeze([
   Object.freeze({ id: 'pnl-explain', label: 'P&L Explain', hint: 'Attribution' }),
   Object.freeze({ id: 'limits', label: 'Limits', hint: 'Utilization & status' }),
   Object.freeze({ id: 'risk-runs', label: 'Risk Runs', hint: 'Async run status' }),
+  Object.freeze({ id: 'market-data', label: 'Market Data', hint: 'Search & history' }),
 ])
 
 export const DEFAULT_SECTION_ID = NAV_SECTIONS[0].id

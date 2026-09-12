@@ -9,6 +9,7 @@ import {
   resolveApiBase,
   reverseStress,
   reverseStressMulti,
+  searchInstruments,
 } from './api.js'
 import { API_BASE, server } from './test/mswServer.js'
 import { RISK_RUN_POLL_MS } from './lib/risk.mjs'
@@ -434,5 +435,35 @@ describe('HEAVY UI RiskRun fallback', () => {
     await vi.advanceTimersByTimeAsync(RISK_RUN_POLL_MS)
     const data = await pending
     expect(data).toEqual(asyncPayload)
+  })
+})
+
+describe('searchInstruments', () => {
+  it('GETs /api/v1/instruments/search and returns the JSON list', async () => {
+    let seen = null
+    server.use(
+      http.get(`${API_BASE}${API_V1}/instruments/search`, ({ request }) => {
+        seen = new URL(request.url).searchParams.get('q')
+        return HttpResponse.json([
+          {
+            instrument_id: 'equity:US:AAPL',
+            display_name: 'Apple Inc.',
+            provider: 'yahoo',
+            source_symbol: 'AAPL',
+            asset_type: 'equity',
+            currency: 'USD',
+            supported_for_history: true,
+            supported_for_snapshot: true,
+            supported_for_risk_factor: true,
+            risk_factor_mapping: 'EquitySpot:AAPL',
+            coverage: null,
+          },
+        ])
+      }),
+    )
+    const rows = await searchInstruments('apple')
+    expect(seen).toBe('apple')
+    expect(rows[0].instrument_id).toBe('equity:US:AAPL')
+    expect(rows[0].supported_for_history).toBe(true)
   })
 })

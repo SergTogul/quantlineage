@@ -9,6 +9,7 @@ from app.api.attribution import router as attribution_router
 from app.api.auth import SharedTokenMiddleware, require_shared_auth_configured
 from app.api.errors import register_exception_handlers
 from app.api.health import router as health_router
+from app.api.instruments import router as instruments_router
 from app.api.legacy_deprecation import LegacyDeprecationMiddleware
 from app.api.limits import router as limits_router
 from app.api.market import router as market_router
@@ -28,6 +29,7 @@ API_V1_PREFIX = "/api/v1"
 _DOMAIN_ROUTERS = (
     health_router,
     portfolio_router,
+    instruments_router,
     market_router,
     risk_router,
     stress_router,
