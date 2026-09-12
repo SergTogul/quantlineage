@@ -304,6 +304,12 @@ export function searchInstruments(query) {
   return json(`${API_V1}/instruments/search?${q}`)
 }
 
+/** GET series lineage + quality for a catalog instrument (display only). */
+export function getInstrumentQuality(instrumentId, start, end) {
+  const q = new URLSearchParams({ start: start ?? '', end: end ?? '' })
+  return json(`${API_V1}/instruments/${encodeURIComponent(instrumentId)}/quality?${q}`)
+}
+
 /**
  * Flagship two-RiskRun explain → RiskChangeReport (Stage 10.2).
  * Body: { t0_run_id, t1_run_id, metric }. Display only — no client-side risk math.

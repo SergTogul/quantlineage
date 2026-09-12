@@ -6,7 +6,7 @@ from app.market.catalog.models import (
     CatalogSearchResult,
     ProviderMapping,
 )
-from app.market.catalog.service import search_catalog
+from app.market.catalog.service import get_catalog_record, search_catalog
 from app.market.catalog.universe import WAVE_A_UNIVERSE
 
 __all__ = [
@@ -15,5 +15,6 @@ __all__ = [
     "CatalogSearchHit",
     "CatalogSearchResult",
     "ProviderMapping",
+    "get_catalog_record",
     "search_catalog",
 ]

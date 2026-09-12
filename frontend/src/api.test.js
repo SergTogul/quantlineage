@@ -9,6 +9,7 @@ import {
   resolveApiBase,
   reverseStress,
   reverseStressMulti,
+  getInstrumentQuality,
   searchInstruments,
 } from './api.js'
 import { API_BASE, server } from './test/mswServer.js'
@@ -465,5 +466,47 @@ describe('searchInstruments', () => {
     expect(seen).toBe('apple')
     expect(rows[0].instrument_id).toBe('equity:US:AAPL')
     expect(rows[0].supported_for_history).toBe(true)
+  })
+})
+
+describe('getInstrumentQuality', () => {
+  it('GETs /api/v1/instruments/{id}/quality with start and end', async () => {
+    let seen = null
+    server.use(
+      http.get(`${API_BASE}${API_V1}/instruments/:instrumentId/quality`, ({ request, params }) => {
+        const url = new URL(request.url)
+        seen = {
+          instrumentId: params.instrumentId,
+          start: url.searchParams.get('start'),
+          end: url.searchParams.get('end'),
+        }
+        return HttpResponse.json({
+          source: 'yahoo',
+          source_symbol: 'AAPL',
+          instrument_id: 'equity:US:AAPL',
+          unit: 'price',
+          frequency: 'daily',
+          currency: 'USD',
+          adjustment: 'adjusted',
+          first_observation: '2021-01-04',
+          last_observation: '2021-01-08',
+          observation_count: 5,
+          retrieved_at: '2026-01-15T12:00:00Z',
+          missing_count: 0,
+          duplicate_count: 0,
+          stale: false,
+          content_hash: 'abc123',
+          normalization_version: 'wave-a-v1',
+        })
+      }),
+    )
+    const row = await getInstrumentQuality('equity:US:AAPL', '2021-01-04', '2021-01-08')
+    expect(seen).toEqual({
+      instrumentId: 'equity:US:AAPL',
+      start: '2021-01-04',
+      end: '2021-01-08',
+    })
+    expect(row.content_hash).toBe('abc123')
+    expect(row.stale).toBe(false)
   })
 })

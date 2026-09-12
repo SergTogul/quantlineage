@@ -10,7 +10,8 @@ from typing import Any
 from app.market.ingestion.errors import MalformedResponseError
 from app.market.ingestion.models import HistoricalPoint
 
-_STALE_AFTER_DAYS = 7
+STALE_AFTER_DAYS = 7
+"""Wave A stale rule: last observation more than 7 calendar days before the horizon."""
 
 
 def parse_observation_value(
@@ -64,7 +65,8 @@ def collect_points(
 
 
 def is_stale(*, last_observation: date | None, requested_end: date, retrieved_at: datetime) -> bool:
+    """True when last observation is more than STALE_AFTER_DAYS before requested_end/retrieved_at."""
     if last_observation is None:
         return True
     horizon = requested_end if requested_end <= retrieved_at.date() else retrieved_at.date()
-    return (horizon - last_observation).days > _STALE_AFTER_DAYS
+    return (horizon - last_observation).days > STALE_AFTER_DAYS
