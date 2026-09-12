@@ -298,6 +298,12 @@ export function getRatesShowcase() {
   return json(`${API_V1}/market/rates-showcase`)
 }
 
+/** GET instrument catalog search hits (curated + provider merge). */
+export function searchInstruments(query) {
+  const q = new URLSearchParams({ q: query ?? '' })
+  return json(`${API_V1}/instruments/search?${q}`)
+}
+
 /**
  * Flagship two-RiskRun explain → RiskChangeReport (Stage 10.2).
  * Body: { t0_run_id, t1_run_id, metric }. Display only — no client-side risk math.

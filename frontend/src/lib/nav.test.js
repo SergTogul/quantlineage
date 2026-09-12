@@ -7,9 +7,11 @@ import {
 test('NAV_SECTIONS covers terminal target areas in order', () => {
   assert.deepEqual(NAV_SECTIONS.map((s) => s.id), [
     'overview', 'portfolio', 'risk-factors', 'var-es', 'stress',
-    'scenario-builder', 'pnl-explain', 'limits', 'risk-runs',
+    'scenario-builder', 'pnl-explain', 'limits', 'risk-runs', 'market-data',
   ])
   assert.equal(DEFAULT_SECTION_ID, 'overview')
+  assert.equal(navSectionById('market-data').label, 'Market Data')
+  assert.equal(navSectionById('market-data').hint, 'Search & history')
   for (const s of NAV_SECTIONS) {
     assert.ok(s.label)
     assert.ok(s.hint)
@@ -26,6 +28,7 @@ test('sectionFromHash defaults empty and unknown to overview', () => {
 test('sectionFromHash accepts known ids with or without hash prefix', () => {
   assert.equal(sectionFromHash('#stress'), 'stress')
   assert.equal(sectionFromHash('risk-runs'), 'risk-runs')
+  assert.equal(sectionFromHash('#market-data'), 'market-data')
   assert.equal(sectionFromHash('  #limits  '), 'limits')
 })
 

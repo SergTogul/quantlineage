@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { loadDashboard } from './api'
 import AppNav from './components/AppNav'
+import MarketData from './components/MarketData'
 import Overview from './components/Overview'
 import { Contributors, Limits, Stress, ThreatScenarios } from './components/RiskTable'
 import {
@@ -184,6 +185,15 @@ export default function App() {
       body = (
         <SectionFrame id="risk-runs">
           <div className="grid"><RiskRuns portfolio={portfolio} /></div>
+        </SectionFrame>
+      )
+      break
+    case 'market-data':
+      body = (
+        <SectionFrame id="market-data">
+          <div className="grid">
+            <MarketData />
+          </div>
         </SectionFrame>
       )
       break
