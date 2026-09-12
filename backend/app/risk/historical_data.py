@@ -25,7 +25,6 @@ semantics (those remain open Critical M1 items).
 from __future__ import annotations
 
 import csv
-import os
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
@@ -486,14 +485,20 @@ def create_historical_dataset(
     - ``real:public:wave-a`` — frozen public CSV (env ``QUANTLINEAGE_PUBLIC_HISTORY_CSV``)
     - path to a ``.csv`` file (four-macro or per-factor headers)
 
+    When ``source`` and ``RISKFORGE_HISTORICAL_DATASET`` are unset,
+    ``QUANTLINEAGE_DATA_MODE=public`` selects ``real:public:wave-a`` (fails closed
+    if the CSV is missing). Unset / ``synthetic`` keeps the demo panel.
+
     ``HistoricalRiskEngine()`` with ``dataset=None`` still defaults to
     ``SyntheticHistoricalDataset`` for backward-compatible ctor behavior.
     Default ``create_historical_dataset()`` stays the demo panel; public history
-    is opt-in by id and never fetches HTTP.
+    is opt-in by id or ``QUANTLINEAGE_DATA_MODE=public`` and never fetches HTTP.
     """
+    from app.market.history.data_mode import apply_quantlineage_data_mode
+
     default = DEFAULT_HISTORICAL_DATASET_SOURCE
-    raw = source if source is not None else os.getenv(HISTORICAL_DATASET_ENV, default)
-    resolved = (raw or default).strip()
+    selected = apply_quantlineage_data_mode(source)
+    resolved = (selected or default).strip()
     key = resolved.lower()
     if key in {
         DEMO_MULTI_FACTOR_DATASET_ID,

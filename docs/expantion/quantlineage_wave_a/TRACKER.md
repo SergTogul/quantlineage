@@ -48,12 +48,12 @@ Do not mark DONE without gate evidence.
 | A6.3 | Error UX | DONE | `err.body.code` + `err.body.message`; unavailable / rate_limited / stale / not_found / insufficient | |
 | A6.4 | API/frontend tests | DONE | `tests/test_quantlineage_product_api.py` + MarketData/App vitest; fake providers; no live network | |
 | A6.5 | Contract tests | DONE | search/history/quality/freeze/snapshot/failure covered with TestClient + MSW | |
-| G6 | API/UI gate | REVIEW | Waiting independent review | |
-| A7.1 | Demo materialization command | NOT_STARTED | | |
-| A7.2 | Optional data-mode integration | NOT_STARTED | | |
-| A7.3 | Public demo docs | NOT_STARTED | | |
-| A7.4 | Optional T0/T1 real-date demo | NOT_STARTED | | |
-| G7 | Public demo gate | NOT_STARTED | | |
+| G6 | API/UI gate | DONE | commit `22be31a`; review PASS `.superpowers/sdd/task-g6-review.md` | |
+| A7.1 | Demo materialization command | REVIEW | `scripts/build_public_demo_data.py`; injected fakes; `--live` opt-in in the script only | |
+| A7.2 | Optional data-mode integration | REVIEW | `QUANTLINEAGE_DATA_MODE`; Compose unset; missing CSV fails closed naming freeze script | |
+| A7.3 | Public demo docs | REVIEW | `docs/public_data_demo.md`; known_limitations + README pointer | |
+| A7.4 | Optional T0/T1 real-date demo | REVIEW | `--t0/--t1` prints two snapshot ids + Friday lineage; existing `/risk/runs/compare` | |
+| G7 | Public demo gate | REVIEW | `tests/test_public_data_demo.py` (8); waiting independent review | |
 | A8.1 | Unit/date/missing attacks | NOT_STARTED | | |
 | A8.2 | Lineage/repro attacks | NOT_STARTED | | |
 | A8.3 | Provider/security attacks | NOT_STARTED | | |
@@ -62,8 +62,8 @@ Do not mark DONE without gate evidence.
 | G8 | Wave A final gate | NOT_STARTED | | |
 
 ## Completion summary
-- Overall: `IN_PROGRESS` (G1–G5 DONE; G6 implementer complete, pending review)
-- Latest verified commit: `4af0135`
+- Overall: `IN_PROGRESS` (G1–G6 DONE, G7 REVIEW)
+- Latest verified commit: `22be31a`
 - Latest green CI:
 - Public providers chosen: Yahoo Finance public JSON (equity/ETF) + FRED (USD rates/macro)
 - Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`)

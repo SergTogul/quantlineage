@@ -1,6 +1,7 @@
 """Freeze public observed history into a versioned per-factor CSV artifact."""
 
 from app.market.history.artifact import PUBLIC_HISTORY_CSV_ENV, resolve_public_history_csv
+from app.market.history.data_mode import QUANTLINEAGE_DATA_MODE_ENV, apply_quantlineage_data_mode
 from app.market.history.freeze import (
     FrozenHistoryArtifact,
     MissingRequiredFactorError,
@@ -30,6 +31,7 @@ from app.market.history.transforms import (
 
 __all__ = [
     "PUBLIC_HISTORY_CSV_ENV",
+    "QUANTLINEAGE_DATA_MODE_ENV",
     "WAVE_A_DATASET_ID",
     "WAVE_A_FACTOR_MAPPINGS",
     "WAVE_A_MIN_ALIGNED_RETURNS",
@@ -41,6 +43,7 @@ __all__ = [
     "PublicSnapshotBuild",
     "StalePublicSnapshotError",
     "UnsavedPublicSnapshotError",
+    "apply_quantlineage_data_mode",
     "bind_risk_run_to_saved_snapshot",
     "build_public_snapshot",
     "equity_relative_return",

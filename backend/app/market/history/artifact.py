@@ -57,12 +57,17 @@ def resolve_public_history_csv() -> Path:
     if raw:
         path = Path(raw).expanduser()
         if not path.is_file():
-            raise ValueError(f"frozen public history CSV not found: {path}")
+            raise ValueError(
+                f"frozen public history CSV not found: {path}; "
+                "run python scripts/build_public_demo_data.py "
+                "(see docs/public_data_demo.md)"
+            )
         return path.resolve()
     default = default_public_history_csv_path()
     if default.is_file():
         return default.resolve()
     raise ValueError(
-        f"frozen public history CSV not found; set {PUBLIC_HISTORY_CSV_ENV} "
+        "frozen public history CSV not found; run python scripts/build_public_demo_data.py "
+        f"(see docs/public_data_demo.md) or set {PUBLIC_HISTORY_CSV_ENV} "
         f"or place {PUBLIC_HISTORY_CSV_NAME} under data/"
     )
