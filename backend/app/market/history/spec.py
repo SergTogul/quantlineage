@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from app.market.ingestion.models import NORMALIZATION_VERSION, Frequency
+from app.market.ingestion.models import NORMALIZATION_VERSION, Frequency, HistoricalSeries
 from app.market.quality.models import MIN_OBSERVATIONS
 
 WAVE_A_DATASET_ID = "real:public:wave-a"
@@ -127,3 +127,39 @@ WAVE_A_SPEC = PublicHistoryDatasetSpec(
     factor_mappings=WAVE_A_FACTOR_MAPPINGS,
     provider_source=WAVE_A_PROVIDER_SOURCE,
 )
+
+
+class CanonicalMappingError(ValueError):
+    """Wrong factor mapping or provider metadata vs the required Wave A identity."""
+
+    code = "canonical_mapping_mismatch"
+
+    def __init__(self, message: str = "canonical mapping mismatch") -> None:
+        super().__init__(message)
+
+
+def assert_canonical_mappings(spec: PublicHistoryDatasetSpec) -> None:
+    """Reject a Wave A dataset_id whose factor mappings are not the locked table."""
+    if spec.dataset_id == WAVE_A_DATASET_ID and spec.factor_mappings != WAVE_A_FACTOR_MAPPINGS:
+        raise CanonicalMappingError(
+            "canonical mapping mismatch: Wave A dataset_id requires locked factor mappings"
+        )
+
+
+def assert_series_matches_mapping(series: HistoricalSeries, mapping: FactorMapping) -> None:
+    """Reject series whose provider/source symbol disagrees with the required mapping."""
+    if series.instrument.instrument_id != mapping.instrument_id:
+        raise CanonicalMappingError(
+            f"provider metadata mismatch for {mapping.instrument_id}: "
+            f"series instrument {series.instrument.instrument_id}"
+        )
+    if series.metadata.source != mapping.provider:
+        raise CanonicalMappingError(
+            f"provider metadata mismatch for {mapping.instrument_id}: "
+            f"{series.metadata.source} != {mapping.provider}"
+        )
+    if series.metadata.source_symbol != mapping.source_symbol:
+        raise CanonicalMappingError(
+            f"provider metadata mismatch for {mapping.instrument_id}: "
+            f"{series.metadata.source_symbol} != {mapping.source_symbol}"
+        )

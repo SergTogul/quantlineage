@@ -49,23 +49,23 @@ Do not mark DONE without gate evidence.
 | A6.4 | API/frontend tests | DONE | `tests/test_quantlineage_product_api.py` + MarketData/App vitest; fake providers; no live network | |
 | A6.5 | Contract tests | DONE | search/history/quality/freeze/snapshot/failure covered with TestClient + MSW | |
 | G6 | API/UI gate | DONE | commit `22be31a`; review PASS `.superpowers/sdd/task-g6-review.md` | |
-| A7.1 | Demo materialization command | REVIEW | `scripts/build_public_demo_data.py`; injected fakes; `--live` opt-in in the script only | |
-| A7.2 | Optional data-mode integration | REVIEW | `QUANTLINEAGE_DATA_MODE`; Compose unset; missing CSV fails closed naming freeze script | |
-| A7.3 | Public demo docs | REVIEW | `docs/public_data_demo.md`; known_limitations + README pointer | |
-| A7.4 | Optional T0/T1 real-date demo | REVIEW | `--t0/--t1` prints two snapshot ids + Friday lineage; existing `/risk/runs/compare` | |
-| G7 | Public demo gate | REVIEW | commit `fd78bde`; `tests/test_public_data_demo.py` (8); waiting independent review | |
-| A8.1 | Unit/date/missing attacks | NOT_STARTED | | |
-| A8.2 | Lineage/repro attacks | NOT_STARTED | | |
-| A8.3 | Provider/security attacks | NOT_STARTED | | |
-| A8.4 | Full regression/CI | NOT_STARTED | | |
-| A8.5 | Final hostile review | NOT_STARTED | | |
-| G8 | Wave A final gate | NOT_STARTED | | |
+| A7.1 | Demo materialization command | DONE | `scripts/build_public_demo_data.py`; injected fakes; `--live` opt-in in the script only | |
+| A7.2 | Optional data-mode integration | DONE | `QUANTLINEAGE_DATA_MODE`; Compose unset; missing CSV fails closed naming freeze script | |
+| A7.3 | Public demo docs | DONE | `docs/public_data_demo.md`; known_limitations + README pointer | |
+| A7.4 | Optional T0/T1 real-date demo | DONE | `--t0/--t1` prints two snapshot ids + Friday lineage; existing `/risk/runs/compare` | |
+| G7 | Public demo gate | DONE | commits `fd78bde` + `4c402d7`; review PASS `.superpowers/sdd/task-g7-review.md`; no Critical/Important | |
+| A8.1 | Unit/date/missing attacks | IN_PROGRESS | `tests/test_wave_a_hostile.py`: as_of-before-history, Saturday last-print, UTC dates / `retrieved_at` | |
+| A8.2 | Lineage/repro attacks | IN_PROGRESS | Canonical mapping + provider metadata fail-closed; snapshot id/as_of bind check; freeze→unload adapters→same RiskRun/hash/numbers | |
+| A8.3 | Provider/security attacks | IN_PROGRESS | CI workflow parse offline; `YAHOO_BASE`/`FRED_BASE` constants; FRED key absent from 403/provenance; FX/vol N/A | |
+| A8.4 | Full regression/CI | IN_PROGRESS | Targeted Wave A + hostile 164 passed (2 demo tests fail only after G1 isolation reload; pass alone). QL 134 passed. Frontend 165 passed; lint pre-existing Analytics.jsx. Build ok. E2E sandbox skip. Postgres DSN unset (SQLite in pytest). Full `pytest -q` 251 failed / 1496 passed — not GitHub CI. | |
+| A8.5 | Final hostile review | IN_PROGRESS | `reviews/wave-a-real-data-hostile-review.md` (six-section). Verdict PASS Wave A matrix; G8 not DONE. | |
+| G8 | Wave A final gate | IN_PROGRESS | Implementer evidence above; independent review next. Do not mark DONE. | |
 
 ## Completion summary
-- Overall: `IN_PROGRESS` (G1–G6 DONE, G7 REVIEW)
-- Latest verified commit: `fd78bde`
-- Latest green CI:
+- Overall: `IN_PROGRESS` (G1–G7 DONE, G8 IN_PROGRESS)
+- Latest verified commit: `4c402d7` (G7). G8 implementer commit pending independent review.
+- Latest green CI: not claimed (not pushed)
 - Public providers chosen: Yahoo Finance public JSON (equity/ETF) + FRED (USD rates/macro)
 - Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`)
 - Public snapshot id/as_of: `real:public:wave-a:{as_of ISO}`; snapshot `as_of` is the requested date; lineage `source_observation_date` is last print ≤ as_of
-- Hostile review verdict:
+- Hostile review verdict: implementer **PASS (Wave A matrix)** in `reviews/wave-a-real-data-hostile-review.md`; G8 remains IN_PROGRESS
