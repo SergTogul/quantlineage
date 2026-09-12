@@ -4,8 +4,9 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 ## Market Data
 
-- No live market-data vendor integration is implemented.
-- Production demo historical factors are a packaged per-factor synthetic replay (`data/demo_multi_factor_history.csv`, id `demo-multi-factor-history` / `v1`), not observed licensed market data.
+- No live market-data vendor integration is implemented. There is no Bloomberg or Refinitiv plant.
+- Production demo historical factors are a packaged per-factor synthetic replay (`data/demo_multi_factor_history.csv`, id `demo-multi-factor-history` / `v1`), not observed licensed market data. That packaged synthetic history remains the default (`QUANTLINEAGE_DATA_MODE=synthetic` or unset).
+- An **optional** public freeze exists (`scripts/build_public_demo_data.py`, Yahoo public EOD + FRED). It is not the Compose/API default and is not a vendor feed. See [`docs/public_data_demo.md`](public_data_demo.md).
 - The four-column CSV (`data/demo_historical_factors.csv`) remains an explicit `four_macro_demo` fixture for goldens and `factor_panel=None`. It is not the production demo default.
 - `PositionMarketDataProvider` always raises `SampleMarksRemovedError`; it is not a last-writer constructor of market state from positions. Positions are contractual economics only. Live marks live on an explicit `MarketSnapshot` (canned demos bind `_DEMO_*` tables).
 - Snapshot shock application (`shock_snapshot`) still delegates to risk-layer helpers (`app.risk.scenario_engine`); a domain-layer rewrite of that dependency is not claimed.
