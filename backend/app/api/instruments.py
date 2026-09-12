@@ -11,7 +11,11 @@ from app.market.catalog import CatalogRecord, CatalogSearchHit, get_catalog_reco
 from app.market.ingestion.errors import ProviderError
 from app.market.ingestion.fred import FredAdapter
 from app.market.ingestion.models import Frequency, InstrumentRef, MacroSeriesRef
-from app.market.ingestion.protocols import HistoricalDataProvider, InstrumentSearchProvider, MacroDataProvider
+from app.market.ingestion.protocols import (
+    HistoricalDataProvider,
+    InstrumentSearchProvider,
+    MacroDataProvider,
+)
 from app.market.ingestion.yahoo import YahooFinanceAdapter
 from app.market.quality import SeriesLineage, SeriesValidationError, validate_series
 
@@ -29,13 +33,15 @@ _PROVIDER_STATUS: dict[str, int] = {
 }
 
 _PROVIDER_MESSAGES: dict[str, str] = {
-    "unavailable": "Search provider unavailable",
-    "rate_limited": "Search provider rate limited",
-    "authorization": "Search provider authorization failed",
-    "not_found": "Search provider resource not found",
-    "malformed_response": "Search provider returned a malformed response",
-    "insufficient_history": "Search provider returned insufficient history",
+    "unavailable": "Provider unavailable",
+    "rate_limited": "Provider rate limited",
+    "authorization": "Provider authorization failed",
+    "not_found": "Provider resource not found",
+    "malformed_response": "Provider returned a malformed response",
+    "insufficient_history": "Provider returned insufficient history",
 }
+
+MAX_HISTORY_RANGE_DAYS = 1826
 
 
 def get_search_provider() -> InstrumentSearchProvider:
@@ -56,11 +62,39 @@ def get_macro_provider() -> MacroDataProvider:
 def _provider_http_error(exc: ProviderError) -> HTTPException:
     code = getattr(exc, "code", "unavailable") or "unavailable"
     status_code = _PROVIDER_STATUS.get(code, status.HTTP_503_SERVICE_UNAVAILABLE)
-    message = _PROVIDER_MESSAGES.get(code, "Search provider unavailable")
+    message = _PROVIDER_MESSAGES.get(code, "Provider unavailable")
     return HTTPException(
         status_code=status_code,
         detail=error_payload(code=code, message=message, details=None),
     )
+
+
+def parse_start_end(
+    start: str | None,
+    end: str | None,
+    *,
+    max_days: int | None = None,
+) -> tuple[date, date]:
+    """Parse ISO start/end; reject inverted or oversized ranges."""
+    start_date = _parse_query_date(start, field="start")
+    end_date = _parse_query_date(end, field="end")
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_payload(
+                code="bad_request", message="start must be on or before end", details=None
+            ),
+        )
+    if max_days is not None and (end_date - start_date).days > max_days:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_payload(
+                code="bad_request",
+                message=f"Date range exceeds {max_days} days",
+                details=None,
+            ),
+        )
+    return start_date, end_date
 
 
 def _parse_query_date(raw: str | None, *, field: str) -> date:
@@ -136,13 +170,7 @@ def get_instrument_quality(
     macro_provider: MacroDataProvider = Depends(get_macro_provider),
 ) -> SeriesLineage:
     """Validate fetched history and return series lineage plus quality fields."""
-    start_date = _parse_query_date(start, field="start")
-    end_date = _parse_query_date(end, field="end")
-    if start_date > end_date:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_payload(code="bad_request", message="start must be on or before end", details=None),
-        )
+    start_date, end_date = parse_start_end(start, end)
     record = get_catalog_record(instrument_id)
     if record is None:
         raise HTTPException(

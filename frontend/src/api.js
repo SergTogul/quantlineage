@@ -310,6 +310,38 @@ export function getInstrumentQuality(instrumentId, start, end) {
   return json(`${API_V1}/instruments/${encodeURIComponent(instrumentId)}/quality?${q}`)
 }
 
+/** GET normalized history levels for a catalog instrument (display only). */
+export function getInstrumentHistory(instrumentId, start, end) {
+  const q = new URLSearchParams({ start: start ?? '', end: end ?? '' })
+  return json(`${API_V1}/market/history/${encodeURIComponent(instrumentId)}?${q}`)
+}
+
+/** POST freeze Wave A public history. Display ids/paths only. */
+export function freezePublicDataset(start, end) {
+  return json(`${API_V1}/data/datasets`, {
+    method: 'POST',
+    body: JSON.stringify({ start, end }),
+  })
+}
+
+/** GET frozen Wave A dataset sidecar. */
+export function getPublicDataset(datasetId) {
+  return json(`${API_V1}/data/datasets/${encodeURIComponent(datasetId)}`)
+}
+
+/** POST build+persist a public MarketSnapshot from injected providers. */
+export function buildPublicSnapshot(asOf) {
+  return json(`${API_V1}/market/snapshots/from-public-data`, {
+    method: 'POST',
+    body: JSON.stringify({ as_of: asOf }),
+  })
+}
+
+/** GET a persisted MarketSnapshot by id (no secrets). */
+export function getMarketSnapshot(snapshotId) {
+  return json(`${API_V1}/market/snapshots/${encodeURIComponent(snapshotId)}`)
+}
+
 /**
  * Flagship two-RiskRun explain → RiskChangeReport (Stage 10.2).
  * Body: { t0_run_id, t1_run_id, metric }. Display only — no client-side risk math.
