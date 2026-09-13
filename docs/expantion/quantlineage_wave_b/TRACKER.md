@@ -3,10 +3,10 @@
 | ID | Task | Status | Evidence | Blocker |
 |---|---|---|---|---|
 | B0 | Inspect/reuse current analytics APIs | DONE | `B0_INTEGRATION_MAP.md`; commit `aebfafa` | |
-| B1 | Historical analytics backend | IN_PROGRESS | commit `0d52457`; tests in `tests/test_historical_analytics.py`; report `.superpowers/sdd/task-b1-report.md` | independent review + CI |
-| G1 | Historical analytics gate | IN_PROGRESS | implementer evidence in `.superpowers/sdd/task-b1-report.md`; **not DONE** | independent review + CI |
-| B2 | Benchmark/relative risk | NOT_STARTED | | |
-| G2 | Benchmark gate | NOT_STARTED | | |
+| B1 | Historical analytics backend | DONE | commit `0d52457`; `tests/test_historical_analytics.py` 13 passed; review PASS `.superpowers/sdd/task-b1-review.md` | |
+| G1 | Historical analytics gate | DONE | `aebfafa`..`cc27632`; review PASS; no Critical/Important | |
+| B2 | Benchmark/relative risk | IN_PROGRESS | `tests/test_historical_analytics.py` G2 cases; report `.superpowers/sdd/task-b2-report.md` / `B2_IMPLEMENTER_REPORT.md`; **not DONE** | independent review + CI |
+| G2 | Benchmark gate | IN_PROGRESS | implementer evidence in `.superpowers/sdd/task-b2-report.md`; **not DONE** | independent review + CI |
 | B3 | Risk visualizations | NOT_STARTED | | |
 | G3 | Visualization gate | NOT_STARTED | | |
 | B4 | Risk-change waterfall | NOT_STARTED | | |
@@ -18,4 +18,4 @@
 | B7 | Hostile review + full regression | NOT_STARTED | | |
 | G7 | Wave B final gate | NOT_STARTED | | |
 
-Overall: NOT_STARTED
+Overall: IN_PROGRESS (G1 DONE, B2/G2 IN_PROGRESS — not DONE)

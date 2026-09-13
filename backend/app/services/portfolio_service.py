@@ -250,6 +250,7 @@ class PortfolioService:
             risk_free_rate=request.risk_free_rate,
             missing_date_policy=request.missing_date_policy,
             period_window=request.period_window,
+            include_benchmark=request.include_benchmark,
         )
 
     def stresses(self, portfolio: Portfolio, scenarios: list[ScenarioLike] | None = None) -> list[StressResult]:

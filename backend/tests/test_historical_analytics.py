@@ -1,4 +1,4 @@
-"""Wave B G1 — historical analytics on frozen panel + portfolio identity.
+"""Wave B G1/G2 — historical analytics and canonical SPY relative risk.
 
 Conventions (tested):
 - Period returns are fractions (0.01 = 1%), ``pnl / market_value``.
@@ -9,6 +9,13 @@ Conventions (tested):
 - Sharpe is ``(ann_return - rf) / ann_vol``; undefined when vol is 0.
 - Portfolio VaR/ES come from ``HistoricalRiskEngine.calculate`` on the sliced
   panel (currency loss, ``max(0, quantile)``) — not a second quantile module.
+- Canonical benchmark is Wave A ``equity:US:SPY`` / ``EquitySpot:SPY``.
+- Alignment is calendar-date intersection (no positional zip, no ffill).
+- Beta is ``cov(r_p, r_b) / var(r_b)`` (same sample ddof); fail closed if
+  ``var(r_b)=0``. Tracking error is sample std of ``r_p - r_b`` × sqrt(ppy).
+- Excess return is ``W_p - W_b`` (fraction). Relative drawdown is drawdown of
+  ``W_p / W_b`` with implicit start 1 (≤ 0).
+- Benchmark VaR/ES are engine numbers on a same-notional SPY book.
 - DAILY missing weekdays: drop with note or fail closed; never silent ffill.
 - Tolerances: 1e-12 for linear cash-equity identities; 1e-10 for CAGR/vol.
 """
@@ -26,13 +33,17 @@ from app.risk.factor_panel import HistoricalFactorPanel
 from app.risk.factor_types import EquitySpot
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.historical_analytics import (
+    WAVE_A_BENCHMARK_FACTOR,
+    WAVE_A_BENCHMARK_INSTRUMENT_ID,
     AnalyticsFrequency,
     AnnualizationConvention,
     MissingDatePolicy,
+    align_dated_series,
     compute_historical_analytics,
 )
 
 AAA = EquitySpot("AAA")
+SPY = EquitySpot("SPY")
 PRICING = BuiltinPricingEngine()
 DATASET_ID = "test-frozen-history"
 DATASET_VERSION = "v1"
@@ -367,6 +378,66 @@ def test_api_echoes_frozen_identities_without_provider_http():
     assert body["annualization"]["return_method"] == "cagr"
     assert "wealth" in body and len(body["wealth"]) >= 1
     assert body["units"]["var_es"] == "currency_loss"
+    assert body.get("benchmark") is None
+
+
+def test_api_canonical_spy_benchmark_without_provider_http():
+    from fastapi.testclient import TestClient
+    from tests.market_fixtures import FixedMarketProvider
+
+    from app.domain.models import MarketSnapshot
+    from app.main import app
+    from app.risk.historical_data import DEMO_MULTI_FACTOR_DATASET_ID
+    from app.services.risk_factories import DEFAULT_HISTORICAL_DATASET_VERSION
+
+    book = Portfolio(
+        id="api-aaa",
+        name="API AAA",
+        version=2,
+        positions=[EquityPosition(type="equity", id="nvda", symbol="NVDA", quantity=10)],
+    )
+    payload = {
+        "portfolio": book.model_dump(mode="json"),
+        "start": "2022-01-03",
+        "end": "2022-01-07",
+        "frequency": "DAILY",
+        "methodology": "LINEAR",
+        "annualization": {
+            "periods_per_year": 252,
+            "return_method": "cagr",
+            "volatility_method": "sqrt_time",
+            "sample_ddof": 1,
+        },
+        "historical_dataset_id": DEMO_MULTI_FACTOR_DATASET_ID,
+        "historical_dataset_version": DEFAULT_HISTORICAL_DATASET_VERSION,
+        "rolling_window": 21,
+        "missing_date_policy": "drop_with_note",
+        "include_benchmark": True,
+    }
+    market = MarketSnapshot(
+        id="snap-nvda-spy",
+        as_of=date(2022, 1, 3),
+        equity_spots={"NVDA": 190.0, "SPY": 400.0},
+        rates={"USD": 0.04},
+    )
+    with TestClient(app) as client:
+        svc = client.app.state.portfolio_service
+        previous = svc.market_data
+        svc.market_data = FixedMarketProvider(market)
+        try:
+            resp = client.post("/api/v1/risk/historical-analytics", json=payload)
+        finally:
+            svc.market_data = previous
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    bench = body["benchmark"]
+    assert bench["instrument_id"] == "equity:US:SPY"
+    assert bench["factor_column"] == "EquitySpot:SPY"
+    assert bench["units"]["beta"] == "dimensionless"
+    assert bench["units"]["tracking_error"] == "annualized_fraction"
+    assert bench["units"]["excess_return"] == "fraction"
+    assert bench["units"]["var_es"] == "currency_loss"
+    assert bench["observation_count"] >= 2
 
 
 def test_range_slice_does_not_mutate_source_panel():
@@ -390,3 +461,218 @@ def test_range_slice_does_not_mutate_source_panel():
     )
     assert panel.dates == original
     assert len(panel.dates) == 5
+
+
+def _equity_book_with_spy(
+    *, quantity: float = 10.0, spot: float = 100.0, spy_spot: float = 400.0
+) -> tuple[Portfolio, MarketSnapshot]:
+    book = Portfolio(
+        id="eq-aaa",
+        name="AAA cash equity",
+        version=3,
+        positions=[EquityPosition(type="equity", id="aaa", symbol="AAA", quantity=quantity)],
+    )
+    market = MarketSnapshot(
+        id="snap-aaa",
+        as_of=date(2024, 1, 2),
+        equity_spots={"AAA": spot, "SPY": spy_spot},
+        rates={"USD": 0.04},
+    )
+    return book, market
+
+
+def _panel_with_spy(
+    dates: list[date], aaa_returns: list[float], spy_returns: list[float]
+) -> HistoricalFactorPanel:
+    return HistoricalFactorPanel.from_pairs(
+        dates=dates,
+        rows=[[(AAA, a), (SPY, s)] for a, s in zip(aaa_returns, spy_returns, strict=True)],
+    )
+
+
+def _analyze_vs_spy(
+    dates: list[date],
+    aaa_returns: list[float],
+    spy_returns: list[float],
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    rolling_window: int = 21,
+    missing_date_policy: MissingDatePolicy = MissingDatePolicy.DROP_WITH_NOTE,
+    methodology: VaRMethodology = VaRMethodology.LINEAR,
+    include_benchmark: bool = True,
+):
+    book, market = _equity_book_with_spy()
+    panel = _panel_with_spy(dates, aaa_returns, spy_returns)
+    return compute_historical_analytics(
+        portfolio=book,
+        pricing_engine=PRICING,
+        market=market,
+        panel=panel,
+        start=start or dates[0],
+        end=end or dates[-1],
+        frequency=AnalyticsFrequency.DAILY,
+        methodology=methodology,
+        annualization=ANN,
+        historical_dataset_id=DATASET_ID,
+        historical_dataset_version=DATASET_VERSION,
+        rolling_window=rolling_window,
+        missing_date_policy=missing_date_policy,
+        include_benchmark=include_benchmark,
+    )
+
+
+def test_identical_series_beta_one_tracking_error_zero():
+    dates = _weekdays(5)
+    rets = [0.01, -0.02, 0.015, 0.005, 0.02]
+    result = _analyze_vs_spy(dates, rets, rets)
+    bench = result.benchmark
+    assert bench is not None
+    assert bench.instrument_id == WAVE_A_BENCHMARK_INSTRUMENT_ID
+    assert bench.factor_column == "EquitySpot:SPY"
+    assert WAVE_A_BENCHMARK_FACTOR == SPY
+    assert bench.beta == pytest.approx(1.0, abs=TOL)
+    assert bench.tracking_error == pytest.approx(0.0, abs=TOL)
+    assert bench.correlation == pytest.approx(1.0, abs=TOL)
+    assert bench.excess_return == pytest.approx(0.0, abs=TOL)
+    assert bench.relative_drawdown == pytest.approx(0.0, abs=TOL)
+    assert bench.cumulative_return == pytest.approx(result.cumulative_return, abs=TOL)
+
+
+def test_uncorrelated_series_beta_near_zero():
+    dates = _weekdays(4)
+    aaa = [0.01, 0.01, -0.01, -0.01]
+    spy = [0.01, -0.01, 0.01, -0.01]
+    result = _analyze_vs_spy(dates, aaa, spy)
+    assert result.benchmark is not None
+    assert result.benchmark.beta == pytest.approx(0.0, abs=TOL)
+    assert result.benchmark.correlation == pytest.approx(0.0, abs=TOL)
+
+
+def test_shifted_dates_are_not_silently_matched():
+    port_dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    port_rets = [0.10, 0.01, -0.05]
+    bench_dates = [date(2024, 1, 3), date(2024, 1, 4), date(2024, 1, 5)]
+    bench_rets = [0.10, 0.01, -0.05]
+    # Positional zip of the raw series is identical (beta would be 1, TE 0).
+    assert port_rets == bench_rets
+    aligned_dates, r_p, r_b = align_dated_series(port_dates, port_rets, bench_dates, bench_rets)
+    assert aligned_dates == [date(2024, 1, 3), date(2024, 1, 4)]
+    assert list(r_p) == pytest.approx([0.01, -0.05], abs=TOL)
+    assert list(r_b) == pytest.approx([0.10, 0.01], abs=TOL)
+    var_b = float(np.var(r_b, ddof=1))
+    cov = float(np.cov(r_p, r_b, ddof=1)[0, 1])
+    beta = cov / var_b
+    tracking_error = float(np.std(r_p - r_b, ddof=1) * np.sqrt(252))
+    assert beta != pytest.approx(1.0, abs=1e-6)
+    assert tracking_error != pytest.approx(0.0, abs=1e-6)
+
+
+def test_insufficient_overlap_fails_closed():
+    with pytest.raises(ValueError, match="insufficient"):
+        align_dated_series(
+            [date(2024, 1, 2), date(2024, 1, 3)],
+            [0.01, 0.02],
+            [date(2024, 1, 4), date(2024, 1, 5)],
+            [0.03, 0.04],
+        )
+    dates = _weekdays(1)
+    with pytest.raises(ValueError, match="insufficient"):
+        _analyze_vs_spy(dates, [0.02], [0.01], rolling_window=21)
+
+
+def test_missing_spy_factor_fails_closed():
+    dates = _weekdays(4)
+    book, market = _equity_book_with_spy()
+    with pytest.raises(ValueError, match="EquitySpot:SPY"):
+        compute_historical_analytics(
+            portfolio=book,
+            pricing_engine=PRICING,
+            market=market,
+            panel=_panel(dates, [0.01] * 4),
+            start=dates[0],
+            end=dates[-1],
+            frequency=AnalyticsFrequency.DAILY,
+            methodology=VaRMethodology.LINEAR,
+            annualization=ANN,
+            historical_dataset_id=DATASET_ID,
+            historical_dataset_version=DATASET_VERSION,
+            rolling_window=21,
+            include_benchmark=True,
+        )
+
+
+def test_percent_fraction_units_beta_te_excess_not_scaled_by_100():
+    dates = _weekdays(5)
+    aaa = [0.01, 0.02, 0.015, 0.005, 0.012]
+    spy = [0.00, 0.01, 0.005, -0.005, 0.002]
+    result = _analyze_vs_spy(dates, aaa, spy)
+    bench = result.benchmark
+    assert bench is not None
+    expected_excess = float(np.prod(1.0 + np.asarray(aaa)) - np.prod(1.0 + np.asarray(spy)))
+    assert bench.excess_return == pytest.approx(expected_excess, abs=TOL)
+    assert abs(bench.excess_return) < 1.0
+    assert bench.units["beta"] == "dimensionless"
+    assert bench.units["tracking_error"] == "annualized_fraction"
+    assert bench.units["excess_return"] == "fraction"
+    active = np.asarray(aaa, dtype=float) - np.asarray(spy, dtype=float)
+    expected_te = float(np.std(active, ddof=1) * np.sqrt(252))
+    assert bench.tracking_error == pytest.approx(expected_te, abs=TOL_ANN)
+    assert bench.tracking_error < 1.0
+
+
+def test_benchmark_var_es_reuses_historical_risk_engine_on_spy_book():
+    dates = _weekdays(20)
+    aaa = [0.01] * 16 + [-0.04, -0.08, -0.12, 0.02]
+    spy = [0.005] * 16 + [-0.02, -0.03, -0.06, 0.01]
+    book, market = _equity_book_with_spy()
+    panel = _panel_with_spy(dates, aaa, spy)
+    result = compute_historical_analytics(
+        portfolio=book,
+        pricing_engine=PRICING,
+        market=market,
+        panel=panel,
+        start=dates[0],
+        end=dates[-1],
+        frequency=AnalyticsFrequency.DAILY,
+        methodology=VaRMethodology.LINEAR,
+        annualization=ANN,
+        historical_dataset_id=DATASET_ID,
+        historical_dataset_version=DATASET_VERSION,
+        rolling_window=5,
+        include_benchmark=True,
+    )
+    assert result.benchmark is not None
+    spy_spot = float(market.equity_spots["SPY"])
+    quantity = result.market_value / spy_spot
+    spy_book = Portfolio(
+        id="benchmark:equity:US:SPY",
+        name="Wave A SPY benchmark",
+        version=1,
+        positions=[EquityPosition(type="equity", id="spy", symbol="SPY", quantity=quantity)],
+    )
+    engine = HistoricalRiskEngine(
+        factor_panel=panel,
+        methodology=VaRMethodology.LINEAR,
+        observations=panel.n_observations,
+    )
+    summary = engine.calculate(spy_book, PRICING, methodology=VaRMethodology.LINEAR, market=market)
+    assert result.benchmark.var_95 == pytest.approx(summary.var_95, abs=TOL)
+    assert result.benchmark.var_99 == pytest.approx(summary.var_99, abs=TOL)
+    assert result.benchmark.expected_shortfall_99 == pytest.approx(
+        summary.expected_shortfall_99, abs=TOL
+    )
+    assert result.benchmark.var_99 >= result.benchmark.var_95 >= 0.0
+    assert result.benchmark.units["var_es"] == "currency_loss"
+
+
+def test_zero_benchmark_variance_fails_closed():
+    dates = _weekdays(4)
+    with pytest.raises(ValueError, match="var\\(r_b\\)|benchmark variance"):
+        _analyze_vs_spy(dates, [0.01, -0.02, 0.03, 0.00], [0.0, 0.0, 0.0, 0.0])
+
+
+def test_g1_without_benchmark_flag_leaves_nested_object_none():
+    dates = _weekdays(5)
+    result = _analyze(dates, [0.01] * 5, rolling_window=21)
+    assert result.benchmark is None
