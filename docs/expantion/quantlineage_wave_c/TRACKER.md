@@ -15,7 +15,7 @@
 | G5 | UX/devex gate | DONE | `dab210f`..`41b83f4`; review PASS; no Critical/Important | |
 | C6 | Eval harness + adversarial cases | DONE | commit `1a8aa48` + `682280d`; `tests/test_wave_c_evals.py`; review PASS `.superpowers/sdd/task-c6-review.md` + Important follow-up PASS | |
 | G6 | Safety/eval gate | DONE | `41b83f4`..`682280d`; review PASS; Important MCP-auth denylist + payload-digit helper closed | |
-| C7 | Demo + hostile review + CI | DONE | commit `714b677`; `docs/wave_c_ai_mcp_demo.md`; `reviews/wave-c-ai-mcp-hostile-review.md`; review PASS (local) `.superpowers/sdd/task-c7-review.md`; CI pending | |
-| G7 | Wave C final gate | IN_PROGRESS | local PASS `682280d`..`714b677`; no Critical/Important; CI not yet green | |
+| C7 | Demo + hostile review + CI | DONE | commit `714b677`; `docs/wave_c_ai_mcp_demo.md`; `reviews/wave-c-ai-mcp-hostile-review.md`; review PASS `.superpowers/sdd/task-c7-review.md`; CI green https://github.com/SergTogul/riskforge-mvp/actions/runs/34767763441 | |
+| G7 | Wave C final gate | DONE | `682280d`..`f325d2c`; local PASS; PR-FULL green including e2e-playwright `34767763441` | |
 
-Overall: C0–C7 local PASS; G7 pending CI
+Overall: DONE (G1–G7; CI PR-FULL green on `f325d2c`, run 34767763441)
