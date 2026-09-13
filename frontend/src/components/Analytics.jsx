@@ -4,6 +4,7 @@ import {
   explainPnLDemo, getRatesShowcase, getRiskRun, getRiskRunProvenance, API_V1,
 } from '../api'
 import BlockHelp from './BlockHelp'
+import { ContributionBars, KeyRateDv01Curve } from './RiskVisuals.jsx'
 import {
   money, topFactors, varMethod, hierarchySummary, hierarchyNodeAtPath, hierarchyChildRows,
   hierarchyNodeMetrics, attributionSummary,
@@ -95,6 +96,7 @@ export function RatesShowcase() {
             {s.market_snapshot_id ? ` · ${s.market_snapshot_id}` : ''}
             {s.conventions.shock_unit ? ` · ${s.conventions.shock_unit}` : ''}
           </div>
+          <KeyRateDv01Curve rows={s.key_rate_dv01} />
           <table>
             <thead><tr><th>Tenor</th><th>Zero</th><th>KR-DV01</th></tr></thead>
             <tbody>
@@ -110,9 +112,12 @@ export function RatesShowcase() {
               })}
             </tbody>
           </table>
-          <div className="muted foot">
-            Parallel DV01 {money(s.parallel_dv01 ?? 0)}
-            {s.conventions.sensitivity_unit ? ` · ${s.conventions.sensitivity_unit}` : ''}
+          <div className="parallel-dv01" data-testid="parallel-dv01">
+            <span className="muted">Parallel DV01</span>
+            <strong>{money(s.parallel_dv01 ?? 0)}</strong>
+            {s.conventions.sensitivity_unit ? (
+              <span className="muted">{s.conventions.sensitivity_unit}</span>
+            ) : null}
           </div>
           {s.conventions.limitations && (
             <div className="muted foot">{s.conventions.limitations}</div>
@@ -880,24 +885,33 @@ export function ESContributions({ portfolio }) {
           {s.items.length === 0
             ? <div className="muted foot">No contributions in {ES_DIM_LABELS[s.dimension]}</div>
             : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>{ES_DIM_LABELS[s.dimension] || 'Key'}</th>
-                    <th>Component ES</th>
-                    <th>Contrib %</th>
-                  </tr>
-                </thead>
-                <tbody>{s.items.map((x) => (
-                  <tr key={x.key}>
-                    <td>{x.label || x.key}</td>
-                    <td className={(x.component_es ?? 0) < 0 ? 'negative' : 'positive'}>
-                      {money(x.component_es ?? 0)}
-                    </td>
-                    <td>{(x.contribution_pct ?? 0).toFixed(1)}%</td>
-                  </tr>
-                ))}</tbody>
-              </table>
+              <>
+                {s.dimension === 'by_risk_factor' && (
+                  <ContributionBars
+                    items={s.items}
+                    amountKey="component_es"
+                    ariaLabel="ES risk-factor contribution bars"
+                  />
+                )}
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{ES_DIM_LABELS[s.dimension] || 'Key'}</th>
+                      <th>Component ES</th>
+                      <th>Contrib %</th>
+                    </tr>
+                  </thead>
+                  <tbody>{s.items.map((x) => (
+                    <tr key={x.key}>
+                      <td>{x.label || x.key}</td>
+                      <td className={(x.component_es ?? 0) < 0 ? 'negative' : 'positive'}>
+                        {money(x.component_es ?? 0)}
+                      </td>
+                      <td>{(x.contribution_pct ?? 0).toFixed(1)}%</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </>
             )}
           <div className="muted foot">
             Showing {s.items.length} of {s.item_count}

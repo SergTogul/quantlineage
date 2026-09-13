@@ -1,22 +1,25 @@
 import { useState } from 'react'
 import { limitDrilldown } from '../api'
 import BlockHelp from './BlockHelp'
+import { ContributionBars } from './RiskVisuals.jsx'
 import {
   breachedLimits, limitDrilldownSummary, limitStatus, limitStatusClass, limitStatusCounts,
   money, percent, threatClass, topContributors,
 } from '../lib/risk.mjs'
 
 export function Contributors({ items }) {
+  const rows = topContributors(items)
   return (
     <div className="card" data-testid="golden-demo-contributors">
       <div className="block-title">
         <h3>Component VaR Contributors</h3>
         <BlockHelp id="component-var" />
       </div>
-      <div className="muted">Parametric component VaR by trade</div>
+      <div className="muted">Parametric component VaR by trade — bars from API risk_amount / contribution_pct</div>
+      <ContributionBars items={rows} ariaLabel="Component VaR contribution bars" />
       <table>
         <tbody>
-          {topContributors(items).map((x) => (
+          {rows.map((x) => (
             <tr key={x.position_id}>
               <td>{x.label}</td>
               <td>{x.contribution_pct.toFixed(1)}%</td>
