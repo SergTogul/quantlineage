@@ -13,7 +13,12 @@ from app.market.quality.errors import (
     UnsortedDatesError,
 )
 from app.market.quality.hash import content_hash
-from app.market.quality.models import ALLOWED_UNITS, MIN_OBSERVATIONS, AlignmentResult, SeriesLineage
+from app.market.quality.models import (
+    ALLOWED_UNITS,
+    MIN_OBSERVATIONS,
+    AlignmentResult,
+    SeriesLineage,
+)
 from app.market.quality.validate import validate_series
 
 __all__ = [
