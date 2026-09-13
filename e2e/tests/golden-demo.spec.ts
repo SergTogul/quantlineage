@@ -109,9 +109,11 @@ test.describe('Stage 10.4 golden institutional demo', () => {
 
     const flagship = change.getByTestId('golden-demo-risk-change-result')
     await expect(flagship).toBeVisible({ timeout: 120_000 })
-    await expect(flagship.getByText(/Trade/)).toBeVisible()
-    await expect(flagship.getByText(/Market/)).toBeVisible()
-    await expect(flagship.getByText(/residual/i)).toBeVisible()
+    await expect(flagship.getByTestId('risk-change-waterfall')).toBeVisible()
+    await expect(flagship.getByTestId('waterfall-step-portfolio')).toBeVisible()
+    await expect(flagship.getByTestId('waterfall-step-market')).toBeVisible()
+    await expect(flagship.getByTestId('waterfall-step-residual')).toBeVisible()
+    await expect(flagship.getByText('Market snapshot')).toBeVisible()
     await expect(flagship.locator('table tbody tr')).not.toHaveCount(0)
     await expect(change.locator('.error')).toHaveCount(0)
 

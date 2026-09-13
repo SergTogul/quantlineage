@@ -776,7 +776,7 @@ function RiskChangeWaterfall({ report }) {
           key={step.key}
           className="waterfall-step"
           role="listitem"
-          data-testid={step.key === 'residual' ? 'waterfall-step-residual' : 'waterfall-step'}
+          data-testid={`waterfall-step-${step.key}`}
           data-step={step.key}
         >
           <span className="waterfall-step-label">{step.label}</span>
