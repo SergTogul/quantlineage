@@ -387,10 +387,12 @@ def test_prices_cash_aapl_book_from_public_snapshot_without_provider() -> None:
 
 def test_historical_module_still_does_not_import_adapters() -> None:
     for name in list(sys.modules):
-        if name in FORBIDDEN_ADAPTERS or name.startswith("app.market.ingestion.yahoo"):
-            del sys.modules[name]
-        if name.startswith("app.market.ingestion.fred"):
-            del sys.modules[name]
+        if (
+            name in FORBIDDEN_ADAPTERS
+            or name.startswith("app.market.ingestion.yahoo")
+            or name.startswith("app.market.ingestion.fred")
+        ):
+            sys.modules.pop(name, None)
 
     import app.risk.historical  # noqa: F401
 

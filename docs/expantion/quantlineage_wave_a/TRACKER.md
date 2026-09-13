@@ -57,9 +57,9 @@ Do not mark DONE without gate evidence.
 | A8.1 | Unit/date/missing attacks | IN_PROGRESS | `tests/test_wave_a_hostile.py`: as_of-before-history, Saturday last-print, UTC dates / `retrieved_at` | |
 | A8.2 | Lineage/repro attacks | IN_PROGRESS | Canonical mapping + provider metadata fail-closed; snapshot id/as_of bind check; freeze→unload adapters→same RiskRun/hash/numbers | |
 | A8.3 | Provider/security attacks | IN_PROGRESS | CI workflow parse offline; `YAHOO_BASE`/`FRED_BASE` constants; FRED key absent from 403/provenance; FX/vol N/A | |
-| A8.4 | Full regression/CI | IN_PROGRESS | Targeted Wave A + hostile 164 passed (2 demo tests fail only after G1 isolation reload; pass alone). QL 134 passed. Frontend 165 passed; lint pre-existing Analytics.jsx. Build ok. E2E sandbox skip. Postgres DSN unset (SQLite in pytest). Full `pytest -q` 251 failed / 1496 passed — not GitHub CI. | |
-| A8.5 | Final hostile review | IN_PROGRESS | `reviews/wave-a-real-data-hostile-review.md` (six-section). Verdict PASS Wave A matrix; G8 not DONE. | |
-| G8 | Wave A final gate | IN_PROGRESS | Implementer evidence above; independent review next. Do not mark DONE. | |
+| A8.4 | Full regression/CI | IN_PROGRESS | Local backend `pytest -q`: **1749 passed**, 9 skipped (after isolation subprocess + route class + lint + stale demo-id pin). Frontend 165 passed; lint green; build ok. E2E/Postgres not re-run here. Not GitHub CI. | |
+| A8.5 | Final hostile review | IN_PROGRESS | `reviews/wave-a-real-data-hostile-review.md`; G8 FAIL then red-suite fix; re-review next | |
+| G8 | Wave A final gate | IN_PROGRESS | Red tests are blockers. Independent review FAIL `.superpowers/sdd/task-g8-review.md`. Fix commit pending re-review. Do not mark DONE. | |
 
 ## Completion summary
 - Overall: `IN_PROGRESS` (G1–G7 DONE, G8 IN_PROGRESS)

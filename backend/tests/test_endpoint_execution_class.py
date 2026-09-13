@@ -98,6 +98,15 @@ def test_dashboard_batch_is_heavy() -> None:
     assert not is_interactive_only("POST", "/risk/dashboard")
 
 
+def test_wave_a_public_market_routes_are_interactive() -> None:
+    assert classify("GET", "/market/history/{instrument_id}") is ExecutionClass.INTERACTIVE
+    assert classify("GET", "/market/snapshots/{snapshot_id}") is ExecutionClass.INTERACTIVE
+    assert classify("POST", "/market/snapshots/from-public-data") is ExecutionClass.INTERACTIVE
+    assert classify("GET", "/api/v1/market/history/{instrument_id}") is ExecutionClass.INTERACTIVE
+    assert is_interactive_only("GET", "/market/history/{instrument_id}")
+    assert is_interactive_only("POST", "/market/snapshots/from-public-data")
+
+
 def test_every_owned_route_is_classified() -> None:
     registered = _openapi_owned_routes()
     mapped = {(method, normalize_path(path)) for method, path in ENDPOINT_EXECUTION_CLASS}

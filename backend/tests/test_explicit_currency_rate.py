@@ -195,9 +195,12 @@ def test_usd_demo_books_and_snapshot_ids_unchanged() -> None:
     assert SAMPLE_PORTFOLIO is CROSS_ASSET_PORTFOLIO
     assert [p.id for p in EQUITY_VOL_PORTFOLIO.positions] == [
         "eq-nvda",
+        "eq-aapl",
+        "eq-msft",
         "eq-spy",
         "opt-spy-put",
         "opt-nvda-call",
+        "opt-aapl-call",
         "opt-spy-call-short",
         "fut-es",
     ]
@@ -211,9 +214,12 @@ def test_usd_demo_books_and_snapshot_ids_unchanged() -> None:
     ]
     assert [p.id for p in CROSS_ASSET_PORTFOLIO.positions] == [
         "eq-nvda",
+        "eq-aapl",
+        "eq-msft",
         "eq-spy",
         "opt-spy-put",
         "opt-nvda-call",
+        "opt-msft-put",
         "bond-ust10",
         "swap-usd5y",
         "fut-es",
