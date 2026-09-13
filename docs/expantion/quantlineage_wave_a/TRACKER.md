@@ -54,18 +54,18 @@ Do not mark DONE without gate evidence.
 | A7.3 | Public demo docs | DONE | `docs/public_data_demo.md`; known_limitations + README pointer | |
 | A7.4 | Optional T0/T1 real-date demo | DONE | `--t0/--t1` prints two snapshot ids + Friday lineage; existing `/risk/runs/compare` | |
 | G7 | Public demo gate | DONE | commits `fd78bde` + `4c402d7`; review PASS `.superpowers/sdd/task-g7-review.md`; no Critical/Important | |
-| A8.1 | Unit/date/missing attacks | IN_PROGRESS | `tests/test_wave_a_hostile.py`: as_of-before-history, Saturday last-print, UTC dates / `retrieved_at` | |
-| A8.2 | Lineage/repro attacks | IN_PROGRESS | Canonical mapping + provider metadata fail-closed; snapshot id/as_of bind check; freeze→unload adapters→same RiskRun/hash/numbers | |
-| A8.3 | Provider/security attacks | IN_PROGRESS | CI workflow parse offline; `YAHOO_BASE`/`FRED_BASE` constants; FRED key absent from 403/provenance; FX/vol N/A | |
-| A8.4 | Full regression/CI | IN_PROGRESS | Local backend `pytest -q`: **1749 passed**, 9 skipped (after isolation subprocess + route class + lint + stale demo-id pin). Frontend 165 passed; lint green; build ok. E2E/Postgres not re-run here. Not GitHub CI. | |
-| A8.5 | Final hostile review | IN_PROGRESS | `reviews/wave-a-real-data-hostile-review.md`; G8 FAIL then red-suite fix; re-review next | |
-| G8 | Wave A final gate | IN_PROGRESS | Red tests are blockers. Independent review FAIL `.superpowers/sdd/task-g8-review.md`. Fix commit pending re-review. Do not mark DONE. | |
+| A8.1 | Unit/date/missing attacks | DONE | `tests/test_wave_a_hostile.py`: as_of-before-history, Saturday last-print, UTC dates / `retrieved_at` | |
+| A8.2 | Lineage/repro attacks | DONE | Canonical mapping + provider metadata fail-closed; snapshot id/as_of bind check; freeze→unload adapters→same RiskRun/hash/numbers | |
+| A8.3 | Provider/security attacks | DONE | CI workflow parse offline; `YAHOO_BASE`/`FRED_BASE` constants; FRED key absent from 403/provenance; FX/vol N/A | |
+| A8.4 | Full regression/CI | DONE | Local pytest **1749 passed**, 9 skipped. Frontend 165 + lint + build. GitHub CI `d73e7df` PR-FULL green: https://github.com/SergTogul/riskforge-mvp/actions/runs/34728082547 | |
+| A8.5 | Final hostile review | DONE | `reviews/wave-a-real-data-hostile-review.md`; G8 FAIL on red suite then fix `51b5869`; ruff `caad046`; mypy `d73e7df` | |
+| G8 | Wave A final gate | DONE | commit `d73e7df`; CI green run 34728082547; red tests treated as blockers | |
 
 ## Completion summary
-- Overall: `IN_PROGRESS` (G1–G7 DONE, G8 IN_PROGRESS)
-- Latest verified commit: `4c402d7` (G7). G8 implementer commit pending independent review.
-- Latest green CI: not claimed (not pushed)
+- Overall: `DONE` (G1–G8)
+- Latest verified commit: `d73e7df`
+- Latest green CI: https://github.com/SergTogul/riskforge-mvp/actions/runs/34728082547
 - Public providers chosen: Yahoo Finance public JSON (equity/ETF) + FRED (USD rates/macro)
 - Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`)
 - Public snapshot id/as_of: `real:public:wave-a:{as_of ISO}`; snapshot `as_of` is the requested date; lineage `source_observation_date` is last print ≤ as_of
-- Hostile review verdict: implementer **PASS (Wave A matrix)** in `reviews/wave-a-real-data-hostile-review.md`; G8 remains IN_PROGRESS
+- Hostile review verdict: PASS (`reviews/wave-a-real-data-hostile-review.md`); G8 closed after red-suite/CI lint blockers were fixed
