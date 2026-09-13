@@ -397,6 +397,7 @@ export function FunctionKeysLayout({
           <h3>{teaser.label}</h3>
           <p className="muted">{teaser.hint}</p>
           <p>{teaser.teaser}</p>
+          {teaser.id === 'risk-factors' && <FactorExposureHeatmap items={factors} />}
           <button type="button" className="book-status-go" onClick={() => onNavigate?.(teaser.id)}>
             Open {teaser.label}
           </button>
