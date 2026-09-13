@@ -447,6 +447,15 @@ class PortfolioService:
             current_market=current,
             dt_years=1.0 / 252.0,
         ))
+
+    def build_rates_showcase(self):
+        """C1/C5: rates-macro KR-DV01 for ``get_key_rate_dv01``. No new bump engine."""
+        from app.risk.rates_showcase import build_rates_showcase
+        from app.sample import RATES_MACRO_PORTFOLIO, demo_market_snapshot
+
+        book = RATES_MACRO_PORTFOLIO
+        return build_rates_showcase(book, demo_market_snapshot(book), self.pricing)
+
     def query(self, portfolio, question): return self.query_engine.answer(question,portfolio,self)
 
     def dashboard(

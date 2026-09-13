@@ -342,23 +342,141 @@ export function ReverseStressMulti({ portfolio }) {
   )
 }
 
+const RISK_QUERY_EXAMPLES = [
+  'Why did VaR change?',
+  'Top contributors?',
+  'Show USD 10Y KR-DV01.',
+  'Run equity-down stress.',
+  'Compare these RiskRuns.',
+]
+
+const MISSING_ON_PAYLOAD = 'not on this payload'
+
+const RISK_QUERY_CARD_FIELDS = [
+  ['metric', 'Metric'],
+  ['value', 'Value'],
+  ['unit', 'Unit'],
+  ['sign_convention', 'Sign'],
+  ['risk_run_id', 'Run'],
+  ['as_of', 'As of'],
+]
+
+const RISK_QUERY_PROVENANCE_FIELDS = [
+  ['metric', 'Metric'],
+  ['value', 'Value'],
+  ['unit', 'Unit'],
+  ['sign_convention', 'Sign'],
+  ['risk_run_id', 'Run'],
+  ['as_of', 'As of'],
+  ['methodology', 'Methodology'],
+  ['market_snapshot_id', 'Snapshot'],
+]
+
+function copiedQueryField(source, key) {
+  if (!source || !Object.prototype.hasOwnProperty.call(source, key)) {
+    return MISSING_ON_PAYLOAD
+  }
+  const value = source[key]
+  if (value == null || value === '') return MISSING_ON_PAYLOAD
+  if (typeof value === 'object') return MISSING_ON_PAYLOAD
+  if (typeof value === 'number') return String(value).replace('-', '−')
+  return String(value)
+}
+
+function QueryFieldList({ title, source, fields, testId }) {
+  return (
+    <section className="risk-query-fields" data-testid={testId}>
+      <h4>{title}</h4>
+      <dl>
+        {fields.map(([key, label]) => (
+          <div key={key} className="risk-query-field">
+            <dt>{label}</dt>
+            <dd>{copiedQueryField(source, key)}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+function hasCopiedObject(value) {
+  return value != null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0
+}
+
 export function RiskQuery({ portfolio }) {
   const [q, setQ] = useState('What is the worst stress scenario?')
   const [r, setR] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(question) {
+    setQ(question)
+    setBusy(true)
+    setError('')
+    try {
+      setR(await askRisk(portfolio, question))
+    } catch (e) {
+      setR(null)
+      setError(e.message || 'Query failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const card = r?.data?.card
+  const provenance = r?.data?.provenance
+
   return (
     <div className="card" data-testid="golden-demo-risk-query">
       <div className="block-title">
         <h3>Risk Query</h3>
         <BlockHelp id="risk-query" />
       </div>
-      <div className="query">
-        <input value={q} onChange={(e) => setQ(e.target.value)} />
-        <button type="button" onClick={async () => setR(await askRisk(portfolio, q))}>Ask</button>
+      <div className="query-examples" data-testid="risk-query-examples">
+        {RISK_QUERY_EXAMPLES.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            className="query-example"
+            disabled={busy}
+            onClick={() => submit(prompt)}
+          >
+            {prompt}
+          </button>
+        ))}
       </div>
-      {r && <p className="query-answer">{r.answer}</p>}
+      <div className="query">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          aria-label="Risk question"
+          disabled={busy}
+        />
+        <button type="button" disabled={busy} onClick={() => submit(q)}>Ask</button>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {r && (
+        <p className="query-answer" data-testid="risk-query-answer">{r.answer}</p>
+      )}
+      {hasCopiedObject(card) && (
+        <QueryFieldList
+          title="Result card"
+          source={card}
+          fields={RISK_QUERY_CARD_FIELDS}
+          testId="risk-query-result-card"
+        />
+      )}
+      {hasCopiedObject(provenance) && (
+        <QueryFieldList
+          title="Provenance"
+          source={provenance}
+          fields={RISK_QUERY_PROVENANCE_FIELDS}
+          testId="risk-query-provenance"
+        />
+      )}
       <div className="muted">
-        Deterministic routing; “Why did my risk change?” needs two completed RiskRun ids
-        and never invents VaR.
+        Deterministic routing; “Why did VaR change?” needs two completed RiskRun ids
+        and never invents VaR. Query is the control on Overview Command (`#overview/command`).
       </div>
     </div>
   )

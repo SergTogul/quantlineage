@@ -321,3 +321,34 @@ def test_c3_keyword_path_forwards_principal_into_submit() -> None:
     )
     assert response.tool_name == "run_stress"
     assert service.submits[0]["owner"] == "alice"
+
+
+def test_c5_usd_10y_kr_dv01_keyword_reaches_get_key_rate_dv01() -> None:
+    from tests.test_wave_c_tool_contracts import _RatesShowcaseService
+
+    engine = RiskQueryEngine()
+    service = _RatesShowcaseService()
+    question = "Show USD 10Y KR-DV01."
+    plan = engine.route(question)
+    assert plan.tool_name == RiskToolName.GET_KEY_RATE_DV01
+    assert not plan.needs_clarification
+    assert plan.tool_args.get("tenor") == "10Y"
+
+    response = engine.answer(question, SAMPLE_PORTFOLIO, service)
+    assert service.calls == ["build_rates_showcase"]
+    assert response.tool_name == "get_key_rate_dv01"
+    rows = response.data["tool_result"]["key_rate_dv01"]
+    assert [row["tenor"] for row in rows] == ["10Y"]
+    assert response.data["card"] is not None
+
+
+def test_c5_http_query_service_executes_key_rate_dv01() -> None:
+    from app.services.risk_factories import build_portfolio_service
+
+    service = build_portfolio_service()
+    engine = RiskQueryEngine()
+    response = engine.answer("Show USD 10Y KR-DV01.", SAMPLE_PORTFOLIO, service)
+    assert response.tool_name == "get_key_rate_dv01"
+    assert not response.requires_clarification
+    rows = response.data["tool_result"]["key_rate_dv01"]
+    assert [row["tenor"] for row in rows] == ["10Y"]
