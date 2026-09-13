@@ -114,11 +114,13 @@ class GetKeyRateDv01Args(BaseModel):
 
 
 class GetTopRiskContributorsArgs(BaseModel):
-    """Prefer RiskRun ``run_type=contributors``. Ranking math is unchanged."""
+    """Prefer RiskRun ``run_type=contributors``. Ranking math is unchanged.
+
+    Truncation is not a tool arg: the contributors RiskRun request blob cannot
+    carry ``top_n`` (RF-019 still slices the sync dump to 5).
+    """
 
     model_config = ConfigDict(extra="forbid")
-
-    top_n: int = Field(default=5, ge=1, le=50)
 
 
 class GetRunProvenanceArgs(BaseModel):
@@ -224,7 +226,7 @@ def execute_allowlisted_tool(
             submit(
                 portfolio=portfolio,
                 run_type="stress",
-                request={},
+                request={"scenario_id": args["scenario_id"]},
                 market_snapshot_id=args.get("market_snapshot_id"),
             )
         )

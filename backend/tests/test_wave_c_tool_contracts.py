@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from pathlib import Path
 
+from pydantic import ValidationError
 from tests.test_ai_query_orchestration import (
     _FixturePayload,
     _FixtureService,
@@ -12,6 +13,7 @@ from tests.test_ai_query_orchestration import (
 )
 
 from app.api.instruments import MAX_HISTORY_RANGE_DAYS
+from app.api.schemas import parse_risk_run_request
 from app.domain.models import RiskChangeMetric
 from app.risk.query import (
     TOOL_CONTRACTS,
@@ -281,6 +283,82 @@ def test_c1_run_stress_allowlists_named_default_scenarios() -> None:
     assert "risk/runs" in contract.http_path
 
 
+def test_c1_run_stress_dispatch_forwards_named_scenario_id() -> None:
+    service = _RiskRunService()
+    engine = RiskQueryEngine()
+    first = engine.answer_with_model(
+        "equity down",
+        SAMPLE_PORTFOLIO,
+        service,
+        _ScriptedModel(
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.RUN_STRESS,
+                tool_args={"scenario_id": "eq_down_10"},
+                intent="run_stress",
+            )
+        ),
+    )
+    second = engine.answer_with_model(
+        "rates up",
+        SAMPLE_PORTFOLIO,
+        service,
+        _ScriptedModel(
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.RUN_STRESS,
+                tool_args={"scenario_id": "rates_up_100"},
+                intent="run_stress",
+            )
+        ),
+    )
+    assert service.submits[0]["request"] == {"scenario_id": "eq_down_10"}
+    assert service.submits[1]["request"] == {"scenario_id": "rates_up_100"}
+    assert first.data["tool_result"]["request"]["scenario_id"] == "eq_down_10"
+    assert second.data["tool_result"]["request"]["scenario_id"] == "rates_up_100"
+
+
+def test_c1_stress_run_execute_filters_default_library() -> None:
+    from app.services.risk_run_worker import execute_run_type
+
+    class _Spy:
+        def __init__(self) -> None:
+            self.seen = None
+
+        def stresses(self, portfolio, scenarios=None):
+            self.seen = scenarios
+            return []
+
+    spy = _Spy()
+    execute_run_type(
+        spy,
+        run_type="stress",
+        portfolio=SAMPLE_PORTFOLIO,
+        request={"scenario_id": "rates_up_100"},
+    )
+    assert spy.seen is not None
+    assert [item.id for item in spy.seen] == ["rates_up_100"]
+    execute_run_type(spy, run_type="stress", portfolio=SAMPLE_PORTFOLIO, request={})
+    assert spy.seen is None
+    parsed = parse_risk_run_request("stress", {"scenario_id": "eq_down_10"})
+    assert parsed.scenario_id == "eq_down_10"
+    try:
+        parse_risk_run_request("stress", {"scenario_id": "eq_down_10", "sql": "1"})
+        raise AssertionError("extra keys must fail")
+    except ValidationError:
+        pass
+
+
+def test_c1_top_n_is_not_a_lying_contributors_arg() -> None:
+    schema = tool_json_schemas()["get_top_risk_contributors"]
+    assert "top_n" not in (schema.get("properties") or {})
+    refused = validate_tool_call("get_top_risk_contributors", {"top_n": 3})
+    assert not refused.allowed
+
+
+def test_c1_service_method_matches_dispatcher_getattr() -> None:
+    assert TOOL_CONTRACTS[RiskToolName.GET_DATA_QUALITY].service_method == "get_data_quality"
+    assert TOOL_CONTRACTS[RiskToolName.GET_RUN_PROVENANCE].service_method == "get_run_provenance"
+
+
 def test_c1_key_rate_dv01_maps_to_rates_showcase_not_new_bump_engine() -> None:
     contract = TOOL_CONTRACTS[RiskToolName.GET_KEY_RATE_DV01]
     assert contract.service_method == "build_rates_showcase"
@@ -364,6 +442,10 @@ class _SharedCompareService(_FixtureService):
 
 
 class _RiskRunService(_FixtureService):
+    def __init__(self) -> None:
+        super().__init__()
+        self.submits: list[dict] = []
+
     def submit(
         self,
         *,
@@ -374,7 +456,7 @@ class _RiskRunService(_FixtureService):
         **_kwargs,
     ):
         self.calls.append("submit")
-        return {
+        blob = {
             "id": "run-1",
             "portfolio_id": portfolio.id,
             "status": "QUEUED",
@@ -382,6 +464,8 @@ class _RiskRunService(_FixtureService):
             "market_snapshot_id": market_snapshot_id,
             "request": request or {},
         }
+        self.submits.append(blob)
+        return blob
 
     def summary(self, portfolio):
         self.calls.append("summary")

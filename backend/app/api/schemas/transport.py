@@ -138,6 +138,16 @@ class GenericRiskRunRequest(RiskRunRequestBody):
     """Typed envelope for supported run types that ignore most request knobs."""
 
 
+class StressRunRequest(RiskRunRequestBody):
+    """``run_type=stress`` — optional allowlisted ``DEFAULT_SCENARIOS`` id.
+
+    Omitted ``scenario_id`` keeps the existing full default library. Unknown ids
+    fail at execute time against that library (no custom shocks).
+    """
+
+    scenario_id: str | None = None
+
+
 def _coerce_scenario_wires(value: Any) -> list[Any]:
     """Validate formal Scenario wire dicts."""
     if not isinstance(value, list):
@@ -231,7 +241,7 @@ RISK_RUN_REQUEST_SCHEMAS: Mapping[str, type[RiskRunRequestBody]] = MappingProxyT
         "summary": SummaryRiskRunRequest,
         "var": VarRiskRunRequest,
         "dashboard": DashboardRiskRunRequest,
-        "stress": GenericRiskRunRequest,
+        "stress": StressRunRequest,
         "factors": GenericRiskRunRequest,
         "limits": GenericRiskRunRequest,
         "hierarchy": GenericRiskRunRequest,
