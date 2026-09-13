@@ -13,7 +13,7 @@ Portfolio Risk Engineer (one implementer). Nested on the G1 analytics result; AP
 Extended the G1 `HistoricalAnalyticsResult` with an optional nested `benchmark` object. Canonical identity is Wave A `equity:US:SPY` / `EquitySpot:SPY` from the locked factor-mapping table, read from the same sliced `HistoricalFactorPanel` (no Yahoo HTTP). Alignment is calendar-date intersection (no positional zip, no ffill). Beta denominator is `cov(r_p, r_b) / var(r_b)` with G1 sample `ddof`; zero benchmark variance fails closed. Tracking error uses the same `AnnualizationConvention` as G1. Benchmark VaR/ES is `HistoricalRiskEngine.calculate()` on a same-notional SPY book — not a second quantile engine. `include_benchmark=False` (default) preserves the G1 contract (`benchmark=None`).
 
 ## Commits
-- feat commit on `feat/quantlineage-wave-b` (this change)
+- `497ee4a` `feat(risk): add Wave A SPY benchmark relative analytics`
 - Tracked copy: `docs/expantion/quantlineage_wave_b/B2_IMPLEMENTER_REPORT.md` (`.superpowers/sdd/` is gitignored)
 
 ## Files changed
