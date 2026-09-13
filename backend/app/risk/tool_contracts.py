@@ -8,6 +8,7 @@ historical-analytics.
 
 from __future__ import annotations
 
+import inspect
 from datetime import date
 from typing import Any, Literal
 
@@ -168,13 +169,30 @@ def _require_submit(service: Any):
     return submit
 
 
+def _supported_kwargs(fn: Any, **kwargs: Any) -> dict[str, Any]:
+    """Pass only kwargs the callable declares (C2 principal plumbing)."""
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return {}
+    if any(item.kind == inspect.Parameter.VAR_KEYWORD for item in params.values()):
+        return kwargs
+    return {key: value for key, value in kwargs.items() if key in params}
+
+
+def _call(fn: Any, *args: Any, **kwargs: Any) -> Any:
+    return fn(*args, **_supported_kwargs(fn, **kwargs))
+
+
 def execute_allowlisted_tool(
     tool_name: str,
     portfolio: Any,
     service: Any,
     args: dict[str, Any] | None = None,
+    *,
+    principal: str | None = None,
 ) -> dict[str, Any]:
-    """Dispatch C1 tools to existing service methods. No risk arithmetic here."""
+    """Dispatch allowlisted tools to existing service methods. No risk arithmetic here."""
     args = args or {}
     if tool_name == "search_instruments":
         search = getattr(service, "search_catalog", None)
@@ -184,7 +202,12 @@ def execute_allowlisted_tool(
             from app.market.catalog.service import search_catalog
 
             result = search_catalog(args["query"])
-        hits = getattr(result, "hits", result)
+        if hasattr(result, "hits"):
+            hits = result.hits
+        elif isinstance(result, dict) and "hits" in result:
+            hits = result["hits"]
+        else:
+            hits = result
         return {"hits": [_dump(item) for item in hits]}
     if tool_name == "get_market_history":
         fetch = getattr(service, "get_market_history", None)
@@ -199,35 +222,41 @@ def execute_allowlisted_tool(
     if tool_name == "run_portfolio_risk":
         submit = _require_submit(service)
         return _dump(
-            submit(
+            _call(
+                submit,
                 portfolio=portfolio,
                 run_type=args.get("run_type", "summary"),
                 request={},
                 market_snapshot_id=args.get("market_snapshot_id"),
+                owner=principal,
             )
         )
     if tool_name == "get_risk_run":
         getter = getattr(service, "get", None)
         if not callable(getter):
             raise ValueError("RiskRun get is not configured")
-        return _dump(getter(args["run_id"]))
+        return _dump(_call(getter, args["run_id"], principal=principal))
     if tool_name in {"compare_risk_runs", "explain_risk_change"}:
         compare = _compare_runs_fn(service)
         return _dump(
-            compare(
+            _call(
+                compare,
                 args["t0_run_id"],
                 args["t1_run_id"],
                 metric=args.get("metric", "var_99"),
+                principal=principal,
             )
         )
     if tool_name == "run_stress":
         submit = _require_submit(service)
         return _dump(
-            submit(
+            _call(
+                submit,
                 portfolio=portfolio,
                 run_type="stress",
                 request={"scenario_id": args["scenario_id"]},
                 market_snapshot_id=args.get("market_snapshot_id"),
+                owner=principal,
             )
         )
     if tool_name == "get_key_rate_dv01":
@@ -247,15 +276,27 @@ def execute_allowlisted_tool(
     if tool_name == "get_top_risk_contributors":
         submit = _require_submit(service)
         return _dump(
-            submit(
+            _call(
+                submit,
                 portfolio=portfolio,
                 run_type="contributors",
                 request={},
+                owner=principal,
             )
         )
     if tool_name == "get_run_provenance":
         fetch = getattr(service, "get_run_provenance", None)
         if not callable(fetch):
             raise ValueError("run provenance service is not configured")
-        return _dump(fetch(args["run_id"]))
+        return _dump(_call(fetch, args["run_id"], principal=principal))
+    if tool_name == "get_portfolio_summary":
+        return _dump(service.summary(portfolio))
+    if tool_name == "get_var_es":
+        return _dump(service.var_report(portfolio))
+    if tool_name == "get_worst_stress":
+        return _dump(service.threat_evaluation(portfolio))
+    if tool_name == "get_limits":
+        return {"limits": [_dump(item) for item in service.limits(portfolio)]}
+    if tool_name == "get_contributors":
+        return {"contributors": [_dump(item) for item in service.contributors(portfolio)[:5]]}
     raise ValueError(f"unsupported risk tool: {tool_name}")
