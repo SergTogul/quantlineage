@@ -532,6 +532,16 @@ class RiskQueryEngine:
                 tool_name=RiskToolName.GET_RUN_PROVENANCE,
                 tool_args={"run_id": run_ids[0]},
             )
+        if _is_key_rate_dv01_question(q):
+            args: dict[str, Any] = {}
+            tenor = _extract_showcase_tenor(original)
+            if tenor:
+                args["tenor"] = tenor
+            return RiskQueryPlan(
+                intent="get_key_rate_dv01",
+                tool_name=RiskToolName.GET_KEY_RATE_DV01,
+                tool_args=args,
+            )
         if _is_instrument_discovery(q):
             query = _extract_search_query(original)
             if not query:
@@ -1215,6 +1225,26 @@ def _is_compare_runs_question(question: str) -> bool:
 
 def _is_provenance_question(question: str) -> bool:
     return _mentions(question, "provenance", "lineage")
+
+
+def _is_key_rate_dv01_question(question: str) -> bool:
+    return _mentions(
+        question,
+        "kr-dv01",
+        "kr dv01",
+        "kr_dv01",
+        "key-rate dv01",
+        "key rate dv01",
+        "key_rate_dv01",
+    )
+
+
+def _extract_showcase_tenor(question: str) -> str | None:
+    upper = question.upper()
+    for tenor in ("10Y", "5Y", "2Y"):
+        if tenor in upper:
+            return tenor
+    return None
 
 
 def _is_enqueue(question: str) -> bool:

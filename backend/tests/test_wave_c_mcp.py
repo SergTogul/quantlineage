@@ -200,6 +200,19 @@ def test_mcp_module_has_no_llm_or_quant_formula() -> None:
     assert "openai" not in sys.modules
 
 
+def test_c5_mcp_docs_exist_and_omit_forbidden_tools() -> None:
+    docs = Path(__file__).resolve().parents[2] / "docs" / "mcp.md"
+    assert docs.is_file()
+    text = docs.read_text(encoding="utf-8")
+    lowered = text.lower()
+    assert "python -m app.mcp" in lowered
+    assert "riskforge_mcp_authorization" in lowered
+    assert "allowlist" in lowered
+    for banned in ("shell_exec", "sql tool", "filesystem tool", "general http", "yahoo"):
+        assert banned not in lowered
+    assert "live llm" not in lowered or "no live llm" in lowered
+
+
 def test_fastapi_main_imports_when_mcp_unused() -> None:
     source = _MAIN_MODULE.read_text(encoding="utf-8")
     assert "app.mcp" not in source

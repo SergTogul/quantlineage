@@ -87,7 +87,7 @@ const entries = {
   },
   'risk-query': {
     body:
-      'NL question routed to deterministic risk tools (summary, stress, contributors, etc.). Answer text is assembled from API results — no LLM-invented risk numbers.',
+      'NL question routed to deterministic risk tools (summary, stress, contributors, KR-DV01, etc.). Example chips submit the question; cards copy API `data.card` / `data.provenance` — no LLM-invented risk numbers.',
   },
   'pnl-explain': {
     body:

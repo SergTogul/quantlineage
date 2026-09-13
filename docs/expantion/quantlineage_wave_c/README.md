@@ -17,3 +17,6 @@ The AI may choose tools, ask clarification, and summarize results.
 It may not invent or calculate VaR/ES, stress, attribution, DV01, or other risk numbers.
 
 Non-goals: autonomous trading, order execution, unrestricted shell/SQL/filesystem/HTTP tools, or mandatory external LLM dependency.
+
+Developer entry for the optional MCP stdio server: [`docs/mcp.md`](../../mcp.md).
+The Risk Query UI lives on Scenario Builder and Overview Command (`#overview/command`).

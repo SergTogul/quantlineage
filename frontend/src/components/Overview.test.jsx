@@ -79,6 +79,8 @@ describe('Overview', () => {
     render(<Overview {...props} layout="command" portfolio={{ id: 'p', positions: [] }} />)
     expect(screen.getByTestId('overview-layout-command')).toBeInTheDocument()
     expect(screen.getByTestId('golden-demo-risk-query')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Why did VaR change?' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show USD 10Y KR-DV01.' })).toBeInTheDocument()
   })
 
   it('hierarchy book uses the tree as the overview', () => {
