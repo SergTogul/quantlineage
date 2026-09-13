@@ -1,19 +1,26 @@
-"""Deterministic historical analytics from a frozen factor panel (Wave B G1).
+"""Deterministic historical analytics from a frozen factor panel (Wave B G1/G2).
 
 Period P&L uses the same panel approximations as ``HistoricalRiskEngine``.
 Portfolio VaR/ES are the engine's ``calculate()`` numbers on the sliced
 window — this module does not reimplement quantile / tail math.
 
+Canonical benchmark (G2) is Wave A ``equity:US:SPY`` / ``EquitySpot:SPY`` on
+the same frozen panel. Relative analytics, not allocation advice (AD-B4).
+Benchmark VaR/ES is ``HistoricalRiskEngine.calculate()`` on a same-notional
+SPY book. Beta denominator is ``cov(r_p, r_b) / var(r_b)``.
+
 Units:
-- period / cumulative / annualized returns: fraction (0.01 = 1%)
-- drawdown: fraction of peak, ≤ 0, with implicit start NAV = 1
-- volatility / Sharpe: annualized fraction; Sharpe undefined at zero vol
+- period / cumulative / annualized / excess returns: fraction (0.01 = 1%)
+- drawdown / relative drawdown: fraction of peak, ≤ 0, implicit start NAV = 1
+- volatility / tracking error / Sharpe: annualized fraction
+- beta / correlation: dimensionless
 - VaR / ES: currency loss (≥ 0), HistoricalRiskEngine convention
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from datetime import date, timedelta
 from enum import StrEnum
 from typing import Literal
@@ -22,6 +29,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.models import (
+    EquityPosition,
     FiniteFloat,
     FiniteInputMixin,
     MarketSnapshot,
@@ -29,13 +37,19 @@ from app.domain.models import (
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
-from app.risk.factor_panel import HistoricalFactorPanel
-from app.risk.factor_types import RiskFactor
+from app.market.history.spec import WAVE_A_FACTOR_MAPPINGS
+from app.risk.factor_panel import HistoricalFactorPanel, panel_factor_identity
+from app.risk.factor_types import RiskFactor, factor_column_id, parse_factor_column_id
 from app.risk.historical import (
     HistoricalRiskEngine,
     approximate_pnl_from_panel,
     full_revaluation_pnl_from_panel,
 )
+
+_SPY_MAPPING = next(item for item in WAVE_A_FACTOR_MAPPINGS if item.instrument_id == "equity:US:SPY")
+WAVE_A_BENCHMARK_INSTRUMENT_ID = _SPY_MAPPING.instrument_id
+WAVE_A_BENCHMARK_FACTOR = parse_factor_column_id(_SPY_MAPPING.factor_column)
+_MIN_BENCHMARK_OVERLAP = 2
 
 _NOTE_ZERO_VOL = "sharpe_undefined_zero_volatility"
 _NOTE_SHORT_VOL = "sample_volatility_undefined_n_lt_2"
@@ -92,6 +106,31 @@ class HistoricalAnalyticsRequest(FiniteInputMixin):
     risk_free_rate: FiniteFloat = 0.0
     missing_date_policy: MissingDatePolicy = MissingDatePolicy.DROP_WITH_NOTE
     period_window: int = Field(default=1, ge=1, le=5000)
+    include_benchmark: bool = False
+
+
+class BenchmarkRelativeRisk(BaseModel):
+    """Canonical Wave A SPY relative analytics nested on the G1 result (AD-B3)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    instrument_id: str
+    factor_column: str
+    observation_count: int
+    cumulative_return: float
+    excess_return: float
+    correlation: float
+    beta: float
+    tracking_error: float
+    relative_drawdown: float
+    var_95: float
+    var_99: float
+    expected_shortfall_99: float
+    wealth: list[DatedValue]
+    relative_drawdown_series: list[DatedValue]
+    aligned_start: date
+    aligned_end: date
+    units: dict[str, str]
 
 
 class HistoricalAnalyticsResult(BaseModel):
@@ -130,6 +169,41 @@ class HistoricalAnalyticsResult(BaseModel):
     dropped_dates: list[date]
     observation_count: int
     units: dict[str, str]
+    benchmark: BenchmarkRelativeRisk | None = None
+
+
+def align_dated_series(
+    left_dates: Sequence[date],
+    left_values: Sequence[float],
+    right_dates: Sequence[date],
+    right_values: Sequence[float],
+    *,
+    min_overlap: int = _MIN_BENCHMARK_OVERLAP,
+) -> tuple[list[date], np.ndarray, np.ndarray]:
+    """Intersect two dated series by calendar date. No positional zip, no ffill."""
+    if len(left_dates) != len(left_values):
+        raise ValueError("left dates/values length mismatch")
+    if len(right_dates) != len(right_values):
+        raise ValueError("right dates/values length mismatch")
+    left_map: dict[date, float] = {}
+    for as_of, value in zip(left_dates, left_values, strict=True):
+        if as_of in left_map:
+            raise ValueError(f"duplicate left date: {as_of.isoformat()}")
+        left_map[as_of] = float(value)
+    right_map: dict[date, float] = {}
+    for as_of, value in zip(right_dates, right_values, strict=True):
+        if as_of in right_map:
+            raise ValueError(f"duplicate right date: {as_of.isoformat()}")
+        right_map[as_of] = float(value)
+    overlap = sorted(set(left_map) & set(right_map))
+    if len(overlap) < min_overlap:
+        raise ValueError(
+            f"insufficient overlapping dates for benchmark alignment: "
+            f"{len(overlap)} < {min_overlap}"
+        )
+    left = np.asarray([left_map[day] for day in overlap], dtype=float)
+    right = np.asarray([right_map[day] for day in overlap], dtype=float)
+    return overlap, left, right
 
 
 def _weekdays_inclusive(start: date, end: date) -> list[date]:
@@ -180,6 +254,145 @@ def _window_compound(returns: np.ndarray, start: int, length: int) -> float:
     return float(np.prod(1.0 + returns[start : start + length]) - 1.0)
 
 
+def _panel_factor(panel: HistoricalFactorPanel, factor: RiskFactor) -> RiskFactor | None:
+    identity = panel_factor_identity(factor)
+    for stored in panel.factors:
+        if panel_factor_identity(stored) == identity:
+            return stored
+    return None
+
+
+def _dated_factor_returns(
+    panel: HistoricalFactorPanel, factor: RiskFactor
+) -> tuple[list[date], np.ndarray]:
+    dates = list(panel.dates)
+    values = np.asarray([obs.change(factor) for obs in panel.observations], dtype=float)
+    return dates, values
+
+
+def _panel_on_dates(panel: HistoricalFactorPanel, dates: Sequence[date]) -> HistoricalFactorPanel:
+    wanted = set(dates)
+    kept_dates: list[date] = []
+    rows: list[list[tuple[RiskFactor, float]]] = []
+    for obs in panel.observations:
+        if obs.as_of in wanted:
+            kept_dates.append(obs.as_of)
+            rows.append([(factor, obs.change(factor)) for factor in panel.factors])
+    if not kept_dates:
+        raise ValueError("no factor observations on aligned benchmark dates")
+    return HistoricalFactorPanel.from_pairs(kept_dates, rows)
+
+
+def _spy_benchmark_book(market_value: float, spy_spot: float) -> Portfolio:
+    quantity = market_value / spy_spot
+    return Portfolio(
+        id="benchmark:equity:US:SPY",
+        name="Wave A SPY benchmark",
+        version=1,
+        positions=[
+            EquityPosition(type="equity", id="spy-benchmark", symbol="SPY", quantity=quantity)
+        ],
+    )
+
+
+def _canonical_benchmark_relative_risk(
+    *,
+    sliced: HistoricalFactorPanel,
+    portfolio_dates: Sequence[date],
+    portfolio_returns: np.ndarray,
+    portfolio_market_value: float,
+    pricing_engine: PricingEngine,
+    market: MarketSnapshot,
+    methodology: VaRMethodology,
+    convention: AnnualizationConvention,
+) -> BenchmarkRelativeRisk:
+    stored = _panel_factor(sliced, WAVE_A_BENCHMARK_FACTOR)
+    if stored is None:
+        raise ValueError(
+            "canonical benchmark factor EquitySpot:SPY is missing from the sliced panel; "
+            "no silent substitute"
+        )
+    spy_dates, spy_returns = _dated_factor_returns(sliced, stored)
+    aligned_dates, r_p, r_b = align_dated_series(
+        portfolio_dates, portfolio_returns, spy_dates, spy_returns
+    )
+    ddof = convention.sample_ddof
+    ppy = float(convention.periods_per_year)
+    var_b = float(np.var(r_b, ddof=ddof))
+    if var_b == 0.0 or not math.isfinite(var_b):
+        raise ValueError("benchmark variance is zero; beta denominator var(r_b) is undefined")
+    cov = float(np.cov(r_p, r_b, ddof=ddof)[0, 1])
+    beta = cov / var_b
+    corr = float(np.corrcoef(r_p, r_b)[0, 1])
+    if not math.isfinite(corr):
+        raise ValueError("benchmark correlation is undefined")
+    tracking_error = float(np.std(r_p - r_b, ddof=ddof) * math.sqrt(ppy))
+
+    wealth_p = np.cumprod(1.0 + r_p)
+    wealth_b = np.cumprod(1.0 + r_b)
+    if float(np.min(wealth_b)) <= 0.0:
+        raise ValueError("benchmark wealth must stay positive")
+    excess_return = float(wealth_p[-1] - wealth_b[-1])
+    cumulative_return = float(wealth_b[-1] - 1.0)
+    relative_wealth = wealth_p / wealth_b
+    peak = np.maximum.accumulate(np.concatenate([[1.0], relative_wealth]))[1:]
+    relative_dd = relative_wealth / peak - 1.0
+
+    spy_spot = market.equity_spots.get("SPY")
+    if spy_spot is None or float(spy_spot) == 0.0 or not math.isfinite(float(spy_spot)):
+        raise ValueError(
+            "market snapshot missing non-zero SPY spot for canonical benchmark equity:US:SPY"
+        )
+    spy_book = _spy_benchmark_book(portfolio_market_value, float(spy_spot))
+    aligned_panel = _panel_on_dates(sliced, aligned_dates)
+    engine = HistoricalRiskEngine(
+        factor_panel=aligned_panel,
+        methodology=methodology,
+        observations=aligned_panel.n_observations,
+    )
+    summary = engine.calculate(
+        spy_book,
+        pricing_engine,
+        methodology=methodology,
+        market=market,
+    )
+
+    def _series(values: np.ndarray) -> list[DatedValue]:
+        return [
+            DatedValue(as_of=as_of, value=float(value))
+            for as_of, value in zip(aligned_dates, values, strict=True)
+        ]
+
+    return BenchmarkRelativeRisk(
+        instrument_id=WAVE_A_BENCHMARK_INSTRUMENT_ID,
+        factor_column=factor_column_id(WAVE_A_BENCHMARK_FACTOR),
+        observation_count=len(aligned_dates),
+        cumulative_return=cumulative_return,
+        excess_return=excess_return,
+        correlation=corr,
+        beta=float(beta),
+        tracking_error=tracking_error,
+        relative_drawdown=float(relative_dd.min()),
+        var_95=float(summary.var_95),
+        var_99=float(summary.var_99),
+        expected_shortfall_99=float(summary.expected_shortfall_99),
+        wealth=_series(wealth_b),
+        relative_drawdown_series=_series(relative_dd),
+        aligned_start=aligned_dates[0],
+        aligned_end=aligned_dates[-1],
+        units={
+            "returns": "fraction",
+            "excess_return": "fraction",
+            "beta": "dimensionless",
+            "correlation": "dimensionless",
+            "tracking_error": "annualized_fraction",
+            "relative_drawdown": "fraction_of_peak_relative_wealth_negative",
+            "var_es": "currency_loss",
+            "wealth": "end_of_period_index",
+        },
+    )
+
+
 def compute_historical_analytics(
     *,
     portfolio: Portfolio,
@@ -197,6 +410,7 @@ def compute_historical_analytics(
     risk_free_rate: float = 0.0,
     missing_date_policy: MissingDatePolicy = MissingDatePolicy.DROP_WITH_NOTE,
     period_window: int = 1,
+    include_benchmark: bool = False,
 ) -> HistoricalAnalyticsResult:
     """Build wealth, risk, and identity fields from a frozen panel slice."""
     if frequency is not AnalyticsFrequency.DAILY:
@@ -302,6 +516,19 @@ def compute_historical_analytics(
     def _series(values: np.ndarray) -> list[DatedValue]:
         return [DatedValue(as_of=as_of, value=float(value)) for as_of, value in zip(dates, values)]
 
+    benchmark = None
+    if include_benchmark:
+        benchmark = _canonical_benchmark_relative_risk(
+            sliced=sliced,
+            portfolio_dates=dates,
+            portfolio_returns=returns,
+            portfolio_market_value=market_value,
+            pricing_engine=pricing_engine,
+            market=market,
+            methodology=methodology,
+            convention=convention,
+        )
+
     return HistoricalAnalyticsResult(
         portfolio_id=portfolio.id,
         portfolio_version=portfolio.version,
@@ -340,4 +567,5 @@ def compute_historical_analytics(
             "var_es": "currency_loss",
             "wealth": "end_of_period_index",
         },
+        benchmark=benchmark,
     )
