@@ -189,6 +189,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
 .risk-change-identity table{margin-top:8px;font-variant-numeric:tabular-nums}
 .risk-change-identity tr[data-changed="true"] th,.risk-change-identity tr[data-changed="true"] td{color:var(--amber)}
 .risk-change-drill-up{margin-left:10px}
+#var-es-contributors,#var-es-risk-change,#risk-factors-kr-dv01{scroll-margin-top:12px}
 .parallel-dv01{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-top:12px;padding:10px 12px;border:1px solid var(--line);background:var(--inset);font-variant-numeric:tabular-nums}
 .parallel-dv01 strong{font-size:16px}
 .overview-collage{margin-top:20px;padding:14px;background:var(--panel);border:1px solid var(--line)}

@@ -2,8 +2,9 @@ import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import {
   NAV_SECTIONS, DEFAULT_SECTION_ID, DEFAULT_OVERVIEW_LAYOUT, OVERVIEW_LAYOUTS,
-  sectionFromHash, hashForSection, isNavSection, navSectionById,
+  SECTION_PANELS, sectionFromHash, hashForSection, isNavSection, navSectionById,
   parseRoute, hashForOverviewLayout, overviewLayoutFromHash,
+  hashForPanel, panelElementId,
 } from './nav.mjs'
 
 test('NAV_SECTIONS covers terminal target areas in order', () => {
@@ -56,15 +57,41 @@ test('OVERVIEW_LAYOUTS are eight named compositions', () => {
 })
 
 test('parseRoute keeps #overview as the shipped status blotter', () => {
-  assert.deepEqual(parseRoute('#overview'), { section: 'overview', layout: 'status' })
-  assert.deepEqual(parseRoute(''), { section: 'overview', layout: 'status' })
+  assert.deepEqual(parseRoute('#overview'), { section: 'overview', layout: 'status', panel: null })
+  assert.deepEqual(parseRoute(''), { section: 'overview', layout: 'status', panel: null })
   assert.equal(sectionFromHash('#overview/desk'), 'overview')
 })
 
 test('parseRoute reads overview layout from the hash path', () => {
-  assert.deepEqual(parseRoute('#overview/desk'), { section: 'overview', layout: 'desk' })
-  assert.deepEqual(parseRoute('#overview/nope'), { section: 'overview', layout: 'status' })
-  assert.deepEqual(parseRoute('#limits'), { section: 'limits', layout: 'status' })
+  assert.deepEqual(parseRoute('#overview/desk'), { section: 'overview', layout: 'desk', panel: null })
+  assert.deepEqual(parseRoute('#overview/nope'), { section: 'overview', layout: 'status', panel: null })
+  assert.deepEqual(parseRoute('#limits'), { section: 'limits', layout: 'status', panel: null })
+})
+
+test('parseRoute reads distinct VaR/ES and Risk Factors demo panels', () => {
+  assert.deepEqual(SECTION_PANELS['var-es'], ['contributors', 'risk-change'])
+  assert.deepEqual(SECTION_PANELS['risk-factors'], ['kr-dv01'])
+  assert.deepEqual(parseRoute('#var-es/contributors'), {
+    section: 'var-es', layout: 'status', panel: 'contributors',
+  })
+  assert.deepEqual(parseRoute('#var-es/risk-change'), {
+    section: 'var-es', layout: 'status', panel: 'risk-change',
+  })
+  assert.deepEqual(parseRoute('#risk-factors/kr-dv01'), {
+    section: 'risk-factors', layout: 'status', panel: 'kr-dv01',
+  })
+  assert.deepEqual(parseRoute('#var-es/nope'), {
+    section: 'var-es', layout: 'status', panel: null,
+  })
+  assert.equal(sectionFromHash('#var-es/contributors'), 'var-es')
+  assert.equal(hashForPanel('var-es', 'contributors'), '#var-es/contributors')
+  assert.equal(hashForPanel('var-es', 'risk-change'), '#var-es/risk-change')
+  assert.equal(hashForPanel('risk-factors', 'kr-dv01'), '#risk-factors/kr-dv01')
+  assert.equal(hashForPanel('var-es', 'bogus'), '#var-es')
+  assert.equal(panelElementId('var-es', 'contributors'), 'var-es-contributors')
+  assert.equal(panelElementId('var-es', 'risk-change'), 'var-es-risk-change')
+  assert.equal(panelElementId('risk-factors', 'kr-dv01'), 'risk-factors-kr-dv01')
+  assert.equal(panelElementId('var-es', 'bogus'), null)
 })
 
 test('hashForOverviewLayout and overviewLayoutFromHash round-trip', () => {

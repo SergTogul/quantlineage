@@ -82,7 +82,7 @@ export function RatesShowcase() {
   const s = ratesShowcaseSummary(payload)
 
   return (
-    <div className="card">
+    <div className="card" id="risk-factors-kr-dv01">
       <div className="block-title">
         <h3>Rates curve / KR-DV01</h3>
         <BlockHelp id="rates-showcase" />
@@ -114,7 +114,7 @@ export function RatesShowcase() {
             </tbody>
           </table>
           <div className="parallel-dv01" data-testid="parallel-dv01">
-            <span className="muted">Parallel DV01</span>
+            <span className="muted">Parallel DV01 (not KR-DV01)</span>
             <strong>{money(s.parallel_dv01 ?? 0)}</strong>
             {s.conventions.sensitivity_unit ? (
               <span className="muted">{s.conventions.sensitivity_unit}</span>
@@ -644,7 +644,7 @@ export function RiskChangeAttribution({ portfolio }) {
   const waterfallDisabled = loading || !WATERFALL_METRICS.includes(metric)
 
   return (
-    <div className="card wide" data-testid="golden-demo-risk-change">
+    <div className="card wide" id="var-es-risk-change" data-testid="golden-demo-risk-change">
       <div className="block-title">
         <h3>Risk Change Attribution</h3>
         <BlockHelp id="risk-change-attribution" />

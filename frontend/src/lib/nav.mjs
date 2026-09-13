@@ -29,28 +29,41 @@ export const OVERVIEW_LAYOUTS = Object.freeze([
 
 export const DEFAULT_OVERVIEW_LAYOUT = OVERVIEW_LAYOUTS[0].id
 
+/** Intra-section landing targets for demo hashes (`#var-es/contributors`). */
+export const SECTION_PANELS = Object.freeze({
+  'var-es': Object.freeze(['contributors', 'risk-change']),
+  'risk-factors': Object.freeze(['kr-dv01']),
+})
+
 const SECTION_IDS = new Set(NAV_SECTIONS.map((s) => s.id))
 const OVERVIEW_LAYOUT_IDS = new Set(OVERVIEW_LAYOUTS.map((s) => s.id))
+const EMPTY_ROUTE = Object.freeze({
+  section: DEFAULT_SECTION_ID,
+  layout: DEFAULT_OVERVIEW_LAYOUT,
+  panel: null,
+})
 
 function hashBody(hash) {
   return String(hash || '').trim().replace(/^#/, '').trim()
 }
 
-/** Section + overview layout from location hash. Unknown layout → status blotter. */
+/** Section + overview layout + optional panel from location hash. Unknown layout → status blotter. */
 export function parseRoute(hash) {
   const raw = hashBody(hash)
-  if (!raw) return { section: DEFAULT_SECTION_ID, layout: DEFAULT_OVERVIEW_LAYOUT }
+  if (!raw) return { ...EMPTY_ROUTE }
   const slash = raw.indexOf('/')
   const head = slash === -1 ? raw : raw.slice(0, slash)
   const tail = slash === -1 ? '' : raw.slice(slash + 1)
   if (!SECTION_IDS.has(head)) {
-    return { section: DEFAULT_SECTION_ID, layout: DEFAULT_OVERVIEW_LAYOUT }
+    return { ...EMPTY_ROUTE }
   }
   if (head !== DEFAULT_SECTION_ID) {
-    return { section: head, layout: DEFAULT_OVERVIEW_LAYOUT }
+    const allowed = SECTION_PANELS[head]
+    const panel = allowed && allowed.includes(tail) ? tail : null
+    return { section: head, layout: DEFAULT_OVERVIEW_LAYOUT, panel }
   }
   const layout = OVERVIEW_LAYOUT_IDS.has(tail) ? tail : DEFAULT_OVERVIEW_LAYOUT
-  return { section: DEFAULT_SECTION_ID, layout }
+  return { section: DEFAULT_SECTION_ID, layout, panel: null }
 }
 
 /** Resolve active section from location hash; unknown → overview. */
@@ -70,6 +83,22 @@ export function hashForSection(id) {
 export function hashForOverviewLayout(layout) {
   const id = OVERVIEW_LAYOUT_IDS.has(layout) ? layout : DEFAULT_OVERVIEW_LAYOUT
   return id === DEFAULT_OVERVIEW_LAYOUT ? '#overview' : `#overview/${id}`
+}
+
+/** Hash for a known intra-section panel; unknown panel → section root. */
+export function hashForPanel(section, panel) {
+  const safe = SECTION_IDS.has(section) ? section : DEFAULT_SECTION_ID
+  const allowed = SECTION_PANELS[safe]
+  if (!panel || !allowed || !allowed.includes(panel)) return `#${safe}`
+  return `#${safe}/${panel}`
+}
+
+/** DOM id paired with `hashForPanel` (`var-es-contributors`). */
+export function panelElementId(section, panel) {
+  if (!section || !panel) return null
+  const allowed = SECTION_PANELS[section]
+  if (!allowed || !allowed.includes(panel)) return null
+  return `${section}-${panel}`
 }
 
 export function isNavSection(id) {

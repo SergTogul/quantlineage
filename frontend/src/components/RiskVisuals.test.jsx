@@ -94,6 +94,7 @@ describe('Factor contribution bars', () => {
       />,
     )
     const card = screen.getByTestId('golden-demo-contributors')
+    expect(card).toHaveAttribute('id', 'var-es-contributors')
     expect(within(card).getAllByText('EQ-1').length).toBeGreaterThan(0)
     expect(within(card).getAllByText('62.5%').length).toBeGreaterThan(0)
     expect(within(card).getAllByText('$8.5K').length).toBeGreaterThan(0)
@@ -136,6 +137,7 @@ describe('KR-DV01 tenor curve', () => {
     )
     render(<RatesShowcase />)
     await waitFor(() => expect(screen.getByTestId('kr-dv01-tenor-curve')).toBeTruthy())
+    expect(document.getElementById('risk-factors-kr-dv01')).toBeTruthy()
     const curve = screen.getByTestId('kr-dv01-tenor-curve')
     expect(curve).toHaveTextContent('2Y')
     expect(curve).toHaveTextContent('5Y')

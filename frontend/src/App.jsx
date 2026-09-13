@@ -16,7 +16,7 @@ import {
   FactorExposureHeatmap, HierarchyRiskHeatmap, LimitUtilizationHeatmap, StressPnlHeatmap,
 } from './components/Heatmaps'
 import { applyTheme, persistTheme, readStoredTheme } from './lib/theme.mjs'
-import { hashForOverviewLayout, hashForSection, navSectionById, parseRoute } from './lib/nav.mjs'
+import { hashForOverviewLayout, hashForSection, navSectionById, parseRoute, panelElementId } from './lib/nav.mjs'
 import BlockHelp from './components/BlockHelp'
 import './styles.css'
 
@@ -39,7 +39,7 @@ export default function App() {
   const [route, setRoute] = useState(() =>
     typeof window !== 'undefined'
       ? parseRoute(window.location.hash)
-      : { section: 'overview', layout: 'status' },
+      : { section: 'overview', layout: 'status', panel: null },
   )
   const [theme, setTheme] = useState(() =>
     typeof window !== 'undefined' ? applyTheme(readStoredTheme()) : 'dark',
@@ -55,6 +55,16 @@ export default function App() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  useEffect(() => {
+    const id = panelElementId(route.section, route.panel)
+    if (!id) return undefined
+    const el = document.getElementById(id)
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest' })
+    }
+    return undefined
+  }, [route.section, route.panel, data])
 
   const selectSection = (id) => {
     const next = hashForSection(id)

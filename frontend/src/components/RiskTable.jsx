@@ -10,7 +10,7 @@ import {
 export function Contributors({ items }) {
   const rows = topContributors(items)
   return (
-    <div className="card" data-testid="golden-demo-contributors">
+    <div className="card" id="var-es-contributors" data-testid="golden-demo-contributors">
       <div className="block-title">
         <h3>Component VaR Contributors</h3>
         <BlockHelp id="component-var" />
