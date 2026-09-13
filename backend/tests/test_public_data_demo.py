@@ -58,10 +58,12 @@ def _import_targets(path: Path) -> set[str]:
 
 def _drop_adapter_modules() -> None:
     for name in list(sys.modules):
-        if name in FORBIDDEN_ADAPTERS or name.startswith("app.market.ingestion.yahoo"):
-            del sys.modules[name]
-        if name.startswith("app.market.ingestion.fred"):
-            del sys.modules[name]
+        if (
+            name in FORBIDDEN_ADAPTERS
+            or name.startswith("app.market.ingestion.yahoo")
+            or name.startswith("app.market.ingestion.fred")
+        ):
+            sys.modules.pop(name, None)
 
 
 class ExplodingHistoryProvider:

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -14,12 +16,6 @@ FORBIDDEN_ADAPTERS = frozenset(
     }
 )
 QUANT_PACKAGES = ("risk", "pricing")
-CORE_MODULES = (
-    "app.risk.historical",
-    "app.risk.historical_data",
-    "app.risk.factor_panel",
-    "app.pricing",
-)
 
 
 def _import_targets(path: Path) -> set[str]:
@@ -48,22 +44,62 @@ def test_risk_and_pricing_sources_do_not_import_provider_adapters() -> None:
 def test_importing_quant_core_does_not_load_adapter_modules() -> None:
     """Runtime check: importing risk/pricing must not pull adapter modules.
 
-    Other ingestion tests may already have loaded adapters; drop them first so
-    this pin observes the import graph of the quant modules themselves.
+    Run in a subprocess so deleting ``app.risk.*`` / ``app.pricing.*`` cannot
+    split dataclass identity (``RateZero``) for later tests in this process.
     """
-    for name in list(sys.modules):
-        if name == "app.market.ingestion" or name.startswith("app.market.ingestion."):
-            del sys.modules[name]
-        if name in CORE_MODULES or name.startswith("app.risk.") or name.startswith("app.pricing."):
-            del sys.modules[name]
+    from app.risk.factor_types import RateZero
 
-    import app.pricing  # noqa: F401
-    import app.risk.factor_panel  # noqa: F401
-    import app.risk.historical  # noqa: F401
-    import app.risk.historical_data  # noqa: F401
+    before = RateZero
+    script = r"""
+import sys
 
-    loaded = sorted(name for name in FORBIDDEN_ADAPTERS if name in sys.modules)
-    assert loaded == [], f"quant import loaded adapters: {loaded}"
+FORBIDDEN = frozenset({"app.market.ingestion.yahoo", "app.market.ingestion.fred"})
+CORE_MODULES = (
+    "app.risk.historical",
+    "app.risk.historical_data",
+    "app.risk.factor_panel",
+    "app.pricing",
+)
+for name in list(sys.modules):
+    if name == "app.market.ingestion" or name.startswith("app.market.ingestion."):
+        sys.modules.pop(name, None)
+    if name in CORE_MODULES or name.startswith("app.risk.") or name.startswith("app.pricing."):
+        sys.modules.pop(name, None)
+
+import app.pricing  # noqa: F401
+import app.risk.factor_panel  # noqa: F401
+import app.risk.historical  # noqa: F401
+import app.risk.historical_data  # noqa: F401
+
+loaded = sorted(name for name in FORBIDDEN if name in sys.modules)
+if loaded:
+    raise SystemExit("quant import loaded adapters: " + ",".join(loaded))
+"""
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(APP_ROOT.parent), env.get("PYTHONPATH", "")]
+    ).rstrip(os.pathsep)
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=str(APP_ROOT.parent),
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    from app.risk.factor_types import RateZero as After
+
+    assert After is before
+
+
+def test_quant_core_adapter_isolation_preserves_factor_type_identity() -> None:
+    from app.risk.factor_types import RateZero
+
+    test_importing_quant_core_does_not_load_adapter_modules()
+    from app.risk.factor_types import RateZero as After
+
+    assert After is RateZero
 
 
 def test_ingestion_models_and_protocols_do_not_import_httpx_or_fastapi() -> None:

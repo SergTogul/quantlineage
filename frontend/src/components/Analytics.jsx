@@ -134,11 +134,7 @@ export function RunProvenance({ runId, embedded, provenance }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (embedded) {
-      return undefined
-    }
-    if (!runId) {
-      setFetched(null)
+    if (embedded || !runId) {
       return undefined
     }
     let cancelled = false
@@ -155,7 +151,7 @@ export function RunProvenance({ runId, embedded, provenance }) {
     return () => { cancelled = true }
   }, [runId, embedded])
 
-  const payload = embedded ? provenance : fetched
+  const payload = embedded ? provenance : (runId ? fetched : null)
 
   const s = runProvenanceSummary(payload)
   const rows = s

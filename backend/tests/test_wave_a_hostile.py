@@ -40,9 +40,7 @@ from tests.test_public_market_snapshot import (
 
 from app.domain.models import EquityPosition, Portfolio, RiskRun
 from app.market.ingestion.errors import AuthorizationError
-from app.market.ingestion.fred import FRED_BASE, FredAdapter
 from app.market.ingestion.models import Frequency, InstrumentRef
-from app.market.ingestion.yahoo import YAHOO_BASE, YahooFinanceAdapter
 from app.persistence.memory_repos import (
     InMemoryMarketSnapshotRepository,
     InMemoryRiskRunRepository,
@@ -66,10 +64,12 @@ _BEFORE_HISTORY = date(2019, 6, 15)
 
 def _drop_adapter_modules() -> None:
     for name in list(sys.modules):
-        if name in FORBIDDEN_ADAPTERS or name.startswith("app.market.ingestion.yahoo") or name.startswith(
-            "app.market.ingestion.fred"
+        if (
+            name in FORBIDDEN_ADAPTERS
+            or name.startswith("app.market.ingestion.yahoo")
+            or name.startswith("app.market.ingestion.fred")
         ):
-            del sys.modules[name]
+            sys.modules.pop(name, None)
 
 
 def _cash_book() -> Portfolio:
@@ -83,7 +83,9 @@ def _cash_book() -> Portfolio:
     )
 
 
-def _fred(handler) -> FredAdapter:
+def _fred(handler):
+    from app.market.ingestion.fred import FredAdapter
+
     client = httpx.Client(transport=httpx.MockTransport(handler), timeout=10.0)
     return FredAdapter(client=client, api_key=_SECRET)
 
@@ -382,6 +384,9 @@ def test_ci_workflows_stay_offline() -> None:
 
 
 def test_yahoo_and_fred_bases_are_hardcoded_module_constants() -> None:
+    from app.market.ingestion.fred import FRED_BASE, FredAdapter
+    from app.market.ingestion.yahoo import YAHOO_BASE, YahooFinanceAdapter
+
     assert YAHOO_BASE == "https://query1.finance.yahoo.com"
     assert FRED_BASE == "https://api.stlouisfed.org"
     yahoo_params = inspect.signature(YahooFinanceAdapter.__init__).parameters

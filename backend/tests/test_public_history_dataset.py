@@ -462,10 +462,12 @@ def test_quant_core_and_freeze_do_not_import_provider_adapters() -> None:
 
 def test_importing_historical_engine_does_not_load_adapters_or_call_providers() -> None:
     for name in list(sys.modules):
-        if name in FORBIDDEN_ADAPTERS or name.startswith("app.market.ingestion.yahoo"):
-            del sys.modules[name]
-        if name.startswith("app.market.ingestion.fred"):
-            del sys.modules[name]
+        if (
+            name in FORBIDDEN_ADAPTERS
+            or name.startswith("app.market.ingestion.yahoo")
+            or name.startswith("app.market.ingestion.fred")
+        ):
+            sys.modules.pop(name, None)
 
     import app.risk.historical  # noqa: F401
     import app.risk.historical_data  # noqa: F401
