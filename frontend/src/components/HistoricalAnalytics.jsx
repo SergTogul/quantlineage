@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { historicalAnalytics } from '../api.js'
 import BlockHelp from './BlockHelp'
 import { DatedSeriesChart } from './RiskVisuals.jsx'
+import { hashForPanel, hashForSection } from '../lib/nav.mjs'
 import { money } from '../lib/risk.mjs'
 
 const DEFAULT_START = '2024-01-02'
@@ -299,8 +300,10 @@ export default function HistoricalAnalytics({ portfolio }) {
             </table>
           </div>
           <nav className="ha-links" data-testid="ha-links" aria-label="Related analytics">
-            <a href="#var-es">Component VaR contributors</a>
-            <a href="#var-es">Risk-change waterfall</a>
+            <a href={hashForPanel('var-es', 'contributors')}>Component VaR contributors</a>
+            <a href={hashForPanel('risk-factors', 'kr-dv01')}>KR-DV01 tenor curve</a>
+            <a href={hashForPanel('var-es', 'risk-change')}>Risk-change waterfall</a>
+            <a href={hashForSection('risk-runs')}>Calculation provenance</a>
           </nav>
         </>
       )}

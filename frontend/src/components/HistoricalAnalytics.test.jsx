@@ -236,11 +236,15 @@ describe('HistoricalAnalytics page', () => {
     expect(screen.queryByText('1.15')).not.toBeInTheDocument()
   })
 
-  it('links to existing contributors and risk-change nav hashes', async () => {
+  it('links to distinct contributors, KR-DV01, waterfall, and provenance hashes', async () => {
     stubAnalytics(() => HttpResponse.json(fixture()))
     render(<HistoricalAnalytics portfolio={demoPortfolio} />)
     await screen.findByTestId('ha-links')
-    expect(screen.getByRole('link', { name: /contributors/i })).toHaveAttribute('href', '#var-es')
-    expect(screen.getByRole('link', { name: /risk-change/i })).toHaveAttribute('href', '#var-es')
+    expect(screen.getByRole('link', { name: /contributors/i })).toHaveAttribute('href', '#var-es/contributors')
+    expect(screen.getByRole('link', { name: /kr-dv01/i })).toHaveAttribute('href', '#risk-factors/kr-dv01')
+    expect(screen.getByRole('link', { name: /risk-change/i })).toHaveAttribute('href', '#var-es/risk-change')
+    expect(screen.getByRole('link', { name: /provenance/i })).toHaveAttribute('href', '#risk-runs')
+    const hrefs = [...screen.getByTestId('ha-links').querySelectorAll('a')].map((a) => a.getAttribute('href'))
+    expect(new Set(hrefs).size).toBe(hrefs.length)
   })
 })

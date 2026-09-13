@@ -168,6 +168,7 @@ describe('RiskChangeAttribution flagship card', () => {
     expect(postedRuns[1].market_snapshot_id).toBe('snap-t0')
     expect(getCompareBody().t0_run_id).toBeTruthy()
     expect(getCompareBody().t1_run_id).toBeTruthy()
+    expect(screen.getByTestId('golden-demo-risk-change')).toHaveAttribute('id', 'var-es-risk-change')
     expect(screen.getByText(/Why did my risk change/i)).toBeTruthy()
     expect(screen.getByText(/currency loss/i)).toBeTruthy()
     expect(screen.getAllByText(/residual \/ interactions/i).length).toBeGreaterThan(0)
