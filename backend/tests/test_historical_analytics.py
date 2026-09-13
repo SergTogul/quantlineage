@@ -676,3 +676,61 @@ def test_g1_without_benchmark_flag_leaves_nested_object_none():
     dates = _weekdays(5)
     result = _analyze(dates, [0.01] * 5, rolling_window=21)
     assert result.benchmark is None
+
+
+def test_beta_denominator_is_cov_over_var_benchmark_not_inverted():
+    """Hostile: beta = cov(r_p, r_b) / var(r_b). Doubled portfolio returns → 2, not 0.5."""
+    dates = _weekdays(6)
+    spy = [0.01, -0.02, 0.015, 0.005, -0.01, 0.02]
+    aaa = [2.0 * x for x in spy]
+    result = _analyze_vs_spy(dates, aaa, spy)
+    bench = result.benchmark
+    assert bench is not None
+    r_p = np.asarray(aaa, dtype=float)
+    r_b = np.asarray(spy, dtype=float)
+    cov = float(np.cov(r_p, r_b, ddof=1)[0, 1])
+    var_b = float(np.var(r_b, ddof=1))
+    var_p = float(np.var(r_p, ddof=1))
+    assert bench.beta == pytest.approx(2.0, abs=TOL)
+    assert bench.beta == pytest.approx(cov / var_b, abs=TOL)
+    inverted = cov / var_p
+    assert inverted == pytest.approx(0.5, abs=TOL)
+    assert bench.beta != pytest.approx(inverted, abs=1e-6)
+
+
+def test_tracking_error_annualizes_std_times_sqrt_periods_per_year():
+    """Hostile: TE is G1 sample std × sqrt(ppy), not × ppy and not stuck at 252."""
+    dates = _weekdays(4)
+    aaa = [0.02, 0.01, -0.01, 0.00]
+    spy = [0.00, 0.01, 0.01, -0.01]
+    book, market = _equity_book_with_spy()
+    monthly = AnnualizationConvention(
+        periods_per_year=12,
+        return_method="cagr",
+        volatility_method="sqrt_time",
+        sample_ddof=1,
+    )
+    result = compute_historical_analytics(
+        portfolio=book,
+        pricing_engine=PRICING,
+        market=market,
+        panel=_panel_with_spy(dates, aaa, spy),
+        start=dates[0],
+        end=dates[-1],
+        frequency=AnalyticsFrequency.DAILY,
+        methodology=VaRMethodology.LINEAR,
+        annualization=monthly,
+        historical_dataset_id=DATASET_ID,
+        historical_dataset_version=DATASET_VERSION,
+        rolling_window=21,
+        include_benchmark=True,
+    )
+    assert result.benchmark is not None
+    active = np.asarray(aaa, dtype=float) - np.asarray(spy, dtype=float)
+    expected_12 = float(np.std(active, ddof=1) * np.sqrt(12))
+    expected_252 = float(np.std(active, ddof=1) * np.sqrt(252))
+    wrong_linear = float(np.std(active, ddof=1) * 12)
+    assert result.benchmark.tracking_error == pytest.approx(expected_12, abs=TOL_ANN)
+    assert result.benchmark.tracking_error != pytest.approx(expected_252, abs=1e-6)
+    assert result.benchmark.tracking_error != pytest.approx(wrong_linear, abs=1e-6)
+    assert result.annualization.periods_per_year == 12

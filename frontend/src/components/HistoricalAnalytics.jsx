@@ -35,6 +35,21 @@ function buildRequest(portfolio, start, end) {
   }
 }
 
+/** Result/error belong to this POST only — never show a prior range/book. */
+function requestKey(portfolio, start, end) {
+  if (!portfolio || !start || !end) return ''
+  return `${portfolio.id}:${portfolio.version}:${start}:${end}`
+}
+
+function resultRequestKey(result) {
+  if (!result) return ''
+  return requestKey(
+    { id: result.portfolio_id, version: result.portfolio_version },
+    result.start,
+    result.end,
+  )
+}
+
 function Identity({ result }) {
   const ann = result.annualization || {}
   return (
@@ -162,29 +177,32 @@ export default function HistoricalAnalytics({ portfolio }) {
   const [start, setStart] = useState(DEFAULT_START)
   const [end, setEnd] = useState(DEFAULT_END)
   const [result, setResult] = useState(null)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
   const seq = useRef(0)
+  const key = requestKey(portfolio, start, end)
+  const current = Boolean(result && resultRequestKey(result) === key)
+  const errorCurrent = Boolean(error && error.key === key)
+  const waiting = Boolean(portfolio && start && end && !current && !errorCurrent)
 
   useEffect(() => {
     if (!portfolio || !start || !end) return undefined
     const requestId = seq.current + 1
     seq.current = requestId
+    const postedKey = requestKey(portfolio, start, end)
     let cancelled = false
     historicalAnalytics(buildRequest(portfolio, start, end))
       .then((next) => {
         if (cancelled || seq.current !== requestId) return
         setResult(next)
-        setError('')
+        setError(null)
       })
       .catch((err) => {
         if (cancelled || seq.current !== requestId) return
         setResult(null)
-        setError(apiErrorText(err, 'Historical analytics failed'))
+        setError({ key: postedKey, message: apiErrorText(err, 'Historical analytics failed') })
       })
     return () => { cancelled = true }
   }, [portfolio, start, end])
-
-  const waiting = Boolean(portfolio && start && end && !result && !error)
 
   if (!portfolio) {
     return (
@@ -228,8 +246,8 @@ export default function HistoricalAnalytics({ portfolio }) {
         {waiting && <span className="muted">Requesting analytics…</span>}
       </form>
       {waiting && <div className="skel-strip" aria-hidden="true" />}
-      {error && <div className="error ha-error" role="alert">{error}</div>}
-      {result && (
+      {errorCurrent && <div className="error ha-error" role="alert">{error.message}</div>}
+      {current && result && (
         <>
           <Identity result={result} />
           <SummaryTable result={result} />

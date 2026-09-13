@@ -236,6 +236,76 @@ describe('HistoricalAnalytics page', () => {
     expect(screen.queryByText('1.15')).not.toBeInTheDocument()
   })
 
+  it('does not apply a slower first response after a later range request', async () => {
+    let releaseFirst
+    const firstGate = new Promise((resolve) => { releaseFirst = resolve })
+    let calls = 0
+    stubAnalytics(async (body) => {
+      calls += 1
+      if (calls === 1) {
+        await firstGate
+        return HttpResponse.json(fixture({
+          start: body.start,
+          end: body.end,
+          cumulative_return: 0.99,
+          observation_count: 999,
+        }))
+      }
+      return HttpResponse.json(fixture({
+        start: body.start,
+        end: body.end,
+        cumulative_return: 0.0111,
+        observation_count: 10,
+      }))
+    })
+    render(<HistoricalAnalytics portfolio={demoPortfolio} />)
+    await waitFor(() => expect(calls).toBe(1))
+    fireEvent.change(screen.getByLabelText(/end date/i), { target: { value: '2024-06-28' } })
+    await waitFor(() => expect(calls).toBe(2))
+    const summary = await screen.findByTestId('ha-summary')
+    expect(summary).toHaveTextContent('1.11%')
+    expect(screen.getByTestId('ha-identity')).toHaveTextContent('2024-06-28')
+    releaseFirst()
+    await waitFor(() => {
+      expect(screen.getByTestId('ha-summary')).toHaveTextContent('1.11%')
+      expect(screen.getByTestId('ha-summary')).not.toHaveTextContent('99.00%')
+      expect(screen.getByTestId('ha-identity')).toHaveTextContent('2024-06-28')
+      expect(screen.getByTestId('ha-identity')).not.toHaveTextContent('2024-11-15')
+    })
+  })
+
+  it('does not keep the previous range result on screen while a newer request is in flight', async () => {
+    let releaseSecond
+    const secondGate = new Promise((resolve) => { releaseSecond = resolve })
+    let calls = 0
+    stubAnalytics(async (body) => {
+      calls += 1
+      if (calls === 1) {
+        return HttpResponse.json(fixture({
+          start: body.start,
+          end: body.end,
+          cumulative_return: 0.0248,
+        }))
+      }
+      await secondGate
+      return HttpResponse.json(fixture({
+        start: body.start,
+        end: body.end,
+        cumulative_return: 0.0111,
+      }))
+    })
+    render(<HistoricalAnalytics portfolio={demoPortfolio} />)
+    expect(await screen.findByTestId('ha-summary')).toHaveTextContent('2.48%')
+    fireEvent.change(screen.getByLabelText(/end date/i), { target: { value: '2024-06-28' } })
+    await waitFor(() => expect(calls).toBe(2))
+    expect(screen.queryByTestId('ha-summary')).not.toBeInTheDocument()
+    expect(screen.getByText(/requesting analytics/i)).toBeTruthy()
+    expect(screen.queryByText('2.48%')).not.toBeInTheDocument()
+    releaseSecond()
+    expect(await screen.findByTestId('ha-summary')).toHaveTextContent('1.11%')
+    expect(screen.getByTestId('ha-identity')).toHaveTextContent('2024-06-28')
+  })
+
   it('links to distinct contributors, KR-DV01, waterfall, and provenance hashes', async () => {
     stubAnalytics(() => HttpResponse.json(fixture()))
     render(<HistoricalAnalytics portfolio={demoPortfolio} />)
