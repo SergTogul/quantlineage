@@ -13,9 +13,9 @@
 | G4 | Risk-change gate | DONE | `e02872b`..`60b0188`; review PASS; no Critical/Important | |
 | B5 | Historical Analytics UI | DONE | commit `0e43ba1`; frontend 192 passed; review PASS `.superpowers/sdd/task-b5-review.md` | |
 | G5 | UI gate | DONE | `60b0188`..`0e43ba1`; review PASS; no Critical/Important | |
-| B6 | Demo/polish/docs | IN_PROGRESS | `docs/historical_analytics_demo.md`; panel hashes `#var-es/contributors` `#var-es/risk-change` `#risk-factors/kr-dv01`; frontend 196 passed; G6 not marked DONE | |
-| G6 | Demo gate | NOT_STARTED | | |
-| B7 | Hostile review + full regression | NOT_STARTED | | |
+| B6 | Demo/polish/docs | DONE | commit `fab0357`; `docs/historical_analytics_demo.md`; frontend 195 passed (independent); review PASS `.superpowers/sdd/task-b6-review.md` | |
+| G6 | Demo gate | DONE | `0e43ba1`..`fab0357`; review PASS; no Critical/Important | |
+| B7 | Hostile review + full regression | IN_PROGRESS | `reviews/wave-b-analytics-hostile-review.md`; stale-HA keyed display; backend 1778 passed / frontend 198 passed + lint; G7 not marked DONE | |
 | G7 | Wave B final gate | NOT_STARTED | | |
 
-Overall: IN_PROGRESS (G1–G5 DONE, B6 IN_PROGRESS)
+Overall: IN_PROGRESS (G1–G6 DONE, B7 IN_PROGRESS)
