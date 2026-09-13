@@ -15,6 +15,7 @@ import {
   buildPublicSnapshot,
   getMarketSnapshot,
   getPublicDataset,
+  historicalAnalytics,
   searchInstruments,
 } from './api.js'
 import { API_BASE, server } from './test/mswServer.js'
@@ -600,5 +601,31 @@ describe('getPublicDataset / getMarketSnapshot', () => {
     const snapshot = await getMarketSnapshot('real:public:wave-a:2024-01-08')
     expect(dataset.dataset_id).toBe('real:public:wave-a')
     expect(snapshot.equity_spots.AAPL).toBe(185)
+  })
+})
+
+describe('historicalAnalytics', () => {
+  it('POSTs /api/v1/risk/historical-analytics and returns the JSON body', async () => {
+    let seen = null
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/historical-analytics`, async ({ request }) => {
+        seen = await request.json()
+        return HttpResponse.json({
+          portfolio_id: seen.portfolio.id,
+          sharpe: null,
+          include_echo: seen.include_benchmark,
+        })
+      }),
+    )
+    const result = await historicalAnalytics({
+      portfolio: DEMO_PORTFOLIO,
+      start: '2024-01-02',
+      end: '2024-11-15',
+      include_benchmark: true,
+    })
+    expect(seen.include_benchmark).toBe(true)
+    expect(seen.start).toBe('2024-01-02')
+    expect(result.sharpe).toBeNull()
+    expect(result.include_echo).toBe(true)
   })
 })

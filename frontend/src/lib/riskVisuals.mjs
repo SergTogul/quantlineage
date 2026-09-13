@@ -64,6 +64,42 @@ export function keyRateDv01Chart(rows) {
 }
 
 /**
+ * SVG polyline from an API dated series. Y is display scale on min/max
+ * of the payload values — not a volatility, Sharpe, or drawdown measure.
+ */
+export function datedSeriesChart(series, { width = 640, height = 96, pad = 4 } = {}) {
+  const list = Array.isArray(series) ? series : []
+  const rowsIn = []
+  for (const point of list) {
+    const value = Number(point?.value)
+    if (!Number.isFinite(value)) continue
+    rowsIn.push({ as_of: point.as_of, value })
+  }
+  if (!rowsIn.length) return { points: '', rows: [], min: 0, max: 0 }
+  let min = rowsIn[0].value
+  let max = rowsIn[0].value
+  for (const row of rowsIn) {
+    if (row.value < min) min = row.value
+    if (row.value > max) max = row.value
+  }
+  const span = max - min
+  const innerH = height - pad * 2
+  const innerW = width - pad * 2
+  const n = rowsIn.length
+  const rows = rowsIn.map((row, i) => {
+    const x = n === 1 ? width / 2 : pad + (i / (n - 1)) * innerW
+    const y = span === 0 ? height / 2 : pad + (1 - (row.value - min) / span) * innerH
+    return { ...row, x, y }
+  })
+  return {
+    points: rows.map((row) => `${row.x.toFixed(1)},${row.y.toFixed(1)}`).join(' '),
+    rows,
+    min,
+    max,
+  }
+}
+
+/**
  * Flagship T0→T1 waterfall steps from RiskChangeReport fields.
  * Copies API amounts; does not reconstruct residual or running totals.
  */

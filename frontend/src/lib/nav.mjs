@@ -4,6 +4,7 @@ export const NAV_SECTIONS = Object.freeze([
   Object.freeze({ id: 'portfolio', label: 'Portfolio', hint: 'Hierarchy & positions' }),
   Object.freeze({ id: 'risk-factors', label: 'Risk Factors', hint: 'Exposures & heatmaps' }),
   Object.freeze({ id: 'var-es', label: 'VaR & ES', hint: 'Analytics & attribution' }),
+  Object.freeze({ id: 'historical-analytics', label: 'Historical', hint: 'Wealth, drawdown, SPY' }),
   Object.freeze({ id: 'stress', label: 'Stress', hint: 'Scenarios & reverse stress' }),
   Object.freeze({ id: 'scenario-builder', label: 'Scenario Builder', hint: 'Shocks & hedge compare' }),
   Object.freeze({ id: 'pnl-explain', label: 'P&L Explain', hint: 'Attribution' }),

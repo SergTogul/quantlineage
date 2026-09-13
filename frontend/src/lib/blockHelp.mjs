@@ -53,6 +53,10 @@ const entries = {
     body:
       'Waterfall or two-RiskRun explain of Δ(VaR/ES/DV01/Vega/stress). Drivers, residual, and identity come from the backend payload; the UI does not compute risk.',
   },
+  'historical-analytics': {
+    body:
+      'One POST /api/v1/risk/historical-analytics result on a frozen dataset: wealth, drawdown, rolling vol, Sharpe, VaR/ES, and nested SPY when include_benchmark is true. Range changes issue a new request. The UI formats and charts API fields only — it does not annualize or compute beta.',
+  },
   'stress-pnl-heatmap': {
     body:
       'One tile per library stress scenario showing portfolio PnL = shocked MV − base MV after full revaluation under scenario shocks. Color diverges around zero from API `pnl`.',
