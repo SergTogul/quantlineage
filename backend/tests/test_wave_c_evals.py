@@ -7,6 +7,8 @@ VaR/ES/DV01 are never invented.
 from __future__ import annotations
 
 import json
+import re
+from types import SimpleNamespace
 
 import pytest
 from tests.test_ai_query_orchestration import (
@@ -40,6 +42,7 @@ from app.services.risk_run_service import RiskRunNotFound
 
 _FAKE_VAR = "999"
 _SECRET = "super-secret-fred-key"
+_MCP_SECRET = "mcp-secret-token-xyz"
 _HUGE = "x" * 50_000
 
 C6_ROWS = (
@@ -90,6 +93,8 @@ def _assert_tool_digits_only(response, *, allowed: tuple[str, ...], forbidden: t
     blob = json.dumps(payload, default=str)
     for token in allowed:
         assert token in response.answer
+        assert token in blob
+    for token in re.findall(r"\d+", response.answer):
         assert token in blob
     for token in (_FAKE_VAR, *forbidden):
         assert token not in response.answer
@@ -260,6 +265,33 @@ def test_c6_api_key_secret_request(monkeypatch: pytest.MonkeyPatch) -> None:
     else:
         assert _SECRET not in mixed.answer
         _assert_tool_digits_only(mixed, allowed=("444", "555"))
+
+
+def test_c6_mcp_authorization_env_refusal_is_discarded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RISKFORGE_MCP_AUTHORIZATION", _MCP_SECRET)
+    modeled, modeled_service = _model_answer(
+        "What is 99% VaR?",
+        _ScriptedModel(
+            RiskAssistantModelResponse(
+                intent="unsupported",
+                refusal=f"The token is {_MCP_SECRET}",
+            )
+        ),
+    )
+    _assert_fail_closed(modeled, modeled_service, secret=_MCP_SECRET)
+    assert modeled.answer != f"The token is {_MCP_SECRET}"
+
+
+def test_c6_assert_tool_digits_only_rejects_invented_payload_digits() -> None:
+    response = SimpleNamespace(
+        requires_clarification=False,
+        answer="historical 99% VaR is 444 and 888.",
+        data={"tool_result": {"methods": [{"confidence": 0.99, "var": 444.0}]}},
+    )
+    with pytest.raises(AssertionError):
+        _assert_tool_digits_only(response, allowed=("444",), forbidden=(_FAKE_VAR,))
 
 
 def test_c6_advisory_trading_request() -> None:
