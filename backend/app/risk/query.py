@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from enum import Enum
 from typing import Any, Protocol
 
@@ -73,6 +74,7 @@ class RiskQueryPlan(BaseModel):
     tool_name: RiskToolName | None = None
     needs_clarification: bool = False
     clarification: str | None = None
+    tool_args: dict[str, Any] = Field(default_factory=dict)
 
 
 class RiskToolArgs(BaseModel):
@@ -321,6 +323,11 @@ SAFE_UNGROUNDED_ANSWER = (
     "VaR/ES, limits, contributors, worst stress, portfolio summary, or why risk changed."
 )
 
+_TOOL_FAILURE_ANSWER = (
+    "The selected deterministic tool could not be executed. "
+    "I cannot invent VaR, Expected Shortfall, or Greeks."
+)
+
 _INJECTION_MARKERS = (
     "ignore tools",
     "ignore the tools",
@@ -392,6 +399,7 @@ class DeterministicRiskAssistantModel:
         plan = self.router.route(request.question)
         return RiskAssistantModelResponse(
             tool_name=plan.tool_name,
+            tool_args=dict(plan.tool_args),
             intent=plan.intent,
             requires_clarification=plan.needs_clarification,
             clarification=plan.clarification,
@@ -403,38 +411,130 @@ class RiskQueryEngine:
     """Deterministic query router. An LLM can later call the same service methods as tools."""
 
     def route(self, question: str) -> RiskQueryPlan:
-        q = " ".join(question.lower().strip().split())
+        original = " ".join(question.strip().split())
+        q = original.lower()
         if not q:
             return _clarification_plan(
                 "unsupported",
                 "Ask a supported portfolio risk question: VaR/ES, limits, contributors, "
-                "worst stress, or portfolio summary.",
+                "worst stress, portfolio summary, instrument search, history, stress, "
+                "run comparison, or provenance.",
             )
         if _is_prompt_injection(q):
             return _clarification_plan("unsupported", SAFE_UNGROUNDED_ANSWER)
+        if _is_advisory(q):
+            return _clarification_plan(
+                "unsupported",
+                "I can only answer supported portfolio risk questions using deterministic "
+                "RiskForge tools: VaR/ES, limits, contributors, worst stress, or portfolio summary.",
+            )
+        collision = _ambiguous_tool_pair(q)
+        if collision:
+            return _clarification_plan("ambiguous", collision)
         if _is_risk_change_question(q):
-            return RiskQueryPlan(
+            return _plan_for_two_run_ids(
                 intent="explain_risk_change",
                 tool_name=RiskToolName.EXPLAIN_RISK_CHANGE,
-                needs_clarification=True,
-                clarification=(
+                question=original,
+                missing=(
                     "Provide two completed RiskRun identifiers to explain why the "
                     "risk metric changed. Do not invent VaR."
                 ),
+            )
+        if _is_compare_runs_question(q):
+            return _plan_for_two_run_ids(
+                intent="run_comparison",
+                tool_name=RiskToolName.COMPARE_RISK_RUNS,
+                question=original,
+                missing=(
+                    "Provide two completed RiskRun identifiers to compare. "
+                    "Do not invent VaR."
+                ),
+            )
+        if _is_provenance_question(q):
+            run_ids = _extract_run_ids(original)
+            if not run_ids:
+                return _clarification_plan(
+                    "provenance",
+                    "Provide a completed RiskRun identifier for provenance. "
+                    "Do not invent lineage.",
+                    tool_name=RiskToolName.GET_RUN_PROVENANCE,
+                )
+            return RiskQueryPlan(
+                intent="provenance",
+                tool_name=RiskToolName.GET_RUN_PROVENANCE,
+                tool_args={"run_id": run_ids[0]},
+            )
+        if _is_instrument_discovery(q):
+            query = _extract_search_query(original)
+            if not query:
+                return _clarification_plan(
+                    "instrument_discovery",
+                    "Provide a catalog search query.",
+                    tool_name=RiskToolName.SEARCH_INSTRUMENTS,
+                )
+            return RiskQueryPlan(
+                intent="instrument_discovery",
+                tool_name=RiskToolName.SEARCH_INSTRUMENTS,
+                tool_args={"query": query},
+            )
+        if _is_history_question(q):
+            instrument_id = _extract_instrument_id(original)
+            dates = _extract_iso_dates(original)
+            if not instrument_id or len(dates) < 2:
+                return _clarification_plan(
+                    "history",
+                    "Provide an instrument id and a start and end date range. "
+                    "Do not invent prices.",
+                    tool_name=RiskToolName.GET_MARKET_HISTORY,
+                )
+            return RiskQueryPlan(
+                intent="history",
+                tool_name=RiskToolName.GET_MARKET_HISTORY,
+                tool_args={
+                    "instrument_id": instrument_id,
+                    "start": dates[0],
+                    "end": dates[1],
+                },
             )
         if _mentions(q, "worst", "largest") and _mentions(q, "stress", "scenario", "threat"):
             return RiskQueryPlan(
                 intent="worst_scenario",
                 tool_name=RiskToolName.GET_WORST_STRESS,
             )
+        scenario_id = _named_stress_scenario(q)
+        if scenario_id or (_is_enqueue(q) and _mentions(q, "stress")):
+            if not scenario_id:
+                return _clarification_plan(
+                    "stress",
+                    "Choose an allowlisted stress scenario. Do not invent losses.",
+                    tool_name=RiskToolName.RUN_STRESS,
+                )
+            return RiskQueryPlan(
+                intent="stress",
+                tool_name=RiskToolName.RUN_STRESS,
+                tool_args={"scenario_id": scenario_id},
+            )
         if _mentions(q, "contributor", "contributors", "dominate", "biggest risk", "top risk"):
+            if _is_enqueue(q):
+                return RiskQueryPlan(
+                    intent="contributors",
+                    tool_name=RiskToolName.GET_TOP_RISK_CONTRIBUTORS,
+                )
             return RiskQueryPlan(
                 intent="contributors",
                 tool_name=RiskToolName.GET_CONTRIBUTORS,
             )
         if _mentions(q, "limit", "limits", "breach", "breaches"):
             return RiskQueryPlan(intent="limits", tool_name=RiskToolName.GET_LIMITS)
-        if _mentions(q, "var", "expected shortfall", "es"):
+        if _is_enqueue(q) and _mentions(q, "portfolio risk", "risk run", "riskrun"):
+            run_type = "var" if _mentions(q, "var") else "summary"
+            return RiskQueryPlan(
+                intent="portfolio_risk",
+                tool_name=RiskToolName.RUN_PORTFOLIO_RISK,
+                tool_args={"run_type": run_type},
+            )
+        if _mentions(q, "var", "expected shortfall") or re.search(r"\bes\b", q):
             return RiskQueryPlan(intent="var", tool_name=RiskToolName.GET_VAR_ES)
         if _mentions(q, "summary", "summarize", "overview", "portfolio"):
             return RiskQueryPlan(
@@ -453,7 +553,14 @@ class RiskQueryEngine:
             "RiskForge tools: VaR/ES, limits, contributors, worst stress, or portfolio summary.",
         )
 
-    def answer(self, question: str, portfolio: Portfolio, service) -> RiskQueryResponse:
+    def answer(
+        self,
+        question: str,
+        portfolio: Portfolio,
+        service,
+        *,
+        principal: str | None = None,
+    ) -> RiskQueryResponse:
         plan = self.route(question)
         if plan.tool_name is None or plan.needs_clarification:
             return RiskQueryResponse(
@@ -468,7 +575,7 @@ class RiskQueryEngine:
                 requires_clarification=True,
             )
 
-        checked = validate_tool_call(plan.tool_name, {})
+        checked = validate_tool_call(plan.tool_name, plan.tool_args)
         if not checked.allowed or checked.tool_name is None:
             return RiskQueryResponse(
                 intent="unsupported",
@@ -481,17 +588,13 @@ class RiskQueryEngine:
                 tool_name=None,
                 requires_clarification=True,
             )
-        contract = TOOL_CONTRACTS[checked.tool_name]
-        payload = _execute_tool(checked.tool_name, portfolio, service)
-        data = {
-            "tool_contract": contract.model_dump(mode="json"),
-            "tool_result": payload,
-        }
-        return RiskQueryResponse(
+        return self._grounded_tool_response(
             intent=plan.intent,
-            answer=_format_answer(plan.tool_name, payload),
-            data=data,
-            tool_name=plan.tool_name.value,
+            tool_name=checked.tool_name,
+            portfolio=portfolio,
+            service=service,
+            args=checked.args,
+            principal=principal,
         )
 
     def answer_with_model(
@@ -500,6 +603,8 @@ class RiskQueryEngine:
         portfolio: Portfolio,
         service,
         model: RiskAssistantModel,
+        *,
+        principal: str | None = None,
     ) -> RiskQueryResponse:
         request = RiskAssistantModelRequest(
             question=question,
@@ -551,17 +656,55 @@ class RiskQueryEngine:
                 requires_clarification=True,
             )
 
-        contract = TOOL_CONTRACTS[checked.tool_name]
-        payload = _execute_tool(checked.tool_name, portfolio, service, args=checked.args)
-        return RiskQueryResponse(
+        return self._grounded_tool_response(
             intent=model_response.intent or _intent_for_tool(checked.tool_name),
-            answer=_format_answer(checked.tool_name, payload),
-            data={
-                "tool_contract": contract.model_dump(mode="json"),
-                "tool_result": payload,
-                "model": model_data,
-            },
-            tool_name=checked.tool_name.value,
+            tool_name=checked.tool_name,
+            portfolio=portfolio,
+            service=service,
+            args=checked.args,
+            principal=principal,
+            extra_data={"model": model_data},
+        )
+
+    def _grounded_tool_response(
+        self,
+        *,
+        intent: str,
+        tool_name: RiskToolName,
+        portfolio: Portfolio,
+        service,
+        args: dict[str, Any],
+        principal: str | None = None,
+        extra_data: dict[str, Any] | None = None,
+    ) -> RiskQueryResponse:
+        contract = TOOL_CONTRACTS[tool_name]
+        try:
+            payload = _execute_tool(
+                tool_name, portfolio, service, args=args, principal=principal
+            )
+        except (ValueError, AttributeError, TypeError):
+            return RiskQueryResponse(
+                intent=intent,
+                answer=_TOOL_FAILURE_ANSWER,
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    **(extra_data or {}),
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+        data = {
+            "tool_contract": contract.model_dump(mode="json"),
+            "tool_result": payload,
+            **(extra_data or {}),
+        }
+        return RiskQueryResponse(
+            intent=intent,
+            answer=_format_answer(tool_name, payload),
+            data=data,
+            tool_name=tool_name.value,
         )
 
 
@@ -570,8 +713,16 @@ def _execute_tool(
     portfolio: Portfolio,
     service,
     args: dict[str, Any] | None = None,
+    *,
+    principal: str | None = None,
 ) -> dict[str, Any]:
-    return execute_allowlisted_tool(tool_name.value, portfolio, service, args or {})
+    return execute_allowlisted_tool(
+        tool_name.value,
+        portfolio,
+        service,
+        args or {},
+        principal=principal,
+    )
 
 
 def _format_answer(tool_name: RiskToolName, payload: dict[str, Any]) -> str:
@@ -640,6 +791,20 @@ def _intent_for_tool(tool_name: RiskToolName) -> str:
         return "contributors"
     if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
         return "explain_risk_change"
+    if tool_name == RiskToolName.SEARCH_INSTRUMENTS:
+        return "instrument_discovery"
+    if tool_name == RiskToolName.GET_MARKET_HISTORY:
+        return "history"
+    if tool_name == RiskToolName.RUN_PORTFOLIO_RISK:
+        return "portfolio_risk"
+    if tool_name == RiskToolName.COMPARE_RISK_RUNS:
+        return "run_comparison"
+    if tool_name == RiskToolName.RUN_STRESS:
+        return "stress"
+    if tool_name == RiskToolName.GET_TOP_RISK_CONTRIBUTORS:
+        return "contributors"
+    if tool_name == RiskToolName.GET_RUN_PROVENANCE:
+        return "provenance"
     return tool_name.value
 
 
@@ -699,6 +864,192 @@ def _mentions(question: str, *terms: str) -> bool:
     return any(term in question for term in terms)
 
 
+_RUN_ID_RE = re.compile(
+    r"\b(run[-_][a-zA-Z0-9-]+|"
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b",
+    re.I,
+)
+_ISO_DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+_CATALOG_ID_RE = re.compile(r"\b[a-z][a-z0-9]*:[a-z]{2}:[a-z0-9._-]+\b", re.I)
+_STRESS_ALIASES: tuple[tuple[str, str], ...] = (
+    ("eq_down_vol_up", "eq_down_vol_up"),
+    ("combined_crisis", "combined_crisis"),
+    ("combined crisis", "combined_crisis"),
+    ("eq_down_10", "eq_down_10"),
+    ("equity-down", "eq_down_10"),
+    ("equity down", "eq_down_10"),
+    ("rates_up_100", "rates_up_100"),
+    ("rates up", "rates_up_100"),
+    ("vol_up_25", "vol_up_25"),
+    ("vol up", "vol_up_25"),
+)
+_HISTORY_STOPWORDS = {
+    "show",
+    "get",
+    "fetch",
+    "the",
+    "a",
+    "an",
+    "for",
+    "from",
+    "to",
+    "and",
+    "of",
+    "with",
+    "between",
+    "market",
+    "history",
+    "historical",
+    "price",
+    "prices",
+    "series",
+    "range",
+    "please",
+    "instrument",
+    "instruments",
+    "start",
+    "end",
+    "date",
+    "dates",
+}
+
+
+def _is_advisory(question: str) -> bool:
+    return _mentions(
+        question,
+        "should we",
+        "should i",
+        "recommend",
+        "investment advice",
+        "trading advice",
+        "go to cash",
+    )
+
+
+def _is_instrument_discovery(question: str) -> bool:
+    return bool(re.search(r"\bsearch\b", question)) or _mentions(
+        question, "find instrument", "look up", "lookup"
+    )
+
+
+def _is_history_question(question: str) -> bool:
+    return bool(re.search(r"\bhistory\b", question)) or _mentions(
+        question, "price series", "historical prices"
+    )
+
+
+def _is_compare_runs_question(question: str) -> bool:
+    if not _mentions(question, "compare"):
+        return False
+    return _mentions(question, "runs", "risk run", "riskrun") or bool(
+        re.search(r"\brun\b", question)
+    )
+
+
+def _is_provenance_question(question: str) -> bool:
+    return _mentions(question, "provenance", "lineage")
+
+
+def _is_enqueue(question: str) -> bool:
+    return _mentions(question, "enqueue", "submit") or bool(re.search(r"\brun\b", question))
+
+
+def _named_stress_scenario(question: str) -> str | None:
+    for alias, scenario_id in _STRESS_ALIASES:
+        if alias in question:
+            return scenario_id
+    return None
+
+
+def _ambiguous_tool_pair(question: str) -> str | None:
+    if _is_instrument_discovery(question) and _is_history_question(question):
+        return (
+            "Please choose one deterministic tool: instrument search or market history."
+        )
+    if _is_compare_runs_question(question) and _is_risk_change_question(question):
+        return (
+            "Please choose one deterministic tool: run comparison or "
+            "risk-change explanation."
+        )
+    return None
+
+
+def _extract_run_ids(question: str) -> list[str]:
+    seen: list[str] = []
+    for match in _RUN_ID_RE.findall(question):
+        if match not in seen:
+            seen.append(match)
+    return seen
+
+
+def _extract_iso_dates(question: str) -> list[str]:
+    seen: list[str] = []
+    for match in _ISO_DATE_RE.findall(question):
+        if match not in seen:
+            seen.append(match)
+    return seen
+
+
+def _extract_instrument_id(question: str) -> str | None:
+    catalog = _CATALOG_ID_RE.findall(question)
+    if catalog:
+        return catalog[0]
+    dates = set(_extract_iso_dates(question))
+    for token in re.findall(r"[a-z0-9:._-]+", question, flags=re.I):
+        lowered = token.lower()
+        if lowered in _HISTORY_STOPWORDS or token in dates:
+            continue
+        if _RUN_ID_RE.fullmatch(token):
+            continue
+        if token.isalpha() and 2 <= len(token) <= 6:
+            return token.upper()
+        if ":" in token:
+            return token
+    return None
+
+
+def _extract_search_query(question: str) -> str | None:
+    original = question.strip()
+    lowered = original.lower()
+    prefixes = (
+        "search instruments for",
+        "search instrument",
+        "search for",
+        "find instrument",
+        "look up",
+        "lookup",
+        "search",
+    )
+    rest = None
+    for prefix in prefixes:
+        if lowered.startswith(prefix) or f" {prefix} " in f" {lowered} ":
+            idx = lowered.find(prefix)
+            rest = original[idx + len(prefix) :].strip(" ?.")
+            break
+    if rest is None:
+        return None
+    rest = re.sub(r"^(instruments?|catalog|for)\s+", "", rest, flags=re.I)
+    rest = re.split(r"\band\b", rest, maxsplit=1, flags=re.I)[0].strip(" ?.")
+    return rest or None
+
+
+def _plan_for_two_run_ids(
+    *,
+    intent: str,
+    tool_name: RiskToolName,
+    question: str,
+    missing: str,
+) -> RiskQueryPlan:
+    run_ids = _extract_run_ids(question)
+    if len(run_ids) < 2:
+        return _clarification_plan(intent, missing, tool_name=tool_name)
+    return RiskQueryPlan(
+        intent=intent,
+        tool_name=tool_name,
+        tool_args={"t0_run_id": run_ids[0], "t1_run_id": run_ids[1]},
+    )
+
+
 def _is_risk_change_question(question: str) -> bool:
     if not _mentions(question, "why", "explain"):
         return False
@@ -724,9 +1075,14 @@ def _safe_ungrounded_text(*candidates: str | None, fallback: str) -> str:
     return SAFE_UNGROUNDED_ANSWER
 
 
-def _clarification_plan(intent: str, message: str) -> RiskQueryPlan:
+def _clarification_plan(
+    intent: str,
+    message: str,
+    tool_name: RiskToolName | None = None,
+) -> RiskQueryPlan:
     return RiskQueryPlan(
         intent=intent,
+        tool_name=tool_name,
         needs_clarification=True,
         clarification=message,
     )
