@@ -8,9 +8,10 @@ This is the implementer artifact. Independent review still applies. G7 is **not 
 
 None on the Wave B analytics path after the smallest UI close-gate fix.
 
-Attack that failed closed after the smallest production fix (no new product scope):
+Attacks that failed closed after the smallest production fix (no new product scope):
 
 - **Stale async UI response.** Historical Analytics kept the previous range’s summary/charts on screen after start/end changed, while a newer POST was in flight. Identity (`result.start` / `result.end`) disagreed with the date controls. A slower first response was already ignored via `seq` + `cancelled` (that pin passed). The in-flight previous result did not. Now a result or error is shown only when its portfolio id/version + start + end match the request that is on the controls. Cited: `test_does_not_keep_the_previous_range_result_on_screen_while_a_newer_request_is_in_flight` (red, then green), `test_does_not_apply_a_slower_first_response_after_a_later_range_request`.
+- **CI golden-demo e2e strict locator.** Independent G7 review: `flagship.getByText(/Market/)` matched both identity **Market snapshot** and totals **Market $0** (`e2e-playwright` red, run 34733596657). Waterfall steps now have unique `waterfall-step-{key}` testids; the e2e asserts those plus exact `Market snapshot`. Not a math hole. Cited: `keeps Market snapshot identity distinct from the waterfall market step`.
 
 ## 2. High severity
 

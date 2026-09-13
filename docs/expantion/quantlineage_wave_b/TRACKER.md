@@ -15,7 +15,7 @@
 | G5 | UI gate | DONE | `60b0188`..`0e43ba1`; review PASS; no Critical/Important | |
 | B6 | Demo/polish/docs | DONE | commit `fab0357`; `docs/historical_analytics_demo.md`; frontend 195 passed (independent); review PASS `.superpowers/sdd/task-b6-review.md` | |
 | G6 | Demo gate | DONE | `0e43ba1`..`fab0357`; review PASS; no Critical/Important | |
-| B7 | Hostile review + full regression | IN_PROGRESS | `reviews/wave-b-analytics-hostile-review.md`; stale-HA keyed display; backend 1778 passed / frontend 198 passed + lint; G7 not marked DONE | |
+| B7 | Hostile review + full regression | IN_PROGRESS | `5576b7f` stale HA + pins; e2e Market locator close-gate after independent review; G7 not DONE | CI e2e red `34733596657` |
 | G7 | Wave B final gate | NOT_STARTED | | |
 
 Overall: IN_PROGRESS (G1–G6 DONE, B7 IN_PROGRESS)

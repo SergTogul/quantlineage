@@ -177,6 +177,14 @@ describe('RiskChangeAttribution flagship card', () => {
     expect(screen.getByRole('link', { name: /run-t1/i })).toBeTruthy()
   })
 
+  it('keeps Market snapshot identity distinct from the waterfall market step', async () => {
+    await compareFlagship()
+    expect(screen.getByTestId('risk-change-identity')).toHaveTextContent('Market snapshot')
+    expect(screen.getByTestId('waterfall-step-market')).toHaveTextContent('market / factor changes')
+    expect(screen.getByTestId('waterfall-step-portfolio')).toHaveTextContent('portfolio / trade change')
+    expect(screen.getAllByText(/Market/).length).toBeGreaterThan(1)
+  })
+
   it('charts waterfall steps from API fields without client residual math', async () => {
     await compareFlagship()
     const chart = screen.getByTestId('risk-change-waterfall')
