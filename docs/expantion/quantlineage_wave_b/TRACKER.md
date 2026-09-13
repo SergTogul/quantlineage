@@ -15,7 +15,7 @@
 | G5 | UI gate | DONE | `60b0188`..`0e43ba1`; review PASS; no Critical/Important | |
 | B6 | Demo/polish/docs | DONE | commit `fab0357`; `docs/historical_analytics_demo.md`; frontend 195 passed (independent); review PASS `.superpowers/sdd/task-b6-review.md` | |
 | G6 | Demo gate | DONE | `0e43ba1`..`fab0357`; review PASS; no Critical/Important | |
-| B7 | Hostile review + full regression | IN_PROGRESS | `5576b7f` stale HA + pins; e2e Market locator close-gate after independent review; G7 not DONE | CI e2e red `34733596657` |
-| G7 | Wave B final gate | NOT_STARTED | | |
+| B7 | Hostile review + full regression | DONE | `5576b7f` + `3d26f62`; `reviews/wave-b-analytics-hostile-review.md`; review PASS `.superpowers/sdd/task-b7-review.md`; CI green https://github.com/SergTogul/riskforge-mvp/actions/runs/34734252960 | |
+| G7 | Wave B final gate | DONE | `fab0357`..`3d26f62`; named attacks held; e2e Market locator closed; PR-FULL green `34734252960` | |
 
-Overall: IN_PROGRESS (G1–G6 DONE, B7 IN_PROGRESS)
+Overall: DONE (G1–G7; CI PR-FULL green on `3d26f62`, run 34734252960)
