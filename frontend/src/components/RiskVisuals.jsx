@@ -1,5 +1,5 @@
 import { money } from '../lib/risk.mjs'
-import { contributionBarRows, keyRateDv01Chart } from '../lib/riskVisuals.mjs'
+import { contributionBarRows, datedSeriesChart, keyRateDv01Chart } from '../lib/riskVisuals.mjs'
 
 /**
  * Horizontal contribution bars from API amounts / contribution_pct.
@@ -95,6 +95,55 @@ export function KeyRateDv01Curve({ rows }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Time series from API dated values. Display scale only.
+ */
+export function DatedSeriesChart({
+  series,
+  ariaLabel,
+  testId,
+  className = '',
+}) {
+  const chart = datedSeriesChart(series)
+  if (!chart.rows.length) return null
+  const W = 640
+  const H = 96
+  return (
+    <div className={`ha-series ${className}`.trim()} data-testid={testId}>
+      <svg
+        className="ha-series-svg"
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label={ariaLabel}
+      >
+        <polyline
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          points={chart.points}
+        />
+        {chart.rows.map((row) => (
+          <circle
+            key={`${row.as_of}-${row.value}`}
+            cx={Number(row.x.toFixed(1))}
+            cy={Number(row.y.toFixed(1))}
+            r="2.5"
+            data-value={row.value}
+          />
+        ))}
+      </svg>
+      <p className="ha-series-extrema">
+        {chart.rows[0].as_of}
+        {chart.rows.length > 1 ? ` → ${chart.rows[chart.rows.length - 1].as_of}` : ''}
+        {' · min '}
+        {String(chart.min)}
+        {' · max '}
+        {String(chart.max)}
+      </p>
     </div>
   )
 }

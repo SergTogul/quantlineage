@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { loadDashboard } from './api'
 import AppNav from './components/AppNav'
 import MarketData from './components/MarketData'
+import HistoricalAnalytics from './components/HistoricalAnalytics'
 import Overview from './components/Overview'
 import { Contributors, Limits, Stress, ThreatScenarios } from './components/RiskTable'
 import {
@@ -176,6 +177,13 @@ export default function App() {
             <VaRCompare portfolio={portfolio} />
             <RiskChangeAttribution portfolio={portfolio} />
           </div>
+        </SectionFrame>
+      )
+      break
+    case 'historical-analytics':
+      body = (
+        <SectionFrame id="historical-analytics">
+          <HistoricalAnalytics portfolio={portfolio} />
         </SectionFrame>
       )
       break

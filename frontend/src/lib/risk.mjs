@@ -663,6 +663,12 @@ export function overviewCollage({ summary, threats, limits, hierarchy, stress, f
         : 'VaR / ES analytics',
     },
     {
+      id: 'historical-analytics',
+      label: 'Historical',
+      hint: 'Wealth, drawdown, SPY',
+      teaser: 'POST /risk/historical-analytics',
+    },
+    {
       id: 'stress',
       label: 'Stress',
       hint: 'Scenarios & reverse stress',

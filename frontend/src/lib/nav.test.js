@@ -8,10 +8,12 @@ import {
 
 test('NAV_SECTIONS covers terminal target areas in order', () => {
   assert.deepEqual(NAV_SECTIONS.map((s) => s.id), [
-    'overview', 'portfolio', 'risk-factors', 'var-es', 'stress',
+    'overview', 'portfolio', 'risk-factors', 'var-es', 'historical-analytics', 'stress',
     'scenario-builder', 'pnl-explain', 'limits', 'risk-runs', 'market-data',
   ])
   assert.equal(DEFAULT_SECTION_ID, 'overview')
+  assert.equal(navSectionById('historical-analytics').label, 'Historical')
+  assert.equal(navSectionById('historical-analytics').hint, 'Wealth, drawdown, SPY')
   assert.equal(navSectionById('market-data').label, 'Market Data')
   assert.equal(navSectionById('market-data').hint, 'Search & history')
   for (const s of NAV_SECTIONS) {

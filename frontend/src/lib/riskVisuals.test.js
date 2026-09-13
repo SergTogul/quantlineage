@@ -3,16 +3,18 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
-import { contributionBarPct, contributionBarRows, keyRateDv01Chart, riskChangeWaterfallSteps } from './riskVisuals.mjs'
+import { contributionBarPct, contributionBarRows, datedSeriesChart, keyRateDv01Chart, riskChangeWaterfallSteps } from './riskVisuals.mjs'
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'riskVisuals.mjs'), 'utf8')
 
 test('presentation helpers do not contain risk math or KR sums', () => {
   assert.doesNotMatch(src, /bps_to_decimal|0\.0001/)
   assert.doesNotMatch(src, /1\.645|1\.96|Math\.sqrt/)
+  assert.doesNotMatch(src, /\*\*\s*\(/)
   assert.doesNotMatch(src, /key_rate_dv01[\s\S]{0,120}\.reduce|key_rate_dv01\s*\+/)
   assert.doesNotMatch(src, /total_change\s*-/)
   assert.doesNotMatch(src, /previous_risk\s*\+/)
+  assert.doesNotMatch(src, /sharpe\s*=|tracking_error\s*=|beta\s*=/)
 })
 
 test('contributionBarPct scales |API amount| against maxAbs', () => {
@@ -74,4 +76,19 @@ test('riskChangeWaterfallSteps copies API fields and keeps residual at 0', () =>
   assert.equal(steps[3].label, 'residual / interactions')
   assert.equal(steps[4].value, 1420)
   assert.equal(riskChangeWaterfallSteps(null).length, 0)
+})
+
+test('datedSeriesChart copies API values and scales display y only', () => {
+  const chart = datedSeriesChart([
+    { as_of: '2024-01-02', value: 0 },
+    { as_of: '2024-01-15', value: -0.083 },
+    { as_of: '2024-03-29', value: -0.02 },
+  ], { width: 100, height: 50, pad: 0 })
+  assert.equal(chart.rows.length, 3)
+  assert.equal(chart.rows[1].value, -0.083)
+  assert.equal(chart.min, -0.083)
+  assert.equal(chart.max, 0)
+  assert.equal(chart.rows[1].y, 50)
+  assert.equal(chart.rows[0].y, 0)
+  assert.equal(datedSeriesChart(null).rows.length, 0)
 })

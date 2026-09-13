@@ -706,11 +706,12 @@ test('overviewKpis and overviewCollage use API teasers', () => {
     stress: [{ scenario: 'A', pnl: -9 }, { scenario: 'B', pnl: -2 }],
     factors: [{ factor: 'SPX', exposure: -100, factor_type: 'equity', bucket: 'spot' }],
   })
-  assert.equal(cards.length, 8)
+  assert.equal(cards.length, 9)
   assert.equal(cards[0].id, 'portfolio')
   assert.match(cards[0].teaser, /desks/)
-  assert.match(cards[6].teaser, /1 breach/)
   assert.equal(cards[2].id, 'var-es')
+  assert.equal(cards[3].id, 'historical-analytics')
+  assert.match(cards.find((c) => c.id === 'limits').teaser, /1 breach/)
 })
 
 test('overviewBookStatus is Breach when limits or threats breach', () => {

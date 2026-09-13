@@ -9,7 +9,7 @@ const EXPECTED_IDS = [
   'positions', 'portfolio-hierarchy', 'hierarchy-risk-heatmap', 'risk-factors',
   'rates-showcase', 'run-provenance',
   'factor-exposure-heatmap', 'var-es', 'component-var', 'es-contributions',
-  'var-compare', 'risk-change-attribution', 'stress-pnl-heatmap', 'stress-tests',
+  'var-compare', 'risk-change-attribution', 'historical-analytics', 'stress-pnl-heatmap', 'stress-tests',
   'threat-scenarios', 'reverse-stress', 'reverse-stress-multi', 'scenario-builder',
   'hedge-compare', 'risk-query', 'pnl-explain', 'limit-utilization-heatmap',
   'limits', 'risk-runs',
@@ -21,6 +21,7 @@ const WIRED_FILES = [
   '../components/RiskTable.jsx',
   '../components/ScenarioBuilder.jsx',
   '../components/Analytics.jsx',
+  '../components/HistoricalAnalytics.jsx',
 ]
 
 const HELP_TAG = /<BlockHelp\s+id="([^"]+)"\s*\/>/g

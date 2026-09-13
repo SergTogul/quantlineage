@@ -343,6 +343,17 @@ export function getMarketSnapshot(snapshotId) {
 }
 
 /**
+ * Historical wealth / drawdown / SPY relative analytics.
+ * POST /api/v1/risk/historical-analytics — display the result; no client math.
+ */
+export function historicalAnalytics(request) {
+  return json(`${API_V1}/risk/historical-analytics`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+/**
  * Flagship two-RiskRun explain → RiskChangeReport (Stage 10.2).
  * Body: { t0_run_id, t1_run_id, metric }. Display only — no client-side risk math.
  */
