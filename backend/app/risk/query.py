@@ -571,20 +571,7 @@ def _execute_tool(
     service,
     args: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    args = args or {}
-    if tool_name.value in C1_ARG_MODELS:
-        return execute_allowlisted_tool(tool_name.value, portfolio, service, args)
-    if tool_name == RiskToolName.GET_PORTFOLIO_SUMMARY:
-        return _dump(service.summary(portfolio))
-    if tool_name == RiskToolName.GET_VAR_ES:
-        return _dump(service.var_report(portfolio))
-    if tool_name == RiskToolName.GET_WORST_STRESS:
-        return _dump(service.threat_evaluation(portfolio))
-    if tool_name == RiskToolName.GET_LIMITS:
-        return {"limits": [_dump(item) for item in service.limits(portfolio)]}
-    if tool_name == RiskToolName.GET_CONTRIBUTORS:
-        return {"contributors": [_dump(item) for item in service.contributors(portfolio)[:5]]}
-    raise ValueError(f"unsupported risk tool: {tool_name}")
+    return execute_allowlisted_tool(tool_name.value, portfolio, service, args or {})
 
 
 def _format_answer(tool_name: RiskToolName, payload: dict[str, Any]) -> str:
@@ -654,12 +641,6 @@ def _intent_for_tool(tool_name: RiskToolName) -> str:
     if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
         return "explain_risk_change"
     return tool_name.value
-
-
-def _dump(value) -> dict[str, Any]:
-    if hasattr(value, "model_dump"):
-        return value.model_dump()
-    return dict(value)
 
 
 def _format_c1_answer(tool_name: RiskToolName, payload: dict[str, Any]) -> str:
