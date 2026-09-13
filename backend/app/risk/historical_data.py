@@ -487,7 +487,8 @@ def create_historical_dataset(
     - unset / ``demo-multi-factor-history`` — packaged per-factor demo panel
     - ``demo`` / ``demo-historical-factors`` — labeled four-macro fixture CSV
     - ``synthetic`` — seeded four-macro RNG (``SyntheticHistoricalDataset``)
-    - ``real:public:wave-a`` — frozen public CSV (env ``QUANTLINEAGE_PUBLIC_HISTORY_CSV``)
+    - ``real:public:wave-a`` — frozen public CSV (env ``QUANTLINEAGE_PUBLIC_HISTORY_CSV``
+      or hashed files under ``data/public_history/real-public-wave-a/``)
     - path to a ``.csv`` file (four-macro or per-factor headers)
 
     When ``source`` and ``RISKFORGE_HISTORICAL_DATASET`` are unset,

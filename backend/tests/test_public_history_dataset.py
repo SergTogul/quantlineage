@@ -373,6 +373,99 @@ def test_same_normalized_content_same_hash_changed_observation_new_hash(tmp_path
     assert "retrieved_at" not in json.dumps({"dataset_version": first.dataset_version})
 
 
+def _mutated_aapl_catalog() -> dict[str, HistoricalSeries]:
+    catalog = _default_equity_catalog()
+    original = catalog["equity:US:AAPL"]
+    mutated_points = list(original.points)
+    mutated_points[1] = HistoricalPoint(
+        observation_date=mutated_points[1].observation_date, value=101.5
+    )
+    catalog["equity:US:AAPL"] = original.model_copy(update={"points": mutated_points})
+    return catalog
+
+
+def test_freeze_writes_content_hashed_files_under_dataset_slug(tmp_path: Path) -> None:
+    artifact = _freeze(tmp_path)
+    dataset_dir = tmp_path / "real-public-wave-a"
+    assert artifact.csv_path.parent.resolve() == dataset_dir.resolve()
+    assert artifact.csv_path.name == f"{artifact.dataset_version}.csv"
+    assert artifact.sidecar_path.name == f"{artifact.dataset_version}.json"
+    assert artifact.csv_path.is_file()
+    assert artifact.sidecar_path.is_file()
+    assert not (tmp_path / "real_public_wave_a.csv").exists()
+    sidecar = json.loads(artifact.sidecar_path.read_text(encoding="utf-8"))
+    assert sidecar["dataset_id"] == "real:public:wave-a"
+    assert sidecar["dataset_version"] == artifact.dataset_version
+
+
+def test_second_freeze_does_not_overwrite_prior_version_bytes(tmp_path: Path) -> None:
+    first = _freeze(tmp_path)
+    first_bytes = first.csv_path.read_bytes()
+    first_sidecar = first.sidecar_path.read_text(encoding="utf-8")
+    second = _freeze(tmp_path, history=FakeHistoryProvider(_mutated_aapl_catalog()))
+    assert second.dataset_id == first.dataset_id == "real:public:wave-a"
+    assert second.dataset_version != first.dataset_version
+    assert second.csv_path != first.csv_path
+    assert first.csv_path.is_file()
+    assert first.csv_path.read_bytes() == first_bytes
+    assert first.sidecar_path.read_text(encoding="utf-8") == first_sidecar
+    assert second.csv_path.is_file()
+    assert json.loads(first.sidecar_path.read_text(encoding="utf-8"))["dataset_version"] == (
+        first.dataset_version
+    )
+
+
+def test_dataset_id_plus_version_resolves_immutable_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.market.history.artifact import PUBLIC_HISTORY_DIR_ENV, resolve_public_history_csv
+    from app.market.history.spec import WAVE_A_DATASET_ID
+
+    first = _freeze(tmp_path)
+    second = _freeze(tmp_path, history=FakeHistoryProvider(_mutated_aapl_catalog()))
+    monkeypatch.delenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", raising=False)
+    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.setenv(PUBLIC_HISTORY_DIR_ENV, str(tmp_path))
+
+    older = resolve_public_history_csv(dataset_version=first.dataset_version)
+    newer = resolve_public_history_csv(dataset_version=second.dataset_version)
+    assert older.resolve() == first.csv_path.resolve()
+    assert newer.resolve() == second.csv_path.resolve()
+    assert older.read_bytes() != newer.read_bytes()
+
+    old_spec = resolve_run_spec(
+        {
+            "historical_dataset_id": WAVE_A_DATASET_ID,
+            "historical_dataset_version": first.dataset_version,
+        }
+    )
+    new_spec = resolve_run_spec(
+        {
+            "historical_dataset_id": WAVE_A_DATASET_ID,
+            "historical_dataset_version": second.dataset_version,
+        }
+    )
+    assert old_spec.historical_dataset_id == new_spec.historical_dataset_id == WAVE_A_DATASET_ID
+    assert old_spec.historical_dataset_version == first.dataset_version
+    assert new_spec.historical_dataset_version == second.dataset_version
+
+    old_engine = build_historical_risk_engine(
+        historical_dataset_id=WAVE_A_DATASET_ID,
+        historical_dataset_version=first.dataset_version,
+    )
+    new_engine = build_historical_risk_engine(
+        historical_dataset_id=WAVE_A_DATASET_ID,
+        historical_dataset_version=second.dataset_version,
+    )
+    assert Path(old_engine.dataset.source_path).resolve() == first.csv_path.resolve()
+    assert Path(new_engine.dataset.source_path).resolve() == second.csv_path.resolve()
+    old_id, old_version = dataset_identity(old_engine.dataset)
+    new_id, new_version = dataset_identity(new_engine.dataset)
+    assert old_id == new_id == WAVE_A_DATASET_ID
+    assert old_version == first.dataset_version
+    assert new_version == second.dataset_version
+
+
 def test_freeze_then_factory_loads_by_id_without_providers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

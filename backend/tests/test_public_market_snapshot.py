@@ -234,13 +234,42 @@ def _build(as_of: date = _MONDAY, *, history=None, macro=None):
     )
 
 
-def test_snapshot_id_is_real_public_wave_a_as_of_iso() -> None:
+def test_snapshot_id_embeds_as_of_and_content_hash() -> None:
     built = _build(_MONDAY)
-    assert built.snapshot.id == "real:public:wave-a:2024-01-08"
+    digest = built.snapshot.content_hash()
+    assert built.snapshot.id == f"real:public:wave-a:{_MONDAY.isoformat()}:{digest}"
     assert built.snapshot.as_of == _MONDAY
     later = _build(date(2024, 1, 12))
-    assert later.snapshot.id == "real:public:wave-a:2024-01-12"
+    assert later.snapshot.id == f"real:public:wave-a:2024-01-12:{later.snapshot.content_hash()}"
     assert later.snapshot.id != built.snapshot.id
+
+
+def test_revised_marks_same_as_of_do_not_reuse_snapshot_id() -> None:
+    from app.market.history.snapshot import persist_public_snapshot
+
+    first = _build(_MONDAY)
+    catalog = _equity_catalog()
+    original = catalog["equity:US:AAPL"]
+    mutated_points = list(original.points)
+    mutated_points[1] = HistoricalPoint(observation_date=_FRIDAY, value=999.0)
+    catalog["equity:US:AAPL"] = original.model_copy(update={"points": mutated_points})
+    second = _build(_MONDAY, history=FakeHistoryProvider(catalog))
+    assert first.snapshot.as_of == second.snapshot.as_of == _MONDAY
+    assert first.snapshot.content_hash() != second.snapshot.content_hash()
+    assert first.snapshot.id != second.snapshot.id
+    assert first.snapshot.id.endswith(first.snapshot.content_hash())
+    assert second.snapshot.id.endswith(second.snapshot.content_hash())
+    markets = InMemoryMarketSnapshotRepository()
+    first_id = persist_public_snapshot(markets, first)
+    second_id = persist_public_snapshot(markets, second)
+    assert first_id != second_id
+    loaded_first = markets.get(first_id)
+    loaded_second = markets.get(second_id)
+    assert loaded_first is not None and loaded_second is not None
+    assert loaded_first.equity_spots["AAPL"] == pytest.approx(185.0, abs=1e-12)
+    assert loaded_second.equity_spots["AAPL"] == pytest.approx(999.0, abs=1e-12)
+    assert loaded_first.content_hash() == first.snapshot.content_hash()
+    assert loaded_second.content_hash() == second.snapshot.content_hash()
 
 
 def test_fred_percent_4_25_is_snapshot_decimal_0_0425_not_bp() -> None:

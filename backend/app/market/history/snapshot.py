@@ -2,7 +2,9 @@
 
 Providers are injected (tests use fakes). Pricing and RiskRun consume the
 persisted snapshot id and never call Yahoo/FRED. Cash books need spots + USD
-key rates only — this builder does not attach vol surfaces.
+key rates only — this builder does not attach vol surfaces. Public-data Wave A
+covers US equity spot and USD Treasury-rate factors; FX and volatility stay
+outside this universe. Snapshot ids are ``dataset_id:as_of:content_hash``.
 """
 
 from __future__ import annotations
@@ -144,11 +146,16 @@ def build_public_snapshot(
         rates={"USD": usd_discount},
         key_rates={"USD": key_rates_usd},
     )
-    _assert_snapshot_id_matches_as_of(snapshot, dataset_id=spec.dataset_id)
+    digest = snapshot.content_hash()
+    snapshot = snapshot.model_copy(
+        update={"id": public_snapshot_id(spec.dataset_id, as_of, digest)}
+    )
+    _assert_snapshot_identity(snapshot, dataset_id=spec.dataset_id)
     lineage = {
         "dataset_id": spec.dataset_id,
         "as_of": as_of_wire(as_of),
         "stale_after_days": STALE_AFTER_DAYS,
+        "snapshot_content_hash": digest,
         "marks": marks,
     }
     return PublicSnapshotBuild(snapshot=snapshot, lineage=lineage)
@@ -158,7 +165,14 @@ def persist_public_snapshot(
     repo: MarketSnapshotRepository, built: PublicSnapshotBuild
 ) -> str:
     """Write the frozen snapshot before any RiskRun may bind its id."""
-    _assert_snapshot_id_matches_as_of(built.snapshot)
+    _assert_snapshot_identity(built.snapshot)
+    existing = repo.get(built.snapshot.id)
+    if existing is not None:
+        if existing.content_hash() != built.snapshot.content_hash():
+            raise MismatchedPublicSnapshotIdentityError(
+                f"snapshot {built.snapshot.id} already stored with different contents"
+            )
+        return existing.id
     return repo.save(built.snapshot, meta=built.lineage)
 
 
@@ -173,7 +187,7 @@ def bind_risk_run_to_saved_snapshot(
     stored = market_repo.get(snapshot_id)
     if stored is None:
         raise UnsavedPublicSnapshotError(f"snapshot not persisted: {snapshot_id}")
-    _assert_snapshot_id_matches_as_of(stored)
+    _assert_snapshot_identity(stored)
     bound = run.model_copy(
         update={
             "market_snapshot_id": stored.id,
@@ -183,7 +197,11 @@ def bind_risk_run_to_saved_snapshot(
     return run_repo.create(bound)
 
 
-def _assert_snapshot_id_matches_as_of(
+def public_snapshot_id(dataset_id: str, as_of: date, content_hash: str) -> str:
+    return f"{dataset_id}:{as_of.isoformat()}:{content_hash}"
+
+
+def _assert_snapshot_identity(
     snapshot: MarketSnapshot, *, dataset_id: str = WAVE_A_DATASET_ID
 ) -> None:
     as_of = snapshot.as_of
@@ -191,10 +209,11 @@ def _assert_snapshot_id_matches_as_of(
         raise MismatchedPublicSnapshotIdentityError(
             f"snapshot {snapshot.id} as_of is not a calendar date"
         )
-    expected = f"{dataset_id}:{as_of.isoformat()}"
+    expected = public_snapshot_id(dataset_id, as_of, snapshot.content_hash())
     if snapshot.id != expected:
         raise MismatchedPublicSnapshotIdentityError(
-            f"snapshot id {snapshot.id} does not match as_of {as_of.isoformat()}"
+            f"snapshot id {snapshot.id} does not match as_of {as_of.isoformat()} "
+            f"and content hash {snapshot.content_hash()}"
         )
 
 

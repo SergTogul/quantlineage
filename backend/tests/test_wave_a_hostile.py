@@ -123,7 +123,7 @@ def test_freeze_end_before_history_fails_closed(tmp_path: Path) -> None:
 def test_saturday_as_of_keeps_friday_last_print() -> None:
     built = _build(_SATURDAY)
     assert built.snapshot.as_of == _SATURDAY
-    assert built.snapshot.id == "real:public:wave-a:2024-01-06"
+    assert built.snapshot.id == f"real:public:wave-a:2024-01-06:{built.snapshot.content_hash()}"
     lineage = built.lineage["marks"]
     assert lineage["equity:US:AAPL"]["source_observation_date"] == _FRIDAY.isoformat()
     assert lineage["macro:FRED:DGS10"]["source_observation_date"] == _FRIDAY.isoformat()
