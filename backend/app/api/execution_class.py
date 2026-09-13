@@ -35,6 +35,7 @@ METHODOLOGY_BEARING_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/risk/var"),
         ("POST", "/risk/es"),
         ("POST", "/risk/what-if"),
+        ("POST", "/risk/historical-analytics"),
         ("POST", "/risk/stress/compare"),
         ("POST", "/risk/stress/formal/compare"),
     }
@@ -74,6 +75,7 @@ ENDPOINT_EXECUTION_CLASS: Mapping[tuple[str, str], ExecutionClass] = {
     ("GET", "/market/snapshots/{snapshot_id}"): ExecutionClass.INTERACTIVE,
     ("POST", "/market/snapshots/from-public-data"): ExecutionClass.INTERACTIVE,
     ("POST", "/risk/summary"): ExecutionClass.INTERACTIVE,
+    ("POST", "/risk/historical-analytics"): ExecutionClass.HEAVY,
     ("POST", "/risk/factors"): ExecutionClass.INTERACTIVE,
     ("POST", "/risk/limits/drilldown"): ExecutionClass.INTERACTIVE,
     ("POST", "/risk/var"): ExecutionClass.HEAVY,

@@ -2,9 +2,9 @@
 
 | ID | Task | Status | Evidence | Blocker |
 |---|---|---|---|---|
-| B0 | Inspect/reuse current analytics APIs | IN_PROGRESS | `B0_INTEGRATION_MAP.md`; no existing wealth/drawdown/Sharpe API | |
-| B1 | Historical analytics backend | NOT_STARTED | | |
-| G1 | Historical analytics gate | NOT_STARTED | | |
+| B0 | Inspect/reuse current analytics APIs | DONE | `B0_INTEGRATION_MAP.md`; commit `aebfafa` | |
+| B1 | Historical analytics backend | IN_PROGRESS | implementing wealth/drawdown/Sharpe/VaR-ES from frozen panel | |
+| G1 | Historical analytics gate | IN_PROGRESS | not DONE; evidence in `.superpowers/sdd/task-b1-report.md` when recorded | |
 | B2 | Benchmark/relative risk | NOT_STARTED | | |
 | G2 | Benchmark gate | NOT_STARTED | | |
 | B3 | Risk visualizations | NOT_STARTED | | |

@@ -29,6 +29,11 @@ from app.risk.es import ESContributionAnalytics
 from app.risk.factors import RiskFactorEngine
 from app.risk.hierarchy import HierarchyEngine
 from app.risk.historical import HistoricalRiskEngine
+from app.risk.historical_analytics import (
+    HistoricalAnalyticsRequest,
+    HistoricalAnalyticsResult,
+    compute_historical_analytics,
+)
 from app.risk.limit_drilldown import LimitDrilldownEngine
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.query import RiskQueryEngine
@@ -188,6 +193,64 @@ class PortfolioService:
         if result.methodology == methodology:
             return result
         return result.model_copy(update={"methodology": methodology})
+
+    def historical_analytics(self, request: HistoricalAnalyticsRequest) -> HistoricalAnalyticsResult:
+        """Wealth / drawdown / Sharpe / VaR-ES from frozen dataset + snapshot identity."""
+        from app.risk.factor_panel import factor_panel_from_dataset
+        from app.risk.historical_data import create_historical_dataset
+        from app.services.risk_factories import dataset_identity, resolve_dataset_source
+
+        if not isinstance(self.risk, HistoricalRiskEngine):
+            raise ValueError("historical analytics requires HistoricalRiskEngine")
+        engine = self.risk
+        bound_id, bound_version = dataset_identity(engine.dataset)
+        requested_id = request.historical_dataset_id
+        if requested_id is None or requested_id == bound_id:
+            dataset_id, dataset_version = bound_id, bound_version
+            panel = engine.factor_panel
+            if panel is None:
+                panel = factor_panel_from_dataset(
+                    engine.dataset,
+                    observations=engine.observations,
+                    seed=engine.seed,
+                )
+        else:
+            source = resolve_dataset_source(requested_id)
+            dataset = create_historical_dataset(
+                source, seed=engine.seed, observations=engine.observations
+            )
+            dataset_id, dataset_version = dataset_identity(dataset)
+            panel = factor_panel_from_dataset(
+                dataset, observations=engine.observations, seed=engine.seed
+            )
+        if (
+            request.historical_dataset_version is not None
+            and request.historical_dataset_version != dataset_version
+        ):
+            raise ValueError("historical_dataset_version does not match resolved dataset")
+        market = self.market_snapshot(request.portfolio)
+        if (
+            request.market_snapshot_id is not None
+            and request.market_snapshot_id != market.id
+        ):
+            raise ValueError("market_snapshot_id does not match bound snapshot")
+        return compute_historical_analytics(
+            portfolio=request.portfolio,
+            pricing_engine=self.pricing,
+            market=market,
+            panel=panel,
+            start=request.start,
+            end=request.end,
+            frequency=request.frequency,
+            methodology=request.methodology,
+            annualization=request.annualization,
+            historical_dataset_id=dataset_id,
+            historical_dataset_version=dataset_version,
+            rolling_window=request.rolling_window,
+            risk_free_rate=request.risk_free_rate,
+            missing_date_policy=request.missing_date_policy,
+            period_window=request.period_window,
+        )
 
     def stresses(self, portfolio: Portfolio, scenarios: list[ScenarioLike] | None = None) -> list[StressResult]:
         market = self.market_snapshot(portfolio)

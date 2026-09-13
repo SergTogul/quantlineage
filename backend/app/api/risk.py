@@ -26,6 +26,10 @@ from app.domain.models import (
     WhatIfReport,
     WhatIfRequest,
 )
+from app.risk.historical_analytics import (
+    HistoricalAnalyticsRequest,
+    HistoricalAnalyticsResult,
+)
 from app.services.portfolio_service import PortfolioService
 
 router = APIRouter(prefix="/risk", tags=["risk"])
@@ -41,6 +45,27 @@ def risk_summary(
     if methodology is VaRMethodology.FULL_REVALUATION:
         reject_inline_heavy(route="POST /risk/summary")
     return service.summary(portfolio, methodology=methodology)
+
+
+@router.post(
+    "/historical-analytics",
+    response_model=HistoricalAnalyticsResult,
+    summary="Historical wealth, drawdown, Sharpe, and VaR/ES",
+)
+def historical_analytics(
+    request: HistoricalAnalyticsRequest,
+    service: PortfolioService = Depends(get_portfolio_service),
+) -> HistoricalAnalyticsResult:
+    """Deterministic analytics on a frozen dataset + portfolio/snapshot identity.
+
+    Dual-mounted at ``/risk/historical-analytics`` and
+    ``/api/v1/risk/historical-analytics``. Does not call market-data providers.
+    """
+    reject_inline_heavy(route="POST /risk/historical-analytics")
+    try:
+        return service.historical_analytics(request)
+    except ValueError as exc:
+        raise http_bad_request(exc) from exc
 
 
 @router.post("/factors")
