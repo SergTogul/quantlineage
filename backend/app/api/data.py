@@ -8,14 +8,15 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
 
 from app.api.errors import error_payload
 from app.api.instruments import _provider_http_error, get_history_provider, get_macro_provider
 from app.market.history.artifact import (
     PUBLIC_HISTORY_CSV_ENV,
-    default_public_history_csv_path,
+    PUBLIC_HISTORY_DIR_ENV,
+    default_public_history_dir,
     resolve_public_history_csv,
     sidecar_path_for_csv,
 )
@@ -26,8 +27,6 @@ from app.market.ingestion.protocols import HistoricalDataProvider, MacroDataProv
 from app.market.quality import InsufficientAlignedHistoryError, SeriesValidationError
 
 router = APIRouter(prefix="/data", tags=["data"])
-
-PUBLIC_HISTORY_DIR_ENV = "QUANTLINEAGE_PUBLIC_HISTORY_DIR"
 
 
 class FreezeDatasetRequest(BaseModel):
@@ -41,11 +40,13 @@ def public_history_output_dir() -> Path:
     """Directory for freeze writes. Tests point CSV/DIR env at tmp_path."""
     raw_csv = os.getenv(PUBLIC_HISTORY_CSV_ENV, "").strip()
     if raw_csv:
-        return Path(raw_csv).expanduser().resolve().parent
+        path = Path(raw_csv).expanduser().resolve()
+        parent = path.parent if path.suffix.lower() == ".csv" else path
+        return parent
     raw_dir = os.getenv(PUBLIC_HISTORY_DIR_ENV, "").strip()
     if raw_dir:
         return Path(raw_dir).expanduser()
-    return default_public_history_csv_path().parent
+    return default_public_history_dir()
 
 
 @router.post("/datasets")
@@ -112,15 +113,15 @@ def freeze_dataset(
 
 
 @router.get("/datasets/{dataset_id}")
-def get_dataset(dataset_id: str):
-    """Load the Wave A sidecar when the frozen CSV is present."""
+def get_dataset(dataset_id: str, version: str | None = Query(default=None)):
+    """Load a Wave A sidecar. ``version`` is the content hash of immutable bytes."""
     if dataset_id != WAVE_A_DATASET_ID:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_payload(code="not_found", message="Dataset not found", details=None),
         )
     try:
-        csv_path = resolve_public_history_csv()
+        csv_path = resolve_public_history_csv(dataset_version=version)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -134,6 +135,11 @@ def get_dataset(dataset_id: str):
         )
     payload = json.loads(sidecar.read_text(encoding="utf-8"))
     if payload.get("dataset_id") != WAVE_A_DATASET_ID:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=error_payload(code="not_found", message="Dataset not found", details=None),
+        )
+    if version is not None and payload.get("dataset_version") != version:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_payload(code="not_found", message="Dataset not found", details=None),

@@ -362,8 +362,8 @@ def freeze_macro() -> FakeMacroProvider:
 
 @pytest.fixture
 def freeze_client(freeze_history: FakeHistoryProvider, freeze_macro: FakeMacroProvider, tmp_path, monkeypatch: pytest.MonkeyPatch):
-    csv_path = tmp_path / "real_public_wave_a.csv"
-    monkeypatch.setenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", str(csv_path))
+    monkeypatch.setenv("QUANTLINEAGE_PUBLIC_HISTORY_DIR", str(tmp_path))
+    monkeypatch.delenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", raising=False)
     yield from _override_client(freeze_history, freeze_macro)
 
 
@@ -526,7 +526,7 @@ def test_freeze_dataset_then_get_by_id(freeze_client: TestClient, tmp_path) -> N
     assert body["dataset_id"] == WAVE_A_DATASET_ID
     assert body["dataset_id"] == "real:public:wave-a"
     assert isinstance(body["dataset_version"], str) and body["dataset_version"]
-    assert body["csv_path"] == "real_public_wave_a.csv"
+    assert body["csv_path"] == f"{body['dataset_version']}.csv"
     assert str(tmp_path) not in body["csv_path"]
     assert "FRED_API_KEY" not in created.text
 
@@ -616,7 +616,7 @@ def test_build_public_snapshot_then_get(
     )
     assert created.status_code == 200, created.text
     body = created.json()
-    assert body["id"] == "real:public:wave-a:2024-01-08"
+    assert body["id"] == f"real:public:wave-a:2024-01-08:{body['content_hash']}"
     assert body["as_of"] == "2024-01-08"
     assert isinstance(body["content_hash"], str) and body["content_hash"]
     assert "lineage" in body

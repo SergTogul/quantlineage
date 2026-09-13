@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 
 from app.domain.models import as_of_wire
-from app.market.history.artifact import PUBLIC_HISTORY_CSV_NAME
+from app.market.history.artifact import PUBLIC_HISTORY_DATASET_SLUG
 from app.market.history.freeze import FrozenHistoryArtifact, freeze_public_history
 from app.market.history.snapshot import PublicSnapshotBuild, build_public_snapshot
 from app.market.history.spec import WAVE_A_FACTOR_MAPPINGS, WAVE_A_SPEC, PublicHistoryDatasetSpec
@@ -44,7 +44,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--output",
         help=(
             "Directory or CSV path for the freeze artifact. "
-            f"Writes {PUBLIC_HISTORY_CSV_NAME}. Omit to use a temp directory."
+            f"Writes hashed files under {PUBLIC_HISTORY_DATASET_SLUG}/. "
+            "Omit to use a temp directory."
         ),
     )
     parser.add_argument("--start", type=_parse_date, default=WAVE_A_SPEC.start)

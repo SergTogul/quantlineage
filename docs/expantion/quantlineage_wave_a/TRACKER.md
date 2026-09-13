@@ -37,7 +37,7 @@ Do not mark DONE without gate evidence.
 | A4.6 | RiskRun dataset lineage | DONE | `dataset_identity` / `resolve_run_spec` persist sidecar id+content-hash version | |
 | A4.7 | Quant mutation/regression tests | DONE | `tests/test_public_history_dataset.py` | |
 | G4 | Public history gate | DONE | commit `0230c99`; review PASS `.superpowers/sdd/task-g4-review.md`; focused `calculate()` probe with adapters unloaded | |
-| A5.1 | Snapshot build spec | DONE | `real:public:wave-a:{as_of ISO}`; AAPL/MSFT/NVDA/SPY spots; DGS2/5/10 → USD 2Y/5Y/10Y; `rates[USD]`=DGS10 decimal; no public vol | |
+| A5.1 | Snapshot build spec | DONE | `real:public:wave-a:{as_of ISO}:{content_hash}`; AAPL/MSFT/NVDA/SPY spots; DGS2/5/10 → USD 2Y/5Y/10Y; `rates[USD]`=DGS10 decimal; no public vol | |
 | A5.2 | Public snapshot builder | DONE | `build_public_snapshot`; latest obs ≤ as_of; injected providers; lineage in persist meta | |
 | A5.3 | 2Y/5Y/10Y rate mapping | DONE | `percent_level_to_decimal` 4.25→0.0425 on `key_rates`/`rates`; not bp | |
 | A5.4 | Holiday/stale semantics | DONE | Monday as_of keeps Friday `source_observation_date`; `is_stale` fail-closed at 7 days | |
@@ -66,6 +66,7 @@ Do not mark DONE without gate evidence.
 - Latest verified commit: `d73e7df`
 - Latest green CI: https://github.com/SergTogul/riskforge-mvp/actions/runs/34728082547
 - Public providers chosen: Yahoo Finance public JSON (equity/ETF) + FRED (USD rates/macro)
-- Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`)
-- Public snapshot id/as_of: `real:public:wave-a:{as_of ISO}`; snapshot `as_of` is the requested date; lineage `source_observation_date` is last print ≤ as_of
-- Hostile review verdict: PASS (`reviews/wave-a-real-data-hostile-review.md`); G8 closed after red-suite/CI lint blockers were fixed
+- Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`). Bytes live at `data/public_history/real-public-wave-a/<dataset_version>.csv` + sidecar; a later freeze with different content writes a new hash file and does not overwrite prior versions.
+- Public snapshot id/as_of: `real:public:wave-a:{as_of ISO}:{content_hash}`; snapshot `as_of` is the requested date; lineage `source_observation_date` is last print ≤ as_of. Same calendar date with revised Yahoo/FRED marks gets a new id.
+- Universe: US equity spots (AAPL/MSFT/NVDA/SPY) + USD Treasury key rates (DGS2/5/10). FX and vol remain outside Wave A public data.
+- Hostile review verdict: PASS (`reviews/wave-a-real-data-hostile-review.md`); G8 closed after red-suite/CI lint blockers were fixed (`d73e7df`). Close-gate lineage holes (singleton CSV overwrite; as-of-only snapshot id) fixed before Wave B.

@@ -7,6 +7,9 @@ feed, and not institutional entitlements infrastructure.
 Adapters live in `backend/app/market/ingestion/`. Pricing and risk code must not call
 them. HTTP is injected (`httpx.Client`) so CI stays offline.
 
+Public-data mode currently covers US equity spot and USD Treasury-rate factors.
+FX and volatility remain outside the public-data Wave A universe.
+
 ## Selection (locked)
 
 | Role | Provider | Access | Credentials |

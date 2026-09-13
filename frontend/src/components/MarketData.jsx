@@ -122,6 +122,10 @@ export default function MarketData() {
 
   return (
     <div className="card wide market-data">
+      <p className="muted" role="note">
+        Public-data mode currently covers US equity spot and USD Treasury-rate
+        factors. FX and volatility remain outside the public-data Wave A universe.
+      </p>
       <form className="query market-data-search" onSubmit={onSearch}>
         <label>
           Instrument search

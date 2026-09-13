@@ -14,7 +14,12 @@ from datetime import date
 from pathlib import Path
 from typing import Mapping
 
-from app.market.history.artifact import sidecar_path_for_csv, write_sidecar
+from app.market.history.artifact import (
+    public_history_dataset_dir,
+    sidecar_path_for_csv,
+    versioned_csv_path,
+    write_sidecar,
+)
 from app.market.history.spec import (
     WAVE_A_SPEC,
     WAVE_A_TRANSFORM_CONFIG,
@@ -107,10 +112,10 @@ def freeze_public_history(
         )
 
     dataset_version = _panel_content_version(transformed_series, WAVE_A_TRANSFORM_CONFIG)
-    output = Path(output_dir)
-    output.mkdir(parents=True, exist_ok=True)
-    csv_path = output / "real_public_wave_a.csv"
-    _write_factor_csv(csv_path, spec, return_dates, columns)
+    dataset_dir = public_history_dataset_dir(output_dir)
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = versioned_csv_path(dataset_dir, dataset_version)
+    _write_immutable_factor_csv(csv_path, spec, return_dates, columns)
     sidecar_payload = {
         "alignment": spec.alignment,
         "dataset_id": spec.dataset_id,
@@ -259,6 +264,24 @@ def _panel_content_version(
     }
     blob = json.dumps(column_hashes, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(blob).hexdigest()
+
+
+def _write_immutable_factor_csv(
+    csv_path: Path,
+    spec: PublicHistoryDatasetSpec,
+    return_dates: tuple[date, ...],
+    columns: Mapping[str, list[float]],
+) -> None:
+    """Write ``{content-hash}.csv``. Refuse to replace existing bytes with different content."""
+    tmp_path = csv_path.with_name(csv_path.name + ".tmp")
+    _write_factor_csv(tmp_path, spec, return_dates, columns)
+    new_bytes = tmp_path.read_bytes()
+    if csv_path.is_file() and csv_path.read_bytes() != new_bytes:
+        tmp_path.unlink(missing_ok=True)
+        raise FreezeError(
+            f"refusing to overwrite frozen public history {csv_path.name} with different bytes"
+        )
+    tmp_path.replace(csv_path)
 
 
 def _write_factor_csv(

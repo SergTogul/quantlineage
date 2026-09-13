@@ -77,7 +77,9 @@ class ResolvedRiskRunSpec:
     calculation_config: RiskRunCalculationConfig | None = None
 
 
-def resolve_dataset_source(historical_dataset_id: str) -> str:
+def resolve_dataset_source(
+    historical_dataset_id: str, *, dataset_version: str | None = None
+) -> str:
     """Map a client dataset id to a ``create_historical_dataset`` source.
 
     Raises ``ValueError`` when the id is not a known demo/synthetic alias and
@@ -86,6 +88,10 @@ def resolve_dataset_source(historical_dataset_id: str) -> str:
     Bare ``\"file\"`` is ambiguous (legacy collapsed CSV identity) and is
     rejected. Canonical CSV ids use ``file:<abspath>``; plain existing ``.csv``
     paths are also accepted and normalize to that form downstream.
+
+    For ``real:public:wave-a``, ``dataset_version`` (content hash) selects the
+    immutable frozen CSV. Omit version only for a pinned env file or the
+    single/latest artifact on disk.
     """
     raw = historical_dataset_id.strip()
     if not raw:
@@ -99,7 +105,7 @@ def resolve_dataset_source(historical_dataset_id: str) -> str:
     if aliased is not None:
         return aliased
     if raw == WAVE_A_DATASET_ID or raw.lower() == WAVE_A_DATASET_ID:
-        return str(resolve_public_history_csv())
+        return str(resolve_public_history_csv(dataset_version=dataset_version))
     path_raw = raw
     if raw.startswith("file:"):
         path_raw = raw[len("file:") :]
@@ -124,6 +130,7 @@ def resolve_dataset_source(historical_dataset_id: str) -> str:
 def build_historical_risk_engine(
     *,
     historical_dataset_id: str | None = None,
+    historical_dataset_version: str | None = None,
     seed: int | None = None,
     observations: int | None = None,
 ) -> HistoricalRiskEngine:
@@ -131,7 +138,8 @@ def build_historical_risk_engine(
 
     When ``historical_dataset_id`` is set, selects that dataset via
     :func:`resolve_dataset_source` (rebind). Otherwise uses env / per-factor
-    demo default (not the four-macro fixture).
+    demo default (not the four-macro fixture). Public-history identity is
+    ``dataset_id`` plus content-hash ``dataset_version``.
     """
     panel_seed = DEFAULT_HISTORICAL_PANEL_SEED if seed is None else seed
     dataset_kwargs: dict[str, Any] = {"seed": panel_seed}
@@ -139,7 +147,9 @@ def build_historical_risk_engine(
         dataset_kwargs["observations"] = observations
 
     if historical_dataset_id is not None:
-        source = resolve_dataset_source(historical_dataset_id)
+        source = resolve_dataset_source(
+            historical_dataset_id, dataset_version=historical_dataset_version
+        )
         dataset = create_historical_dataset(source, **dataset_kwargs)
     else:
         dataset = create_historical_dataset(**dataset_kwargs)
@@ -160,6 +170,7 @@ def build_historical_risk_engine(
 def build_portfolio_service(
     *,
     historical_dataset_id: str | None = None,
+    historical_dataset_version: str | None = None,
     seed: int | None = None,
     observations: int | None = None,
     market_data: Any | None = None,
@@ -171,6 +182,7 @@ def build_portfolio_service(
     """
     engine = build_historical_risk_engine(
         historical_dataset_id=historical_dataset_id,
+        historical_dataset_version=historical_dataset_version,
         seed=seed,
         observations=observations,
     )
@@ -349,6 +361,7 @@ def build_historical_risk_engine_for_spec(
     cfg = spec.calculation_config
     return build_historical_risk_engine(
         historical_dataset_id=spec.historical_dataset_id,
+        historical_dataset_version=spec.historical_dataset_version,
         seed=None if cfg is None else cfg.seed,
         observations=None if cfg is None else cfg.observations,
     )
@@ -422,18 +435,20 @@ def resolve_run_spec(
 
     if requested_id is not None:
         # Fail closed on unknown ids; rebind known aliases / CSV paths.
-        resolve_dataset_source(requested_id)
+        resolve_dataset_source(requested_id, dataset_version=requested_version)
         selected = build_historical_risk_engine(
             historical_dataset_id=requested_id,
+            historical_dataset_version=requested_version,
             seed=seed,
             observations=observations,
         )
     elif risk_engine is not None:
         selected = risk_engine
         if seed is not None or observations is not None:
-            current_id, _ = dataset_identity(risk_engine.dataset)
+            current_id, current_version = dataset_identity(risk_engine.dataset)
             selected = build_historical_risk_engine(
                 historical_dataset_id=current_id,
+                historical_dataset_version=current_version,
                 seed=seed if seed is not None else risk_engine.seed,
                 observations=(
                     observations if observations is not None else risk_engine.observations

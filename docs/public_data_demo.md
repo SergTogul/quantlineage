@@ -36,27 +36,56 @@ From the repo root (backend venv):
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python scripts/build_public_demo_data.py --live \
-  --output data/real_public_wave_a.csv
+  --output data/public_history
 ```
 
 `--live` is required for Yahoo/FRED HTTP. Without `--live` the command refuses to
 fetch (CI/tests inject fakes). Do not commit a live Yahoo download.
 
+Each freeze writes **content-hashed** files that are never overwritten by a later
+pull with different bytes:
+
+```text
+data/public_history/real-public-wave-a/<sha256>.csv
+data/public_history/real-public-wave-a/<sha256>.json
+```
+
 The script prints provider, source symbols, coverage, aligned observations,
-dataset id/version/hash, snapshot id/as_of, and warnings. Dataset id is
-`real:public:wave-a`. Snapshot id is `real:public:wave-a:{as_of}`.
+dataset id/version/hash, snapshot id/as_of, and warnings. Dataset identity is:
+
+```text
+dataset_id      = real:public:wave-a
+dataset_version = <sha256 of transformed panel>
+```
+
+`dataset_id` + `dataset_version` resolve those immutable bytes. Snapshot identity is
+`real:public:wave-a:{as_of}:{snapshot_content_hash}` so a Yahoo/FRED revision of the
+same calendar date cannot reuse a prior RiskRun snapshot id.
 
 Then:
 
 ```text
 QUANTLINEAGE_DATA_MODE=public
-# optional override:
-# QUANTLINEAGE_PUBLIC_HISTORY_CSV=/abs/path/real_public_wave_a.csv
+# optional pin to one frozen version:
+# QUANTLINEAGE_PUBLIC_HISTORY_CSV=/abs/path/data/public_history/real-public-wave-a/<sha256>.csv
+# QUANTLINEAGE_PUBLIC_HISTORY_DIR=/abs/path/data/public_history
 ```
 
 If mode is `public` and the frozen CSV is missing, resolving the dataset **fails
 closed** with a message pointing at `scripts/build_public_demo_data.py`. It does
 not HTTP, hang, or fall back silently.
+
+## Universe (Wave A)
+
+Public-data mode currently covers US equity spot and USD Treasury-rate factors.
+FX and volatility remain outside the public-data Wave A universe.
+
+Supported public mappings: AAPL, MSFT, NVDA, SPY plus FRED DGS2 / DGS5 / DGS10.
+The public snapshot builder attaches cash-book spots and USD key rates only. It
+does **not** attach FX spots or vol surfaces. The existing cross-asset derivatives
+demo book still uses packaged synthetic history unless you bind a public snapshot
+that actually contains the marks that book needs.
+
 
 ## CI stays offline
 
@@ -78,7 +107,7 @@ The browser talks to the QuantLineage API only. It does not call Yahoo or FRED.
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python scripts/build_public_demo_data.py --live \
-  --output data/real_public_wave_a.csv \
+  --output data/public_history \
   --t0 YYYY-MM-DD --t1 YYYY-MM-DD
 ```
 

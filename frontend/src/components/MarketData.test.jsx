@@ -35,6 +35,15 @@ const TSLA = {
 }
 
 describe('MarketData', () => {
+  it('states the Wave A public-data universe does not include FX or volatility', () => {
+    render(<MarketData />)
+    expect(
+      screen.getByRole('note'),
+    ).toHaveTextContent(
+      'Public-data mode currently covers US equity spot and USD Treasury-rate factors. FX and volatility remain outside the public-data Wave A universe.',
+    )
+  })
+
   it('searches Apple via the instruments API and enables Load History only when supported', async () => {
     const user = userEvent.setup()
     const queries = []
@@ -182,13 +191,13 @@ describe('MarketData', () => {
         return HttpResponse.json({
           dataset_id: 'real:public:wave-a',
           dataset_version: 'dataset-hash',
-          csv_path: 'real_public_wave_a.csv',
+          csv_path: 'abc123.csv',
         })
       }),
       http.post(`${API_BASE}${API_V1}/market/snapshots/from-public-data`, async ({ request }) => {
         snapshotBodies.push(await request.json())
         return HttpResponse.json({
-          id: 'real:public:wave-a:2024-01-08',
+          id: 'real:public:wave-a:2024-01-08:snap-hash',
           as_of: '2024-01-08',
           content_hash: 'snap-hash',
           lineage: {},
@@ -206,8 +215,9 @@ describe('MarketData', () => {
     expect(freezeBodies).toEqual([{ start: '2021-01-04', end: '2021-01-11' }])
 
     await user.click(screen.getByRole('button', { name: /build snapshot/i }))
-    expect(await screen.findByText(/real:public:wave-a:2024-01-08/)).toBeInTheDocument()
-    expect(screen.getByText(/snap-hash/)).toBeInTheDocument()
+    const snapshotSection = await screen.findByRole('region', { name: /public snapshot/i })
+    expect(within(snapshotSection).getByText('real:public:wave-a:2024-01-08:snap-hash')).toBeInTheDocument()
+    expect(within(snapshotSection).getByText('snap-hash')).toBeInTheDocument()
     expect(snapshotBodies).toEqual([{ as_of: '2024-01-08' }])
   })
 

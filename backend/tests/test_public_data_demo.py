@@ -135,9 +135,13 @@ def test_script_with_fakes_prints_dataset_id_version_snapshot_and_coverage(
     assert f"real:public:wave-a:{spec.end.isoformat()}" in printed
     assert spec.start.isoformat() in printed
     assert spec.end.isoformat() in printed
-    csv_path = tmp_path / "real_public_wave_a.csv"
+    csvs = list((tmp_path / "real-public-wave-a").glob("*.csv"))
+    assert len(csvs) == 1
+    csv_path = csvs[0]
     assert csv_path.is_file()
+    assert csv_path.stem == _SHA256.search(printed).group(0)
     assert csv_path.resolve() != (REPO_ROOT / "data" / "real_public_wave_a.csv").resolve()
+    assert not (tmp_path / "real_public_wave_a.csv").exists()
     assert SCRIPT_PATH.is_file()
     shim = SCRIPT_PATH.read_text(encoding="utf-8")
     assert "app.market.history.public_demo" in shim
@@ -189,6 +193,9 @@ def test_public_data_demo_doc_exists() -> None:
     assert "FRED_API_KEY" in text
     assert "QUANTLINEAGE_DATA_MODE" in text
     assert "build_public_demo_data.py" in text
+    assert "Public-data mode currently covers US equity spot and USD Treasury-rate factors." in text
+    assert "FX and volatility remain outside the public-data Wave A universe." in text
+    assert "real-public-wave-a" in text
 
 
 def test_public_mode_missing_csv_fails_closed_mentions_freeze_script(
@@ -223,7 +230,9 @@ def test_public_mode_with_frozen_csv_loads_without_adapters(
         macro=FakeMacroProvider(),
         capsys=capsys,
     )
-    csv_path = tmp_path / "real_public_wave_a.csv"
+    csvs = list((tmp_path / "real-public-wave-a").glob("*.csv"))
+    assert len(csvs) == 1
+    csv_path = csvs[0]
     monkeypatch.setenv("QUANTLINEAGE_DATA_MODE", "public")
     monkeypatch.setenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", str(csv_path))
     monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
