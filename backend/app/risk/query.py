@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from enum import Enum
 from typing import Any, Protocol
@@ -8,7 +9,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.api.schemas import RiskQueryResponse
 from app.domain.models import Portfolio
-from app.risk.tool_contracts import C1_ARG_MODELS, CompareRiskRunsArgs, execute_allowlisted_tool
+from app.risk.tool_contracts import (
+    C1_ARG_MODELS,
+    TOOL_ARG_MAX_CHARS,
+    CompareRiskRunsArgs,
+    execute_allowlisted_tool,
+)
+from app.services.risk_run_service import RiskRunNotFound
 
 
 class RiskToolName(str, Enum):
@@ -323,6 +330,14 @@ SAFE_UNGROUNDED_ANSWER = (
     "VaR/ES, limits, contributors, worst stress, portfolio summary, or why risk changed."
 )
 
+_SECRET_REFUSAL_ANSWER = (
+    "I cannot disclose API keys, tokens, passwords, or other secrets."
+)
+
+_FAKE_TOOL_REFUSAL_ANSWER = (
+    "Unknown tool is not in the RiskForge allowlist."
+)
+
 _TOOL_FAILURE_ANSWER = (
     "The selected deterministic tool could not be executed. "
     "I cannot invent VaR, Expected Shortfall, or Greeks."
@@ -405,6 +420,33 @@ _INJECTION_MARKERS = (
     "ignore previous",
 )
 
+_FAKE_TOOL_MARKERS = (
+    "estimate_var",
+    "invent_var",
+    "shell_exec",
+    "call shell",
+    "run shell",
+    "hidden tool",
+    "shell tool",
+)
+
+_SECRET_REQUEST_MARKERS = (
+    "api key",
+    "api-key",
+    "apikey",
+    "secret key",
+    "password",
+    "credential",
+    "bearer token",
+    "private key",
+)
+
+_SECRET_ENV_NAMES = (
+    "FRED_API_KEY",
+    "RISKFORGE_API_TOKEN",
+    "RISKFORGE_API_TOKENS",
+)
+
 
 def tool_json_schemas() -> dict[str, dict[str, Any]]:
     """Pydantic JSON Schema for each allowlisted RiskToolName (TOOL_CONTRACTS keys only)."""
@@ -445,6 +487,11 @@ def validate_tool_call(
         return ToolCallValidation(
             allowed=False,
             refusal="Unknown tool is not in the RiskForge allowlist.",
+        )
+    if _tool_args_oversized(args):
+        return ToolCallValidation(
+            allowed=False,
+            refusal="Tool arguments failed JSON-schema validation.",
         )
     try:
         parsed = TOOL_ARG_MODELS[name].model_validate(args or {})
@@ -489,6 +536,10 @@ class RiskQueryEngine:
             )
         if _is_prompt_injection(q):
             return _clarification_plan("unsupported", SAFE_UNGROUNDED_ANSWER)
+        if _is_fake_tool_request(q):
+            return _clarification_plan("unsupported", _FAKE_TOOL_REFUSAL_ANSWER)
+        if _is_secret_request(q):
+            return _clarification_plan("unsupported", _SECRET_REFUSAL_ANSWER)
         if _is_advisory(q):
             return _clarification_plan(
                 "unsupported",
@@ -683,6 +734,18 @@ class RiskQueryEngine:
         *,
         principal: str | None = None,
     ) -> RiskQueryResponse:
+        if _is_secret_request(" ".join(question.strip().split()).lower()):
+            return RiskQueryResponse(
+                intent="unsupported",
+                answer=_SECRET_REFUSAL_ANSWER,
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
         request = RiskAssistantModelRequest(
             question=question,
             tools=tool_contract_schemas(),
@@ -759,7 +822,7 @@ class RiskQueryEngine:
             payload = _execute_tool(
                 tool_name, portfolio, service, args=args, principal=principal
             )
-        except (ValueError, AttributeError, TypeError):
+        except (ValueError, AttributeError, TypeError, RiskRunNotFound):
             return RiskQueryResponse(
                 intent=intent,
                 answer=_TOOL_FAILURE_ANSWER,
@@ -1359,15 +1422,57 @@ def _is_prompt_injection(question: str) -> bool:
     return any(marker in question for marker in _INJECTION_MARKERS)
 
 
+def _is_fake_tool_request(question: str) -> bool:
+    return any(marker in question for marker in _FAKE_TOOL_MARKERS)
+
+
+def _is_secret_request(question: str) -> bool:
+    return any(marker in question for marker in _SECRET_REQUEST_MARKERS)
+
+
+def _tool_args_oversized(args: dict[str, Any] | None) -> bool:
+    if not args:
+        return False
+    stack: list[Any] = [args]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, str) and len(current) > TOOL_ARG_MAX_CHARS:
+            return True
+        if isinstance(current, dict):
+            stack.extend(current.values())
+        elif isinstance(current, list | tuple):
+            stack.extend(current)
+    return False
+
+
+def _contains_secret_leak(text: str) -> bool:
+    lowered = text.lower()
+    if any(marker in lowered for marker in _SECRET_REQUEST_MARKERS):
+        return True
+    for env_name in _SECRET_ENV_NAMES:
+        value = os.environ.get(env_name)
+        if value and value in text:
+            return True
+    return False
+
+
 def _contains_ungrounded_number(text: str) -> bool:
     return any(ch.isdigit() for ch in text)
 
 
 def _safe_ungrounded_text(*candidates: str | None, fallback: str) -> str:
     for text in candidates:
-        if text and not _contains_ungrounded_number(text):
+        if (
+            text
+            and not _contains_ungrounded_number(text)
+            and not _contains_secret_leak(text)
+        ):
             return text
-    if fallback and not _contains_ungrounded_number(fallback):
+    if (
+        fallback
+        and not _contains_ungrounded_number(fallback)
+        and not _contains_secret_leak(fallback)
+    ):
         return fallback
     return SAFE_UNGROUNDED_ANSWER
 

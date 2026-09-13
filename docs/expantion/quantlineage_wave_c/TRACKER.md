@@ -11,11 +11,11 @@
 | G3 | Orchestration gate | DONE | `2c1fb75`..`fa7db26`; review PASS; no Critical/Important | |
 | C4 | Grounded explanations/provenance | DONE | commit `dab210f`; `tests/test_wave_c_grounding.py`; review PASS `.superpowers/sdd/task-c4-review.md` | |
 | G4 | Grounding gate | DONE | `fa7db26`..`dab210f`; review PASS; no Critical/Important | |
-| C5 | Risk Query UI + MCP docs | IN_PROGRESS | | |
-| G5 | UX/devex gate | NOT_STARTED | | |
-| C6 | Eval harness + adversarial cases | NOT_STARTED | | |
+| C5 | Risk Query UI + MCP docs | DONE | commit `41b83f4`; `docs/mcp.md`; `RiskQuery.test.jsx`; review PASS `.superpowers/sdd/task-c5-review.md` | |
+| G5 | UX/devex gate | DONE | `dab210f`..`41b83f4`; review PASS; no Critical/Important | |
+| C6 | Eval harness + adversarial cases | IN_PROGRESS | `tests/test_wave_c_evals.py` | |
 | G6 | Safety/eval gate | NOT_STARTED | | |
 | C7 | Demo + hostile review + CI | NOT_STARTED | | |
 | G7 | Wave C final gate | NOT_STARTED | | |
 
-Overall: C0–G4 DONE; C5 IN_PROGRESS
+Overall: C0–G5 DONE; C6 IN_PROGRESS
