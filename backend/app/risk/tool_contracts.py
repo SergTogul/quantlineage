@@ -18,6 +18,8 @@ from app.domain.models import RiskChangeMetric
 
 # Must match ``app.api.instruments.MAX_HISTORY_RANGE_DAYS`` (HTTP 400 oversize).
 HISTORY_MAX_RANGE_DAYS = 1826
+# Single-field cap so huge blobs fail ``validate_tool_call`` (C6).
+TOOL_ARG_MAX_CHARS = 4096
 
 AllowlistedStressScenario = Literal[
     "eq_down_10",
@@ -35,7 +37,7 @@ class SearchInstrumentsArgs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    query: str = Field(min_length=1)
+    query: str = Field(min_length=1, max_length=TOOL_ARG_MAX_CHARS)
 
 
 class GetMarketHistoryArgs(BaseModel):
@@ -43,7 +45,7 @@ class GetMarketHistoryArgs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    instrument_id: str = Field(min_length=1)
+    instrument_id: str = Field(min_length=1, max_length=TOOL_ARG_MAX_CHARS)
     start: date
     end: date
 
@@ -61,7 +63,7 @@ class GetDataQualityArgs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    instrument_id: str = Field(min_length=1)
+    instrument_id: str = Field(min_length=1, max_length=TOOL_ARG_MAX_CHARS)
     start: date
     end: date
 
@@ -78,13 +80,13 @@ class RunPortfolioRiskArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_type: Literal["summary", "var"] = "summary"
-    market_snapshot_id: str | None = None
+    market_snapshot_id: str | None = Field(default=None, max_length=TOOL_ARG_MAX_CHARS)
 
 
 class GetRiskRunArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    run_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1, max_length=TOOL_ARG_MAX_CHARS)
 
 
 class CompareRiskRunsArgs(BaseModel):
@@ -92,8 +94,8 @@ class CompareRiskRunsArgs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    t0_run_id: str = Field(min_length=1)
-    t1_run_id: str = Field(min_length=1)
+    t0_run_id: str = Field(min_length=1, max_length=TOOL_ARG_MAX_CHARS)
+    t1_run_id: str = Field(min_length=1, max_length=TOOL_ARG_MAX_CHARS)
     metric: RiskChangeMetric = "var_99"
 
 
@@ -103,7 +105,7 @@ class RunStressArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenario_id: AllowlistedStressScenario = "eq_down_10"
-    market_snapshot_id: str | None = None
+    market_snapshot_id: str | None = Field(default=None, max_length=TOOL_ARG_MAX_CHARS)
 
 
 class GetKeyRateDv01Args(BaseModel):
@@ -127,7 +129,7 @@ class GetTopRiskContributorsArgs(BaseModel):
 class GetRunProvenanceArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    run_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1, max_length=TOOL_ARG_MAX_CHARS)
 
 
 C1_ARG_MODELS: dict[str, type[BaseModel]] = {
