@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
-import { contributionBarPct, contributionBarRows, keyRateDv01Chart } from './riskVisuals.mjs'
+import { contributionBarPct, contributionBarRows, keyRateDv01Chart, riskChangeWaterfallSteps } from './riskVisuals.mjs'
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'riskVisuals.mjs'), 'utf8')
 
@@ -11,6 +11,8 @@ test('presentation helpers do not contain risk math or KR sums', () => {
   assert.doesNotMatch(src, /bps_to_decimal|0\.0001/)
   assert.doesNotMatch(src, /1\.645|1\.96|Math\.sqrt/)
   assert.doesNotMatch(src, /key_rate_dv01[\s\S]{0,120}\.reduce|key_rate_dv01\s*\+/)
+  assert.doesNotMatch(src, /total_change\s*-/)
+  assert.doesNotMatch(src, /previous_risk\s*\+/)
 })
 
 test('contributionBarPct scales |API amount| against maxAbs', () => {
@@ -47,4 +49,29 @@ test('keyRateDv01Chart maps each tenor independently and does not sum KR values'
   const summed = chart.rows.reduce((n, r) => n + r.value, 0)
   assert.notEqual(summed, chart.maxAbs)
   assert.equal(keyRateDv01Chart(null).rows.length, 0)
+})
+
+test('riskChangeWaterfallSteps copies API fields and keeps residual at 0', () => {
+  const report = {
+    previous_risk: 1000,
+    current_risk: 1420,
+    total_change: 420,
+    portfolio_trade_change: 300,
+    market_change: 110,
+    residual: 0,
+    residual_name: 'residual / interactions',
+  }
+  const reconstructed = report.total_change - report.portfolio_trade_change - report.market_change
+  assert.notEqual(reconstructed, 0)
+
+  const steps = riskChangeWaterfallSteps(report)
+  assert.equal(steps.length, 5)
+  assert.deepEqual(steps.map((s) => s.key), ['t0', 'portfolio', 'market', 'residual', 't1'])
+  assert.equal(steps[0].value, 1000)
+  assert.equal(steps[1].value, 300)
+  assert.equal(steps[2].value, 110)
+  assert.equal(steps[3].value, 0)
+  assert.equal(steps[3].label, 'residual / interactions')
+  assert.equal(steps[4].value, 1420)
+  assert.equal(riskChangeWaterfallSteps(null).length, 0)
 })

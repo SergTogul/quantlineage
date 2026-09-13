@@ -7,9 +7,9 @@
 | G1 | Historical analytics gate | DONE | `aebfafa`..`cc27632`; review PASS; no Critical/Important | |
 | B2 | Benchmark/relative risk | DONE | commit `497ee4a`; `tests/test_historical_analytics.py` 23 passed; review PASS `.superpowers/sdd/task-b2-review.md` | |
 | G2 | Benchmark gate | DONE | `cc27632`..`6f52222`; review PASS; no Critical/Important | |
-| B3 | Risk visualizations | IN_PROGRESS | | |
-| G3 | Visualization gate | NOT_STARTED | | |
-| B4 | Risk-change waterfall | NOT_STARTED | | |
+| B3 | Risk visualizations | DONE | commit `e02872b`; frontend 176 passed; review PASS `.superpowers/sdd/task-b3-review.md` | |
+| G3 | Visualization gate | DONE | `6f52222`..`e02872b`; review PASS; no Critical/Important | |
+| B4 | Risk-change waterfall | IN_PROGRESS | `B4_IMPLEMENTER_REPORT.md` | |
 | G4 | Risk-change gate | NOT_STARTED | | |
 | B5 | Historical Analytics UI | NOT_STARTED | | |
 | G5 | UI gate | NOT_STARTED | | |
@@ -18,4 +18,4 @@
 | B7 | Hostile review + full regression | NOT_STARTED | | |
 | G7 | Wave B final gate | NOT_STARTED | | |
 
-Overall: IN_PROGRESS (G1–G2 DONE, B3 IN_PROGRESS)
+Overall: IN_PROGRESS (G1–G3 DONE, B4 IN_PROGRESS)

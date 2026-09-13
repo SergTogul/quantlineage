@@ -175,6 +175,20 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
 .tenor-col-fill.positive{background:var(--ok)}
 .tenor-col-fill.negative{background:var(--breach)}
 .tenor-label{font-size:11px;color:var(--meta);letter-spacing:.04em;text-transform:uppercase}
+.risk-change-waterfall{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:14px 0 4px;padding:12px 8px;background:var(--inset);border:1px solid var(--line)}
+.waterfall-step{display:grid;justify-items:center;gap:6px;min-width:0;text-align:center;padding:4px}
+.waterfall-step[data-step="residual"]{background:var(--well);border:1px solid var(--well-line)}
+.waterfall-step-label{font-size:11px;color:var(--meta);line-height:1.25}
+.waterfall-step-track{width:22px;height:88px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:flex-end}
+.waterfall-step-fill{width:100%}
+.waterfall-step-fill.positive{background:var(--ok)}
+.waterfall-step-fill.negative{background:var(--breach)}
+.waterfall-step-fill.level{background:var(--amber)}
+.waterfall-step-value{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.risk-change-identity{margin-top:12px;overflow-x:auto}
+.risk-change-identity table{margin-top:8px;font-variant-numeric:tabular-nums}
+.risk-change-identity tr[data-changed="true"] th,.risk-change-identity tr[data-changed="true"] td{color:var(--amber)}
+.risk-change-drill-up{margin-left:10px}
 .parallel-dv01{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-top:12px;padding:10px 12px;border:1px solid var(--line);background:var(--inset);font-variant-numeric:tabular-nums}
 .parallel-dv01 strong{font-size:16px}
 .overview-collage{margin-top:20px;padding:14px;background:var(--panel);border:1px solid var(--line)}

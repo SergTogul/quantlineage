@@ -5,6 +5,7 @@ import {
 } from '../api'
 import BlockHelp from './BlockHelp'
 import { ContributionBars, KeyRateDv01Curve } from './RiskVisuals.jsx'
+import { riskChangeWaterfallSteps } from '../lib/riskVisuals.mjs'
 import {
   money, topFactors, varMethod, hierarchySummary, hierarchyNodeAtPath, hierarchyChildRows,
   hierarchyNodeMetrics, attributionSummary,
@@ -643,7 +644,7 @@ export function RiskChangeAttribution({ portfolio }) {
   const waterfallDisabled = loading || !WATERFALL_METRICS.includes(metric)
 
   return (
-    <div className="card" data-testid="golden-demo-risk-change">
+    <div className="card wide" data-testid="golden-demo-risk-change">
       <div className="block-title">
         <h3>Risk Change Attribution</h3>
         <BlockHelp id="risk-change-attribution" />
@@ -669,11 +670,11 @@ export function RiskChangeAttribution({ portfolio }) {
         >
           {VAR_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
-        <button type="button" onClick={runWaterfall} disabled={!portfolio || waterfallDisabled}>
-          {loading ? 'Attributing…' : 'Run attribution'}
-        </button>
         <button type="button" onClick={runT0T1} disabled={!portfolio || loading}>
           {loading ? 'Comparing…' : 'Compare T0/T1'}
+        </button>
+        <button type="button" onClick={runWaterfall} disabled={!portfolio || waterfallDisabled}>
+          {loading ? 'Attributing…' : 'Run attribution'}
         </button>
       </div>
       {error && <div className="error risk-run-error">{error}</div>}
@@ -715,11 +716,91 @@ export function RiskChangeAttribution({ portfolio }) {
   )
 }
 
+const IDENTITY_FIELDS = [
+  ['portfolio_version', 'Portfolio version'],
+  ['market_snapshot_id', 'Market snapshot'],
+  ['historical_dataset_id', 'Historical dataset'],
+  ['historical_dataset_version', 'Dataset version'],
+  ['methodology', 'Methodology'],
+  ['calculation_config', 'Calculation config'],
+]
+
+function formatIdentityValue(value) {
+  if (value == null || value === '') return '—'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+function RiskChangeIdentity({ identity, disclosedChanges }) {
+  if (!identity) return null
+  const changed = new Set(identity.changed_fields || [])
+  return (
+    <div className="risk-change-identity" data-testid="risk-change-identity">
+      <table>
+        <thead>
+          <tr>
+            <th>Identity</th>
+            <th>T0</th>
+            <th>T1</th>
+          </tr>
+        </thead>
+        <tbody>
+          {IDENTITY_FIELDS.map(([key, label]) => (
+            <tr key={key} data-changed={changed.has(key) ? 'true' : 'false'}>
+              <th scope="row">{label}</th>
+              <td>{formatIdentityValue(identity.t0?.[key])}</td>
+              <td>{formatIdentityValue(identity.t1?.[key])}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {(disclosedChanges || []).length > 0 && (
+        <div className="muted foot">Changed inputs: {disclosedChanges.join(', ')}</div>
+      )}
+    </div>
+  )
+}
+
+function RiskChangeWaterfall({ report }) {
+  const steps = riskChangeWaterfallSteps(report)
+  if (!steps.length) return null
+  return (
+    <div
+      className="risk-change-waterfall"
+      data-testid="risk-change-waterfall"
+      role="list"
+      aria-label="T0 to T1 risk-change waterfall"
+    >
+      {steps.map((step) => (
+        <div
+          key={step.key}
+          className="waterfall-step"
+          role="listitem"
+          data-testid={step.key === 'residual' ? 'waterfall-step-residual' : 'waterfall-step'}
+          data-step={step.key}
+        >
+          <span className="waterfall-step-label">{step.label}</span>
+          <div className="waterfall-step-track">
+            <div
+              className={`waterfall-step-fill ${step.kind === 'level' ? 'level' : step.value < 0 ? 'negative' : 'positive'}`}
+              style={{ height: `${step.barPct}%` }}
+            />
+          </div>
+          <span className={`waterfall-step-value ${step.value < 0 ? 'negative' : 'positive'}`}>
+            {money(step.value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function RiskChangeFlagshipPanel({ report }) {
   const [path, setPath] = useState(null)
   const tree = report.hierarchy_contributors || []
   const node = hierarchyNodeAtPathFromContributors(tree, path) || tree[0]
   const children = node?.children || []
+  const factors = report.factor_contributors || []
 
   return (
     <div className="risk-panel-result" data-testid="golden-demo-risk-change-result">
@@ -732,9 +813,8 @@ function RiskChangeFlagshipPanel({ report }) {
         {' → '}
         <a href={`${API_V1}/risk/runs/${encodeURIComponent(report.t1_run_id)}`}>{report.t1_run_id}</a>
       </div>
-      {(report.disclosed_changes || []).length > 0 && (
-        <div className="muted foot">Changed inputs: {(report.disclosed_changes || []).join(', ')}</div>
-      )}
+      <RiskChangeIdentity identity={report.identity} disclosedChanges={report.disclosed_changes} />
+      <RiskChangeWaterfall report={report} />
       <div className="attribution-total">
         <span>
           {money(report.previous_risk ?? 0)} → {money(report.current_risk ?? 0)}
@@ -749,25 +829,29 @@ function RiskChangeFlagshipPanel({ report }) {
           <strong>{money(report.residual ?? 0)}</strong>
         </span>
       </div>
-      {(report.factor_contributors || []).length > 0 && (
-        <table>
-          <thead><tr><th>Factor</th><th>Δ Risk</th></tr></thead>
-          <tbody>{report.factor_contributors.map((x) => (
-            <tr key={x.factor_id}>
-              <td>{x.factor_id}</td>
-              <td className={(x.delta_risk ?? 0) < 0 ? 'negative' : 'positive'}>
-                {money(x.delta_risk ?? 0)}
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
-      )}
+      <div data-testid="risk-change-factors">
+        {factors.length === 0
+          ? <div className="muted foot">No factor contributors in this report</div>
+          : (
+            <table>
+              <thead><tr><th>Factor</th><th>Δ Risk</th></tr></thead>
+              <tbody>{factors.map((x) => (
+                <tr key={x.factor_id}>
+                  <td>{x.factor_id}</td>
+                  <td className={(x.delta_risk ?? 0) < 0 ? 'negative' : 'positive'}>
+                    {money(x.delta_risk ?? 0)}
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+      </div>
       {node && (
-        <div>
+        <div data-testid="risk-change-drill">
           <div className="muted foot">
             Drilldown {node.level}: {node.path || node.name}
             {path && (
-              <button type="button" className="linkish" onClick={() => setPath(parentContributorPath(path))}>
+              <button type="button" className="linkish risk-change-drill-up" onClick={() => setPath(parentContributorPath(path))}>
                 Up
               </button>
             )}

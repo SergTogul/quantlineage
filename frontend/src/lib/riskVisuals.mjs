@@ -62,3 +62,39 @@ export function keyRateDv01Chart(rows) {
     }),
   }
 }
+
+/**
+ * Flagship T0→T1 waterfall steps from RiskChangeReport fields.
+ * Copies API amounts; does not reconstruct residual or running totals.
+ */
+export function riskChangeWaterfallSteps(report) {
+  if (!report) return []
+  const specs = [
+    { key: 't0', label: 'T0 risk', value: report.previous_risk, kind: 'level' },
+    { key: 'portfolio', label: 'portfolio / trade change', value: report.portfolio_trade_change, kind: 'delta' },
+    { key: 'market', label: 'market / factor changes', value: report.market_change, kind: 'delta' },
+    {
+      key: 'residual',
+      label: report.residual_name || 'residual / interactions',
+      value: report.residual,
+      kind: 'delta',
+    },
+    { key: 't1', label: 'T1 risk', value: report.current_risk, kind: 'level' },
+  ]
+  let maxAbs = 0
+  for (const spec of specs) {
+    const n = Math.abs(Number(spec.value))
+    if (Number.isFinite(n) && n > maxAbs) maxAbs = n
+  }
+  return specs.map((spec) => {
+    const n = Number(spec.value)
+    const finite = Number.isFinite(n) ? n : 0
+    return {
+      key: spec.key,
+      label: spec.label,
+      kind: spec.kind,
+      value: finite,
+      barPct: contributionBarPct(finite, maxAbs),
+    }
+  })
+}
