@@ -145,6 +145,19 @@ def _parse_methodology(request: dict[str, Any]) -> VaRMethodology | None:
     return VaRMethodology(str(raw).strip().upper())
 
 
+def _library_stress_scenarios(request: dict[str, Any]) -> list[Any] | None:
+    """Optional named DEFAULT_SCENARIOS filter. None → full default library."""
+    scenario_id = request.get("scenario_id")
+    if not scenario_id:
+        return None
+    from app.risk.stress import DEFAULT_SCENARIOS
+
+    selected = [item for item in DEFAULT_SCENARIOS if item.id == scenario_id]
+    if not selected:
+        raise ValueError(f"unknown stress scenario_id: {scenario_id}")
+    return selected
+
+
 def _scenarios_from_request(request: dict[str, Any]) -> list[Any]:
     raw = request.get("scenarios") or []
     return wires_to_scenarios([ScenarioWire.model_validate(item) for item in raw])
@@ -173,7 +186,9 @@ def execute_run_type(
             portfolio_service.var_report(portfolio, methodology=methodology)
         )
     if run_type == "stress":
-        return _serialize_result(portfolio_service.stresses(portfolio))
+        return _serialize_result(
+            portfolio_service.stresses(portfolio, _library_stress_scenarios(request))
+        )
     if run_type == "factors":
         return _serialize_result(portfolio_service.factors(portfolio))
     if run_type == "limits":

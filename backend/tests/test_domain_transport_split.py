@@ -24,6 +24,7 @@ HTTP_TRANSPORT_NAMES = frozenset(
         "DashboardRiskRunRequest",
         "GenericRiskRunRequest",
         "StressEvaluateRiskRunRequest",
+        "StressRunRequest",
         "ReverseStressRiskRunRequest",
         "ReverseStressMultiRiskRunRequest",
         "StressCompareRiskRunRequest",

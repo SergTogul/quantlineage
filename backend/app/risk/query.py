@@ -189,7 +189,7 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
     RiskToolName.GET_DATA_QUALITY: RiskToolContract(
         name=RiskToolName.GET_DATA_QUALITY,
         description="Return series lineage and quality flags without history points.",
-        service_method="validate_series",
+        service_method="get_data_quality",
         required_inputs=["instrument_id", "start", "end"],
         returns=["SeriesLineage"],
         numeric_source="deterministic GET /api/v1/instruments/{id}/quality payload",
@@ -293,7 +293,7 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
     RiskToolName.GET_RUN_PROVENANCE: RiskToolContract(
         name=RiskToolName.GET_RUN_PROVENANCE,
         description="Return persisted RiskRun lineage. Never invents release_sha.",
-        service_method="provenance_from_risk_run",
+        service_method="get_run_provenance",
         required_inputs=["run_id"],
         returns=["RiskRunProvenance"],
         numeric_source="deterministic GET /api/v1/risk/runs/{id}/provenance payload",
