@@ -1,0 +1,1 @@
+Read the complete Wave B pack and inspect the current QuantLineage repository. Start by updating TRACKER.md and mapping existing analytics/risk APIs. Execute G1 through G7 automatically with narrow subagents. Backend must own all financial calculations. Keep “Why did my risk change?” as the hero visual workflow. Do not add retail planning, optimizer, or unrelated infrastructure.
