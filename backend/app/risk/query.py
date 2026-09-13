@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.api.schemas import RiskQueryResponse
 from app.domain.models import Portfolio
+from app.risk.tool_contracts import C1_ARG_MODELS, CompareRiskRunsArgs, execute_allowlisted_tool
 
 
 class RiskToolName(str, Enum):
@@ -16,6 +17,16 @@ class RiskToolName(str, Enum):
     GET_LIMITS = "get_limits"
     GET_CONTRIBUTORS = "get_contributors"
     EXPLAIN_RISK_CHANGE = "explain_risk_change"
+    SEARCH_INSTRUMENTS = "search_instruments"
+    GET_MARKET_HISTORY = "get_market_history"
+    GET_DATA_QUALITY = "get_data_quality"
+    RUN_PORTFOLIO_RISK = "run_portfolio_risk"
+    GET_RISK_RUN = "get_risk_run"
+    COMPARE_RISK_RUNS = "compare_risk_runs"
+    RUN_STRESS = "run_stress"
+    GET_KEY_RATE_DV01 = "get_key_rate_dv01"
+    GET_TOP_RISK_CONTRIBUTORS = "get_top_risk_contributors"
+    GET_RUN_PROVENANCE = "get_run_provenance"
 
 
 class RiskToolContract(BaseModel):
@@ -25,6 +36,8 @@ class RiskToolContract(BaseModel):
     required_inputs: list[str]
     returns: list[str]
     numeric_source: str
+    http_path: str = ""
+    provenance_fields: list[str] = Field(default_factory=list)
 
 
 class RiskAssistantModelRequest(BaseModel):
@@ -68,14 +81,7 @@ class RiskToolArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class ExplainRiskChangeArgs(BaseModel):
-    """t0/t1 run ids are required; the model never invents metric values."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    t0_run_id: str = Field(min_length=1)
-    t1_run_id: str = Field(min_length=1)
-    metric: str = "var_99"
+ExplainRiskChangeArgs = CompareRiskRunsArgs
 
 
 class ToolCallValidation(BaseModel):
@@ -130,19 +136,184 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
         name=RiskToolName.EXPLAIN_RISK_CHANGE,
         description=(
             "Explain why a risk metric changed between two COMPLETED RiskRuns. "
-            "Requires t0_run_id and t1_run_id; never invent VaR or other numbers."
+            "Requires t0_run_id and t1_run_id; never invent VaR or other numbers. "
+            "Shares compare_runs with compare_risk_runs."
         ),
-        service_method="explain_risk_change",
+        service_method="compare_runs",
         required_inputs=["t0_run_id", "t1_run_id"],
         returns=["RiskChangeReport"],
-        numeric_source="deterministic PortfolioService.explain_risk_change payload",
+        numeric_source="deterministic RiskRunWorker.compare_runs payload",
+        http_path="POST /api/v1/risk/runs/compare",
+        provenance_fields=[
+            "t0_run_id",
+            "t1_run_id",
+            "metric",
+            "unit",
+            "sign_convention",
+            "identity",
+        ],
+    ),
+    RiskToolName.SEARCH_INSTRUMENTS: RiskToolContract(
+        name=RiskToolName.SEARCH_INSTRUMENTS,
+        description="Search the curated instrument catalog. Curated identity wins.",
+        service_method="search_catalog",
+        required_inputs=["query"],
+        returns=["list[CatalogSearchHit]"],
+        numeric_source="deterministic search_catalog metadata payload",
+        http_path="GET /api/v1/instruments/search",
+        provenance_fields=["instrument_id", "provider", "source_symbol"],
+    ),
+    RiskToolName.GET_MARKET_HISTORY: RiskToolContract(
+        name=RiskToolName.GET_MARKET_HISTORY,
+        description=(
+            "Return normalized instrument price/percent levels and series lineage. "
+            "Does not compute returns and is not Wave B historical-analytics."
+        ),
+        service_method="get_market_history",
+        required_inputs=["instrument_id", "start", "end"],
+        returns=["InstrumentHistoryOut"],
+        numeric_source=(
+            "deterministic GET /api/v1/market/history levels payload; "
+            "not historical-analytics"
+        ),
+        http_path="GET /api/v1/market/history/{instrument_id}",
+        provenance_fields=[
+            "instrument_id",
+            "source",
+            "source_symbol",
+            "content_hash",
+            "normalization_version",
+            "unit",
+        ],
+    ),
+    RiskToolName.GET_DATA_QUALITY: RiskToolContract(
+        name=RiskToolName.GET_DATA_QUALITY,
+        description="Return series lineage and quality flags without history points.",
+        service_method="validate_series",
+        required_inputs=["instrument_id", "start", "end"],
+        returns=["SeriesLineage"],
+        numeric_source="deterministic GET /api/v1/instruments/{id}/quality payload",
+        http_path="GET /api/v1/instruments/{instrument_id}/quality",
+        provenance_fields=["content_hash", "unit", "currency", "frequency", "adjustment"],
+    ),
+    RiskToolName.RUN_PORTFOLIO_RISK: RiskToolContract(
+        name=RiskToolName.RUN_PORTFOLIO_RISK,
+        description=(
+            "Enqueue a portfolio RiskRun (summary or var). "
+            "Prefer run identity over a synchronous dump."
+        ),
+        service_method="submit",
+        required_inputs=["portfolio", "run_type"],
+        returns=["RiskRunView"],
+        numeric_source="deterministic RiskRunWorker.submit payload",
+        http_path="POST /api/v1/risk/runs",
+        provenance_fields=[
+            "id",
+            "portfolio_id",
+            "portfolio_version",
+            "market_snapshot_id",
+            "historical_dataset_id",
+            "historical_dataset_version",
+            "as_of",
+            "methodology",
+        ],
+    ),
+    RiskToolName.GET_RISK_RUN: RiskToolContract(
+        name=RiskToolName.GET_RISK_RUN,
+        description="Read a persisted RiskRun. Stale ids fail closed.",
+        service_method="get",
+        required_inputs=["run_id"],
+        returns=["RiskRunView"],
+        numeric_source="deterministic RiskRunWorker.get payload",
+        http_path="GET /api/v1/risk/runs/{run_id}",
+        provenance_fields=[
+            "id",
+            "market_snapshot_id",
+            "historical_dataset_id",
+            "as_of",
+            "methodology",
+        ],
+    ),
+    RiskToolName.COMPARE_RISK_RUNS: RiskToolContract(
+        name=RiskToolName.COMPARE_RISK_RUNS,
+        description=(
+            "Compare two COMPLETED RiskRuns. Same compare_runs engine as "
+            "explain_risk_change; no second kernel."
+        ),
+        service_method="compare_runs",
+        required_inputs=["t0_run_id", "t1_run_id"],
+        returns=["RiskChangeReport"],
+        numeric_source="deterministic RiskRunWorker.compare_runs payload",
+        http_path="POST /api/v1/risk/runs/compare",
+        provenance_fields=[
+            "t0_run_id",
+            "t1_run_id",
+            "metric",
+            "unit",
+            "sign_convention",
+            "identity",
+        ],
+    ),
+    RiskToolName.RUN_STRESS: RiskToolContract(
+        name=RiskToolName.RUN_STRESS,
+        description=(
+            "Enqueue an allowlisted named stress RiskRun (DEFAULT_SCENARIOS, "
+            "including eq_down_10 / equity-down). Not arbitrary shocks."
+        ),
+        service_method="submit",
+        required_inputs=["portfolio", "scenario_id"],
+        returns=["RiskRunView"],
+        numeric_source="deterministic RiskRunWorker.submit stress payload",
+        http_path="POST /api/v1/risk/runs",
+        provenance_fields=["id", "run_type", "market_snapshot_id", "as_of", "methodology"],
+    ),
+    RiskToolName.GET_KEY_RATE_DV01: RiskToolContract(
+        name=RiskToolName.GET_KEY_RATE_DV01,
+        description=(
+            "USD key-rate DV01 from the rates-macro showcase (2Y/5Y/10Y). "
+            "Demo book only; not a second bump engine."
+        ),
+        service_method="build_rates_showcase",
+        required_inputs=[],
+        returns=["RatesShowcaseView"],
+        numeric_source="deterministic GET /api/v1/market/rates-showcase payload",
+        http_path="GET /api/v1/market/rates-showcase",
+        provenance_fields=["portfolio_id", "market_snapshot_id", "unit"],
+    ),
+    RiskToolName.GET_TOP_RISK_CONTRIBUTORS: RiskToolContract(
+        name=RiskToolName.GET_TOP_RISK_CONTRIBUTORS,
+        description="Enqueue a contributors RiskRun (parametric component VaR).",
+        service_method="submit",
+        required_inputs=["portfolio"],
+        returns=["RiskRunView"],
+        numeric_source="deterministic RiskRunWorker.submit contributors payload",
+        http_path="POST /api/v1/risk/runs",
+        provenance_fields=["id", "run_type", "portfolio_id", "market_snapshot_id"],
+    ),
+    RiskToolName.GET_RUN_PROVENANCE: RiskToolContract(
+        name=RiskToolName.GET_RUN_PROVENANCE,
+        description="Return persisted RiskRun lineage. Never invents release_sha.",
+        service_method="provenance_from_risk_run",
+        required_inputs=["run_id"],
+        returns=["RiskRunProvenance"],
+        numeric_source="deterministic GET /api/v1/risk/runs/{id}/provenance payload",
+        http_path="GET /api/v1/risk/runs/{run_id}/provenance",
+        provenance_fields=[
+            "risk_run_id",
+            "portfolio_id",
+            "market_snapshot_id",
+            "as_of",
+            "historical_dataset_id",
+            "methodology",
+        ],
     ),
 }
 
 TOOL_ARG_MODELS: dict[RiskToolName, type[BaseModel]] = {
     name: RiskToolArgs for name in TOOL_CONTRACTS
 }
-TOOL_ARG_MODELS[RiskToolName.EXPLAIN_RISK_CHANGE] = ExplainRiskChangeArgs
+for _c1_name, _c1_model in C1_ARG_MODELS.items():
+    TOOL_ARG_MODELS[RiskToolName(_c1_name)] = _c1_model
 
 SAFE_UNGROUNDED_ANSWER = (
     "I cannot ignore deterministic tools or invent VaR, Greeks, P&L, prices, "
@@ -401,6 +572,8 @@ def _execute_tool(
     args: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     args = args or {}
+    if tool_name.value in C1_ARG_MODELS:
+        return execute_allowlisted_tool(tool_name.value, portfolio, service, args)
     if tool_name == RiskToolName.GET_PORTFOLIO_SUMMARY:
         return _dump(service.summary(portfolio))
     if tool_name == RiskToolName.GET_VAR_ES:
@@ -411,14 +584,6 @@ def _execute_tool(
         return {"limits": [_dump(item) for item in service.limits(portfolio)]}
     if tool_name == RiskToolName.GET_CONTRIBUTORS:
         return {"contributors": [_dump(item) for item in service.contributors(portfolio)[:5]]}
-    if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
-        return _dump(
-            service.explain_risk_change(
-                args["t0_run_id"],
-                args["t1_run_id"],
-                args.get("metric", "var_99"),
-            )
-        )
     raise ValueError(f"unsupported risk tool: {tool_name}")
 
 
@@ -462,14 +627,17 @@ def _format_answer(tool_name: RiskToolName, payload: dict[str, Any]) -> str:
             for item in contributors
         ]
         return "Top risk contributors: " + ", ".join(names) + "."
-    if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
+    if tool_name in (
+        RiskToolName.EXPLAIN_RISK_CHANGE,
+        RiskToolName.COMPARE_RISK_RUNS,
+    ):
         return (
             f"Metric {payload.get('metric')} changed from {_fmt(payload.get('previous_risk'))} "
             f"to {_fmt(payload.get('current_risk'))} "
             f"(total {_fmt(payload.get('total_change'))}); "
             f"residual {_fmt(payload.get('residual'))}."
         )
-    raise ValueError(f"unsupported risk tool: {tool_name}")
+    return _format_c1_answer(tool_name, payload)
 
 
 def _intent_for_tool(tool_name: RiskToolName) -> str:
@@ -485,13 +653,61 @@ def _intent_for_tool(tool_name: RiskToolName) -> str:
         return "contributors"
     if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
         return "explain_risk_change"
-    raise ValueError(f"unsupported risk tool: {tool_name}")
+    return tool_name.value
 
 
 def _dump(value) -> dict[str, Any]:
     if hasattr(value, "model_dump"):
         return value.model_dump()
     return dict(value)
+
+
+def _format_c1_answer(tool_name: RiskToolName, payload: dict[str, Any]) -> str:
+    """Summarize C1 payloads without computing risk numbers."""
+    if tool_name == RiskToolName.RUN_PORTFOLIO_RISK:
+        return (
+            f"Submitted RiskRun {payload.get('id')} "
+            f"({payload.get('run_type')}) with status {payload.get('status')}."
+        )
+    if tool_name == RiskToolName.GET_RISK_RUN:
+        return (
+            f"RiskRun {payload.get('id')} status is {payload.get('status')} "
+            f"for {payload.get('run_type')}."
+        )
+    if tool_name == RiskToolName.GET_MARKET_HISTORY:
+        points = payload.get("points") or []
+        return (
+            f"History for {payload.get('instrument_id')} has {len(points)} "
+            f"level observations (unit {payload.get('unit')})."
+        )
+    if tool_name == RiskToolName.GET_DATA_QUALITY:
+        return f"Quality lineage for {payload.get('instrument_id')} from validate_series."
+    if tool_name == RiskToolName.SEARCH_INSTRUMENTS:
+        hits = payload.get("hits") or []
+        return f"Catalog search returned {len(hits)} hits."
+    if tool_name == RiskToolName.RUN_STRESS:
+        return (
+            f"Submitted stress RiskRun {payload.get('id')} "
+            f"with status {payload.get('status')}."
+        )
+    if tool_name == RiskToolName.GET_KEY_RATE_DV01:
+        rows = payload.get("key_rate_dv01") or []
+        labels = ", ".join(str(row.get("tenor")) for row in rows) or "none"
+        return (
+            f"Rates showcase KR-DV01 tenors: {labels} "
+            f"(snapshot {payload.get('market_snapshot_id')})."
+        )
+    if tool_name == RiskToolName.GET_TOP_RISK_CONTRIBUTORS:
+        return (
+            f"Submitted contributors RiskRun {payload.get('id')} "
+            f"with status {payload.get('status')}."
+        )
+    if tool_name == RiskToolName.GET_RUN_PROVENANCE:
+        return (
+            f"Provenance for RiskRun {payload.get('risk_run_id')} "
+            f"methodology {payload.get('methodology')}."
+        )
+    return f"Deterministic tool {tool_name.value} returned a service payload."
 
 
 def _fmt(value: Any) -> str:
