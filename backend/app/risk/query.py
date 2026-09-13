@@ -594,6 +594,25 @@ class RiskQueryEngine:
                 tool_name=RiskToolName.GET_KEY_RATE_DV01,
                 tool_args=args,
             )
+        if _is_data_quality_question(q):
+            instrument_id = _extract_instrument_id(original, extra_stopwords=_QUALITY_STOPWORDS)
+            dates = _extract_iso_dates(original)
+            if not instrument_id or len(dates) < 2:
+                return _clarification_plan(
+                    "quality",
+                    "Provide an instrument id and a start and end date range. "
+                    "Do not invent quality scores.",
+                    tool_name=RiskToolName.GET_DATA_QUALITY,
+                )
+            return RiskQueryPlan(
+                intent="quality",
+                tool_name=RiskToolName.GET_DATA_QUALITY,
+                tool_args={
+                    "instrument_id": instrument_id,
+                    "start": dates[0],
+                    "end": dates[1],
+                },
+            )
         if _is_instrument_discovery(q):
             query = _extract_search_query(original)
             if not query:
@@ -1136,6 +1155,8 @@ def _intent_for_tool(tool_name: RiskToolName) -> str:
         return "instrument_discovery"
     if tool_name == RiskToolName.GET_MARKET_HISTORY:
         return "history"
+    if tool_name == RiskToolName.GET_DATA_QUALITY:
+        return "quality"
     if tool_name == RiskToolName.RUN_PORTFOLIO_RISK:
         return "portfolio_risk"
     if tool_name == RiskToolName.COMPARE_RISK_RUNS:
@@ -1254,6 +1275,19 @@ _HISTORY_STOPWORDS = {
     "dates",
 }
 
+_QUALITY_STOPWORDS = _HISTORY_STOPWORDS | {
+    "data",
+    "quality",
+    "inspect",
+    "book",
+    "catalog",
+    "coverage",
+    "flags",
+    "score",
+    "scores",
+    "lineage",
+}
+
 
 def _is_advisory(question: str) -> bool:
     return _mentions(
@@ -1276,6 +1310,16 @@ def _is_instrument_discovery(question: str) -> bool:
 def _is_history_question(question: str) -> bool:
     return bool(re.search(r"\bhistory\b", question)) or _mentions(
         question, "price series", "historical prices"
+    )
+
+
+def _is_data_quality_question(question: str) -> bool:
+    return _mentions(
+        question,
+        "data quality",
+        "inspect quality",
+        "series quality",
+        "quality flags",
     )
 
 
@@ -1327,6 +1371,10 @@ def _ambiguous_tool_pair(question: str) -> str | None:
         return (
             "Please choose one deterministic tool: instrument search or market history."
         )
+    if _is_instrument_discovery(question) and _is_data_quality_question(question):
+        return (
+            "Please choose one deterministic tool: instrument search or data quality."
+        )
     if _is_compare_runs_question(question) and _is_risk_change_question(question):
         return (
             "Please choose one deterministic tool: run comparison or "
@@ -1351,14 +1399,17 @@ def _extract_iso_dates(question: str) -> list[str]:
     return seen
 
 
-def _extract_instrument_id(question: str) -> str | None:
+def _extract_instrument_id(
+    question: str, *, extra_stopwords: set[str] | None = None
+) -> str | None:
     catalog = _CATALOG_ID_RE.findall(question)
     if catalog:
         return catalog[0]
     dates = set(_extract_iso_dates(question))
+    stopwords = _HISTORY_STOPWORDS if extra_stopwords is None else extra_stopwords
     for token in re.findall(r"[a-z0-9:._-]+", question, flags=re.I):
         lowered = token.lower()
-        if lowered in _HISTORY_STOPWORDS or token in dates:
+        if lowered in stopwords or token in dates:
             continue
         if _RUN_ID_RE.fullmatch(token):
             continue

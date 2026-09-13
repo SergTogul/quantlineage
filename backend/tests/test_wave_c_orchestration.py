@@ -81,6 +81,25 @@ class _FailingHistoryService(_FixtureService):
         raise ValueError("estimated VaR is 999")
 
 
+class _QualityService(_FixtureService):
+    def get_data_quality(self, instrument_id: str, start, end):
+        self.calls.append("get_data_quality")
+        return {
+            "instrument_id": instrument_id,
+            "start": str(start),
+            "end": str(end),
+            "source": "catalog",
+            "source_symbol": "AAPL",
+            "unit": "price",
+            "currency": "USD",
+            "frequency": "daily",
+            "adjustment": "adjusted",
+            "content_hash": "abc123",
+            "stale": False,
+            "observation_count": 5,
+        }
+
+
 def _assert_no_invented_numbers(text: str) -> None:
     assert not any(ch.isdigit() for ch in text)
 
@@ -352,3 +371,118 @@ def test_c5_http_query_service_executes_key_rate_dv01() -> None:
     assert not response.requires_clarification
     rows = response.data["tool_result"]["key_rate_dv01"]
     assert [row["tenor"] for row in rows] == ["10Y"]
+
+
+def test_c7_data_quality_without_instrument_clarifies() -> None:
+    engine = RiskQueryEngine()
+    service = _QualityService()
+    plan = engine.route("show data quality for the book")
+    assert plan.tool_name == RiskToolName.GET_DATA_QUALITY
+    assert plan.needs_clarification
+
+    response = engine.answer("show data quality for the book", SAMPLE_PORTFOLIO, service)
+    assert service.calls == []
+    assert response.requires_clarification
+    assert response.tool_name is None
+    assert response.data["tool_result"] is None
+    _assert_no_invented_numbers(response.answer)
+
+
+def test_c7_search_apple_then_quality_reaches_get_data_quality() -> None:
+    engine = RiskQueryEngine()
+    catalog = _CatalogService()
+    search = engine.answer("search Apple", SAMPLE_PORTFOLIO, catalog)
+    assert search.tool_name == "search_instruments"
+    assert catalog.calls == ["search_catalog"]
+    instrument_id = search.data["tool_result"]["hits"][0]["instrument_id"]
+    assert instrument_id == "equity:US:AAPL"
+
+    quality = _QualityService()
+    question = f"show data quality for {instrument_id} from 2021-01-04 to 2021-01-08"
+    plan = engine.route(question)
+    assert plan.tool_name == RiskToolName.GET_DATA_QUALITY
+    assert not plan.needs_clarification
+    assert plan.tool_args["instrument_id"] == instrument_id
+    assert plan.tool_args["start"] == "2021-01-04"
+    assert plan.tool_args["end"] == "2021-01-08"
+
+    response = engine.answer(question, SAMPLE_PORTFOLIO, quality)
+    assert quality.calls == ["get_data_quality"]
+    assert response.tool_name == "get_data_quality"
+    assert response.data["tool_result"]["instrument_id"] == instrument_id
+    assert response.data["tool_result"]["content_hash"] == "abc123"
+    assert not response.requires_clarification
+
+
+def test_c7_http_query_service_executes_data_quality(monkeypatch) -> None:
+    from tests.test_instrument_quality_api import FakeHistoryProvider, _aapl_series
+
+    from app.api import instruments as instruments_mod
+    from app.services.risk_factories import build_portfolio_service
+
+    monkeypatch.setattr(
+        instruments_mod, "get_history_provider", lambda: FakeHistoryProvider(_aapl_series())
+    )
+    service = build_portfolio_service()
+    engine = RiskQueryEngine()
+    question = "show data quality for equity:US:AAPL from 2021-01-04 to 2021-01-08"
+    response = engine.answer(question, SAMPLE_PORTFOLIO, service)
+    assert response.tool_name == "get_data_quality"
+    assert not response.requires_clarification
+    payload = response.data["tool_result"]
+    assert payload["instrument_id"] == "equity:US:AAPL"
+    assert payload["source_symbol"] == "AAPL"
+    assert payload.get("content_hash")
+    assert "points" not in payload
+
+
+def test_c7_http_query_service_executes_provenance() -> None:
+    from types import SimpleNamespace
+
+    from app.services.risk_factories import build_portfolio_service
+
+    class _Worker:
+        def get(self, run_id: str, *, principal=None):
+            return SimpleNamespace(
+                provenance={
+                    "risk_run_id": run_id,
+                    "methodology": "DELTA_GAMMA",
+                    "status": "COMPLETED",
+                    "principal": principal,
+                }
+            )
+
+    service = build_portfolio_service()
+    service.risk_run_worker = _Worker()
+    engine = RiskQueryEngine()
+    question = "show provenance for run-t0"
+    response = engine.answer(question, SAMPLE_PORTFOLIO, service)
+    assert response.tool_name == "get_run_provenance"
+    assert not response.requires_clarification
+    assert response.data["tool_result"]["risk_run_id"] == "run-t0"
+    assert response.data["tool_result"]["methodology"] == "DELTA_GAMMA"
+
+
+def test_c7_demo_questions_route_to_allowlisted_tools() -> None:
+    engine = RiskQueryEngine()
+    cases = (
+        ("search Apple", RiskToolName.SEARCH_INSTRUMENTS, False),
+        (
+            "show data quality for equity:US:AAPL from 2021-01-04 to 2021-01-08",
+            RiskToolName.GET_DATA_QUALITY,
+            False,
+        ),
+        ("run portfolio risk", RiskToolName.RUN_PORTFOLIO_RISK, False),
+        ("Top contributors?", RiskToolName.GET_CONTRIBUTORS, False),
+        ("Why did VaR change?", RiskToolName.EXPLAIN_RISK_CHANGE, True),
+        ("Run equity-down stress.", RiskToolName.RUN_STRESS, False),
+        ("Show USD 10Y KR-DV01.", RiskToolName.GET_KEY_RATE_DV01, False),
+        ("show run provenance", RiskToolName.GET_RUN_PROVENANCE, True),
+        ("Should we buy more NVDA tomorrow?", None, True),
+    )
+    for question, expected, needs_clarification in cases:
+        plan = engine.route(question)
+        assert plan.tool_name == expected, question
+        assert plan.needs_clarification is needs_clarification, question
+        if expected is not None:
+            assert expected in TOOL_CONTRACTS

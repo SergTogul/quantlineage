@@ -173,6 +173,7 @@ class PortfolioService:
         )
         self.query_engine = RiskQueryEngine()
         self.risk_run_compare = None
+        self.risk_run_worker = None
 
     def market_snapshot(self, portfolio: Portfolio): return self.market_data.snapshot(portfolio)
 
@@ -455,6 +456,56 @@ class PortfolioService:
 
         book = RATES_MACRO_PORTFOLIO
         return build_rates_showcase(book, demo_market_snapshot(book), self.pricing)
+
+    def get_data_quality(self, instrument_id, start, end):
+        """C1/C7: SeriesLineage via ``validate_series``. Same path as quality HTTP."""
+        from datetime import date as date_cls
+
+        from app.api.instruments import (
+            _fetch_catalog_series,
+            get_history_provider,
+            get_macro_provider,
+        )
+        from app.market.catalog import get_catalog_record
+        from app.market.ingestion.errors import ProviderError
+        from app.market.quality import SeriesValidationError, validate_series
+
+        start_date = start if isinstance(start, date_cls) else date_cls.fromisoformat(str(start))
+        end_date = end if isinstance(end, date_cls) else date_cls.fromisoformat(str(end))
+        record = get_catalog_record(str(instrument_id))
+        if record is None:
+            raise ValueError(f"instrument not found: {instrument_id}")
+        try:
+            series = _fetch_catalog_series(
+                record,
+                start=start_date,
+                end=end_date,
+                history_provider=get_history_provider(),
+                macro_provider=get_macro_provider(),
+            )
+            return validate_series(series, requested_end=end_date)
+        except (ProviderError, SeriesValidationError) as exc:
+            raise ValueError(str(exc)) from exc
+
+    def submit(self, **kwargs):
+        """C7: enqueue via the lifespan RiskRun worker. No second run engine."""
+        worker = self.risk_run_worker
+        if worker is None:
+            raise ValueError("RiskRun submit is not configured")
+        return worker.submit(**kwargs)
+
+    def get_run_provenance(self, run_id, *, principal=None):
+        """C7: copy persisted RiskRun provenance. Same payload as provenance HTTP."""
+        from app.services.risk_run_service import RiskRunNotFound
+
+        worker = self.risk_run_worker
+        if worker is None:
+            raise ValueError("run provenance service is not configured")
+        view = worker.get(run_id, principal=principal)
+        provenance = getattr(view, "provenance", None)
+        if provenance is None:
+            raise RiskRunNotFound(run_id)
+        return provenance
 
     def query(self, portfolio, question): return self.query_engine.answer(question,portfolio,self)
 

@@ -13,9 +13,9 @@
 | G4 | Grounding gate | DONE | `fa7db26`..`dab210f`; review PASS; no Critical/Important | |
 | C5 | Risk Query UI + MCP docs | DONE | commit `41b83f4`; `docs/mcp.md`; `RiskQuery.test.jsx`; review PASS `.superpowers/sdd/task-c5-review.md` | |
 | G5 | UX/devex gate | DONE | `dab210f`..`41b83f4`; review PASS; no Critical/Important | |
-| C6 | Eval harness + adversarial cases | IN_PROGRESS | `tests/test_wave_c_evals.py` | |
-| G6 | Safety/eval gate | NOT_STARTED | | |
-| C7 | Demo + hostile review + CI | NOT_STARTED | | |
+| C6 | Eval harness + adversarial cases | DONE | commit `1a8aa48` + `682280d`; `tests/test_wave_c_evals.py`; review PASS `.superpowers/sdd/task-c6-review.md` + Important follow-up PASS | |
+| G6 | Safety/eval gate | DONE | `41b83f4`..`682280d`; review PASS; Important MCP-auth denylist + payload-digit helper closed | |
+| C7 | Demo + hostile review + CI | IN_PROGRESS | demo `docs/wave_c_ai_mcp_demo.md`; `reviews/wave-c-ai-mcp-hostile-review.md`; quality query wired; G7 not claimed | |
 | G7 | Wave C final gate | NOT_STARTED | | |
 
-Overall: C0–G5 DONE; C6 IN_PROGRESS
+Overall: C0–G6 DONE; C7 IN_PROGRESS

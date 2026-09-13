@@ -20,3 +20,5 @@ Non-goals: autonomous trading, order execution, unrestricted shell/SQL/filesyste
 
 Developer entry for the optional MCP stdio server: [`docs/mcp.md`](../../mcp.md).
 The Risk Query UI lives on Scenario Builder and Overview Command (`#overview/command`).
+Demo walkthrough: [`docs/wave_c_ai_mcp_demo.md`](../../wave_c_ai_mcp_demo.md).
+Implementer hostile review (G7 not DONE): [`reviews/wave-c-ai-mcp-hostile-review.md`](../../../reviews/wave-c-ai-mcp-hostile-review.md).
