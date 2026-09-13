@@ -444,11 +444,16 @@ def load_demo_historical_dataset() -> FileHistoricalDataset:
             f"demo historical dataset not found at {path}; "
             "expected repo data/demo_historical_factors.csv"
         )
-    return load_csv_historical_dataset(
+    dataset = load_csv_historical_dataset(
         path,
         dataset_id=DEMO_HISTORICAL_DATASET_ID,
         projection=FOUR_MACRO_DEMO_PROJECTION,
     )
+    if not isinstance(dataset, FileHistoricalDataset):
+        raise TypeError(
+            f"demo four-macro CSV must load as FileHistoricalDataset, got {type(dataset).__name__}"
+        )
+    return dataset
 
 
 def load_demo_multi_factor_dataset() -> PerFactorFileHistoricalDataset:

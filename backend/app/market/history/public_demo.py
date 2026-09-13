@@ -10,6 +10,7 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
+from app.domain.models import as_of_wire
 from app.market.history.artifact import PUBLIC_HISTORY_CSV_NAME
 from app.market.history.freeze import FrozenHistoryArtifact, freeze_public_history
 from app.market.history.snapshot import PublicSnapshotBuild, build_public_snapshot
@@ -117,11 +118,11 @@ def format_report(
         prefix = f"{label}_" if label not in {"", "snapshot"} else ""
         if label in {"", "snapshot"}:
             lines.append(f"snapshot_id: {built.snapshot.id}")
-            lines.append(f"snapshot_as_of: {built.snapshot.as_of.isoformat()}")
+            lines.append(f"snapshot_as_of: {as_of_wire(built.snapshot.as_of)}")
             lines.append(f"source_observation_date: {_source_observation_dates(built)}")
         else:
             lines.append(f"{prefix}snapshot_id: {built.snapshot.id}")
-            lines.append(f"{prefix}as_of: {built.snapshot.as_of.isoformat()}")
+            lines.append(f"{prefix}as_of: {as_of_wire(built.snapshot.as_of)}")
             lines.append(
                 f"{prefix}source_observation_date: {_source_observation_dates(built)}"
             )
