@@ -328,6 +328,73 @@ _TOOL_FAILURE_ANSWER = (
     "I cannot invent VaR, Expected Shortfall, or Greeks."
 )
 
+MISSING_ON_PAYLOAD = "not on this payload"
+
+_CARD_IDENTITY_KEYS = (
+    "metric",
+    "value",
+    "unit",
+    "sign_convention",
+    "as_of",
+    "methodology",
+    "market_snapshot_id",
+    "historical_dataset_id",
+    "historical_dataset_version",
+)
+
+_PROVENANCE_KEYS = (
+    "metric",
+    "value",
+    "unit",
+    "sign_convention",
+    "risk_run_id",
+    "id",
+    "as_of",
+    "methodology",
+    "market_snapshot_id",
+    "historical_dataset_id",
+    "historical_dataset_version",
+)
+
+_RISK_CHANGE_CARD_KEYS = (
+    "t0_run_id",
+    "t1_run_id",
+    "metric",
+    "unit",
+    "sign_convention",
+    "previous_risk",
+    "current_risk",
+    "total_change",
+    "portfolio_trade_change",
+    "market_change",
+    "explained_change",
+    "residual",
+    "residual_name",
+    "disclosed_changes",
+    "identity",
+    "factor_contributors",
+    "hierarchy_contributors",
+    "items",
+)
+
+_NUMERIC_TOOLS = frozenset(
+    {
+        RiskToolName.GET_PORTFOLIO_SUMMARY,
+        RiskToolName.GET_VAR_ES,
+        RiskToolName.GET_WORST_STRESS,
+        RiskToolName.GET_LIMITS,
+        RiskToolName.GET_CONTRIBUTORS,
+        RiskToolName.EXPLAIN_RISK_CHANGE,
+        RiskToolName.COMPARE_RISK_RUNS,
+        RiskToolName.RUN_PORTFOLIO_RISK,
+        RiskToolName.GET_RISK_RUN,
+        RiskToolName.RUN_STRESS,
+        RiskToolName.GET_KEY_RATE_DV01,
+        RiskToolName.GET_TOP_RISK_CONTRIBUTORS,
+        RiskToolName.GET_RUN_PROVENANCE,
+    }
+)
+
 _INJECTION_MARKERS = (
     "ignore tools",
     "ignore the tools",
@@ -695,14 +762,18 @@ class RiskQueryEngine:
                 tool_name=None,
                 requires_clarification=True,
             )
+        card = _grounded_card(tool_name, payload)
+        provenance = _grounded_provenance(card)
         data = {
             "tool_contract": contract.model_dump(mode="json"),
             "tool_result": payload,
+            "card": card,
+            "provenance": provenance,
             **(extra_data or {}),
         }
         return RiskQueryResponse(
             intent=intent,
-            answer=_format_answer(tool_name, payload),
+            answer=_format_answer(tool_name, payload, card=card),
             data=data,
             tool_name=tool_name.value,
         )
@@ -725,13 +796,208 @@ def _execute_tool(
     )
 
 
-def _format_answer(tool_name: RiskToolName, payload: dict[str, Any]) -> str:
+def _nested_result_payloads(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in payload.get("results") or []:
+        if isinstance(item, dict) and isinstance(item.get("payload"), dict):
+            rows.append(item["payload"])
+    return rows
+
+
+def _payload_field(payload: dict[str, Any], key: str) -> Any:
+    if key in payload and payload[key] is not None:
+        return payload[key]
+    for nested in _nested_result_payloads(payload):
+        if key in nested and nested[key] is not None:
+            return nested[key]
+    request = payload.get("request")
+    if isinstance(request, dict) and key in request and request[key] is not None:
+        return request[key]
+    return None
+
+
+def _payload_run_id(payload: dict[str, Any]) -> Any:
+    for key in ("risk_run_id", "id", "run_id"):
+        value = _payload_field(payload, key)
+        if value is not None:
+            return value
+    return None
+
+
+def _copy_present(payload: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
+    card: dict[str, Any] = {}
+    for key in keys:
+        value = _payload_field(payload, key)
+        if value is not None:
+            card[key] = value
+    return card
+
+
+def _fill_missing_identity(card: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
+    for key in keys:
+        if key not in card:
+            card[key] = MISSING_ON_PAYLOAD
+    return card
+
+
+def _grounded_card(tool_name: RiskToolName, payload: dict[str, Any]) -> dict[str, Any]:
+    """Copy display/provenance fields from the tool payload. Never compute risk."""
+    if tool_name in (RiskToolName.EXPLAIN_RISK_CHANGE, RiskToolName.COMPARE_RISK_RUNS):
+        card = _copy_present(payload, _RISK_CHANGE_CARD_KEYS)
+        run_id = _payload_run_id(payload)
+        if run_id is not None:
+            card.setdefault("risk_run_id", run_id)
+        return _fill_missing_identity(
+            card,
+            (
+                "residual",
+                "unit",
+                "sign_convention",
+                "risk_run_id",
+                "as_of",
+                "methodology",
+                "market_snapshot_id",
+                "historical_dataset_id",
+            ),
+        )
+
+    card = _copy_present(payload, _CARD_IDENTITY_KEYS)
+    run_id = _payload_run_id(payload)
+    if run_id is not None:
+        card["risk_run_id"] = run_id
+        if payload.get("id") is not None:
+            card.setdefault("id", payload["id"])
+    if tool_name in _NUMERIC_TOOLS:
+        _fill_missing_identity(
+            card,
+            (
+                "metric",
+                "value",
+                "unit",
+                "sign_convention",
+                "risk_run_id",
+                "as_of",
+                "methodology",
+                "market_snapshot_id",
+                "historical_dataset_id",
+                "historical_dataset_version",
+            ),
+        )
+    return card
+
+
+def _grounded_provenance(card: dict[str, Any]) -> dict[str, Any]:
+    return {key: card[key] for key in _PROVENANCE_KEYS if key in card}
+
+
+def _format_card_value(value: Any) -> str:
+    if value == MISSING_ON_PAYLOAD:
+        return MISSING_ON_PAYLOAD
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return _fmt(value)
+    return str(value)
+
+
+def _format_card_text(card: dict[str, Any]) -> str:
+    labels = (
+        ("metric", "metric"),
+        ("value", "value"),
+        ("unit", "unit"),
+        ("sign_convention", "sign"),
+        ("risk_run_id", "run"),
+        ("as_of", "as_of"),
+        ("methodology", "methodology"),
+        ("market_snapshot_id", "market_snapshot_id"),
+        ("historical_dataset_id", "historical_dataset_id"),
+        ("historical_dataset_version", "historical_dataset_version"),
+    )
+    parts = []
+    for key, label in labels:
+        if key in card and not isinstance(card[key], (dict, list)):
+            parts.append(f"{label} {_format_card_value(card[key])}")
+    return "; ".join(parts)
+
+
+def _label_payload(payload: dict[str, Any], key: str, label: str) -> str:
+    if key in payload and payload[key] is not None:
+        return f"{label} {_format_card_value(payload[key])}"
+    return f"{label} {MISSING_ON_PAYLOAD}"
+
+
+def _format_risk_change_answer(payload: dict[str, Any]) -> str:
+    parts = [
+        _label_payload(payload, "metric", "Metric"),
+        _label_payload(payload, "t0_run_id", "T0"),
+        _label_payload(payload, "t1_run_id", "T1"),
+    ]
+    if "previous_risk" in payload or "current_risk" in payload:
+        parts.append(
+            "changed from "
+            f"{_format_card_value(payload.get('previous_risk'))} to "
+            f"{_format_card_value(payload.get('current_risk'))}"
+        )
+    parts.extend(
+        [
+            _label_payload(payload, "total_change", "total"),
+            _label_payload(payload, "portfolio_trade_change", "portfolio/trade"),
+            _label_payload(payload, "market_change", "market"),
+            _label_payload(payload, "residual", "residual"),
+        ]
+    )
+    contributor_names: list[str] = []
+    for item in payload.get("factor_contributors") or []:
+        if isinstance(item, dict):
+            contributor_names.append(str(item.get("factor") or item.get("factor_id") or item))
+    for item in payload.get("hierarchy_contributors") or []:
+        if isinstance(item, dict):
+            contributor_names.append(str(item.get("name") or item.get("path") or item))
+    if contributor_names:
+        parts.append("contributors " + ", ".join(contributor_names))
+    elif "factor_contributors" in payload or "hierarchy_contributors" in payload:
+        parts.append("contributors none")
+    else:
+        parts.append(f"contributors {MISSING_ON_PAYLOAD}")
+    if "disclosed_changes" in payload:
+        changes = payload.get("disclosed_changes") or []
+        parts.append(
+            "disclosed changes " + ", ".join(str(item) for item in changes)
+            if changes
+            else "disclosed changes none"
+        )
+    else:
+        parts.append(f"disclosed changes {MISSING_ON_PAYLOAD}")
+    parts.append(_label_payload(payload, "unit", "unit"))
+    parts.append(_label_payload(payload, "sign_convention", "sign"))
+    identity = payload.get("identity")
+    if isinstance(identity, dict):
+        changed = identity.get("changed_fields") or []
+        if changed:
+            parts.append("identity " + ", ".join(str(item) for item in changed))
+    return "; ".join(parts) + "."
+
+
+def _join_grounding(text: str, card: dict[str, Any] | None) -> str:
+    extra = _format_card_text(card or {})
+    if not extra:
+        return text
+    base = text.rstrip()
+    if not base.endswith("."):
+        base += "."
+    return f"{base} {extra}."
+
+
+def _format_answer(
+    tool_name: RiskToolName,
+    payload: dict[str, Any],
+    card: dict[str, Any] | None = None,
+) -> str:
     if tool_name == RiskToolName.GET_PORTFOLIO_SUMMARY:
-        return (
+        text = (
             f"Portfolio market value is {_fmt(payload.get('market_value'))}; "
             f"99% VaR is {_fmt(payload.get('var_99'))}; "
             f"99% Expected Shortfall is {_fmt(payload.get('expected_shortfall_99'))}."
         )
+        return _join_grounding(text, card)
     if tool_name == RiskToolName.GET_VAR_ES:
         methods = payload.get("methods") or []
         parts = []
@@ -745,37 +1011,38 @@ def _format_answer(tool_name: RiskToolName, payload: dict[str, Any]) -> str:
                 parts.append(f"{label} {float(confidence) * 100:.0f}% VaR is {var_value}")
             if item.get("expected_shortfall") is not None:
                 parts[-1] += f" and Expected Shortfall is {_fmt(item.get('expected_shortfall'))}"
-        return "; ".join(parts) + "." if parts else "No VaR/ES methods returned."
+        text = "; ".join(parts) + "." if parts else "No VaR/ES methods returned."
+        return _join_grounding(text, card)
     if tool_name == RiskToolName.GET_WORST_STRESS:
         scenario = payload.get("worst_scenario")
         loss = payload.get("worst_loss")
         if scenario is None:
-            return "No stress scenarios returned."
-        return f"Worst stress scenario is {scenario} with loss {_fmt(loss)}."
+            text = "No stress scenarios returned."
+        else:
+            text = f"Worst stress scenario is {scenario} with loss {_fmt(loss)}."
+        return _join_grounding(text, card)
     if tool_name == RiskToolName.GET_LIMITS:
         limits = payload.get("limits") or []
         breaches = [item for item in limits if item.get("breached")]
-        return f"{len(breaches)} limit breaches from {len(limits)} evaluated limits."
+        text = f"{len(breaches)} limit breaches from {len(limits)} evaluated limits."
+        return _join_grounding(text, card)
     if tool_name == RiskToolName.GET_CONTRIBUTORS:
         contributors = payload.get("contributors") or []
         if not contributors:
-            return "No risk contributors returned."
-        names = [
-            f"{item.get('label', item.get('position_id'))} {float(item.get('contribution_pct', 0.0)):.1f}%"
-            for item in contributors
-        ]
-        return "Top risk contributors: " + ", ".join(names) + "."
+            text = "No risk contributors returned."
+        else:
+            names = [
+                f"{item.get('label', item.get('position_id'))} {float(item.get('contribution_pct', 0.0)):.1f}%"
+                for item in contributors
+            ]
+            text = "Top risk contributors: " + ", ".join(names) + "."
+        return _join_grounding(text, card)
     if tool_name in (
         RiskToolName.EXPLAIN_RISK_CHANGE,
         RiskToolName.COMPARE_RISK_RUNS,
     ):
-        return (
-            f"Metric {payload.get('metric')} changed from {_fmt(payload.get('previous_risk'))} "
-            f"to {_fmt(payload.get('current_risk'))} "
-            f"(total {_fmt(payload.get('total_change'))}); "
-            f"residual {_fmt(payload.get('residual'))}."
-        )
-    return _format_c1_answer(tool_name, payload)
+        return _join_grounding(_format_risk_change_answer(payload), card)
+    return _join_grounding(_format_c1_answer(tool_name, payload), card)
 
 
 def _intent_for_tool(tool_name: RiskToolName) -> str:
