@@ -75,6 +75,7 @@ async def lifespan(app: FastAPI):
         worker.ensure_running()
 
     app.state.risk_run_worker = worker
+    service.risk_run_worker = worker
     service.risk_run_compare = worker.compare_runs
     yield
     worker.shutdown(wait=False)
