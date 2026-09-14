@@ -113,13 +113,16 @@ export function ScenarioBuilder({ portfolio }) {
         </button>
       </div>
       {payloadPreview && (
-        <div className="muted foot scenario-payload-preview">
-          API shocks: equity {equityAmt ?? '—'} · vol {volAmt ?? '—'}
-          {' · '}rates {rateAmt != null ? `${rateAmt} (decimal)` : '—'}
-          {' · '}fx {fxAmt ?? '—'}
-          {' · '}max loss {percent(payloadPreview.max_loss_pct)}
-          {' · '}{payloadPreview.shocks.length} factor(s)
-        </div>
+        <details className="tech-details scenario-payload-preview" data-testid="scenario-api-payload">
+          <summary>API payload</summary>
+          <p className="muted foot">
+            API shocks: equity {equityAmt ?? '—'} · vol {volAmt ?? '—'}
+            {' · '}rates {rateAmt != null ? `${rateAmt} (decimal)` : '—'}
+            {' · '}fx {fxAmt ?? '—'}
+            {' · '}max loss {percent(payloadPreview.max_loss_pct)}
+            {' · '}{payloadPreview.shocks.length} factor(s)
+          </p>
+        </details>
       )}
       {error && <div className="error risk-run-error">{error}</div>}
       {!result && !error && <div className="muted foot">No scenario run yet</div>}

@@ -86,8 +86,8 @@ def create_risk_run(
     """Create a QUEUED risk run and execute it on an in-process worker thread.
 
     Available at ``/risk/runs`` and ``/api/v1/risk/runs`` (M7.2 dual-mount).
-    Persistence: in-memory by default; SQLAlchemy when RISKFORGE_DATABASE_URL
-    is set at app lifespan (M5.6). When RISKFORGE_EXTERNAL_WORKER=1 (Compose
+    Persistence: in-memory by default; SQLAlchemy when QUANTLINEAGE_DATABASE_URL
+    is set at app lifespan (M5.6). When QUANTLINEAGE_EXTERNAL_WORKER=1 (Compose
     backend), the run stays QUEUED until ``python -m app.worker`` polls it (M5.7).
     Shared profile stamps the Bearer principal as run owner (RF-014).
     """

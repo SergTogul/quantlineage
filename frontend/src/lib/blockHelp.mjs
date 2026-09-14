@@ -1,7 +1,7 @@
 /**
  * Help copy for analysis card "?" popovers.
  * Sole source of block explanations — keep UI out of this file.
- * Tone: technical — what is shown and how RiskForge calculates it.
+ * Tone: technical — what is shown and how QuantLineage calculates it.
  */
 
 const entries = {

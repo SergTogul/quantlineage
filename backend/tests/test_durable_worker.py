@@ -38,11 +38,11 @@ def _wait_worker(worker: RiskRunWorker, run_id: str, *, timeout_s: float=30.0):
     raise AssertionError(f'run {run_id} did not finish; last={last}')
 
 def test_external_worker_env_flag(monkeypatch):
-    monkeypatch.delenv('RISKFORGE_EXTERNAL_WORKER', raising=False)
+    monkeypatch.delenv('QUANTLINEAGE_EXTERNAL_WORKER', raising=False)
     assert external_worker_enabled() is False
-    monkeypatch.setenv('RISKFORGE_EXTERNAL_WORKER', '1')
+    monkeypatch.setenv('QUANTLINEAGE_EXTERNAL_WORKER', '1')
     assert external_worker_enabled() is True
-    monkeypatch.setenv('RISKFORGE_EXTERNAL_WORKER', 'true')
+    monkeypatch.setenv('QUANTLINEAGE_EXTERNAL_WORKER', 'true')
     assert external_worker_enabled() is True
 
 def test_list_by_status_memory_fifo():
@@ -93,7 +93,7 @@ def test_submit_execute_true_returns_stable_queued_acceptance_snapshot(tiny_port
     assert done.results[0].result_type == 'summary'
 
 def test_external_worker_env_defers_execution(monkeypatch, tiny_portfolio, tmp_path):
-    monkeypatch.setenv('RISKFORGE_EXTERNAL_WORKER', '1')
+    monkeypatch.setenv('QUANTLINEAGE_EXTERNAL_WORKER', '1')
     url = f"sqlite:///{tmp_path / 'm57_ext.db'}"
     factory = make_sqlite_session_factory(url)
     svc = PortfolioService(create_pricing_engine(), HistoricalRiskEngine(), market_data=FixedMarketProvider(equity_spot_market('AAPL', 190.0)))

@@ -6,7 +6,7 @@
 
 ## Context
 
-RiskForge needs durable storage for portfolios, trades, market snapshots,
+QuantLineage needs durable storage for portfolios, trades, market snapshots,
 scenario definitions, risk runs/results, and limit definitions. Pricing uses
 QuantLib at runtime; those handles are not serializable and must not be stored.
 
@@ -16,7 +16,7 @@ QuantLib at runtime; those handles are not serializable and must not be stored.
  session/config, repository interfaces + SQLAlchemy implementations).
 2. Use **SQLAlchemy 2.0** + **Alembic** for schema migrations.
 3. Prefer **PostgreSQL** in Compose / production via
- ``RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@…/riskforge``.
+ ``QUANTLINEAGE_DATABASE_URL=postgresql+psycopg://quantlineage:quantlineage@…/quantlineage``.
 4. Unit tests use **SQLite** (``create_all`` and/or Alembic upgrade) so live
  Postgres is not required for the default pytest suite. CI also runs a
  dedicated ``postgres-smoke`` job (service container +
@@ -43,7 +43,7 @@ QuantLib at runtime; those handles are not serializable and must not be stored.
 
 ## Consequences
 
-- FastAPI DI ( **DONE**): when ``RISKFORGE_DATABASE_URL`` is set, lifespan
+- FastAPI DI ( **DONE**): when ``QUANTLINEAGE_DATABASE_URL`` is set, lifespan
  builds a SQLAlchemy session factory, seeds ``SAMPLE_PORTFOLIO``, a sample
  market snapshot (``position_marks``), ``DEFAULT_SCENARIOS`` +
  ``THREAT_SCENARIOS``, and ``DEFAULT_LIMITS``, and wires
@@ -67,11 +67,11 @@ QuantLib at runtime; those handles are not serializable and must not be stored.
  ``RiskRunWorker`` + SQLAlchemy session factory as API lifespan). ``poll_once``
  calls ``claim_queued``: on PostgreSQL, ``SELECT … FOR UPDATE SKIP LOCKED``
  then QUEUED→RUNNING so concurrent workers do not race; SQLite/unit path uses
- FIFO claim without skip-locked. Backend sets ``RISKFORGE_EXTERNAL_WORKER=1``
+ FIFO claim without skip-locked. Backend sets ``QUANTLINEAGE_EXTERNAL_WORKER=1``
  so HTTP enqueues only. Local/default remains in-process ``ThreadPoolExecutor``.
  Redis/RQ not required for claim safety. Compose ships one worker by default.
 - Apply Alembic before first use: ``alembic upgrade head`` (or
  ``docker compose run --rm backend alembic upgrade head``).
 - Local / CI Postgres smoke: ``./scripts/smoke_postgres.sh`` (requires
- ``RISKFORGE_DATABASE_URL``). GitHub-hosted runner evidence is recorded in
+ ``QUANTLINEAGE_DATABASE_URL``). GitHub-hosted runner evidence is recorded in
  ``ROADMAP.md``.

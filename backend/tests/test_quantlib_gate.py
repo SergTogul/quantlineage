@@ -12,9 +12,9 @@ def test_import_quantlib_returns_installed_module():
 
 
 def test_quantlib_required_reads_env(monkeypatch):
-    monkeypatch.delenv("RISKFORGE_REQUIRE_QUANTLIB", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_REQUIRE_QUANTLIB", raising=False)
     assert quantlib_required() is False
-    monkeypatch.setenv("RISKFORGE_REQUIRE_QUANTLIB", "1")
+    monkeypatch.setenv("QUANTLINEAGE_REQUIRE_QUANTLIB", "1")
     assert quantlib_required() is True
-    monkeypatch.setenv("RISKFORGE_REQUIRE_QUANTLIB", "true")
+    monkeypatch.setenv("QUANTLINEAGE_REQUIRE_QUANTLIB", "true")
     assert quantlib_required() is True

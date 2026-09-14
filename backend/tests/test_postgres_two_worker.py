@@ -1,7 +1,7 @@
 """R0.12.4 nightly — live Postgres two-worker claim (SKIP LOCKED).
 
-Local (``CI`` and ``RISKFORGE_NIGHTLY`` unset): skip if the DSN is missing or
-unreachable. When ``RISKFORGE_NIGHTLY`` is set, fail if the DSN is missing or
+Local (``CI`` and ``QUANTLINEAGE_NIGHTLY`` unset): skip if the DSN is missing or
+unreachable. When ``QUANTLINEAGE_NIGHTLY`` is set, fail if the DSN is missing or
 unreachable. When ``CI`` is set and a postgresql DSN is offered, fail if it is
 unreachable (the GHA skip-green hole). ``CI`` plus an unset DSN still skips so
 PR ``backend-pytest`` is not broken. Does not change PR ``postgres-persistence-smoke``.
@@ -47,19 +47,19 @@ def _postgres_reachable(url: str) -> bool:
 def require_live_postgres() -> str:
     """Return a reachable postgresql DSN, or skip/fail per env.
 
-    * Local (``CI`` and ``RISKFORGE_NIGHTLY`` unset): skip if missing/unreachable.
-    * ``RISKFORGE_NIGHTLY`` set: fail if missing or unreachable.
+    * Local (``CI`` and ``QUANTLINEAGE_NIGHTLY`` unset): skip if missing/unreachable.
+    * ``QUANTLINEAGE_NIGHTLY`` set: fail if missing or unreachable.
     * ``CI`` set and a postgresql DSN is offered: fail if unreachable.
     * ``CI`` set and DSN missing: skip (PR ``backend-pytest`` has no Postgres).
     """
     ci = _env_flag('CI')
-    nightly = _env_flag('RISKFORGE_NIGHTLY')
+    nightly = _env_flag('QUANTLINEAGE_NIGHTLY')
     url = _configured_postgres_url()
     if url and _postgres_reachable(url):
         return url
     if nightly or (ci and url):
         detail = 'unreachable' if url else 'missing'
-        pytest.fail(f'RISKFORGE_DATABASE_URL must be a reachable postgresql DSN when CI or RISKFORGE_NIGHTLY is set ({detail})')
+        pytest.fail(f'QUANTLINEAGE_DATABASE_URL must be a reachable postgresql DSN when CI or QUANTLINEAGE_NIGHTLY is set ({detail})')
     pytest.skip('live Postgres required (nightly GHA service; local docker optional — see BUILD_NOTES / .github/workflows/nightly.yml)')
 
 def _factory():

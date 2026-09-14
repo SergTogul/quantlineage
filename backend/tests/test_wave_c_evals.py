@@ -270,7 +270,7 @@ def test_c6_api_key_secret_request(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_c6_mcp_authorization_env_refusal_is_discarded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_MCP_AUTHORIZATION", _MCP_SECRET)
+    monkeypatch.setenv("QUANTLINEAGE_MCP_AUTHORIZATION", _MCP_SECRET)
     modeled, modeled_service = _model_answer(
         "What is 99% VaR?",
         _ScriptedModel(

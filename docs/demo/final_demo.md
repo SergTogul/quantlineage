@@ -33,9 +33,9 @@ To regenerate the committed artifact intentionally:
 
 ```bash
 cd backend
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_PRICING_CACHE=0 \
-  RISKFORGE_CURVE_CACHE=0 RISKFORGE_SCENARIO_CACHE=0 \
-  RISKFORGE_SCENARIO_KERNEL=python \
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin QUANTLINEAGE_PRICING_CACHE=0 \
+  QUANTLINEAGE_CURVE_CACHE=0 QUANTLINEAGE_SCENARIO_CACHE=0 \
+  QUANTLINEAGE_SCENARIO_KERNEL=python \
   .venv/bin/python -m app.demo.run_demo_risk \
   --check -o ../data/demo_risk_artifact.json
 ```
@@ -46,13 +46,13 @@ Expected stable artifact: `data/demo_risk_artifact.json` with sorted keys and ro
 
 The screenshots below were captured from the local app against the deterministic demo API path.
 
-![Overview](riskforge_demo_01_overview.png)
+![Overview](quantlineage_demo_01_overview.png)
 
-![Portfolio](riskforge_demo_02_portfolio.png)
+![Portfolio](quantlineage_demo_02_portfolio.png)
 
-![VaR and ES](riskforge_demo_03_var_es.png)
+![VaR and ES](quantlineage_demo_03_var_es.png)
 
-![Stress](riskforge_demo_04_stress.png)
+![Stress](quantlineage_demo_04_stress.png)
 
 ## Expected Ranges
 
@@ -82,17 +82,17 @@ These QuantLib bands are CI guardrails against a wrong engine or empty book, not
 
 2. Open the default Cross-Asset book.
    Command/API: `GET /api/v1/portfolio` or `GET /api/v1/portfolios/global-macro`.
-   Screenshot: `riskforge_demo_02_portfolio.png`.
+   Screenshot: `quantlineage_demo_02_portfolio.png`.
    Talk track: firm/desk/strategy/book metadata is part of the sample book.
 
 3. Show risk summary and VaR/ES.
    Artifact section: `portfolios[].summary` and `portfolios[].var_report`.
-   Screenshot: `riskforge_demo_03_var_es.png`.
+   Screenshot: `quantlineage_demo_03_var_es.png`.
    Talk track: Historical VaR uses the packaged synthetic replay; methodology is `DELTA_GAMMA` in the artifact.
 
 4. Show stress scenarios.
    Artifact section: `portfolios[].stress`.
-   Screenshot: `riskforge_demo_04_stress.png`.
+   Screenshot: `quantlineage_demo_04_stress.png`.
    Talk track: default scenarios are deterministic scenario definitions; the artifact omits per-position stress detail to stay small.
 
 5. Close with reproducibility.

@@ -23,7 +23,7 @@ from app.sample import SAMPLE_PORTFOLIO, demo_market_snapshot
 
 @pytest.fixture
 def clear_db_url(monkeypatch):
-    monkeypatch.delenv("RISKFORGE_DATABASE_URL", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_DATABASE_URL", raising=False)
 
 
 def test_get_stress_scenarios_from_memory_repo(clear_db_url):
@@ -46,7 +46,7 @@ def test_get_stress_scenarios_from_memory_repo(clear_db_url):
 
 def test_get_stress_scenarios_from_sqlalchemy(monkeypatch, tmp_path):
     """DATABASE_URL set → GET serves SQLAlchemy scenario_definitions."""
-    monkeypatch.setenv("RISKFORGE_DATABASE_URL", f"sqlite:///{tmp_path / 'm59_scenarios.db'}")
+    monkeypatch.setenv("QUANTLINEAGE_DATABASE_URL", f"sqlite:///{tmp_path / 'm59_scenarios.db'}")
     from app.main import app
 
     expected_ids = {s.id for s in default_seed_scenarios()}

@@ -36,7 +36,7 @@ FORBIDDEN_SERVICE_CACHE_MARKERS = (
 
 @pytest.fixture
 def clear_db_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("RISKFORGE_DATABASE_URL", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_DATABASE_URL", raising=False)
 
 
 def _call_name(func: ast.expr) -> str | None:

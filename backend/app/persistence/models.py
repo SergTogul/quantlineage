@@ -53,7 +53,7 @@ class PortfolioRow(Base):
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
-    firm: Mapped[str] = mapped_column(String(128), nullable=False, default="RiskForge")
+    firm: Mapped[str] = mapped_column(String(128), nullable=False, default="QuantLineage")
     desk: Mapped[str] = mapped_column(String(128), nullable=False, default="Global Macro")
     strategy: Mapped[str] = mapped_column(String(128), nullable=False, default="Multi-Asset")
     # Server-owned monotonic version (R0.8.8). Create starts at 1.

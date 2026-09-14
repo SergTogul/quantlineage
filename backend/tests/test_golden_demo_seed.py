@@ -20,7 +20,7 @@ from app.sample import DEMO_PORTFOLIOS, SAMPLE_PORTFOLIO
 
 @pytest.fixture
 def sqlite_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
-    monkeypatch.delenv("RISKFORGE_DATABASE_URL", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_DATABASE_URL", raising=False)
     db_path = tmp_path / "golden-demo.db"
     return f"sqlite:///{db_path}"
 

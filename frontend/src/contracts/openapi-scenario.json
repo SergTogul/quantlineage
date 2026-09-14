@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "RiskForge API",
+    "title": "QuantLineage API",
     "version": "0.3.0"
   },
   "paths": {
@@ -27,7 +27,7 @@
                     "portfolio": {
                       "id": "demo-book",
                       "name": "Demo Book",
-                      "firm": "RiskForge",
+                      "firm": "QuantLineage",
                       "desk": "Global Macro",
                       "strategy": "Multi-Asset",
                       "positions": [
@@ -133,7 +133,7 @@
                     "portfolio": {
                       "id": "demo-book",
                       "name": "Demo Book",
-                      "firm": "RiskForge",
+                      "firm": "QuantLineage",
                       "desk": "Global Macro",
                       "strategy": "Multi-Asset",
                       "positions": [
@@ -165,7 +165,7 @@
                     "hedged_portfolio": {
                       "id": "demo-book-hedged",
                       "name": "Demo Book (hedged)",
-                      "firm": "RiskForge",
+                      "firm": "QuantLineage",
                       "desk": "Global Macro",
                       "strategy": "Multi-Asset",
                       "positions": [
@@ -325,7 +325,7 @@
                     "portfolio": {
                       "id": "demo-book",
                       "name": "Demo Book",
-                      "firm": "RiskForge",
+                      "firm": "QuantLineage",
                       "desk": "Global Macro",
                       "strategy": "Multi-Asset",
                       "positions": [

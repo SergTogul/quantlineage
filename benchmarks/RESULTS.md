@@ -5,7 +5,7 @@
 SLA below — not under an HTTP end-to-end VaR latency claim.
 
  wires this kernel into LINEAR/DELTA_GAMMA approximate P&L behind
-`RISKFORGE_SCENARIO_KERNEL`. parallel results follow the serial baseline.
+`QUANTLINEAGE_SCENARIO_KERNEL`. parallel results follow the serial baseline.
 
 Do **not** cite these numbers as multi-tenant capacity planning or HTTP risk-run
 guarantees. Absolute milliseconds move with CPU/thermal; the published SLA uses
@@ -17,7 +17,7 @@ guarantees. Absolute milliseconds move with CPU/thermal; the published SLA uses
 
 **Claim (Lead Architect + C++ Performance, 2026-09-02):** On the documented
 reference host class, the **native nested-loop scenario kernel** (same ctypes
-ABI Historical VaR uses when `RISKFORGE_SCENARIO_KERNEL=native`) meets:
+ABI Historical VaR uses when `QUANTLINEAGE_SCENARIO_KERNEL=native`) meets:
 
 | ID | Requirement | Floor | Measurement |
 |----|-------------|------:|-------------|
@@ -86,7 +86,7 @@ Every implementation under comparison accepts and returns the same contract as
 |------|-------------|------------|--------|
 | `python` | `PythonScenarioKernel.pnl` | Nested `O(E×S)` | Reference |
 | `numpy` | `benchmarks/run_scenario_bench.py::numpy_pnl` | Strength-reduced `O(E+S)` after packing | Same I/O + numerical result; **not** same asymptotic work |
-| `cpp_ctypes` | `NativeScenarioKernel.pnl` → `riskforge_portfolio_scenarios` | Nested `O(E×S)` + Python packing/FFI | Realistic ctypes overhead |
+| `cpp_ctypes` | `NativeScenarioKernel.pnl` → `quantlineage_portfolio_scenarios` | Nested `O(E×S)` + Python packing/FFI | Realistic ctypes overhead |
 | `cpp_header` | `backend/native/src/benchmark.cpp` → `portfolio_scenarios` | Nested `O(E×S)` in-process | Raw kernel; no Python marshalling |
 
 Harness inputs are deterministic constants matching the C++ CLI defaults
@@ -193,7 +193,7 @@ Wall times are for the timed region only (warmup excluded). Throughput
 ranges. Prefer `std::jthread` when `__cpp_lib_jthread` is defined; otherwise
 `std::thread` + join-on-scope-exit. **Not OpenMP** (Apple Clang often lacks
 bundled `libomp`; mixing runtimes is forbidden).
-**Env:** `RISKFORGE_KERNEL_THREADS` / harness `--threads N --parallel-compare`.
+**Env:** `QUANTLINEAGE_KERNEL_THREADS` / harness `--threads N --parallel-compare`.
 
 ### Why this strategy
 
@@ -267,7 +267,7 @@ backend/.venv/bin/python benchmarks/run_scenario_bench.py \
 - Hyperthreading / power limits / antivirus can flatten speedups.
 - HTTP / 1×N Historical VaR wall time is **not** claimed from this table;
  SLA-K2 is the parallel ctypes floor only.
-- macOS Apple Clang 14 used `std::thread` fallback (`RISKFORGE_HAS_JTHREAD=0`);
+- macOS Apple Clang 14 used `std::thread` fallback (`QUANTLINEAGE_HAS_JTHREAD=0`);
  Linux libstdc++ typically uses `std::jthread` — same partition math either way.
 
 ---

@@ -128,7 +128,7 @@ class Workload:
 
 
 def _quantlib_required() -> bool:
-    return os.environ.get("RISKFORGE_REQUIRE_QUANTLIB", "").strip().lower() in _TRUTHY
+    return os.environ.get("QUANTLINEAGE_REQUIRE_QUANTLIB", "").strip().lower() in _TRUTHY
 
 
 def _peak_rss_kib() -> float:
@@ -239,7 +239,7 @@ def _try_make_engine(engine_name: str) -> tuple[Any, str | None]:
     except ImportError as exc:
         if _quantlib_required():
             raise RuntimeError(
-                "QuantLib is required (RISKFORGE_REQUIRE_QUANTLIB=1) but could not "
+                "QuantLib is required (QUANTLINEAGE_REQUIRE_QUANTLIB=1) but could not "
                 "be imported."
             ) from exc
         return None, "QuantLib is not installed"
@@ -359,8 +359,8 @@ def environment_metadata(*, worker_count: int = 1) -> dict[str, Any]:
         "quantlib": ql_version,
         "logical_cpus": os.cpu_count(),
         "worker_count": worker_count,
-        "kernel_threads": os.environ.get("RISKFORGE_KERNEL_THREADS"),
-        "pricing_engine_env": os.environ.get("RISKFORGE_PRICING_ENGINE"),
+        "kernel_threads": os.environ.get("QUANTLINEAGE_KERNEL_THREADS"),
+        "pricing_engine_env": os.environ.get("QUANTLINEAGE_PRICING_ENGINE"),
         "note": (
             "In-process worker_count=1. QuantLib is process-serialized (ADR 007). "
             "Not an HTTP SLA; SLA-K1/K2 unchanged/post-R0."

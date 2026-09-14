@@ -117,9 +117,9 @@ def test_compose_worker_is_distinct_process_from_api():
     assert 'worker' in bodies
     backend = '\n'.join(bodies['backend'])
     worker = '\n'.join(bodies['worker'])
-    assert 'RISKFORGE_EXTERNAL_WORKER' in backend
+    assert 'QUANTLINEAGE_EXTERNAL_WORKER' in backend
     assert re.search('python",\\s*"-m",\\s*"app\\.worker"', worker) or 'python -m app.worker' in worker
-    assert 'RISKFORGE_EXTERNAL_WORKER' not in worker
+    assert 'QUANTLINEAGE_EXTERNAL_WORKER' not in worker
     assert 'app.worker' not in backend
     assert 'app.main' not in worker
 

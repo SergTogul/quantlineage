@@ -2,14 +2,14 @@
 
 Local demo (loopback bind, default Compose) stays unauthenticated.
 
-A shared / non-loopback profile is active when ``RISKFORGE_SHARED_DEPLOYMENT``
-is truthy or ``RISKFORGE_BIND`` is set to an address outside
+A shared / non-loopback profile is active when ``QUANTLINEAGE_SHARED_DEPLOYMENT``
+is truthy or ``QUANTLINEAGE_BIND`` is set to an address outside
 ``{127.0.0.1, localhost, ::1}``. That profile fails closed without
-``RISKFORGE_API_TOKEN`` or ``RISKFORGE_API_TOKENS`` and rejects
+``QUANTLINEAGE_API_TOKEN`` or ``QUANTLINEAGE_API_TOKENS`` and rejects
 unauthenticated API requests with 401.
 
-``RISKFORGE_API_TOKENS`` is ``principal:token`` pairs (comma-separated).
-``RISKFORGE_API_TOKEN`` still maps to ``RISKFORGE_API_PRINCIPAL`` (default
+``QUANTLINEAGE_API_TOKENS`` is ``principal:token`` pairs (comma-separated).
+``QUANTLINEAGE_API_TOKEN`` still maps to ``QUANTLINEAGE_API_PRINCIPAL`` (default
 ``shared``). This is not OIDC, SSO, or production IAM.
 """
 
@@ -25,11 +25,11 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api.errors import error_payload
 
-ENV_SHARED_DEPLOYMENT = "RISKFORGE_SHARED_DEPLOYMENT"
-ENV_API_TOKEN = "RISKFORGE_API_TOKEN"
-ENV_API_TOKENS = "RISKFORGE_API_TOKENS"
-ENV_API_PRINCIPAL = "RISKFORGE_API_PRINCIPAL"
-ENV_BIND = "RISKFORGE_BIND"
+ENV_SHARED_DEPLOYMENT = "QUANTLINEAGE_SHARED_DEPLOYMENT"
+ENV_API_TOKEN = "QUANTLINEAGE_API_TOKEN"
+ENV_API_TOKENS = "QUANTLINEAGE_API_TOKENS"
+ENV_API_PRINCIPAL = "QUANTLINEAGE_API_PRINCIPAL"
+ENV_BIND = "QUANTLINEAGE_BIND"
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
@@ -37,8 +37,8 @@ DEFAULT_PRINCIPAL = "shared"
 
 UNAUTHORIZED_MESSAGE = "Authentication required"
 BOOT_ERROR = (
-    "Shared/non-loopback deployment requires RISKFORGE_API_TOKEN "
-    "or RISKFORGE_API_TOKENS. "
+    "Shared/non-loopback deployment requires QUANTLINEAGE_API_TOKEN "
+    "or QUANTLINEAGE_API_TOKENS. "
     "Local demo (loopback bind, default Compose) stays unauthenticated. "
     "This token gate is not production IAM."
 )
@@ -104,7 +104,7 @@ def api_token() -> str | None:
 def configured_principals() -> list[tuple[str, str]]:
     """Return ``(principal, token)`` pairs from env. First match wins.
 
-    ``RISKFORGE_API_TOKENS`` is consulted first. ``RISKFORGE_API_TOKEN`` is
+    ``QUANTLINEAGE_API_TOKENS`` is consulted first. ``QUANTLINEAGE_API_TOKEN`` is
     appended only when that secret is not already in the map, so filling
     both with the same value cannot remap Alice to principal ``shared``.
     """

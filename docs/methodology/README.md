@@ -1,10 +1,10 @@
 # Risk Methodology
 
-This page is the interviewer-facing methodology overview for RiskForge. It describes implemented behavior and important assumptions at a level suitable for review; source code and tests remain the authority for exact numerical details.
+This page is the interviewer-facing methodology overview for QuantLineage. It describes implemented behavior and important assumptions at a level suitable for review; source code and tests remain the authority for exact numerical details.
 
 ## VaR And Expected Shortfall
 
-RiskForge supports historical-style and parametric VaR/Expected Shortfall workflows through deterministic risk engines.
+QuantLineage supports historical-style and parametric VaR/Expected Shortfall workflows through deterministic risk engines.
 
 ### Historical Methodology Modes
 
@@ -51,7 +51,7 @@ Curve and volatility surface support is deterministic and local. Curve bootstrap
 
 ## AI Orchestration Guardrails
 
-RiskForge’s natural-language risk path is deterministic today. The query engine chooses from explicit tool contracts backed by `PortfolioService` methods, executes deterministic code, and formats answers from returned payloads.
+QuantLineage’s natural-language risk path is deterministic today. The query engine chooses from explicit tool contracts backed by `PortfolioService` methods, executes deterministic code, and formats answers from returned payloads.
 
 Guardrails:
 

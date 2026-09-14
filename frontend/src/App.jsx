@@ -91,8 +91,8 @@ export default function App() {
         <main>
           <header>
             <div>
-              <h1>{data?.portfolio?.name || 'RiskForge'}</h1>
-              <div className="muted">Institutional Portfolio & Derivatives Risk</div>
+              <h1>{data?.portfolio?.name || 'QuantLineage'}</h1>
+              <div className="muted">AI-Powered Multi-Asset Risk & Attribution Platform</div>
             </div>
           </header>
           <SectionFrame id="market-data">
@@ -110,7 +110,7 @@ export default function App() {
       <div className="app-shell">
         <AppNav active={section} onSelect={selectSection} theme={theme} onThemeChange={selectTheme} />
         <main>
-          <h1>RiskForge</h1>
+          <h1>QuantLineage</h1>
           <div className="error">API error: {error}</div>
         </main>
       </div>
@@ -121,7 +121,7 @@ export default function App() {
       <div className="app-shell">
         <AppNav active={section} onSelect={selectSection} theme={theme} onThemeChange={selectTheme} />
         <main>
-          <h1>RiskForge</h1>
+          <h1>QuantLineage</h1>
           <div className="muted">Loading portfolio risk…</div>
           <div className="skel-strip" aria-hidden="true" />
         </main>
@@ -273,7 +273,7 @@ export default function App() {
         <header>
           <div>
             <h1>{portfolio.name}</h1>
-            <div className="muted">Institutional Portfolio & Derivatives Risk</div>
+            <div className="muted">AI-Powered Multi-Asset Risk & Attribution Platform</div>
           </div>
         </header>
         {body}

@@ -1,4 +1,4 @@
-# RiskForge CI — honest gates matching README / BUILD_NOTES commands.
+# QuantLineage CI — honest gates matching README / BUILD_NOTES commands.
 #
 # Jobs: backend-pytest, backend-quantlib-hard-gate (R0.1.6), PR-FAST (R0.12.1),
 # PR-FULL (R0.12.2), postgres-smoke, frontend-test-build, lint (M9.7),
@@ -63,7 +63,7 @@ jobs:
       - name: Run pytest
         env:
           PYTHONPATH: .
-          RISKFORGE_PRICING_ENGINE: ${{ steps.pricing.outputs.engine }}
+          QUANTLINEAGE_PRICING_ENGINE: ${{ steps.pricing.outputs.engine }}
         run: pytest -q
 
       # Explicit native compile check (g++ is present on ubuntu-latest).
@@ -114,8 +114,8 @@ jobs:
       - name: QuantLib goldens and adapter tests (skips fail)
         env:
           PYTHONPATH: .
-          RISKFORGE_PRICING_ENGINE: quantlib
-          RISKFORGE_REQUIRE_QUANTLIB: "1"
+          QUANTLINEAGE_PRICING_ENGINE: quantlib
+          QUANTLINEAGE_REQUIRE_QUANTLIB: "1"
         run: |
           pytest -q \
             tests/test_quantlib_golden.py \
@@ -162,7 +162,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: .
-          RISKFORGE_PRICING_ENGINE: builtin
+          QUANTLINEAGE_PRICING_ENGINE: builtin
         run: |
           pytest -q \
             tests/test_var_es_golden.py \
@@ -199,13 +199,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: riskforge
-          POSTGRES_PASSWORD: riskforge
-          POSTGRES_DB: riskforge
+          POSTGRES_USER: quantlineage
+          POSTGRES_PASSWORD: quantlineage
+          POSTGRES_DB: quantlineage
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U riskforge -d riskforge"
+          --health-cmd "pg_isready -U quantlineage -d quantlineage"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -239,7 +239,7 @@ jobs:
         env:
           PYTHONPATH: .
           # Job runs on the GHA VM (not a job container): service port map → localhost.
-          RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+          QUANTLINEAGE_DATABASE_URL: postgresql+psycopg://quantlineage:quantlineage@localhost:5432/quantlineage
         run: |
           chmod +x ../scripts/smoke_postgres.sh
           # Script: wait-for-pg → alembic upgrade head (backend/migrations/) → seed wiring.
@@ -347,7 +347,7 @@ jobs:
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          # E2E uses RISKFORGE_PRICING_ENGINE=builtin; QuantLib optional.
+          # E2E uses QUANTLINEAGE_PRICING_ENGINE=builtin; QuantLib optional.
           if pip install -r requirements.txt; then
             echo "Installed backend/requirements.txt"
           else

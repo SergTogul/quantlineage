@@ -71,7 +71,7 @@ def _tiny_book(*, spy_qty: float = 100.0, nvda_qty: float = 40.0) -> Portfolio:
     return Portfolio(
         id="cmp-book",
         name="Compare Book",
-        firm="RiskForge",
+        firm="QuantLineage",
         desk="Global Macro",
         strategy="Multi-Asset",
         positions=[
@@ -673,7 +673,7 @@ def _rates_book(*, qty: float = 1.0) -> Portfolio:
     return Portfolio(
         id="cmp-rates",
         name="Rates Book",
-        firm="RiskForge",
+        firm="QuantLineage",
         desk="Rates",
         strategy="Rates",
         positions=[
@@ -695,7 +695,7 @@ def _option_book(*, qty: float = 10.0) -> Portfolio:
     return Portfolio(
         id="cmp-opt",
         name="Option Book",
-        firm="RiskForge",
+        firm="QuantLineage",
         desk="Global Macro",
         strategy="Vol",
         positions=[

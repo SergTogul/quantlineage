@@ -20,8 +20,8 @@ from app.risk.scenario_model import FactorShock, Scenario, ScenarioCategory
 
 @pytest.fixture(autouse=True)
 def _fresh_scenario_memo(monkeypatch):
-    monkeypatch.setenv("RISKFORGE_SCENARIO_CACHE", "1")
-    monkeypatch.setenv("RISKFORGE_SCENARIO_CACHE_SIZE", "64")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_CACHE", "1")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_CACHE_SIZE", "64")
     reset_scenario_result_memo()
     yield
     reset_scenario_result_memo()
@@ -121,7 +121,7 @@ def test_scenario_memo_formal_scenario():
 
 
 def test_scenario_memo_disabled(monkeypatch):
-    monkeypatch.setenv("RISKFORGE_SCENARIO_CACHE", "0")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_CACHE", "0")
     reset_scenario_result_memo()
     base = _market()
     scenario = _stress()

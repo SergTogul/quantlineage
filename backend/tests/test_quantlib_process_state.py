@@ -230,8 +230,8 @@ def test_factory_cache_does_not_reuse_pv_across_iso_as_of(monkeypatch):
     Same 2Y USDLibor payer swap and marks; 2018 then 2024 must return the
     unwrapped 2024 PV, not the 2018 cached PV.
     """
-    monkeypatch.setenv("RISKFORGE_PRICING_ENGINE", "quantlib")
-    monkeypatch.setenv("RISKFORGE_PRICING_CACHE", "1")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_ENGINE", "quantlib")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_CACHE", "1")
     from app.pricing.factory import create_pricing_engine
 
     swap = _swap()

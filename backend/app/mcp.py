@@ -155,7 +155,7 @@ def handle_jsonrpc(
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "riskforge", "version": "0.3.0"},
+                "serverInfo": {"name": "quantlineage", "version": "0.3.0"},
             },
         }
     if method == "tools/list":
@@ -196,7 +196,7 @@ def handle_jsonrpc(
 
 def main() -> int:
     """Optional stdio entry: ``python -m app.mcp``. Does not start an LLM daemon."""
-    authorization = os.environ.get("RISKFORGE_MCP_AUTHORIZATION")
+    authorization = os.environ.get("QUANTLINEAGE_MCP_AUTHORIZATION")
     server = ThinMcpServer(service=_default_service(), portfolio=_default_portfolio())
     for raw in sys.stdin:
         line = raw.strip()

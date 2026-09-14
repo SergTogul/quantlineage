@@ -5,7 +5,7 @@ as SQLAlchemy so ``RiskRunService`` and M5.4 async APIs can run without Postgres
 
 ``InMemoryMarketSnapshotRepository``, ``InMemoryScenarioDefinitionRepository``,
 and ``InMemoryLimitDefinitionRepository`` mirror the SQLAlchemy repos so FastAPI
-DI can serve the same contracts when ``RISKFORGE_DATABASE_URL`` is unset (M5.6).
+DI can serve the same contracts when ``QUANTLINEAGE_DATABASE_URL`` is unset (M5.6).
 """
 
 from __future__ import annotations

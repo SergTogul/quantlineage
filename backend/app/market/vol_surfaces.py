@@ -1,6 +1,6 @@
 """Volatility surface scaffolding (M1.5).
 
-Equity and FX implied-vol grids over expiry × moneyness (K/S). RiskForge-owned
+Equity and FX implied-vol grids over expiry × moneyness (K/S). QuantLineage-owned
 types only — QuantLib Black surfaces may be built later behind pricing adapters
 from ``to_dict()`` / ``vol()``; QL types never leave this module.
 
@@ -209,7 +209,7 @@ def build_fx_vol_surface(pair: str, vol: float) -> VolSurface:
 
 
 def vol_surface_from_dict(payload: Mapping, *, default_name: str) -> VolSurface:
-    """Rebuild a RiskForge surface from a snapshot ``vol_surfaces`` payload."""
+    """Rebuild a QuantLineage surface from a snapshot ``vol_surfaces`` payload."""
     raw_grid = payload.get("grid") or {}
     grid: dict[GridKey, float] = {}
     for key, vol in raw_grid.items():

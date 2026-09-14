@@ -3,7 +3,7 @@
 A green GitHub check whose display name contains PR-FULL must mean the
 production-relevant jobs have all succeeded. This job is a needs:
 aggregator; it must not re-run pytest. The QuantLib hard-gate (R0.1.6)
-must remain a separate mandatory job with RISKFORGE_REQUIRE_QUANTLIB.
+must remain a separate mandatory job with QUANTLINEAGE_REQUIRE_QUANTLIB.
 This is not nightly (R0.12.4) and not native ABI (R0.12.5).
 """
 
@@ -76,8 +76,8 @@ def test_quantlib_hard_gate_still_requires_quantlib():
     text = _workflow_text()
     assert "name: backend-quantlib-hard-gate" in text
     block = _job_block(text, "backend-quantlib")
-    assert "RISKFORGE_REQUIRE_QUANTLIB" in block
-    assert "RISKFORGE_PRICING_ENGINE: quantlib" in block
+    assert "QUANTLINEAGE_REQUIRE_QUANTLIB" in block
+    assert "QUANTLINEAGE_PRICING_ENGINE: quantlib" in block
     assert "requirements-no-ql" not in block
 
 

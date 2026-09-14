@@ -62,16 +62,16 @@ def _assert_pnl_close(actual: np.ndarray, expected: np.ndarray) -> None:
     )
 
 def test_scenario_kernel_backend_default_python(monkeypatch):
-    monkeypatch.delenv("RISKFORGE_SCENARIO_KERNEL", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_SCENARIO_KERNEL", raising=False)
     assert scenario_kernel_backend() == "python"
     assert get_scenario_kernel() is None
 
 def test_scenario_kernel_backend_native_alias(monkeypatch):
-    monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "ctypes")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_KERNEL", "ctypes")
     assert scenario_kernel_backend() == "native"
 
 def test_scenario_kernel_backend_rejects_unknown(monkeypatch):
-    monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "gpu")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_KERNEL", "gpu")
     with pytest.raises(ValueError, match="python|native"):
         scenario_kernel_backend()
 
@@ -157,7 +157,7 @@ def test_native_approximate_pnl_matches_numpy(native_scenario_lib):
 def test_historical_engine_native_var_matches_python(native_scenario_lib, monkeypatch):
     """M6.7: HistoricalRiskEngine LINEAR/DELTA_GAMMA VaR parity under native kernel."""
     lib = native_scenario_lib
-    monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL_LIB", str(lib))
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_KERNEL_LIB", str(lib))
     dataset = ArrayHistoricalDataset(_factor_series())
     pricing = BuiltinPricingEngine()
     py_engine = HistoricalRiskEngine(dataset=dataset, scenario_backend="python")
@@ -179,8 +179,8 @@ def test_historical_engine_native_var_matches_python(native_scenario_lib, monkey
 
 def test_env_native_backend_loads_lib(native_scenario_lib, monkeypatch):
     lib = native_scenario_lib
-    monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "native")
-    monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL_LIB", str(lib))
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_KERNEL", "native")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_KERNEL_LIB", str(lib))
     kernel = get_scenario_kernel()
     assert isinstance(kernel, NativeScenarioKernel)
     series = _factor_series()
@@ -214,10 +214,10 @@ def test_env_native_backend_loads_lib(native_scenario_lib, monkeypatch):
     _assert_pnl_close(via_env, ref)
 
 def test_full_revaluation_path_unaffected_by_native_flag(native_scenario_lib, monkeypatch):
-    """FULL_REVALUATION must ignore RISKFORGE_SCENARIO_KERNEL (no kernel P&L)."""
+    """FULL_REVALUATION must ignore QUANTLINEAGE_SCENARIO_KERNEL (no kernel P&L)."""
     lib = native_scenario_lib
-    monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "native")
-    monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL_LIB", str(lib))
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_KERNEL", "native")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_KERNEL_LIB", str(lib))
     dataset = ArrayHistoricalDataset(_factor_series())
     pricing = BuiltinPricingEngine()
     engine = HistoricalRiskEngine(dataset=dataset)

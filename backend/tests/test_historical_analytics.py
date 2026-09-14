@@ -378,6 +378,7 @@ def test_api_echoes_frozen_identities_without_provider_http():
     assert body["annualization"]["return_method"] == "cagr"
     assert "wealth" in body and len(body["wealth"]) >= 1
     assert body["units"]["var_es"] == "currency_loss"
+    assert body["data_source_label"].startswith("Synthetic replay")
     assert body.get("benchmark") is None
 
 

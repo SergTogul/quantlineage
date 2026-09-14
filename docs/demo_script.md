@@ -32,7 +32,7 @@ No cloud. No live vendors. Local loopback only.
 
 ### 1. Open the deterministic book (~30s)
 
-- Open `http://127.0.0.1:5173`.
+- Open `http://127.0.0.1:5173` (default Overview is the **status** blotter, not alternate layouts).
 - Confirm heading **Global Macro Demo** (catalog id `global-macro`; also `GET /api/v1/portfolios`).
 - **Talk:** this is the cross-asset demo book, not a production desk.
 

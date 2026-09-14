@@ -180,8 +180,8 @@ def test_submit_cannot_overwrite_seeded_global_macro(session_factory):
 def test_http_post_run_cannot_overwrite_seeded_global_macro(monkeypatch, tmp_path):
     """SEC-003 / RF-013: POST /risk/runs with id=global-macro must not clobber seed."""
     db_path = tmp_path / "rf013_global_macro.db"
-    monkeypatch.setenv("RISKFORGE_DATABASE_URL", f"sqlite:///{db_path}")
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_DATABASE_URL", f"sqlite:///{db_path}")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     from app.main import app
 
     attacker = _attacker_global_macro().model_dump(mode="json")

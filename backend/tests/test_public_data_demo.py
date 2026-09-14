@@ -152,7 +152,7 @@ def test_explicit_synthetic_data_mode_keeps_demo_dataset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("QUANTLINEAGE_DATA_MODE", "synthetic")
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     monkeypatch.delenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", raising=False)
     _drop_adapter_modules()
     dataset = create_historical_dataset()
@@ -165,7 +165,7 @@ def test_default_data_mode_unset_does_not_import_or_call_yahoo(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("QUANTLINEAGE_DATA_MODE", raising=False)
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     monkeypatch.delenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", raising=False)
     _drop_adapter_modules()
     dataset = create_historical_dataset()
@@ -202,7 +202,7 @@ def test_public_mode_missing_csv_fails_closed_mentions_freeze_script(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("QUANTLINEAGE_DATA_MODE", "public")
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     monkeypatch.delenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", raising=False)
     with pytest.raises(ValueError, match="build_public_demo_data") as exc:
         create_historical_dataset()
@@ -235,7 +235,7 @@ def test_public_mode_with_frozen_csv_loads_without_adapters(
     csv_path = csvs[0]
     monkeypatch.setenv("QUANTLINEAGE_DATA_MODE", "public")
     monkeypatch.setenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", str(csv_path))
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     _drop_adapter_modules()
     dataset = create_historical_dataset()
     assert dataset.dataset_id == "real:public:wave-a"

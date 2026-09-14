@@ -4,6 +4,7 @@ import BlockHelp from './BlockHelp'
 import { DatedSeriesChart } from './RiskVisuals.jsx'
 import { hashForPanel, hashForSection } from '../lib/nav.mjs'
 import { money } from '../lib/risk.mjs'
+import DataSourceBadge from './DataSourceBadge.jsx'
 
 const DEFAULT_START = '2024-01-02'
 const DEFAULT_END = '2024-11-15'
@@ -99,7 +100,7 @@ function SummaryTable({ result }) {
         <tr>
           <th scope="row">Sharpe</th>
           <td data-testid="ha-sharpe">{result.sharpe == null ? 'undefined' : formatNumber(result.sharpe)}</td>
-          <td>{result.sharpe == null ? 'undefined' : units.volatility}</td>
+          <td data-testid="ha-sharpe-unit">{result.sharpe == null ? 'undefined' : '—'}</td>
         </tr>
         <tr>
           <th scope="row">Observations</th>
@@ -118,9 +119,14 @@ function BenchmarkBlock({ benchmark }) {
     <div className="ha-block" data-testid="ha-benchmark">
       <h3>SPY benchmark</h3>
       <p className="muted">
-        Nested <code>benchmark</code> from the same result — {benchmark.instrument_id} / {benchmark.factor_column}.
-        Relative analytics, not allocation advice.
+        SPY nested in the same analytics result — a relative comparison, not allocation advice.
       </p>
+      <details className="tech-details">
+        <summary>How this benchmark is nested</summary>
+        <p className="muted">
+          Nested <code>benchmark</code> from the same result — {benchmark.instrument_id} / {benchmark.factor_column}.
+        </p>
+      </details>
       <table>
         <thead>
           <tr><th>Metric</th><th>Value</th><th>Unit</th></tr>
@@ -166,6 +172,7 @@ function BenchmarkBlock({ benchmark }) {
       <h4>Benchmark wealth</h4>
       <DatedSeriesChart
         series={benchmark.wealth}
+        unit={units.wealth}
         ariaLabel="SPY benchmark wealth"
         testId="ha-benchmark-wealth-chart"
       />
@@ -221,11 +228,18 @@ export default function HistoricalAnalytics({ portfolio }) {
         <BlockHelp id="historical-analytics" />
       </div>
       <p className="muted" role="note">
-        One backend result powers this page. Changing the range sends a new
-        POST /api/v1/risk/historical-analytics. This terminal formats and charts
-        API fields; it does not recompute returns, vol, Sharpe, beta, or drawdown.
-        Benchmark is requested with include_benchmark true.
+        Portfolio performance and risk over the selected historical window.
       </p>
+      <details className="tech-details">
+        <summary>How this page is calculated</summary>
+        <p className="muted">
+          Changing the range sends a new POST /api/v1/risk/historical-analytics.
+          This terminal formats and charts API fields; it does not recompute
+          returns, vol, Sharpe, beta, or drawdown. Benchmark is requested with
+          include_benchmark true.
+        </p>
+      </details>
+      <DataSourceBadge payload={current ? result : null} />
       <form className="ha-controls" onSubmit={(event) => event.preventDefault()}>
         <label>
           Start date
@@ -255,15 +269,17 @@ export default function HistoricalAnalytics({ portfolio }) {
             <p className="muted ha-notes">{result.notes.join(' · ')}</p>
           ) : null}
           <div className="ha-block">
-            <h3>Cumulative / wealth</h3>
-            <p className="muted">API <code>wealth</code> ({units.wealth}) and <code>cumulative</code> ({units.returns}).</p>
+            <h3>Portfolio wealth</h3>
+            <p className="muted">Wealth and cumulative return over the selected window.</p>
             <DatedSeriesChart
               series={result.wealth}
+              unit={units.wealth}
               ariaLabel="Portfolio wealth"
               testId="ha-wealth-chart"
             />
             <DatedSeriesChart
               series={result.cumulative}
+              unit={units.returns}
               ariaLabel="Cumulative return"
               testId="ha-cumulative-chart"
             />
@@ -271,11 +287,15 @@ export default function HistoricalAnalytics({ portfolio }) {
           <div className="ha-block">
             <h3>Drawdown</h3>
             <p className="muted">
-              API <code>drawdown</code> series and max_drawdown {formatFraction(result.max_drawdown)}
-              {' '}({units.drawdown}). Values are ≤ 0.
+              Peak-to-trough path over the window. Max drawdown {formatFraction(result.max_drawdown)}.
             </p>
+            <details className="tech-details">
+              <summary>Series unit</summary>
+              <p className="muted">API drawdown series ({units.drawdown}). Values are ≤ 0.</p>
+            </details>
             <DatedSeriesChart
               series={result.drawdown}
+              unit={units.drawdown}
               ariaLabel="Drawdown"
               testId="ha-drawdown-chart"
               className="ha-drawdown"
@@ -283,9 +303,10 @@ export default function HistoricalAnalytics({ portfolio }) {
           </div>
           <div className="ha-block">
             <h3>Rolling volatility</h3>
-            <p className="muted">API <code>rolling_volatility</code> ({units.volatility}).</p>
+            <p className="muted">Annualized rolling volatility over the selected window.</p>
             <DatedSeriesChart
               series={result.rolling_volatility}
+              unit={units.volatility}
               ariaLabel="Rolling volatility"
               testId="ha-rolling-chart"
             />
@@ -293,7 +314,7 @@ export default function HistoricalAnalytics({ portfolio }) {
           <BenchmarkBlock benchmark={result.benchmark} />
           <div className="ha-block" data-testid="ha-var-es">
             <h3>VaR / ES</h3>
-            <p className="muted">Currency loss from HistoricalRiskEngine on the sliced window ({units.var_es}).</p>
+            <p className="muted">Historical VaR and Expected Shortfall as currency loss on the sliced window.</p>
             <table>
               <thead>
                 <tr><th>Metric</th><th>Value</th><th>Unit</th></tr>

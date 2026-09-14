@@ -106,7 +106,7 @@ def test_get_run_provenance_matches_persisted_run_fields(client, tiny_portfolio)
 
 
 def test_provenance_omits_release_sha_when_unset(client, tiny_portfolio, monkeypatch):
-    monkeypatch.delenv("RISKFORGE_RELEASE_SHA", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_RELEASE_SHA", raising=False)
     created = client.post(
         "/api/v1/risk/runs",
         json={
@@ -129,7 +129,7 @@ def test_provenance_omits_release_sha_when_unset(client, tiny_portfolio, monkeyp
 
 
 def test_provenance_includes_release_sha_from_env(client, tiny_portfolio, monkeypatch):
-    monkeypatch.setenv("RISKFORGE_RELEASE_SHA", "abc123deadbeef")
+    monkeypatch.setenv("QUANTLINEAGE_RELEASE_SHA", "abc123deadbeef")
     created = client.post(
         "/api/v1/risk/runs",
         json={

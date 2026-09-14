@@ -1,6 +1,6 @@
 # Performance Report
 
-RiskForge has one formal performance claim today: a scoped native scenario-kernel SLA for the C++20 `ctypes` path used by LINEAR and DELTA_GAMMA approximate Historical VaR aggregation.
+QuantLineage has one formal performance claim today: a scoped native scenario-kernel SLA for the C++20 `ctypes` path used by LINEAR and DELTA_GAMMA approximate Historical VaR aggregation.
 
 It does not claim HTTP latency, full-revaluation throughput, multi-tenant capacity, or QuantLib pricing speedups.
 
@@ -57,8 +57,8 @@ backend/.venv/bin/python benchmarks/check_m6_sla.py
 
 ## Operational Notes
 
-- Native kernel usage is opt-in with `RISKFORGE_SCENARIO_KERNEL=native`.
-- `RISKFORGE_KERNEL_THREADS` controls the C++ stdlib partition count; there is no OpenMP path.
+- Native kernel usage is opt-in with `QUANTLINEAGE_SCENARIO_KERNEL=native`.
+- `QUANTLINEAGE_KERNEL_THREADS` controls the C++ stdlib partition count; there is no OpenMP path.
 - C++ builds require a C++20-capable `g++` and include paths documented in [`backend/native/README.md`](../backend/native/README.md).
 - Benchmark scripts live under [`benchmarks/`](../benchmarks/), separate from product unit tests.
 

@@ -3,7 +3,7 @@ import MetricCard from './MetricCard'
 import { FactorExposureHeatmap, HierarchyRiskHeatmap } from './Heatmaps'
 import { Hierarchy } from './Analytics'
 import { RiskQuery } from './ScenarioBuilder'
-import { NAV_SECTIONS } from '../lib/nav.mjs'
+import { NAV_SECTIONS, hashForPanel } from '../lib/nav.mjs'
 import {
   limitStatus, limitStatusCounts, money, overviewBookStatus, overviewCollage,
   overviewExceptions, overviewKpis, overviewTapeRows, stressSummary,
@@ -109,6 +109,13 @@ export function StatusBlotterLayout({
   return (
     <div data-testid="overview-layout-status">
       <BookStatus status={status} onNavigate={onNavigate} />
+      <a
+        className="overview-hero-action"
+        href={hashForPanel('var-es', 'risk-change')}
+        data-testid="overview-risk-change-hero"
+      >
+        Why did my risk change?
+      </a>
       <section className="exception-list" aria-label="Exceptions">
         <h3>Where</h3>
         {exceptions.length ? (

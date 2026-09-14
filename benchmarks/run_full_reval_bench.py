@@ -15,7 +15,7 @@ R0.6.8 reconstruction uses a European option book (spot/vol/rate/div live),
 pins checksums per engine, measures peak RSS in a subprocess per impl, and
 records the builtin vs QuantLib P&L gap at the existing option-match
 ``rel=2e-3``. QuantLib is skip-or-run (fail-closed when
-``RISKFORGE_REQUIRE_QUANTLIB=1``). Do not invoke ``benchmarks/check_m6_sla.py``.
+``QUANTLINEAGE_REQUIRE_QUANTLIB=1``). Do not invoke ``benchmarks/check_m6_sla.py``.
 """
 
 from __future__ import annotations
@@ -78,7 +78,7 @@ _TRUTHY = {"1", "true", "yes", "on"}
 
 
 def _quantlib_required() -> bool:
-    return os.environ.get("RISKFORGE_REQUIRE_QUANTLIB", "").strip().lower() in _TRUTHY
+    return os.environ.get("QUANTLINEAGE_REQUIRE_QUANTLIB", "").strip().lower() in _TRUTHY
 
 
 def _peak_rss_kib() -> float:
@@ -239,7 +239,7 @@ def run_quantlib_acceptance(
     except ImportError as exc:
         if _quantlib_required():
             raise RuntimeError(
-                "QuantLib is required (RISKFORGE_REQUIRE_QUANTLIB=1) but could not "
+                "QuantLib is required (QUANTLINEAGE_REQUIRE_QUANTLIB=1) but could not "
                 "be imported. Install backend/requirements.txt including QuantLib."
             ) from exc
         return {
@@ -377,7 +377,7 @@ def run_isolated_reconstruction_impl(impl: str, n_positions: int, n_obs: int) ->
     except ImportError as exc:
         if _quantlib_required():
             raise RuntimeError(
-                "QuantLib is required (RISKFORGE_REQUIRE_QUANTLIB=1) but could not "
+                "QuantLib is required (QUANTLINEAGE_REQUIRE_QUANTLIB=1) but could not "
                 "be imported. Install backend/requirements.txt including QuantLib."
             ) from exc
         return _quantlib_unavailable_row(n_positions, n_obs, "QuantLib is not installed")

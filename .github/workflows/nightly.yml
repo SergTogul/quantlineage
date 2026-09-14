@@ -8,8 +8,8 @@
 # Do not weaken PR-FAST, QuantLib hard-gate, or postgres-persistence-smoke.
 #
 # Local laptop: Docker/Postgres is optional. tests/test_postgres_two_worker.py
-# skips when CI and RISKFORGE_NIGHTLY are unset and the DSN is missing or
-# unreachable. The GHA job below sets RISKFORGE_NIGHTLY=1 so a missing or
+# skips when CI and QUANTLINEAGE_NIGHTLY are unset and the DSN is missing or
+# unreachable. The GHA job below sets QUANTLINEAGE_NIGHTLY=1 so a missing or
 # unreachable DSN fails (no skip-green).
 #
 # Native job is compile + 10k×1k checksum/impl identity. Do not run
@@ -25,7 +25,7 @@
 #
 # QuantLib E2E (quantlib-e2e) is nightly-only. Do not add it to PR-FULL needs
 # or to pull_request. If QuantLib cannot be installed, the job fails
-# (RISKFORGE_NIGHTLY=1; no skip-green / no-ql fallback). QA-024 range pytest
+# (QUANTLINEAGE_NIGHTLY=1; no skip-green / no-ql fallback). QA-024 range pytest
 # runs in this job (not byte-equality; not check_m6_sla.py).
 #
 # Hierarchy job is checksum / node-count / MV identity, not a host SLA.
@@ -108,13 +108,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: riskforge
-          POSTGRES_PASSWORD: riskforge
-          POSTGRES_DB: riskforge
+          POSTGRES_USER: quantlineage
+          POSTGRES_PASSWORD: quantlineage
+          POSTGRES_DB: quantlineage
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U riskforge -d riskforge"
+          --health-cmd "pg_isready -U quantlineage -d quantlineage"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -145,7 +145,7 @@ jobs:
       - name: Alembic + seed (same script as PR postgres-smoke)
         env:
           PYTHONPATH: .
-          RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+          QUANTLINEAGE_DATABASE_URL: postgresql+psycopg://quantlineage:quantlineage@localhost:5432/quantlineage
         run: |
           chmod +x ../scripts/smoke_postgres.sh
           ../scripts/smoke_postgres.sh
@@ -153,8 +153,8 @@ jobs:
       - name: Postgres two-worker claim
         env:
           PYTHONPATH: .
-          RISKFORGE_NIGHTLY: "1"
-          RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+          QUANTLINEAGE_NIGHTLY: "1"
+          QUANTLINEAGE_DATABASE_URL: postgresql+psycopg://quantlineage:quantlineage@localhost:5432/quantlineage
         run: pytest -q --tb=short tests/test_postgres_two_worker.py
 
   full-reval-sample:
@@ -188,8 +188,8 @@ jobs:
       - name: Larger FULL_REVALUATION sample
         env:
           PYTHONPATH: .
-          RISKFORGE_PRICING_ENGINE: builtin
-          RISKFORGE_NIGHTLY: "1"
+          QUANTLINEAGE_PRICING_ENGINE: builtin
+          QUANTLINEAGE_NIGHTLY: "1"
         run: pytest -q --tb=short tests/test_nightly_full_reval_sample.py
 
   # RF-016 leftover: optional QuantLib-priced critical E2E + QA-024 demo range.
@@ -227,8 +227,8 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: .
-          RISKFORGE_NIGHTLY: "1"
-          RISKFORGE_REQUIRE_QUANTLIB: "1"
+          QUANTLINEAGE_NIGHTLY: "1"
+          QUANTLINEAGE_REQUIRE_QUANTLIB: "1"
         run: |
           python -c "import QuantLib as ql; print('QuantLib', ql.__version__)"
           python -c "from tests.quantlib_gate import require_quantlib_for_nightly; require_quantlib_for_nightly()"
@@ -237,13 +237,13 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: .
-          RISKFORGE_NIGHTLY: "1"
-          RISKFORGE_PRICING_ENGINE: quantlib
-          RISKFORGE_REQUIRE_QUANTLIB: "1"
-          RISKFORGE_PRICING_CACHE: "0"
-          RISKFORGE_CURVE_CACHE: "0"
-          RISKFORGE_SCENARIO_CACHE: "0"
-          RISKFORGE_SCENARIO_KERNEL: python
+          QUANTLINEAGE_NIGHTLY: "1"
+          QUANTLINEAGE_PRICING_ENGINE: quantlib
+          QUANTLINEAGE_REQUIRE_QUANTLIB: "1"
+          QUANTLINEAGE_PRICING_CACHE: "0"
+          QUANTLINEAGE_CURVE_CACHE: "0"
+          QUANTLINEAGE_SCENARIO_CACHE: "0"
+          QUANTLINEAGE_SCENARIO_KERNEL: python
         run: pytest -q --tb=short tests/test_qa024_ql_demo_range.py
 
       - name: Install frontend dependencies
@@ -260,9 +260,9 @@ jobs:
         working-directory: e2e
         env:
           CI: true
-          RISKFORGE_NIGHTLY: "1"
-          RISKFORGE_PRICING_ENGINE: quantlib
-          RISKFORGE_REQUIRE_QUANTLIB: "1"
+          QUANTLINEAGE_NIGHTLY: "1"
+          QUANTLINEAGE_PRICING_ENGINE: quantlib
+          QUANTLINEAGE_REQUIRE_QUANTLIB: "1"
         run: npx playwright test tests/r0-critical-journey.spec.ts
 
   # RF-016 leftover: hierarchy identity (checksum / node counts / MV), not host SLA.
@@ -296,9 +296,9 @@ jobs:
       - name: Hierarchy identity benchmark (checksum / nodes / MV)
         env:
           PYTHONPATH: backend
-          RISKFORGE_PRICING_ENGINE: builtin
-          RISKFORGE_NIGHTLY: "1"
-          RISKFORGE_SCENARIO_KERNEL: python
+          QUANTLINEAGE_PRICING_ENGINE: builtin
+          QUANTLINEAGE_NIGHTLY: "1"
+          QUANTLINEAGE_SCENARIO_KERNEL: python
         run: |
           python benchmarks/run_hierarchy_bench.py --json \
             | tee /tmp/hierarchy_bench.json
@@ -347,6 +347,6 @@ jobs:
       - name: Reconstruction N=100 × S=50 (record, not SLA)
         env:
           PYTHONPATH: .
-          RISKFORGE_PRICING_ENGINE: builtin
-          RISKFORGE_NIGHTLY: "1"
+          QUANTLINEAGE_PRICING_ENGINE: builtin
+          QUANTLINEAGE_NIGHTLY: "1"
         run: pytest -q --tb=short tests/test_nightly_full_reval_n100.py

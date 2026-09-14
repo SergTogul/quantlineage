@@ -233,15 +233,15 @@ def test_full_reval_bench_reconstruction_records_pnl_gap():
 
 
 def test_full_reval_n100_is_skipped_unless_nightly(monkeypatch):
-    """N=100×50 must not run in default PR (skip unless RISKFORGE_NIGHTLY=1)."""
+    """N=100×50 must not run in default PR (skip unless QUANTLINEAGE_NIGHTLY=1)."""
     path = REPO_ROOT / "backend" / "tests" / "test_nightly_full_reval_n100.py"
     assert path.is_file()
     text = path.read_text(encoding="utf-8")
-    assert "RISKFORGE_NIGHTLY" in text
+    assert "QUANTLINEAGE_NIGHTLY" in text
     assert "skipif" in text
     assert "100" in text
     assert "50" in text
-    monkeypatch.delenv("RISKFORGE_NIGHTLY", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_NIGHTLY", raising=False)
     proc = subprocess.run(
         [
             sys.executable,

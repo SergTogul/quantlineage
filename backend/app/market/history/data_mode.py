@@ -7,7 +7,18 @@ import os
 QUANTLINEAGE_DATA_MODE_ENV = "QUANTLINEAGE_DATA_MODE"
 DATA_MODE_SYNTHETIC = "synthetic"
 DATA_MODE_PUBLIC = "public"
-HISTORICAL_DATASET_ENV = "RISKFORGE_HISTORICAL_DATASET"
+HISTORICAL_DATASET_ENV = "QUANTLINEAGE_HISTORICAL_DATASET"
+PUBLIC_DATASET_PREFIX = "real:public:"
+
+
+def data_source_label(dataset_id: str | None, dataset_version: str | None) -> str | None:
+    """Stable UI identity for a dataset. Kind comes from catalog id, not the client."""
+    ident = (dataset_id or "").strip()
+    if not ident:
+        return None
+    version = (dataset_version or "").strip() or "—"
+    kind = "Public EOD" if ident.startswith(PUBLIC_DATASET_PREFIX) else "Synthetic replay"
+    return f"{kind} · {ident}/{version}"
 
 
 def resolve_data_mode() -> str:
@@ -25,7 +36,7 @@ def resolve_data_mode() -> str:
 def apply_quantlineage_data_mode(source: str | None) -> str:
     """Resolve factory source. Empty string means the synthetic demo default.
 
-    Explicit ``source`` / ``RISKFORGE_HISTORICAL_DATASET`` win. Public mode
+    Explicit ``source`` / ``QUANTLINEAGE_HISTORICAL_DATASET`` win. Public mode
     selects ``real:public:wave-a`` only when those are unset.
     """
     if source is not None and source.strip():

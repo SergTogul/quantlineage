@@ -81,7 +81,7 @@ def _factor_ids(factors) -> set[tuple[str, str, str]]:
 
 
 def test_factory_default_dataset_is_per_factor_demo_panel(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     engine = build_historical_risk_engine()
     panel = engine.factor_panel
     assert panel is not None
@@ -97,7 +97,7 @@ def test_factory_default_dataset_is_per_factor_demo_panel(monkeypatch: pytest.Mo
 
 
 def test_aapl_and_msft_history_differ_on_production_panel(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     panel = build_historical_risk_engine().factor_panel
     assert panel is not None
     assert any(panel.change(as_of, AAPL) != panel.change(as_of, MSFT) for as_of in panel.dates)
@@ -108,14 +108,14 @@ def test_aapl_and_msft_history_differ_on_production_panel(monkeypatch: pytest.Mo
 
 
 def test_usd_2y_and_10y_history_differ_on_production_panel(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     panel = build_historical_risk_engine().factor_panel
     assert panel is not None
     assert any(panel.change(as_of, USD_2Y) != panel.change(as_of, USD_10Y) for as_of in panel.dates)
 
 
 def test_production_panel_dates_come_from_checked_in_file(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     engine = build_historical_risk_engine()
     panel = engine.factor_panel
     assert panel is not None
@@ -139,7 +139,7 @@ def test_production_panel_dates_come_from_checked_in_file(monkeypatch: pytest.Mo
 def test_same_length_per_factor_csvs_produce_different_var(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     n = 24
     dates = [date(2022, 1, 3) + timedelta(days=i) for i in range(n)]
     columns = [
@@ -202,7 +202,7 @@ def test_same_length_per_factor_csvs_produce_different_var(
 
 
 def test_hierarchy_root_var_reconciles_with_direct_var(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service()
     summary = service.summary(SAMPLE_PORTFOLIO)
     root = service.hierarchy(SAMPLE_PORTFOLIO)
@@ -220,7 +220,7 @@ def test_hierarchy_root_var_reconciles_with_direct_var(monkeypatch: pytest.Monke
 
 
 def test_missing_required_factor_fails_closed_not_silent_zero(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     engine = build_historical_risk_engine()
     panel = engine.factor_panel
     assert panel is not None
@@ -247,7 +247,7 @@ def test_missing_required_factor_fails_closed_not_silent_zero(monkeypatch: pytes
 
 
 def test_riskrun_dataset_identity_matches_series_used(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service()
     ds_id, ds_version = dataset_identity(service.risk.dataset)
     assert ds_id == EXPECTED_DATASET_ID

@@ -80,7 +80,7 @@ def seed_golden_demo(*, url: str | None = None) -> dict[str, Any]:
     Parameters
     ----------
     url:
-        Optional SQLAlchemy URL. ``None`` uses ``RISKFORGE_DATABASE_URL`` when
+        Optional SQLAlchemy URL. ``None`` uses ``QUANTLINEAGE_DATABASE_URL`` when
         set; otherwise in-memory wiring (in-code ``DEMO_PORTFOLIOS``).
     """
     catalog_ids = [p.id for p in DEMO_PORTFOLIOS]
@@ -137,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--url",
         default=None,
-        help="SQLAlchemy URL (default: RISKFORGE_DATABASE_URL or in-memory catalog).",
+        help="SQLAlchemy URL (default: QUANTLINEAGE_DATABASE_URL or in-memory catalog).",
     )
     args = parser.parse_args(argv)
     report = seed_golden_demo(url=args.url)

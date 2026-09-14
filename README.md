@@ -1,269 +1,163 @@
-# RiskForge
+# QuantLineage
 
-RiskForge is an institutional-style multi-asset portfolio and derivatives risk-management MVP. It demonstrates how a risk platform can combine mature pricing adapters, immutable market snapshots, deterministic portfolio risk engines, durable run orchestration, and a React risk terminal without moving quant formulas into the UI or an LLM.
+**AI-Powered Multi-Asset Risk & Attribution Platform**
 
-Core rule:
+QuantLineage is an institutional-style portfolio risk platform that calculates risk deterministically, preserves the lineage of every calculation, and explains why risk changed across markets, trades, and factors.
 
-> The pricing library prices. RiskForge manages portfolio risk. The LLM orchestrates deterministic tools; it never calculates financial risk itself.
+> The pricing library prices. QuantLineage manages portfolio risk.
+> The model orchestrates deterministic tools; it never calculates financial risk itself.
 
-## What This Shows
+## Why QuantLineage
 
-- A clean `PricingEngine` boundary with QuantLib as the intended production adapter and a deterministic builtin adapter for development, testing, and fallback.
-- Immutable `MarketSnapshot` state for equities, rates, FX, curves, and volatility surfaces; scenarios and sensitivities create shocked copies instead of mutating shared marks.
-- Historical and parametric VaR/Expected Shortfall, component/marginal/incremental risk, stress testing, reverse stress, limits, hierarchy, P&L explain, and risk attribution.
-- FastAPI under canonical `/api/v1` routes, SQLAlchemy/Alembic persistence when `RISKFORGE_DATABASE_URL` is set, and an optional Postgres-backed worker process for queued risk runs.
-- A React/Vite risk terminal that displays API results for overview, VaR/ES, stress, reverse stress, limits, hierarchy, attribution, risk runs, and deterministic risk query.
-- A reproducible portfolio demo with packaged synthetic historical factors and byte-stable generated artifacts.
+- Multi-asset pricing through a clean `PricingEngine` boundary
+- Historical VaR / ES: Linear, Delta-Gamma, Full Revaluation
+- Greeks, DV01 and KR-DV01
+- Stress and reverse stress
+- Firm → Desk → Book → Trade risk hierarchy
+- “Why did my risk change?” attribution
+- Immutable RiskRuns with dataset/snapshot/methodology lineage
+- Public EOD equity/rates ingestion + deterministic offline demo
+- Typed AI/MCP tools over deterministic risk services
 
-## Architecture At A Glance
+## Signature Workflow — Why Did My Risk Change?
+
+Open the terminal on the default **status** Overview. The hero action **Why did my risk change?** jumps to the Risk Change Attribution waterfall (`#var-es/risk-change`).
+
+That panel compares two completed RiskRuns (T0 → T1) and attributes the change to trades, markets, and residual. Drivers, residual, and identity come from `POST /api/v1/risk/runs/compare`. The UI never recomputes VaR.
+
+Talk track: the book moved; here is whether it was the inventory, the market, or leftover interaction — with the dataset and snapshot that produced the numbers.
+
+## Architecture
 
 ```text
-Portfolio / Position domain models
-  -> PricingEngine interface
-     -> QuantLibPricingEngine
-     -> BuiltinPricingEngine
+Portfolio / Position
+  -> PricingEngine (QuantLib adapter or builtin)
   -> MarketSnapshot + MarketDataProvider
-  -> Risk engines
-     -> VaR / ES / sensitivities / factors
-     -> stress / reverse stress / scenario attribution
-     -> hierarchy / limits / P&L and risk attribution
+  -> Risk engines (VaR/ES, stress, reverse stress, hierarchy, limits, attribution)
   -> PortfolioService
-  -> FastAPI routers under /api/v1
-  -> React risk terminal and deterministic query UI
+  -> FastAPI `/api/v1`
+  -> React risk terminal (display only)
+  -> Optional MCP/tool router over the same deterministic services
 ```
 
-Important boundaries:
-
-- Domain models do not depend on FastAPI, React, or QuantLib runtime objects.
-- Risk modules depend on `PricingEngine`, not concrete QuantLib classes.
-- Scenario logic shocks `MarketSnapshot`; instruments do not own scenario behavior.
-- Native C++ kernels accelerate LINEAR/DELTA_GAMMA scenario aggregation only; FULL_REVALUATION stays on `PricingEngine`.
-- AI/NL code routes to deterministic risk tools and formats returned payloads; it does not invent risk numbers.
+The pricing library prices. QuantLineage owns aggregation, snapshots, risk, lineage, and workflow. Native C++ accelerates LINEAR/DELTA_GAMMA scenario aggregation only; FULL_REVALUATION stays on `PricingEngine`.
 
 See [`docs/architecture.md`](docs/architecture.md) and [`docs/adr/README.md`](docs/adr/README.md).
 
-## Instruments
+## Demo
 
-- Equities
-- Equity futures
-- European equity options
-- Bonds
-- Vanilla interest-rate swaps
-- FX forwards
-- European FX options
-- Interest-rate futures
-- Scoped vanilla caps/floors and European swaptions
+Five to eight minutes from a clean checkout:
 
-Coverage is intentionally scoped. QuantLib handles many production-style paths behind `PricingEngine`; the builtin adapter remains the deterministic reference and fallback. IR optionality is a flat Black-76 slice, not a full vol-cube product.
+1. `docker compose up --build` (or local uvicorn + Vite). Open `http://127.0.0.1:5173` — default Overview is the **status** blotter.
+2. Confirm **QUANTLINEAGE** in the nav and **Global Macro Demo** as the book heading.
+3. Click **Why did my risk change?** → Risk Change Attribution. Run **Compare T0/T1**.
+4. Historical Analytics: wealth, drawdown, Sharpe (dimensionless), data-source badge.
+5. Scenario Builder, Risk Query (“Why did my risk change?”), then Risk Runs provenance.
 
-## Methodology
+Inputs are local: demo books from `GET /api/v1/portfolios`, packaged synthetic history at `data/demo_historical_factors.csv` / `data/demo_multi_factor_history.csv`, optional public EOD freeze in [`docs/public_data_demo.md`](docs/public_data_demo.md). Artifact: `data/demo_risk_artifact.json`.
 
-RiskForge supports three Historical VaR/ES modes:
-
-- `LINEAR`: first-order Greek approximation.
-- `DELTA_GAMMA`: delta-gamma approximation plus vega, DV01, and FX delta terms. This is the default demo methodology.
-- `FULL_REVALUATION`: reprices historical shocked snapshots through `PricingEngine`.
-
-Stress and reverse stress use deterministic scenario definitions. Multi-factor reverse stress uses a constrained adverse-orthant ray search plus coordinate descent and is not a certified global optimizer.
-
-See [`docs/methodology/README.md`](docs/methodology/README.md), [`docs/methodology/multi_factor_reverse_stress.md`](docs/methodology/multi_factor_reverse_stress.md), and [`docs/known_limitations.md`](docs/known_limitations.md).
-
-## Demo Path
-
-Demo inputs are local and reproducible:
-
-- Portfolios: in-code themes via `GET /api/v1/portfolios` (`backend/app/sample.py`).
-- Historical factors: packaged synthetic replay at `data/demo_historical_factors.csv`; no live vendors.
-- Optional public EOD freeze (Yahoo public JSON + FRED, not a vendor feed): [`docs/public_data_demo.md`](docs/public_data_demo.md). Default remains packaged synthetic history. Public-data Wave A covers US equity spots (AAPL/MSFT/NVDA/SPY) and USD Treasury key rates only — not FX or volatility, and not the full cross-asset derivatives book.
-- Deterministic artifact: `data/demo_risk_artifact.json`, generated by `python -m app.demo.run_demo_risk`.
-
-Run the clean-checkout demo smoke from the repo root after backend dependencies are installed:
+Walkthroughs: [`docs/demo/final_demo.md`](docs/demo/final_demo.md) (3–5 min artifact path) and [`docs/demo_script.md`](docs/demo_script.md) (institutional UI story).
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python scripts/check_final_demo.py
 ```
 
-See [`docs/demo/final_demo.md`](docs/demo/final_demo.md) for the 3-5 minute walkthrough and expected ranges derived from the committed artifact.
+![Overview](docs/demo/quantlineage_demo_01_overview.png)
 
-## Main API Endpoints
+## Quant Methodology
 
-**Canonical prefix:** `/api/v1`. Legacy unversioned paths remain dual-mounted and deprecated until the published sunset. See [`docs/api/v1_canonical_and_legacy_sunset.md`](docs/api/v1_canonical_and_legacy_sunset.md).
+Three Historical VaR/ES modes:
 
-```text
-GET /api/v1/health
-GET /api/v1/portfolio
-POST /api/v1/market/snapshot
-POST /api/v1/risk/summary
-POST /api/v1/risk/factors
-POST /api/v1/risk/var
-POST /api/v1/risk/hierarchy
-POST /api/v1/risk/attribution
-POST /api/v1/risk/attribution/demo
-POST /api/v1/risk/contributors
-POST /api/v1/risk/limits
-POST /api/v1/risk/stress
-GET /api/v1/risk/stress/scenarios
-POST /api/v1/risk/stress/evaluate
-POST /api/v1/risk/stress/evaluate/custom
-POST /api/v1/risk/stress/reverse
-POST /api/v1/risk/stress/compare
-POST /api/v1/risk/query
-POST /api/v1/risk/runs
-GET /api/v1/risk/runs/{run_id}
+- `LINEAR` — first-order Greek approximation
+- `DELTA_GAMMA` — delta-gamma plus vega, DV01, and FX delta (demo default)
+- `FULL_REVALUATION` — reprice historical shocked snapshots through `PricingEngine`
+
+Stress and reverse stress are deterministic. Multi-factor reverse stress is a constrained adverse-orthant ray search plus coordinate descent — not a certified global optimizer.
+
+Coverage is scoped: equities, equity futures, European equity options, bonds, vanilla IRS, FX forwards, European FX options, IR futures, vanilla caps/floors and European swaptions.
+
+See [`docs/methodology/README.md`](docs/methodology/README.md), [`docs/methodology/multi_factor_reverse_stress.md`](docs/methodology/multi_factor_reverse_stress.md), and [`docs/known_limitations.md`](docs/known_limitations.md).
+
+## AI / MCP
+
+Typed tools over the same risk services. The model routes; it does not invent VaR, ES, or DV01.
+
+```json
+{
+  "mcpServers": {
+    "quantlineage": {
+      "command": "python",
+      "args": ["-m", "app.mcp"],
+      "cwd": "backend",
+      "env": { "PYTHONPATH": ".", "QUANTLINEAGE_MCP_AUTHORIZATION": "Bearer <token-if-shared>" }
+    }
+  }
+}
 ```
 
-Unversioned aliases (e.g. `/health`, `/risk/summary`) still work but return
-`Deprecation` / `Sunset` / `Link` headers pointing at the `/api/v1` successor.
+See [`docs/mcp.md`](docs/mcp.md) and [`docs/wave_c_ai_mcp_demo.md`](docs/wave_c_ai_mcp_demo.md).
 
-## Run backend
+## Run Locally
 
-Requires **Python 3.12+** (`numpy>=2.3`). On macOS 13 where Homebrew Python 3.12 may not build, install via [uv](https://github.com/astral-sh/uv): `uv python install 3.12`.
+Requires **Python 3.12+** (`numpy>=2.3`). On macOS 13 where Homebrew Python 3.12 may not build, install via [uv](https://github.com/astral-sh/uv).
 
 ```bash
 cd backend
-python3.12 -m venv .venv # or: uv python install 3.12 && ~/.local/share/uv/python/.../python3.12 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-RISKFORGE_PRICING_ENGINE=quantlib uvicorn app.main:app --reload
+QUANTLINEAGE_PRICING_ENGINE=quantlib uvicorn app.main:app --reload
 ```
 
-For development/testing without QuantLib:
+Builtin engine (no QuantLib):
 
 ```bash
-RISKFORGE_PRICING_ENGINE=builtin uvicorn app.main:app --reload
+QUANTLINEAGE_PRICING_ENGINE=builtin uvicorn app.main:app --reload
 ```
 
-## Persistence
-
-SQLAlchemy + Alembic live under `backend/app/persistence/`. When `RISKFORGE_DATABASE_URL` is set, FastAPI lifespan wires SQLAlchemy for portfolios, market snapshots, scenario definitions, limit definitions, and risk runs; otherwise in-memory/sample defaults are used. Unit tests use SQLite; Compose provides Postgres; CI runs the Postgres smoke through `scripts/smoke_postgres.sh`.
-
-**Postgres DSN (Compose / local):**
-
-```text
-postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
-```
-
-Inside Compose, services use host `postgres` instead of `localhost` via `RISKFORGE_DATABASE_URL`.
+Frontend:
 
 ```bash
-# Start Postgres
-# Default Compose publishes bind to loopback only (127.0.0.1).
-# Local demo stays unauthenticated. Shared/non-loopback requires
-# RISKFORGE_SHARED_DEPLOYMENT=1 (or non-loopback RISKFORGE_BIND) and RISKFORGE_API_TOKEN.
-docker compose up -d postgres
-
-# Apply migrations (required before API/worker against Postgres)
-export RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
-cd backend && alembic upgrade head
-
-# Or via Compose image:
-# docker compose run --rm backend alembic upgrade head
-
-# Minimal seed / repo smoke (same script as CI postgres-smoke job)
-./scripts/smoke_postgres.sh
-
-# API + out-of-process worker + frontend
-docker compose up -d backend worker frontend
+cd frontend && npm install && npm run dev
 ```
 
-**Durable worker:** Compose `worker` runs `python -m app.worker`, claiming `QUEUED` risk runs from shared Postgres via `claim_queued` (`SELECT ... FOR UPDATE SKIP LOCKED` to `RUNNING`). Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP only enqueues. Without that flag, local uvicorn executes runs in-process via `ThreadPoolExecutor`. Compose defaults to one worker for the demo; additional Postgres-backed replicas will not double-claim the same row. SQLite unit tests use a non-skip-locked FIFO claim. Redis/RQ is not required for claim safety.
-
-SQLite (dev / CI default when `RISKFORGE_DATABASE_URL` is unset): `sqlite:///:memory:` for tests, or set a file URL and run `alembic upgrade head`.
-See `docs/adr/005-sqlalchemy-persistence.md`.
-
-## Run frontend
+**Compose** (Postgres `quantlineage` / volume `quantlineage_pgdata`, API, worker, frontend):
 
 ```bash
-cd frontend
-npm install
-npm run dev
+docker compose up --build
 ```
 
-## Tests
+DSN: `postgresql+psycopg://quantlineage:quantlineage@localhost:5432/quantlineage`. Compose backend sets `QUANTLINEAGE_EXTERNAL_WORKER=1`; the worker claims queued RiskRuns. Shared/non-loopback requires `QUANTLINEAGE_SHARED_DEPLOYMENT=1` and `QUANTLINEAGE_API_TOKEN`. See Persistence notes in [`BUILD_NOTES.md`](BUILD_NOTES.md).
+
+Canonical API prefix is `/api/v1`. OpenAPI title is **QuantLineage API**. Legacy unversioned paths remain dual-mounted until the published sunset.
+
+## Tests / CI
 
 ```bash
 cd backend
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin pytest -q
-# optional: parallel workers (pytest-xdist); native lib builds once per worker
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin pytest -q -n auto
-
-# static analysis (also CI job lint-static-analysis)
-pip install -r requirements-dev.txt # includes ruff + mypy
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin pytest -q
 ruff check app tests
 mypy app
 
 cd ../frontend
-npm test
-npm run lint # eslint src --max-warnings 0
+npm test && npm run lint && npm run build
 
 cd ../e2e
-npm install && npm run install:browsers
-npm test
-# CI job e2e-playwright runs the same suite with Chromium (see e2e/README.md)
+npm install && npm run install:browsers && npm test
 ```
 
-Playwright boots the builtin-engine API and Vite app, then covers dashboard smoke, Scenario Builder, Reverse Stress, Risk Query, and panels. See `e2e/README.md`.
+CI jobs: backend pytest, QuantLib hard-gate, PR-FAST, frontend test/build, lint, Playwright E2E, Postgres smoke, PR-FULL. Native kernel tests compile C++20 when `g++` is present.
 
-The backend native-kernel tests compile and execute C++20 with `g++` when a compiler is available. QuantLib runtime tests skip only when the QuantLib wheel is absent.
-
-## Performance Claim
-
-RiskForge has a scoped native scenario-kernel benchmark and SLA, not an HTTP latency or multi-tenant throughput claim. The proved path is the C++20 `ctypes` scenario aggregation kernel for LINEAR/DELTA_GAMMA approximate P&L on named benchmark workloads.
-
-See [`docs/performance.md`](docs/performance.md), [`benchmarks/README.md`](benchmarks/README.md), and [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md).
-
-## Optional Native Scenario Kernel
-
-```bash
-cd backend/native
-g++ -std=c++20 -O3 -shared -fPIC -pthread -I include \
-  src/risk_kernel_capi.cpp -o libriskkernel.so
-```
-
-Load it with `app.compute.kernel.NativeScenarioKernel`. No pybind11 is required.
-
-Optional worker count for the C++ stdlib shock-partition thread pool
-(`std::jthread` when available, else `std::thread`+join; not OpenMP):
-
-```bash
-export RISKFORGE_KERNEL_THREADS=4 # 1 = serial; unset = hardware_concurrency
-```
-
-Historical VaR **LINEAR** / **DELTA_GAMMA** approximate P&L can use the kernel behind:
-
-```bash
-export RISKFORGE_SCENARIO_KERNEL=native # default: python (NumPy)
-export RISKFORGE_SCENARIO_KERNEL_LIB=/abs/path/to/libriskkernel.so # optional
-```
-
-`FULL_REVALUATION` never uses this kernel (full PricingEngine revaluation). See
-`backend/native/README.md`. Parity tests: `backend/tests/test_historical_scenario_kernel.py`.
+Optional native kernel and SLA evidence: [`docs/performance.md`](docs/performance.md), [`benchmarks/README.md`](benchmarks/README.md).
 
 ## Known Limitations
 
-The MVP is intentionally honest about what is not complete:
+- No live market-data vendor integration; default history is packaged synthetic replay.
+- Typed historical factors are EquitySpot, EquityVol, RateZero, FXSpot, FXVol; IR vol and dividend/funding maps are not a full factor taxonomy.
+- Curves and vol surfaces are scoped demo inputs, not production calibration.
+- Caps/floors/swaptions are vanilla Black-76; no Bermudan/vol cube.
+- Multi-factor reverse stress is constrained, not a certified global optimum.
+- AI is a deterministic tool-routing slice; no hosted LLM is claimed.
+- Redis/RQ is deferred; durable claim safety uses Postgres `SKIP LOCKED`.
 
-- No live market-data vendor integration; demo history is a packaged synthetic replay.
-- Typed historical factors are `EquitySpot`, `EquityVol`, `RateZero`, `FXSpot`, and `FXVol` only; IR vol, dividend yield, and funding/projection rates are snapshot maps, not a fully general factor taxonomy.
-- Curves use deterministic offline helpers and scoped bootstrap inputs, not production multi-curve calibration.
-- Volatility surfaces are grid/smile inputs consumed by option pricing where attached, not calibrated SABR/local-vol models.
-- Caps/floors/swaptions are scoped vanilla Black-76 implementations; no Bermudan/callable, settlement variation, or IR vol cube.
-- Multi-factor reverse stress is constrained and deterministic, not a certified global optimum.
-- The AI assistant is a deterministic query/tool-routing slice; no full external LLM tool loop is claimed.
-- Redis/RQ is deferred; current durable claim safety uses Postgres `SKIP LOCKED`.
-- CI evidence is recorded in roadmap/build docs when available, but this README is not a live CI status badge.
-
-See [`docs/known_limitations.md`](docs/known_limitations.md) for the fuller catalog.
-
-## Code intelligence (CodeGraph)
-
-This repo can be indexed locally with [CodeGraph](https://github.com/colbymchenry/codegraph) so Cursor and other agents can query symbols, call paths, and blast radius via MCP.
-
-```bash
-# Install CLI (once): npm i -g @colbymchenry/codegraph
-codegraph init # creates .codegraph/ (local index, gitignored)
-codegraph status # index stats
-codegraph query VaR
-```
-
-The SQLite index under `.codegraph/` is machine-local; re-run `codegraph init` or rely on auto-sync after cloning.
+Fuller catalog: [`docs/known_limitations.md`](docs/known_limitations.md).

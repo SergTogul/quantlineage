@@ -45,7 +45,7 @@ from app.pricing.instrument_capabilities import get_capability
 # never hashed; drop it at hash time.
 _EQUITY_FAMILY_TYPES = frozenset({"equity", "equity_future", "european_option"})
 _bypass_valuation_lru: ContextVar[bool] = ContextVar(
-    "riskforge_bypass_valuation_lru", default=False
+    "quantlineage_bypass_valuation_lru", default=False
 )
 
 

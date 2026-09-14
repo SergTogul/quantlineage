@@ -8,12 +8,12 @@ All implementations share identical I/O semantics (see
 ``benchmarks/RESULTS.md``): ``list[Exposure]`` × ``list[Shock]`` →
 ``list[float]`` portfolio scenario PnL of length ``len(shocks)``.
 
-M6.2 baseline: single-thread (``--threads 1`` / ``RISKFORGE_KERNEL_THREADS=1``).
+M6.2 baseline: single-thread (``--threads 1`` / ``QUANTLINEAGE_KERNEL_THREADS=1``).
 M6.4: C++ ``std::jthread`` shock-partition pool — compare serial vs parallel
 with ``--threads N`` (no OpenMP; do not mix strategies).
 
 Not an HTTP/API latency claim. Product LINEAR/DELTA_GAMMA may opt into the same
-ctypes kernel via RISKFORGE_SCENARIO_KERNEL (M6.3). Formal relative floors are
+ctypes kernel via QUANTLINEAGE_SCENARIO_KERNEL (M6.3). Formal relative floors are
 documented in ``benchmarks/RESULTS.md`` (SLA-K1/K2) and checked by
 ``benchmarks/check_m6_sla.py``.
 """
@@ -231,7 +231,7 @@ def environment_block(threads: int) -> dict:
         numpy_version = None
     milestone = "M6.4" if threads != 1 else "M6.2"
     threading = (
-        "single-thread (RISKFORGE_KERNEL_THREADS=1; stdlib thread pool idle)"
+        "single-thread (QUANTLINEAGE_KERNEL_THREADS=1; stdlib thread pool idle)"
         if threads == 1
         else (
             f"std::thread shock-partition pool "
@@ -248,7 +248,7 @@ def environment_block(threads: int) -> dict:
         "python": sys.version.split()[0],
         "numpy": numpy_version,
         "gxx": _gxx_version(),
-        "riskforge_kernel_threads": os.environ.get("RISKFORGE_KERNEL_THREADS"),
+        "quantlineage_kernel_threads": os.environ.get("QUANTLINEAGE_KERNEL_THREADS"),
         "bench_threads": threads,
         "logical_cpus": os.cpu_count(),
         "note": (
@@ -323,7 +323,7 @@ def run_workload(
             thread_sets = [threads]
 
         for thr in thread_sets:
-            os.environ["RISKFORGE_KERNEL_THREADS"] = str(thr)
+            os.environ["QUANTLINEAGE_KERNEL_THREADS"] = str(thr)
             native = NativeScenarioKernel(lib)
             n_out, n_ms, n_rss = _time_kernel(native.pnl, exposures, shocks, iters)
             if abs(n_out[0] - py_out[0]) > 1e-6 * max(1.0, abs(py_out[0])):
@@ -453,14 +453,14 @@ def main(argv: list[str] | None = None) -> int:
     build_dir = args.build_dir
     tmp: tempfile.TemporaryDirectory[str] | None = None
     if build_dir is None:
-        tmp = tempfile.TemporaryDirectory(prefix="riskforge-bench-")
+        tmp = tempfile.TemporaryDirectory(prefix="quantlineage-bench-")
         build_dir = Path(tmp.name)
     else:
         build_dir.mkdir(parents=True, exist_ok=True)
 
     # Align env with requested serial baseline when not comparing.
     if args.threads == 1 and not args.parallel_compare:
-        os.environ["RISKFORGE_KERNEL_THREADS"] = "1"
+        os.environ["QUANTLINEAGE_KERNEL_THREADS"] = "1"
 
     all_results: list[BenchResult] = []
     try:
@@ -494,9 +494,9 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write("\n")
     else:
         title = (
-            "RiskForge scenario-aggregation microbenchmark (M6.4 parallel C++)"
+            "QuantLineage scenario-aggregation microbenchmark (M6.4 parallel C++)"
             if args.threads > 1 or args.parallel_compare
-            else "RiskForge scenario-aggregation microbenchmark (M6.2 single-thread)"
+            else "QuantLineage scenario-aggregation microbenchmark (M6.2 single-thread)"
         )
         print(title)
         print("I/O + caveats: benchmarks/RESULTS.md — not a production claim.")

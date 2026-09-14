@@ -1,4 +1,4 @@
-# RiskForge Playwright E2E
+# QuantLineage Playwright E2E
 
 Critical-path UI tests against a live FastAPI backend (`builtin` pricing) and Vite frontend.
 
@@ -18,7 +18,7 @@ npm test
 
 Requires Google Chrome installed locally. Playwright starts uvicorn (`:8000`) and Vite (`:5173`) automatically unless those ports are already in use.
 
-Optional: `PLAYWRIGHT_USE_CHROMIUM=1` forces bundled Chromium instead of the Chrome channel. `RISKFORGE_E2E_UVICORN` overrides the backend command (default: `backend/.venv/bin/uvicorn` if present, else `python -m uvicorn`).
+Optional: `PLAYWRIGHT_USE_CHROMIUM=1` forces bundled Chromium instead of the Chrome channel. `QUANTLINEAGE_E2E_UVICORN` overrides the backend command (default: `backend/.venv/bin/uvicorn` if present, else `python -m uvicorn`).
 
 ## CI (GitHub Actions)
 

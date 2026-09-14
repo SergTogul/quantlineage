@@ -52,7 +52,7 @@ class RiskAssistantModelRequest(BaseModel):
     question: str
     tools: list[dict[str, Any]]
     instruction: str = (
-        "Select at most one deterministic RiskForge tool. Do not calculate or invent "
+        "Select at most one deterministic QuantLineage tool. Do not calculate or invent "
         "VaR, Greeks, P&L, prices, stress losses, or limit values. Ask for clarification "
         "or refuse unsupported/advisory prompts instead of calling a numerical tool."
     )
@@ -70,7 +70,7 @@ class RiskAssistantModelResponse(BaseModel):
 
 
 class RiskAssistantModel(Protocol):
-    """Provider-agnostic model adapter for one RiskForge tool-selection turn."""
+    """Provider-agnostic model adapter for one QuantLineage tool-selection turn."""
 
     def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
         """Return one tool request, a clarification, or a refusal."""
@@ -85,7 +85,7 @@ class RiskQueryPlan(BaseModel):
 
 
 class RiskToolArgs(BaseModel):
-    """Model-bindable tool arguments. Portfolio is bound by RiskForge, never the LLM."""
+    """Model-bindable tool arguments. Portfolio is bound by QuantLineage, never the LLM."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -335,7 +335,7 @@ _SECRET_REFUSAL_ANSWER = (
 )
 
 _FAKE_TOOL_REFUSAL_ANSWER = (
-    "Unknown tool is not in the RiskForge allowlist."
+    "Unknown tool is not in the QuantLineage allowlist."
 )
 
 _TOOL_FAILURE_ANSWER = (
@@ -443,9 +443,9 @@ _SECRET_REQUEST_MARKERS = (
 
 _SECRET_ENV_NAMES = (
     "FRED_API_KEY",
-    "RISKFORGE_API_TOKEN",
-    "RISKFORGE_API_TOKENS",
-    "RISKFORGE_MCP_AUTHORIZATION",
+    "QUANTLINEAGE_API_TOKEN",
+    "QUANTLINEAGE_API_TOKENS",
+    "QUANTLINEAGE_MCP_AUTHORIZATION",
 )
 
 
@@ -474,7 +474,7 @@ def validate_tool_call(
     if tool_name is None or tool_name == "":
         return ToolCallValidation(
             allowed=False,
-            refusal="No allowlisted RiskForge tool was selected.",
+            refusal="No allowlisted QuantLineage tool was selected.",
         )
     raw = tool_name.value if isinstance(tool_name, RiskToolName) else str(tool_name)
     try:
@@ -482,12 +482,12 @@ def validate_tool_call(
     except ValueError:
         return ToolCallValidation(
             allowed=False,
-            refusal="Unknown tool is not in the RiskForge allowlist.",
+            refusal="Unknown tool is not in the QuantLineage allowlist.",
         )
     if name not in TOOL_CONTRACTS:
         return ToolCallValidation(
             allowed=False,
-            refusal="Unknown tool is not in the RiskForge allowlist.",
+            refusal="Unknown tool is not in the QuantLineage allowlist.",
         )
     if _tool_args_oversized(args):
         return ToolCallValidation(
@@ -545,7 +545,7 @@ class RiskQueryEngine:
             return _clarification_plan(
                 "unsupported",
                 "I can only answer supported portfolio risk questions using deterministic "
-                "RiskForge tools: VaR/ES, limits, contributors, worst stress, or portfolio summary.",
+                "QuantLineage tools: VaR/ES, limits, contributors, worst stress, or portfolio summary.",
             )
         collision = _ambiguous_tool_pair(q)
         if collision:
@@ -698,7 +698,7 @@ class RiskQueryEngine:
         return _clarification_plan(
             "unsupported",
             "I can only answer supported portfolio risk questions using deterministic "
-            "RiskForge tools: VaR/ES, limits, contributors, worst stress, or portfolio summary.",
+            "QuantLineage tools: VaR/ES, limits, contributors, worst stress, or portfolio summary.",
         )
 
     def answer(

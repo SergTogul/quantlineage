@@ -2,7 +2,7 @@
 
 Unknown / unhandled position types must raise from QuantLibPricingEngine.value
 and must not delegate to BuiltinPricingEngine. Builtin remains available only
-via the factory path (RISKFORGE_PRICING_ENGINE=builtin), which this slice
+via the factory path (QUANTLINEAGE_PRICING_ENGINE=builtin), which this slice
 does not change.
 """
 

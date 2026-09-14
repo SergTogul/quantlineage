@@ -7,7 +7,7 @@
 ## Context
 
 QuantLib keeps process-global settings (notably `Settings.instance.evaluationDate`).
-RiskForge prices through `QuantLibPricingEngine` (`backend/app/pricing/quantlib.py`).
+QuantLineage prices through `QuantLibPricingEngine` (`backend/app/pricing/quantlib.py`).
 Risk-run execution today uses an in-process `ThreadPoolExecutor`
 (`backend/app/services/risk_run_worker.py`), so concurrent Python threads may
 call into the same adapter.
@@ -50,7 +50,7 @@ Evidence already in code:
 3. **Keep native kernels off QuantLib globals.**
  The C++ scenario kernel (and any future pure numerical kernels) must stay
  free of QuantLib types, settings, and pricing objects. Parallelism inside
- the `.so` (`RISKFORGE_KERNEL_THREADS`) only partitions shock indices for
+ the `.so` (`QUANTLINEAGE_KERNEL_THREADS`) only partitions shock indices for
  Δ-Γ aggregation. Methodology selection and FULL_REVALUATION remain in
  Python on `PricingEngine`.
 
@@ -72,7 +72,7 @@ SLA-gated) and does not show a cheap, numerically identical chunked
 `ProcessPoolExecutor` for `full_revaluation_pnl_series`. HEAVY
 `FULL_REVALUATION` already runs out of the request thread:
 
-- Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP enqueues
+- Compose `backend` sets `QUANTLINEAGE_EXTERNAL_WORKER=1` so HTTP enqueues
   `QUEUED` rows (`RF-015` CLOSED).
 - Compose `worker` / `python -m app.worker` is a distinct OS process with
   its own QuantLib globals.
@@ -87,7 +87,7 @@ an in-process thread pool.
 |---|---|---|
 | In-process QuantLib (`QuantLibPricingEngine._session`) | `_QL_PROCESS_LOCK` serializes `Settings` / `IndexManager` | None (correct serial bottleneck) |
 | In-process `RiskRunWorker` `ThreadPoolExecutor` | Schedules risk-run **jobs** only; pricing still takes the process lock | Job overlap, not QL overlap |
-| Compose `backend` + `RISKFORGE_EXTERNAL_WORKER=1` | HTTP enqueues `QUEUED` rows; does not execute full reval in the API process | API process stays off the QL work |
+| Compose `backend` + `QUANTLINEAGE_EXTERNAL_WORKER=1` | HTTP enqueues `QUEUED` rows; does not execute full reval in the API process | API process stays off the QL work |
 | Compose `worker` / `python -m app.worker` | Separate OS process claims and executes runs | One QuantLib address space per worker |
 | Extra worker replicas | `FOR UPDATE SKIP LOCKED` claim | Process-level scale-out |
 | Native scenario kernel | Δ-Γ buffers only; no QuantLib types or settings | Shock-index threads inside the `.so` |
@@ -110,7 +110,7 @@ process — not more threads in that loop.
 | Assume QuantLib is thread-safe for evaluation date | Process-global `Settings`; concurrent mutation is undefined / races. |
 | Remove RLock and rely on GIL | GIL does not protect C++ QuantLib globals across extension calls. |
 | Thread-parallel FULL_REVAL without lock | Unsafe; would change numerical/process behavior under load. |
-| Move QuantLib into the native scenario `.so` | Violates “pricing library prices; RiskForge aggregates”; couples ABI to QL. |
+| Move QuantLib into the native scenario `.so` | Violates “pricing library prices; QuantLineage aggregates”; couples ABI to QL. |
 | ProcessPoolExecutor for every risk run now | Heavier ops change; still documents single-process poll + future claim/lease. Prefer documenting the target architecture over premature rewrite. |
 | Chunked `ProcessPoolExecutor` inside `full_revaluation_pnl_series` (R0.6.5 option A) | Not justified: pickling/reconstructing QuantLib per chunk is not cheap; R0.6.1 is identity-not-SLA; Compose worker already is the process partition. |
 

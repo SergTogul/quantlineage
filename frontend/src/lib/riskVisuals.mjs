@@ -1,3 +1,5 @@
+import { money } from './risk.mjs'
+
 /**
  * Display-only mapping for contribution bars and KR-DV01 tenor charts.
  * Passes API amounts through; does not recompute contributions or sum KR tenors.
@@ -67,7 +69,20 @@ export function keyRateDv01Chart(rows) {
  * SVG polyline from an API dated series. Y is display scale on min/max
  * of the payload values — not a volatility, Sharpe, or drawdown measure.
  */
-export function datedSeriesChart(series, { width = 640, height = 96, pad = 4 } = {}) {
+export function formatChartValue(value, unit = '') {
+  if (value == null || !Number.isFinite(Number(value))) return '—'
+  const n = Number(value)
+  const u = String(unit || '').toLowerCase()
+  if (u.includes('currency')) return money(n)
+  if (u.includes('fraction') || u.includes('percent') || u.includes('drawdown')) {
+    return `${(n * 100).toFixed(2)}%`
+  }
+  const abs = Math.abs(n)
+  if (abs >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 1 })
+  return n.toFixed(2)
+}
+
+export function datedSeriesChart(series, { width = 640, height = 96, pad = 4, unit = '' } = {}) {
   const list = Array.isArray(series) ? series : []
   const rowsIn = []
   for (const point of list) {
@@ -75,7 +90,19 @@ export function datedSeriesChart(series, { width = 640, height = 96, pad = 4 } =
     if (!Number.isFinite(value)) continue
     rowsIn.push({ as_of: point.as_of, value })
   }
-  if (!rowsIn.length) return { points: '', rows: [], min: 0, max: 0 }
+  if (!rowsIn.length) {
+    return {
+      points: '',
+      rows: [],
+      min: 0,
+      max: 0,
+      minLabel: '—',
+      maxLabel: '—',
+      firstDate: '',
+      lastDate: '',
+      midLabel: '—',
+    }
+  }
   let min = rowsIn[0].value
   let max = rowsIn[0].value
   for (const row of rowsIn) {
@@ -96,6 +123,11 @@ export function datedSeriesChart(series, { width = 640, height = 96, pad = 4 } =
     rows,
     min,
     max,
+    minLabel: formatChartValue(min, unit),
+    maxLabel: formatChartValue(max, unit),
+    midLabel: formatChartValue((min + max) / 2, unit),
+    firstDate: String(rowsIn[0].as_of || ''),
+    lastDate: String(rowsIn[rowsIn.length - 1].as_of || ''),
   }
 }
 

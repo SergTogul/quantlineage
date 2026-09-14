@@ -34,7 +34,7 @@ USD_10Y = RateZero("USD", "10Y")
 def test_build_historical_risk_engine_uses_per_factor_panel(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     engine = build_historical_risk_engine()
     assert engine.factor_panel is not None
     assert engine.factor_panel.is_per_name_per_tenor_panel is True
@@ -61,7 +61,7 @@ def test_production_panel_equities_and_tenors_move_independently(
     Independence is a synthetic-panel property. Demo/file CSVs broadcast the
     four macro columns onto each typed factor family, so NVDA and SPY match.
     """
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     engine = build_historical_risk_engine(
         historical_dataset_id=SYNTHETIC_HISTORICAL_DATASET_ID
     )
@@ -111,7 +111,7 @@ def test_production_panel_equities_and_tenors_move_independently(
 def test_four_macro_path_still_available_without_panel(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     engine = HistoricalRiskEngine(dataset=load_demo_historical_dataset(), factor_panel=None)
     assert engine.factor_panel is None
     assert engine.dataset.projection == "four_macro_demo"
@@ -124,7 +124,7 @@ def test_four_macro_path_still_available_without_panel(
 def test_build_portfolio_service_inherits_factory_panel(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service()
     assert isinstance(service.risk, HistoricalRiskEngine)
     assert service.risk.factor_panel is not None
@@ -163,7 +163,7 @@ def test_production_full_revaluation_es_on_sample_book(
     from app.domain.models import VaRMethodology
     from app.sample import SAMPLE_PORTFOLIO
 
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service(observations=8, seed=7)
     report = service.es_contributions(
         SAMPLE_PORTFOLIO, methodology=VaRMethodology.FULL_REVALUATION
@@ -182,7 +182,7 @@ def _write_factor_csv(path: Path, *, equity: list[float], vol: list[float], rate
 
 def test_csv_dataset_owns_factor_panel_and_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Review Test A: two same-length CSVs must not share a synthetic panel."""
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     n = 24
     path_a = tmp_path / "hist_a.csv"
     path_b = tmp_path / "hist_b.csv"

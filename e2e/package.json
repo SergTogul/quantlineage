@@ -1,5 +1,5 @@
 {
-  "name": "riskforge-e2e",
+  "name": "quantlineage-e2e",
   "private": true,
   "version": "0.1.0",
   "scripts": {

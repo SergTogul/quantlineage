@@ -1,6 +1,6 @@
 """Resolve option implied vol from ``MarketSnapshot.vol_surfaces`` when present.
 
-Rebuilds RiskForge ``VolSurface`` from the snapshot payload grid
+Rebuilds QuantLineage ``VolSurface`` from the snapshot payload grid
 (``expiry|moneyness`` → vol). QuantLib types stay out of this module.
 """
 

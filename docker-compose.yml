@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: riskforge
-      POSTGRES_PASSWORD: riskforge
-      POSTGRES_DB: riskforge
+      POSTGRES_USER: quantlineage
+      POSTGRES_PASSWORD: quantlineage
+      POSTGRES_DB: quantlineage
     # Local demo: bind to loopback so a laptop on a shared network does not expose Postgres.
     ports: ["127.0.0.1:5432:5432"]
     volumes:
-      - riskforge_pgdata:/var/lib/postgresql/data
+      - quantlineage_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U riskforge -d riskforge"]
+      test: ["CMD-SHELL", "pg_isready -U quantlineage -d quantlineage"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -19,13 +19,13 @@ services:
   backend:
     build: ./backend
     environment:
-      RISKFORGE_PRICING_ENGINE: quantlib
+      QUANTLINEAGE_PRICING_ENGINE: quantlib
       # SQLAlchemy URL (psycopg3). Host ``postgres`` is the Compose service name.
-      RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@postgres:5432/riskforge
+      QUANTLINEAGE_DATABASE_URL: postgresql+psycopg://quantlineage:quantlineage@postgres:5432/quantlineage
       # Defer execution to the ``worker`` service (shared Postgres QUEUED rows).
-      RISKFORGE_EXTERNAL_WORKER: "1"
+      QUANTLINEAGE_EXTERNAL_WORKER: "1"
     # Local demo: bind to loopback (unauthenticated API; not internet-ready).
-    # Shared/non-loopback: set RISKFORGE_SHARED_DEPLOYMENT=1 and RISKFORGE_API_TOKEN (R0.11.5).
+    # Shared/non-loopback: set QUANTLINEAGE_SHARED_DEPLOYMENT=1 and QUANTLINEAGE_API_TOKEN (R0.11.5).
     ports: ["127.0.0.1:8000:8000"]
     depends_on:
       postgres:
@@ -38,10 +38,10 @@ services:
     build: ./backend
     command: ["python", "-m", "app.worker"]
     environment:
-      RISKFORGE_PRICING_ENGINE: quantlib
-      RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:riskforge@postgres:5432/riskforge
-      RISKFORGE_WORKER_POLL_INTERVAL: "2"
-      RISKFORGE_WORKER_POLL_BATCH: "10"
+      QUANTLINEAGE_PRICING_ENGINE: quantlib
+      QUANTLINEAGE_DATABASE_URL: postgresql+psycopg://quantlineage:quantlineage@postgres:5432/quantlineage
+      QUANTLINEAGE_WORKER_POLL_INTERVAL: "2"
+      QUANTLINEAGE_WORKER_POLL_BATCH: "10"
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,4 +53,4 @@ services:
     depends_on: [backend]
 
 volumes:
-  riskforge_pgdata:
+  quantlineage_pgdata:

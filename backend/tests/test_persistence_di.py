@@ -1,4 +1,4 @@
-"""M5.6: optional FastAPI persistence DI via RISKFORGE_DATABASE_URL."""
+"""M5.6: optional FastAPI persistence DI via QUANTLINEAGE_DATABASE_URL."""
 from __future__ import annotations
 
 import time
@@ -40,18 +40,18 @@ from app.sample import SAMPLE_PORTFOLIO
 
 @pytest.fixture
 def clear_db_url(monkeypatch):
-    monkeypatch.delenv('RISKFORGE_DATABASE_URL', raising=False)
+    monkeypatch.delenv('QUANTLINEAGE_DATABASE_URL', raising=False)
 
 def test_get_configured_database_url_none_when_unset(clear_db_url, monkeypatch):
-    monkeypatch.delenv('RISKFORGE_DATABASE_URL', raising=False)
+    monkeypatch.delenv('QUANTLINEAGE_DATABASE_URL', raising=False)
     assert get_configured_database_url() is None
 
 def test_get_configured_database_url_strips_blank(monkeypatch):
-    monkeypatch.setenv('RISKFORGE_DATABASE_URL', '   ')
+    monkeypatch.setenv('QUANTLINEAGE_DATABASE_URL', '   ')
     assert get_configured_database_url() is None
 
 def test_get_configured_database_url_returns_value(monkeypatch):
-    monkeypatch.setenv('RISKFORGE_DATABASE_URL', 'sqlite:///./tmp.db')
+    monkeypatch.setenv('QUANTLINEAGE_DATABASE_URL', 'sqlite:///./tmp.db')
     assert get_configured_database_url() == 'sqlite:///./tmp.db'
 
 def test_default_portfolio_is_sample_without_database_url(clear_db_url):
@@ -136,10 +136,10 @@ def _wait_terminal(client: TestClient, run_id: str, *, timeout_s: float=30.0) ->
     raise AssertionError(f'run {run_id} did not finish; last={last}')
 
 def test_database_url_wires_sqlalchemy_portfolio_and_risk_runs(monkeypatch, tmp_path, tiny_portfolio):
-    """When RISKFORGE_DATABASE_URL is set, lifespan uses SQLAlchemy repos."""
+    """When QUANTLINEAGE_DATABASE_URL is set, lifespan uses SQLAlchemy repos."""
     db_path = tmp_path / 'm56_di.db'
     url = f'sqlite:///{db_path}'
-    monkeypatch.setenv('RISKFORGE_DATABASE_URL', url)
+    monkeypatch.setenv('QUANTLINEAGE_DATABASE_URL', url)
     from app.main import app
     with TestClient(app) as client:
         svc = client.app.state.portfolio_service
@@ -179,7 +179,7 @@ def test_database_url_wires_sqlalchemy_portfolio_and_risk_runs(monkeypatch, tmp_
 def test_database_url_seeds_snapshots_scenarios_limits(monkeypatch, tmp_path):
     """SQLAlchemy path seeds market snapshot, scenarios, and limit definitions."""
     db_path = tmp_path / 'm56_seed.db'
-    monkeypatch.setenv('RISKFORGE_DATABASE_URL', f'sqlite:///{db_path}')
+    monkeypatch.setenv('QUANTLINEAGE_DATABASE_URL', f'sqlite:///{db_path}')
     from app.main import app
     with TestClient(app) as client:
         factory = client.app.state.session_factory
@@ -203,7 +203,7 @@ def test_database_url_seeds_snapshots_scenarios_limits(monkeypatch, tmp_path):
 
 def test_depends_repos_available_with_database_url(monkeypatch, tmp_path):
     """Depends() resolves SQLAlchemy repos when DATABASE_URL is set."""
-    monkeypatch.setenv('RISKFORGE_DATABASE_URL', f"sqlite:///{tmp_path / 'm56_depends.db'}")
+    monkeypatch.setenv('QUANTLINEAGE_DATABASE_URL', f"sqlite:///{tmp_path / 'm56_depends.db'}")
     from app.main import app
 
     @app.get('/_test/di/sql-repos')
@@ -221,7 +221,7 @@ def test_depends_repos_available_with_database_url(monkeypatch, tmp_path):
 
 def test_sqlalchemy_portfolio_reflects_db_updates(monkeypatch, tmp_path):
     db_path = tmp_path / 'm56_portfolio.db'
-    monkeypatch.setenv('RISKFORGE_DATABASE_URL', f'sqlite:///{db_path}')
+    monkeypatch.setenv('QUANTLINEAGE_DATABASE_URL', f'sqlite:///{db_path}')
     from app.main import app
     with TestClient(app) as client:
         factory = client.app.state.session_factory

@@ -147,7 +147,7 @@ def test_list_and_get_demo_portfolio_api(clear_db_url):
 
 def test_sqlalchemy_seed_includes_all_demo_portfolios(monkeypatch, tmp_path, clear_db_url):
     db_path = tmp_path / "m101_demos.db"
-    monkeypatch.setenv("RISKFORGE_DATABASE_URL", f"sqlite:///{db_path}")
+    monkeypatch.setenv("QUANTLINEAGE_DATABASE_URL", f"sqlite:///{db_path}")
 
     from app.main import app
 
@@ -166,7 +166,7 @@ def test_sqlalchemy_seed_includes_all_demo_portfolios(monkeypatch, tmp_path, cle
 
 @pytest.fixture
 def clear_db_url(monkeypatch):
-    monkeypatch.delenv("RISKFORGE_DATABASE_URL", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_DATABASE_URL", raising=False)
 
 
 def test_aggregate_demo_snapshots_seed_required_equity_dividend_yields():

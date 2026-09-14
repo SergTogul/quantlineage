@@ -110,11 +110,11 @@ _MEMO_LOCK = threading.RLock()
 
 
 def scenario_memo_enabled() -> bool:
-    return _env_flag("RISKFORGE_SCENARIO_CACHE", default=True)
+    return _env_flag("QUANTLINEAGE_SCENARIO_CACHE", default=True)
 
 
 def _memo_maxsize() -> int:
-    raw = os.getenv("RISKFORGE_SCENARIO_CACHE_SIZE", "1024").strip()
+    raw = os.getenv("QUANTLINEAGE_SCENARIO_CACHE_SIZE", "1024").strip()
     try:
         return max(1, int(raw))
     except ValueError:

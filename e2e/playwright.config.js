@@ -13,8 +13,8 @@ const isCI = !!process.env.CI
 const useChromeChannel = !isCI && process.env.PLAYWRIGHT_USE_CHROMIUM !== '1'
 
 function backendServerCommand() {
-  if (process.env.RISKFORGE_E2E_UVICORN) {
-    return `${process.env.RISKFORGE_E2E_UVICORN} app.main:app --host 127.0.0.1 --port 8000`
+  if (process.env.QUANTLINEAGE_E2E_UVICORN) {
+    return `${process.env.QUANTLINEAGE_E2E_UVICORN} app.main:app --host 127.0.0.1 --port 8000`
   }
   if (fs.existsSync(venvUvicorn)) {
     return `"${venvUvicorn}" app.main:app --host 127.0.0.1 --port 8000`
@@ -56,8 +56,8 @@ module.exports = defineConfig({
       env: {
         ...process.env,
         PYTHONPATH: backend,
-        // PR e2e stays builtin. Nightly QuantLib E2E sets RISKFORGE_PRICING_ENGINE=quantlib.
-        RISKFORGE_PRICING_ENGINE: process.env.RISKFORGE_PRICING_ENGINE || 'builtin',
+        // PR e2e stays builtin. Nightly QuantLib E2E sets QUANTLINEAGE_PRICING_ENGINE=quantlib.
+        QUANTLINEAGE_PRICING_ENGINE: process.env.QUANTLINEAGE_PRICING_ENGINE || 'builtin',
       },
     },
     {
