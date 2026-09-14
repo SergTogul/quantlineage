@@ -15,7 +15,7 @@ RF-001, RF-002, RF-003, RF-004, RF-005, RF-006, RF-008, RF-009, RF-015 (and prio
 
 ## Global Constraints
 
-1. Pricing library prices; RiskForge manages portfolio risk; LLM never invents numbers.
+1. Pricing library prices; QuantLineage manages portfolio risk; LLM never invents numbers.
 2. Preserve numerical identity vs golden/pre-change suites unless an ADR documents a breaking convention.
 3. Do not change numerical methodology solely for performance.
 4. Do not expand native C++ VaR/QuantLib kernels in R0 (Python-side QuantLib reuse OK).

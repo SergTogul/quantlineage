@@ -58,7 +58,7 @@ Included in this Wave C C6 commit (`feat(wave-c): add adversarial eval harness f
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_wave_c_evals.py tests/test_wave_c_grounding.py tests/test_wave_c_orchestration.py tests/test_ai_query_orchestration.py tests/test_wave_c_mcp.py tests/test_wave_c_tool_contracts.py
 .venv/bin/ruff check app/risk/query.py app/risk/tool_contracts.py tests/test_wave_c_evals.py
 ```

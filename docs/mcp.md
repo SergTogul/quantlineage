@@ -1,4 +1,4 @@
-# RiskForge MCP (Wave C)
+# QuantLineage MCP (Wave C)
 
 Thin, **allowlist-only** MCP over existing deterministic tools. The server
 registers `TOOL_CONTRACTS` from `app.risk.query` and dispatches through
@@ -31,7 +31,7 @@ Reuse existing Bearer mapping (RF-014):
 
 - Local / loopback: unauthenticated, same as HTTP demo.
 - Shared deployment: send `Authorization: Bearer …` on `tools/call`, or set
-  `RISKFORGE_MCP_AUTHORIZATION` for the stdio process (for example
+  `QUANTLINEAGE_MCP_AUTHORIZATION` for the stdio process (for example
   `Bearer <token>`).
 
 The MCP layer does not add a second token scheme.
@@ -41,13 +41,13 @@ The MCP layer does not add a second token scheme.
 ```json
 {
   "mcpServers": {
-    "riskforge": {
+    "quantlineage": {
       "command": "python",
       "args": ["-m", "app.mcp"],
       "cwd": "backend",
       "env": {
         "PYTHONPATH": ".",
-        "RISKFORGE_MCP_AUTHORIZATION": "Bearer <token-if-shared>"
+        "QUANTLINEAGE_MCP_AUTHORIZATION": "Bearer <token-if-shared>"
       }
     }
   }
@@ -68,7 +68,7 @@ PYTHONPATH=. python ../docs/examples/mcp_stdio_client.py
 
 ## What this is not
 
-- Not a model host. Clients may attach an LLM; RiskForge still only executes
+- Not a model host. Clients may attach an LLM; QuantLineage still only executes
   allowlisted tools.
 - Not a rewrite of MCP internals (`backend/app/mcp.py` stays the thin facade).
 - Not a path to invent risk figures when a tool refuses or fails.

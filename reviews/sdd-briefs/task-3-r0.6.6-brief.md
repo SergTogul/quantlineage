@@ -4,7 +4,7 @@
 **Owner agent:** Portfolio Risk Engineer — read `docs/agents/04_PORTFOLIO_RISK_ENGINEER.md`, `AGENTS.md`, `docs/agents/WORKFLOW.md`, `docs/agents/DEFINITION_OF_DONE.md`  
 **Finding:** RF-007 — keep **IN PROGRESS** (do not CLOSED)  
 **Milestone:** `reviews/REMEDIATION_MILESTONE.md` § R0.6.6  
-**Workspace:** `/Users/user/src/riskforge-mvp` branch `r0-core-remediation`  
+**Workspace:** `/Users/user/src/quantlineage` branch `r0-core-remediation`  
 **BASE:** `68c302a` (Task 2 APPROVE)
 
 ## Goal
@@ -33,7 +33,7 @@ Today `_aggregate_factor_pnl_full_reval` (and panel variant) can apply family-on
 ## Suggested tests
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_es.py \
   tests/test_var.py \

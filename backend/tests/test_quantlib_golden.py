@@ -1,7 +1,7 @@
 """Golden / reference QuantLib comparisons (M1.8 baseline + M9.4 expand).
 
 Uses ``tests.quantlib_gate.import_quantlib`` so environments without QuantLib
-still skip these goldens, unless ``RISKFORGE_REQUIRE_QUANTLIB=1`` (R0.1.6).
+still skip these goldens, unless ``QUANTLINEAGE_REQUIRE_QUANTLIB=1`` (R0.1.6).
 
 Numerical conventions (documented for M9.4)
 -------------------------------------------

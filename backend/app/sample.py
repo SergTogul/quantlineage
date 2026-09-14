@@ -42,7 +42,7 @@ EQUITY_VOL_PORTFOLIO = Portfolio.model_validate(
     {
         "id": "equity-vol",
         "name": "Equity Vol Demo",
-        "firm": "RiskForge",
+        "firm": "QuantLineage",
         "desk": "Equity Derivatives",
         "strategy": "Vol Trading",
         "positions": [
@@ -130,7 +130,7 @@ RATES_MACRO_PORTFOLIO = Portfolio.model_validate(
     {
         "id": "rates-macro",
         "name": "Rates Macro Demo",
-        "firm": "RiskForge",
+        "firm": "QuantLineage",
         "desk": "Rates",
         "strategy": "Macro Rates",
         "positions": [
@@ -198,7 +198,7 @@ CROSS_ASSET_PORTFOLIO = Portfolio.model_validate(
     {
         "id": "global-macro",
         "name": "Global Macro Demo",
-        "firm": "RiskForge",
+        "firm": "QuantLineage",
         "desk": "Global Macro",
         "strategy": "Multi-Asset",
         "positions": [

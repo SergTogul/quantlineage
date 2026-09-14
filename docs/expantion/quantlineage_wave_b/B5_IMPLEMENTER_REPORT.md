@@ -60,7 +60,7 @@ Added a `historical-analytics` nav section. The page issues a new POST when star
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/frontend
+cd /Users/user/src/quantlineage/frontend
 npm test -- src/components/HistoricalAnalytics.test.jsx
 npm test
 npm run lint
@@ -83,7 +83,7 @@ npm run build
 
 ## Known limitations / risks
 - G5 is **not DONE**: independent review + CI still required.
-- Endpoint is HEAVY and is **not** a RiskRun type. When `RISKFORGE_HEAVY_INLINE=0` / external worker, the page surfaces the 400 refuse; it does not invent a run_type.
+- Endpoint is HEAVY and is **not** a RiskRun type. When `QUANTLINEAGE_HEAVY_INLINE=0` / external worker, the page surfaces the 400 refuse; it does not invent a run_type.
 - Default window is `2024-01-02`–`2024-11-15` (packaged demo coverage). A range change always POSTs again; stale responses are dropped by a request seq.
 - Display `%` is formatting only; hostile review should still attack percent/fraction confusion.
 - No B6 demo walkthrough.

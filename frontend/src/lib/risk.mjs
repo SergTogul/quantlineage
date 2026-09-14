@@ -803,6 +803,7 @@ export function runProvenanceSummary(payload) {
     as_of: payload.as_of ?? null,
     historical_dataset_id: payload.historical_dataset_id ?? null,
     historical_dataset_version: payload.historical_dataset_version ?? null,
+    data_source_label: payload.data_source_label ?? null,
     pricing_engine_version: payload.pricing_engine_version ?? null,
     methodology: payload.methodology ?? null,
     scenario_set: [...(payload.scenario_set || [])],

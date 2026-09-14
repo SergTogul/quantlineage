@@ -3,7 +3,7 @@
 
 Usage (from repo root)::
 
-    cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin \\
+    cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin \\
       ../.venv/bin/python ../scripts/run_demo_risk.py --check -o ../data/demo_risk_artifact.json
 
 Or with the backend venv::

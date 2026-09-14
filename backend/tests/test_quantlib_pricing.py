@@ -221,7 +221,7 @@ def test_quantlib_equity_option_uses_surface_term_structure_not_point_sigma(engi
         dividend_yields={"ABC": 0.0},
     )
     # ATM remains 20%, while moneyness 1.1 is 25%; the QL adapter must consume
-    # the full grid directly rather than asking RiskForge for one interpolated vol.
+    # the full grid directly rather than asking QuantLineage for one interpolated vol.
     with_surface = attach_vol_surface(scalar, _skewed_equity_surface("ABC", 0.20, 0.50))
     scalar_pv = BuiltinPricingEngine().value(opt, scalar).market_value
 

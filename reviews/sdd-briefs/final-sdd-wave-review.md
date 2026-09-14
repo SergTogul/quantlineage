@@ -130,7 +130,7 @@ Task 3 **did** change FULL_REVAL / stress *factor bucket* meaning: isolated-fami
 Independent focused run (not implementer-reported):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line \
   tests/test_quantlib_reuse.py \
   tests/test_pricing_anti_cache.py \
@@ -156,7 +156,7 @@ Did not re-run the full backend suite (~1200). No C++ / frontend / workflow edit
 - Contribution reuse is structural (call-count / empty `apply` lists), not a wall-clock story. Reconcile is preserved.
 - Option B is the right R0.6.5 call: document the shipped RiskRun partition rather than pickle QuantLib into an unused process pool.
 - Task 5 overreach was reverted; Task 6 scoring was corrected without amending `c12de23`.
-- Bench harness records 10×50 without floors; R0.6.1 identity pin kept; QuantLib skip-or-run with fail-closed `RISKFORGE_REQUIRE_QUANTLIB`.
+- Bench harness records 10×50 without floors; R0.6.1 identity pin kept; QuantLib skip-or-run with fail-closed `QUANTLINEAGE_REQUIRE_QUANTLIB`.
 - Ownership stayed inside each slice’s charter paths; no dual-owned file fights in the range.
 
 ---

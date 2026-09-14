@@ -12,7 +12,7 @@ import { API_V1 } from '../api.js'
 const demoPortfolio = {
   id: 'demo',
   name: 'Demo',
-  firm: 'RiskForge',
+  firm: 'QuantLineage',
   desk: 'Global Macro',
   positions: [{ id: 'eq-1', type: 'equity', symbol: 'SPY', quantity: 100, book: 'Equity' }],
 }
@@ -67,26 +67,26 @@ const FLAGSHIP_REPORT = {
   hierarchy_contributors: [
     {
       level: 'firm',
-      name: 'RiskForge',
-      path: 'RiskForge',
+      name: 'QuantLineage',
+      path: 'QuantLineage',
       delta_risk: 300,
       children: [
         {
           level: 'desk',
           name: 'Global Macro',
-          path: 'RiskForge/Global Macro',
+          path: 'QuantLineage/Global Macro',
           delta_risk: 300,
           children: [
             {
               level: 'book',
               name: 'Equity',
-              path: 'RiskForge/Global Macro/Equity',
+              path: 'QuantLineage/Global Macro/Equity',
               delta_risk: 300,
               children: [
                 {
                   level: 'trade',
                   name: 'eq-1',
-                  path: 'RiskForge/Global Macro/Equity/eq-1',
+                  path: 'QuantLineage/Global Macro/Equity/eq-1',
                   position_id: 'eq-1',
                   delta_risk: 300,
                   children: [],
@@ -228,7 +228,7 @@ describe('RiskChangeAttribution flagship card', () => {
     const { user } = await compareFlagship()
     const drill = screen.getByTestId('risk-change-drill')
     expect(drill).toHaveTextContent(/firm/i)
-    expect(drill).toHaveTextContent('RiskForge')
+    expect(drill).toHaveTextContent('QuantLineage')
     await user.click(screen.getByRole('button', { name: /desk Global Macro/i }))
     expect(drill).toHaveTextContent(/desk/i)
     expect(drill).toHaveTextContent('Global Macro')

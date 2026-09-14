@@ -30,10 +30,10 @@ REQUIRED_PATHS = (
     "data/demo_multi_factor_history.csv",
     "data/demo_risk_artifact.json",
     "docs/demo/final_demo.md",
-    "docs/demo/riskforge_demo_01_overview.png",
-    "docs/demo/riskforge_demo_02_portfolio.png",
-    "docs/demo/riskforge_demo_03_var_es.png",
-    "docs/demo/riskforge_demo_04_stress.png",
+    "docs/demo/quantlineage_demo_01_overview.png",
+    "docs/demo/quantlineage_demo_02_portfolio.png",
+    "docs/demo/quantlineage_demo_03_var_es.png",
+    "docs/demo/quantlineage_demo_04_stress.png",
     "backend/app/demo/run_demo_risk.py",
     "scripts/run_demo_risk.py",
 )
@@ -50,11 +50,11 @@ def check_final_demo(*, output: Path | None = None) -> dict[str, Any]:
         _require_file(ROOT / relpath)
 
     # Force the same deterministic path documented for the final portfolio demo.
-    os.environ["RISKFORGE_PRICING_ENGINE"] = "builtin"
-    os.environ["RISKFORGE_SCENARIO_KERNEL"] = "python"
-    os.environ["RISKFORGE_PRICING_CACHE"] = "0"
-    os.environ["RISKFORGE_CURVE_CACHE"] = "0"
-    os.environ["RISKFORGE_SCENARIO_CACHE"] = "0"
+    os.environ["QUANTLINEAGE_PRICING_ENGINE"] = "builtin"
+    os.environ["QUANTLINEAGE_SCENARIO_KERNEL"] = "python"
+    os.environ["QUANTLINEAGE_PRICING_CACHE"] = "0"
+    os.environ["QUANTLINEAGE_CURVE_CACHE"] = "0"
+    os.environ["QUANTLINEAGE_SCENARIO_CACHE"] = "0"
 
     from app.demo.run_demo_risk import run_demo_risk
     from app.risk.historical_data import DEMO_MULTI_FACTOR_DATASET_ID
@@ -64,7 +64,7 @@ def check_final_demo(*, output: Path | None = None) -> dict[str, Any]:
     tempdir: tempfile.TemporaryDirectory[str] | None = None
     try:
         if output is None:
-            tempdir = tempfile.TemporaryDirectory(prefix="riskforge-final-demo-")
+            tempdir = tempfile.TemporaryDirectory(prefix="quantlineage-final-demo-")
             artifact_path = Path(tempdir.name) / "demo_risk_artifact.json"
         else:
             artifact_path = output

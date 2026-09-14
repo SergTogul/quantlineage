@@ -52,13 +52,13 @@ Disabled the per-snapshot valuation LRU for unique-shock / FULL_REVALUATION exec
 ## Commands Executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_pricing_anti_cache.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py tests/test_quantlib_reuse.py tests/test_pricing*.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py tests/test_quantlib_reuse.py tests/test_pricing*.py tests/test_curve_cache.py tests/test_full_reval_golden.py tests/test_var_methodology.py tests/test_es_contributions.py
 .venv/bin/python -m ruff check app/pricing/cache.py app/pricing/factory.py app/risk/historical.py app/risk/var.py app/risk/es.py tests/test_pricing_anti_cache.py
 .venv/bin/python -m mypy app/pricing/cache.py app/risk/historical.py app/risk/var.py app/risk/es.py
-cd /Users/user/src/riskforge-mvp && /usr/bin/git diff --check
+cd /Users/user/src/quantlineage && /usr/bin/git diff --check
 ```
 
 `tests/test_cache*.py` from the brief does not exist; `tests/test_pricing_cache.py` is included via `tests/test_pricing*.py`.

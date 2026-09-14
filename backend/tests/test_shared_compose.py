@@ -2,7 +2,7 @@
 
 Local ``docker-compose.yml`` stays unauthenticated loopback HTTP.
 Shared overlay/file publishes 443 (not raw 8000) and does not hardcode
-``POSTGRES_PASSWORD=riskforge``.
+``POSTGRES_PASSWORD=quantlineage``.
 """
 
 from __future__ import annotations
@@ -31,9 +31,9 @@ def test_shared_compose_publishes_443_not_raw_8000() -> None:
 
 def test_shared_compose_does_not_hardcode_demo_postgres_password() -> None:
     text = SHARED_COMPOSE.read_text(encoding="utf-8")
-    assert "POSTGRES_PASSWORD=riskforge" not in text
-    assert "POSTGRES_PASSWORD: riskforge" not in text
-    assert "riskforge:riskforge@" not in text
+    assert "POSTGRES_PASSWORD=quantlineage" not in text
+    assert "POSTGRES_PASSWORD: quantlineage" not in text
+    assert "quantlineage:quantlineage@" not in text
     assert "${POSTGRES_PASSWORD:?}" in text
 
 
@@ -41,16 +41,16 @@ def test_shared_env_example_documents_secret_placeholders() -> None:
     assert ENV_EXAMPLE.is_file()
     text = ENV_EXAMPLE.read_text(encoding="utf-8")
     assert "POSTGRES_PASSWORD=" in text
-    assert "RISKFORGE_API_TOKEN=" in text
-    assert "riskforge" not in text.lower() or "POSTGRES_PASSWORD=" in text
-    assert not re.search(r"^POSTGRES_PASSWORD=riskforge\s*$", text, re.MULTILINE)
+    assert "QUANTLINEAGE_API_TOKEN=" in text
+    assert "quantlineage" not in text.lower() or "POSTGRES_PASSWORD=" in text
+    assert not re.search(r"^POSTGRES_PASSWORD=quantlineage\s*$", text, re.MULTILINE)
 
 
 def test_local_compose_keeps_demo_password_and_loopback_8000() -> None:
     text = LOCAL_COMPOSE.read_text(encoding="utf-8")
-    assert "POSTGRES_PASSWORD: riskforge" in text
+    assert "POSTGRES_PASSWORD: quantlineage" in text
     assert "127.0.0.1:8000:8000" in text
-    assert "RISKFORGE_SHARED_DEPLOYMENT:" not in text
+    assert "QUANTLINEAGE_SHARED_DEPLOYMENT:" not in text
 
 
 def test_shared_frontend_bakes_same_origin_api() -> None:

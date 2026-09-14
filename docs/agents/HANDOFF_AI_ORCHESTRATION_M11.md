@@ -5,7 +5,7 @@ M11 AI risk assistant orchestration completion slice
 AI Orchestration Engineer
 
 ## Summary
-Completed the remaining Workstream 11 AI assistant slice by adding a provider-agnostic one-turn model/tool orchestration contract on top of the existing deterministic router and RiskForge tool executor. A model can now request exactly one supported deterministic tool, ask for clarification, or refuse unsupported/advisory prompts; RiskForge executes the tool and formats final answers only from returned tool payloads.
+Completed the remaining Workstream 11 AI assistant slice by adding a provider-agnostic one-turn model/tool orchestration contract on top of the existing deterministic router and QuantLineage tool executor. A model can now request exactly one supported deterministic tool, ask for clarification, or refuse unsupported/advisory prompts; QuantLineage executes the tool and formats final answers only from returned tool payloads.
 
 ## Files changed
 - `backend/app/risk/query.py`
@@ -22,7 +22,7 @@ Completed the remaining Workstream 11 AI assistant slice by adding a provider-ag
 - New `RiskQueryEngine.answer_with_model(...)` path:
   - sends serializable deterministic tool contracts to the model adapter;
   - accepts one selected `RiskToolName`, clarification, or refusal;
-  - executes only known deterministic RiskForge tools;
+  - executes only known deterministic QuantLineage tools;
   - ignores any model-proposed answer text until after tool payloads are returned.
 - Existing response metadata remains backward-compatible:
   - `tool_name: str | None`
@@ -32,7 +32,7 @@ Completed the remaining Workstream 11 AI assistant slice by adding a provider-ag
   - `data.supported_tools` for unsupported/clarification responses
 
 ## Numerical conventions
-- Units: unchanged from the backing RiskForge service payloads.
+- Units: unchanged from the backing QuantLineage service payloads.
 - Sign convention: unchanged from the backing deterministic service payloads.
 - Day count/calendar if relevant: not changed.
 - Tolerances/reference: no new numerical methodology. Tests use fixture values to prove answer text is sourced from deterministic tool results and not from model text.
@@ -44,7 +44,7 @@ Completed the remaining Workstream 11 AI assistant slice by adding a provider-ag
 - `test_m11_unsupported_question_refuses_without_running_risk_tool`: verifies unsupported advisory prompt refuses and does not call risk tools.
 - `test_m11_ambiguous_risk_question_asks_for_clarification_without_numbers`: verifies ambiguous risk prompt asks for clarification without numbers.
 - `test_m11_query_endpoint_exposes_tool_contract_metadata`: verifies `/api/v1/risk/query` exposes selected tool contract metadata.
-- `test_m11_model_tool_loop_executes_selected_deterministic_tool`: verifies a model-selected tool is executed through RiskForge only.
+- `test_m11_model_tool_loop_executes_selected_deterministic_tool`: verifies a model-selected tool is executed through QuantLineage only.
 - `test_m11_model_answer_is_ignored_until_tool_payload_returns`: verifies model-proposed numerical text is not used in the final grounded answer.
 - `test_m11_model_clarification_does_not_execute_numerical_tool`: verifies ambiguous model output returns clarification metadata without service calls.
 - `test_m11_model_refusal_does_not_execute_risk_tool`: verifies advisory/unsupported model output refuses without service calls.
@@ -52,11 +52,11 @@ Completed the remaining Workstream 11 AI assistant slice by adding a provider-ag
 ## Commands executed
 ```bash
 cd backend
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_ai_query_orchestration.py -q
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_ai_query_orchestration.py -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_ai_query_orchestration.py -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_ai_query_orchestration.py -q
 .venv/bin/python -m ruff check app/risk/query.py tests/test_ai_query_orchestration.py && .venv/bin/python -m mypy app
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_ai_query_orchestration.py -q && .venv/bin/python -m ruff check app/risk/query.py tests/test_ai_query_orchestration.py && .venv/bin/python -m mypy app
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_ai_query_orchestration.py -q && .venv/bin/python -m ruff check app/risk/query.py tests/test_ai_query_orchestration.py && .venv/bin/python -m mypy app
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest -q
 ```
 
 ## Results

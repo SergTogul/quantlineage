@@ -8,7 +8,7 @@ Market Data & Curves Engineer (+ Backend/API DI wiring in `deps.py` / `Portfolio
 
 ## Summary
 - Shipped packaged CSV `data/demo_historical_factors.csv` (750 observations) as a frozen replay of `SyntheticHistoricalDataset(seed=7, observations=750)` — **no live vendor feeds**.
-- Added CSV loaders + factory (`create_historical_dataset`) with env `RISKFORGE_HISTORICAL_DATASET=demo|synthetic|/path.csv`.
+- Added CSV loaders + factory (`create_historical_dataset`) with env `QUANTLINEAGE_HISTORICAL_DATASET=demo|synthetic|/path.csv`.
 - API DI defaults to the demo CSV; `HistoricalRiskEngine(dataset=None)` still constructs synthetic RNG for ctor backward compatibility.
 - `PortfolioService` shares the injected engine's dataset with `VaRAnalytics` / `ESContributionAnalytics` / related engines.
 - Removed unused orphan `data/sample_portfolio.csv` (superseded by in-code portfolios).
@@ -28,7 +28,7 @@ Market Data & Curves Engineer (+ Backend/API DI wiring in `deps.py` / `Portfolio
 
 ## Public/interface changes
 - **New** Python APIs: `load_factor_observations_csv`, `load_csv_historical_dataset`, `load_demo_historical_dataset`, `demo_historical_dataset_path`, `create_historical_dataset`, `FileHistoricalDataset`, `DEMO_HISTORICAL_DATASET_ID`
-- **New** env: `RISKFORGE_HISTORICAL_DATASET` (`demo` default for factory / API DI)
+- **New** env: `QUANTLINEAGE_HISTORICAL_DATASET` (`demo` default for factory / API DI)
 - No new HTTP routes; risk APIs consume the dataset via DI
 - No PricingEngine interface changes
 
@@ -42,7 +42,7 @@ Market Data & Curves Engineer (+ Backend/API DI wiring in `deps.py` / `Portfolio
 
 ## Commands executed
 ```bash
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest \
  tests/test_demo_historical_dataset.py tests/test_historical_data.py \
  tests/test_scenarios.py tests/test_var_methodology.py tests/test_api.py \
  tests/test_api_router_decomposition.py tests/test_api_v1_compatibility.py \
@@ -50,7 +50,7 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m 
  -q --tb=line
 # → 77 passed, 1 Starlette/httpx warning
 
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest \
  tests/test_demo_historical_dataset.py tests/test_historical_data.py \
  tests/test_api.py tests/test_next_phase.py -q --tb=line
 
@@ -66,12 +66,12 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 - C++: N/A
 - Build: N/A
 - Workstream 10: **PARTIAL** ( DONE; open)
-- Push: SHA `0ab59cb` on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
+- Push: SHA `0ab59cb` on `origin/master` (https://github.com/SergTogul/quantlineage)
 
 ## Known limitations / risks
 - Aggregate factors only (no per-tenor key-rate history in the CSV)
 - Optional `date` column is documentary; engines do not time-align by calendar
-- Default API source is now file-backed demo (numerically = prior seed-7 synthetic); override with `RISKFORGE_HISTORICAL_DATASET=synthetic` if needed
+- Default API source is now file-backed demo (numerically = prior seed-7 synthetic); override with `QUANTLINEAGE_HISTORICAL_DATASET=synthetic` if needed
 - deterministic demo scripts not started
 
 ## Follow-up / next owner

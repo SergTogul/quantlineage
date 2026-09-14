@@ -1,4 +1,4 @@
-# RiskForge Security Review
+# QuantLineage Security Review
 
 ## Executive Summary
 
@@ -8,7 +8,7 @@ Deployment assumption:
 Current repository is a **local/demo development application** without authentication, tenancy, or a documented production security boundary. README, `docs/known_limitations.md`, and architecture docs describe a reproducible MVP risk terminal, not a multi-user internet service. Compose nonetheless publishes Postgres (`5432`), FastAPI (`8000`), and a static frontend (`5173`) with hardcoded demo database credentials and no bind-address restriction. Docker Compose `ports:` mappings typically listen on all host interfaces (`0.0.0.0`), so a `docker compose up` on a shared network is a realistic accidental remote exposure. ROADMAP Workstream 7 (“API Productionization”) is marked complete but covers versioning, typed models, and the error envelope — not authentication, authorization, or workload isolation. That documentation gap is a deployment-boundary ambiguity, not a hidden production auth system.
 
 Review scope:
-Authorized defensive review of the RiskForge repository as of 2026-09-03. Inspected application source (`backend/`, `frontend/`, `backend/native/`), tests, Docker/Compose, CI, requirements, persistence/migrations, ADRs, and AI/query orchestration. No application source was modified. No exploits were developed. Safe local checks: repository search, Pydantic/JSON non-finite acceptance via the backend venv, and `npm audit --omit=dev` (0 production vulnerabilities reported). `pip-audit` is not installed in this checkout and was not added.
+Authorized defensive review of the QuantLineage repository as of 2026-09-03. Inspected application source (`backend/`, `frontend/`, `backend/native/`), tests, Docker/Compose, CI, requirements, persistence/migrations, ADRs, and AI/query orchestration. No application source was modified. No exploits were developed. Safe local checks: repository search, Pydantic/JSON non-finite acceptance via the backend venv, and `npm audit --omit=dev` (0 production vulnerabilities reported). `pip-audit` is not installed in this checkout and was not added.
 
 Finding counts:
 - Critical: 0
@@ -27,12 +27,12 @@ Top security risks:
 
 ### Assets
 
-- Portfolio / trade payloads submitted in request bodies and, when `RISKFORGE_DATABASE_URL` is set, persisted in `portfolios` / `trades`.
+- Portfolio / trade payloads submitted in request bodies and, when `QUANTLINEAGE_DATABASE_URL` is set, persisted in `portfolios` / `trades`.
 - Market snapshot JSON (`market_snapshots` data blob) and in-code/DI default marks.
 - Risk results: VaR/ES, stress, reverse stress, hierarchy, limits, attribution, and named `risk_results` payloads.
 - Risk-run lifecycle rows (`QUEUED` / `RUNNING` / `COMPLETED` / `FAILED`) and `error_message`.
 - Limit and scenario definition rows seeded from in-code defaults.
-- Demo historical factor CSV (`data/demo_historical_factors.csv`) and any path supplied via `RISKFORGE_HISTORICAL_DATASET`.
+- Demo historical factor CSV (`data/demo_historical_factors.csv`) and any path supplied via `QUANTLINEAGE_HISTORICAL_DATASET`.
 - Application integrity: pricing adapters, native scenario kernel, worker claim protocol.
 - Risk-calculation integrity: methodology, units, historical dataset identity, QuantLib evaluation-date isolation.
 - Service availability: CPU/memory of uvicorn, worker processes, native thread pool, and Postgres.
@@ -41,11 +41,11 @@ Top security risks:
 ### Trust Boundaries
 
 - Browser (Vite origin `localhost:5173` or Compose nginx on published 5173) → FastAPI on `:8000`.
-- FastAPI → SQLAlchemy/Postgres when `RISKFORGE_DATABASE_URL` is set; otherwise in-memory repos.
-- FastAPI → in-process `ThreadPoolExecutor` risk-run worker, or enqueue-only API + `python -m app.worker` process (`RISKFORGE_EXTERNAL_WORKER=1`).
+- FastAPI → SQLAlchemy/Postgres when `QUANTLINEAGE_DATABASE_URL` is set; otherwise in-memory repos.
+- FastAPI → in-process `ThreadPoolExecutor` risk-run worker, or enqueue-only API + `python -m app.worker` process (`QUANTLINEAGE_EXTERNAL_WORKER=1`).
 - Python risk engines → `PricingEngine` (QuantLib or builtin). QuantLib `Settings.evaluationDate` is process-global and serialized by an adapter `RLock`.
-- Python historical VaR (LINEAR / DELTA_GAMMA only) → optional C++ `ctypes` kernel when `RISKFORGE_SCENARIO_KERNEL=native`.
-- Operator environment → process: `RISKFORGE_*` env vars, including database URL, historical CSV path, kernel library path, and worker poll settings.
+- Python historical VaR (LINEAR / DELTA_GAMMA only) → optional C++ `ctypes` kernel when `QUANTLINEAGE_SCENARIO_KERNEL=native`.
+- Operator environment → process: `QUANTLINEAGE_*` env vars, including database URL, historical CSV path, kernel library path, and worker poll settings.
 - Future LLM adapter → deterministic tool executor (`RiskQueryEngine.answer_with_model`). **Not wired to HTTP today.**
 
 No server-side fetch of client-supplied URLs was found (no SSRF surface). No live market-data vendor client exists.
@@ -59,7 +59,7 @@ No server-side fetch of client-supplied URLs was found (no SSRF surface). No liv
 - Environment variables and Compose files (database URL, demo Postgres password, historical dataset path, kernel selection).
 - CLI / worker: `python -m app.worker`, `python -m app.demo.run_demo_risk`, benchmark/native compile scripts (not HTTP).
 - CSV historical loader (env or explicit path; not an upload endpoint).
-- Native FFI: `riskforge_portfolio_scenarios` via ctypes from Historical VaR when native kernel is enabled.
+- Native FFI: `quantlineage_portfolio_scenarios` via ctypes from Historical VaR when native kernel is enabled.
 
 ### Threat Actors
 
@@ -106,7 +106,7 @@ Attack / failure precondition:
 The API process is reachable to anyone other than a fully trusted local user. That includes Compose default published ports, `uvicorn --host 0.0.0.0` in `backend/Dockerfile`, or any host firewall that allows :8000. This is a production exposure blocker for remote/multi-user use. It is **not** scored CRITICAL solely because auth is absent: the product is documented as a local demo.
 
 Evidence:
-No `HTTPBearer`, OAuth2, session cookie, API-key dependency, or user model exists under `backend/app/`. Routers depend on `get_portfolio_service` / worker / demo loaders only. FastAPI is constructed as `FastAPI(title="RiskForge API", ...)` with default `/docs` enabled. CORS is limited to Vite origins (`allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"]`, `allow_credentials=True`) which is appropriate for local UI, not a substitute for authentication. Error mapping includes `unauthorized` / `forbidden` / `rate_limited` codes that are unused by routes.
+No `HTTPBearer`, OAuth2, session cookie, API-key dependency, or user model exists under `backend/app/`. Routers depend on `get_portfolio_service` / worker / demo loaders only. FastAPI is constructed as `FastAPI(title="QuantLineage API", ...)` with default `/docs` enabled. CORS is limited to Vite origins (`allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"]`, `allow_credentials=True`) which is appropriate for local UI, not a substitute for authentication. Error mapping includes `unauthorized` / `forbidden` / `rate_limited` codes that are unused by routes.
 
 Impact:
 Confidentiality: any caller can read demo portfolios, compute and retrieve risk results, and poll risk-run payloads. Integrity: any caller can enqueue runs and, with persistence, mutate stored portfolios (see SEC-003). Availability: any caller can invoke expensive engines (see SEC-002). In a future multi-user deployment this is a full missing security boundary, including IDOR on `run_id` / `portfolio_id`.
@@ -194,7 +194,7 @@ Location:
 - backend/app/persistence/wiring.py:46
 
 Attack / failure precondition:
-`RISKFORGE_DATABASE_URL` is set (Compose backend/worker default). Caller can POST `/api/v1/risk/runs` (no auth; SEC-001).
+`QUANTLINEAGE_DATABASE_URL` is set (Compose backend/worker default). Caller can POST `/api/v1/risk/runs` (no auth; SEC-001).
 
 Evidence:
 `RiskRunWorker.submit` saves the request portfolio through `SqlAlchemyPortfolioRepository.save` whenever a session factory is configured. `save` loads by primary key and **replaces name/hierarchy fields and all trades**. The HTTP body supplies `portfolio.id`. Seeded default id is the cross-asset book `global-macro`. There is no owner field, If-Match, or “create vs update” distinction. `GET /portfolio` then returns whatever was last saved under the default id. In-memory mode skips this SQL upsert (only an in-process run cache is used).
@@ -240,10 +240,10 @@ Attack / failure precondition:
 Someone runs `docker compose up` (documented demo path) on a host whose published ports are reachable. Compose `ports: ["5432:5432"]` / `["8000:8000"]` / `["5173:80"]` do not specify `127.0.0.1:`. Demo user/password are the well-known pair documented in README (not an accidentally leaked production secret). No `REDACTED_SECRET_FOUND`: this is an intentional sample DSN that **does** work.
 
 Evidence:
-`POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` are set to the demo identity. Backend and worker `RISKFORGE_DATABASE_URL` embeds the same values. Postgres is published to the host. The API image listens on all interfaces. There is no `USER` directive in `backend/Dockerfile` or `frontend/Dockerfile` (containers run as root). No TLS. `.gitignore` excludes `.env`, but Compose does not require an env file to start with these defaults.
+`POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` are set to the demo identity. Backend and worker `QUANTLINEAGE_DATABASE_URL` embeds the same values. Postgres is published to the host. The API image listens on all interfaces. There is no `USER` directive in `backend/Dockerfile` or `frontend/Dockerfile` (containers run as root). No TLS. `.gitignore` excludes `.env`, but Compose does not require an env file to start with these defaults.
 
 Impact:
-Confidentiality/integrity of the Postgres volume (`riskforge_pgdata`): anyone who can reach :5432 can read/alter portfolios, snapshots, and risk results using the documented password. Combined with SEC-001, :8000 is a second unauthenticated entry to the same data. This is a production exposure blocker if Compose is treated as “how we run RiskForge,” not only a laptop loopback demo.
+Confidentiality/integrity of the Postgres volume (`quantlineage_pgdata`): anyone who can reach :5432 can read/alter portfolios, snapshots, and risk results using the documented password. Combined with SEC-001, :8000 is a second unauthenticated entry to the same data. This is a production exposure blocker if Compose is treated as “how we run QuantLineage,” not only a laptop loopback demo.
 
 Exploitability:
 Connect to host:5432 with the documented demo DSN, or call the published API. No credential guessing required.
@@ -280,10 +280,10 @@ Location:
 - docker-compose.yml:25, 32-40
 
 Attack / failure precondition:
-`RISKFORGE_EXTERNAL_WORKER=1` (Compose `backend`) so HTTP only enqueues; `python -m app.worker` executes runs. Operator or UI treats `GET /risk/runs/{id}` COMPLETED payloads as the system of record. No malicious input is required beyond using the documented Compose path.
+`QUANTLINEAGE_EXTERNAL_WORKER=1` (Compose `backend`) so HTTP only enqueues; `python -m app.worker` executes runs. Operator or UI treats `GET /risk/runs/{id}` COMPLETED payloads as the system of record. No malicious input is required beyond using the documented Compose path.
 
 Evidence:
-API process-wide `portfolio_service` injects `HistoricalRiskEngine(dataset=create_historical_dataset())`. `create_historical_dataset()` reads `RISKFORGE_HISTORICAL_DATASET` and **defaults to the packaged demo CSV**. The worker entrypoint builds `PortfolioService(..., HistoricalRiskEngine())` with **no dataset argument**, so the engine falls back to `SyntheticHistoricalDataset(seed=7, observations=750)` — a different source than the file replay, even when observation counts match. Interactive `POST /risk/var` therefore need not equal a `run_type=var` completed payload for the same book. This is silent: both results look like plausible VaR.
+API process-wide `portfolio_service` injects `HistoricalRiskEngine(dataset=create_historical_dataset())`. `create_historical_dataset()` reads `QUANTLINEAGE_HISTORICAL_DATASET` and **defaults to the packaged demo CSV**. The worker entrypoint builds `PortfolioService(..., HistoricalRiskEngine())` with **no dataset argument**, so the engine falls back to `SyntheticHistoricalDataset(seed=7, observations=750)` — a different source than the file replay, even when observation counts match. Interactive `POST /risk/var` therefore need not equal a `run_type=var` completed payload for the same book. This is silent: both results look like plausible VaR.
 
 Impact:
 Integrity of persisted risk results and any downstream limit/attribution decisions based on runs. Confidentiality/availability not directly affected. This is a security-integrity issue because the platform presents both numbers as deterministic engine output.
@@ -523,7 +523,7 @@ M9 Engineering Quality / DevOps
 
 The C++ kernel (`backend/native/include/risk_kernel.hpp`, `risk_kernel_capi.cpp`) is a flat double-buffer Δ-Γ aggregator. The C ABI does **not** check null pointers or that `n_exposures`/`n_shocks` match caller buffer bytes; out-of-bounds reads/writes would follow from a mismatched C call.
 
-The Python wrapper (`backend/app/compute/kernel.py:107-116`) builds `eflat`/`sflat`/`O` from the same Python lists it passes as counts, so the in-tree ctypes path is internally consistent. Historical VaR maps the **portfolio-aggregate** Greeks to a **single** `Exposure` and one `Shock` per observation (`backend/app/risk/historical.py:29-64`) — HTTP clients never pass raw native arrays. Default `RISKFORGE_SCENARIO_KERNEL` is `python`; Compose does not enable native. `RISKFORGE_KERNEL_THREADS` is parsed with an upper bound of 4096. `FULL_REVALUATION` never calls the kernel.
+The Python wrapper (`backend/app/compute/kernel.py:107-116`) builds `eflat`/`sflat`/`O` from the same Python lists it passes as counts, so the in-tree ctypes path is internally consistent. Historical VaR maps the **portfolio-aggregate** Greeks to a **single** `Exposure` and one `Shock` per observation (`backend/app/risk/historical.py:29-64`) — HTTP clients never pass raw native arrays. Default `QUANTLINEAGE_SCENARIO_KERNEL` is `python`; Compose does not enable native. `QUANTLINEAGE_KERNEL_THREADS` is parsed with an upper bound of 4096. `FULL_REVALUATION` never calls the kernel.
 
 No HTTP-reachable memory-corruption finding is asserted. Residual risk is: operator-enabled native mode plus a future wrapper that passes client lengths unchecked; huge observation counts then become large `ctypes` allocations (availability), not currently a demonstrated write-primitive. Native tests cover NaN propagation and ABI parity, not adversarial size mismatch from FastAPI.
 
@@ -577,8 +577,8 @@ Ordinary missing tests (e.g. more instrument goldens) are out of scope as securi
 - Consider security headers (CSP, `X-Content-Type-Options`, HSTS behind TLS) on the nginx frontend image; none are configured.
 - Disable or gate `/docs`, `/redoc`, `/openapi.json` outside local dev.
 - Pin Compose/API listen address to loopback even for demos; document “not for LAN.”
-- `RISKFORGE_HISTORICAL_DATASET` may be a filesystem path (operator-controlled, not an HTTP upload). Do not later accept client paths without a jail.
-- `RISKFORGE_DB_ECHO` can log SQL; avoid in shared deployments.
+- `QUANTLINEAGE_HISTORICAL_DATASET` may be a filesystem path (operator-controlled, not an HTTP upload). Do not later accept client paths without a jail.
+- `QUANTLINEAGE_DB_ECHO` can log SQL; avoid in shared deployments.
 - Worker `logger.exception` and API unhandled handler log exceptions; keep portfolio-sized payloads out of log formatters.
 - `frontend/src/api.js` defaults `VITE_API_BASE_URL` to `http://localhost:8000`; Compose frontend does not proxy `/api`. Fine for local browser-to-host API; wrong for a remote UI origin.
 - React UI uses text interpolation (including query answers and scenario names); no `dangerouslySetInnerHTML` in `frontend/src`. `frontend/runtime-dist/index.html` uses `innerHTML` but is not the Vite app Docker artifact.
@@ -606,7 +606,7 @@ Ordinary missing tests (e.g. more instrument goldens) are out of scope as securi
 
 ## Final Assessment
 
-1. Is RiskForge reasonably safe for local development?
+1. Is QuantLineage reasonably safe for local development?
    Yes, on a trusted workstation with the API bound to loopback and Postgres not published to the LAN. The codebase shows several mature defensive choices (typed models, opaque 500s, no unsafe deserialization, QuantLib locking). Treat Compose’s default published ports as **not** “local-only” unless rebound.
 
 2. What prevents public/multi-user deployment?

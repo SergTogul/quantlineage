@@ -439,8 +439,8 @@ def test_lru_eviction():
 
 
 def test_factory_wraps_when_cache_enabled(monkeypatch):
-    monkeypatch.setenv("RISKFORGE_PRICING_ENGINE", "builtin")
-    monkeypatch.setenv("RISKFORGE_PRICING_CACHE", "1")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_ENGINE", "builtin")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_CACHE", "1")
     from app.pricing.factory import create_pricing_engine
 
     engine = create_pricing_engine()
@@ -449,8 +449,8 @@ def test_factory_wraps_when_cache_enabled(monkeypatch):
 
 
 def test_factory_can_disable_cache(monkeypatch):
-    monkeypatch.setenv("RISKFORGE_PRICING_ENGINE", "builtin")
-    monkeypatch.setenv("RISKFORGE_PRICING_CACHE", "0")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_ENGINE", "builtin")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_CACHE", "0")
     from app.pricing.factory import create_pricing_engine
 
     engine = create_pricing_engine()

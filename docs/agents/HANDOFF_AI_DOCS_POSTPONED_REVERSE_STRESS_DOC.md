@@ -36,7 +36,7 @@ cd backend && PYTHONPATH=. .venv/bin/python -m pytest tests/test_m39_methodology
 ## Results
 - Backend: 2 passed (focused suite)
 - No implementation
-- Push: `1283105` on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
+- Push: `1283105` on `origin/master` (https://github.com/SergTogul/quantlineage)
 
 ## Known limitations / risks
 - remains PARTIAL (no VaR wall-time SLA)

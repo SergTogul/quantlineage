@@ -52,7 +52,7 @@ TDD: unknown-type and extra-key pins failed first (writes were accepted). Then g
 TDD red (new file, before production change):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_result_payload_schema.py
 ```
 
@@ -61,7 +61,7 @@ Result: **4 failed, 2 passed** (unknown type / extra keys did not raise).
 Brief + covering (after implement):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_result_payload_schema.py \
   tests/test_persistence.py \

@@ -36,12 +36,12 @@ Implemented a scoped deterministic curve bootstrap helper that converts explicit
 
 ## Commands executed
 ```bash
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_curves.py tests/test_curve_pricing.py -q
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_curves.py tests/test_curve_pricing.py tests/test_market_snapshot.py tests/test_curve_cache.py tests/test_quantlib_pricing.py -q
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_curves.py tests/test_curve_pricing.py tests/test_market_snapshot.py tests/test_curve_cache.py -q
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_curves.py tests/test_curve_pricing.py -q
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_curves.py tests/test_curve_pricing.py tests/test_market_snapshot.py tests/test_curve_cache.py tests/test_quantlib_pricing.py -q
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_curves.py tests/test_curve_pricing.py tests/test_market_snapshot.py tests/test_curve_cache.py -q
 cd backend && .venv/bin/python -m ruff check app/market/curves.py app/pricing/curve_rates.py tests/test_curves.py tests/test_curve_pricing.py
 cd backend && .venv/bin/python -m mypy app/market/curves.py app/pricing/curve_rates.py
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
 ```
 
 ## Results

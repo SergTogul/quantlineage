@@ -48,7 +48,7 @@ Included in this Wave C C2 commit (`feat(wave-c): add thin allowlisted MCP serve
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line tests/test_wave_c_mcp.py tests/test_wave_c_tool_contracts.py tests/test_ai_query_orchestration.py
 .venv/bin/ruff check app/mcp.py app/risk/query.py app/risk/tool_contracts.py tests/test_wave_c_mcp.py
 ```
@@ -64,7 +64,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line tests/test_wave_c_mcp.py te
 
 ## Known limitations / risks
 - Default stdio composite wires worker + catalog search + rates-showcase + RF-019 PortfolioService methods. `get_market_history` / `get_data_quality` still require an injected service method (C1 dispatch honesty); missing methods map to `bad_request` / `Invalid request`, not invented levels.
-- Shared-profile MCP calls need `Authorization: Bearer` (or `RISKFORGE_MCP_AUTHORIZATION` for stdio). Local loopback stays unauthenticated, matching HTTP.
+- Shared-profile MCP calls need `Authorization: Bearer` (or `QUANTLINEAGE_MCP_AUTHORIZATION` for stdio). Local loopback stays unauthenticated, matching HTTP.
 - Keyword router still only selects RF-019 tools; C1 names are registered for MCP / `answer_with_model`, not NL keywords (C3).
 - `docs/mcp.md` and UI client config are C5.
 

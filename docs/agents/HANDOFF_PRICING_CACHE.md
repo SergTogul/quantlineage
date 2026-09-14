@@ -11,9 +11,9 @@ Closed beyond the existing valuation LRU:
 
 1. **Curve-construction cache** (`backend/app/pricing/curve_cache.py`) — LRU for `select_yield_curve` keyed by currency-relevant market fingerprint (rates / key_rates / curves / projection). Equity/FX/vol bumps that leave rate marks unchanged hit; rate bumps miss.
 2. **Scenario-result memo** (`backend/app/risk/scenario_memo.py`) — LRU for `apply_scenario` keyed by `base.id` + `content_hash` + shock fingerprint + id tag. Defensive `model_copy` on get/put.
-3. Env flags mirror `RISKFORGE_PRICING_CACHE`:
- - `RISKFORGE_CURVE_CACHE` / `RISKFORGE_CURVE_CACHE_SIZE` (default on / 256)
- - `RISKFORGE_SCENARIO_CACHE` / `RISKFORGE_SCENARIO_CACHE_SIZE` (default on / 1024)
+3. Env flags mirror `QUANTLINEAGE_PRICING_CACHE`:
+ - `QUANTLINEAGE_CURVE_CACHE` / `QUANTLINEAGE_CURVE_CACHE_SIZE` (default on / 256)
+ - `QUANTLINEAGE_SCENARIO_CACHE` / `QUANTLINEAGE_SCENARIO_CACHE_SIZE` (default on / 1024)
 4. Process-wide caches reset in `tests/conftest.py`; demo artifact tests disable all three caches for determinism.
 5. ROADMAP marked **DONE**. No numerical methodology change; `PricingEngine` seams preserved. No Market Data handoff (cache lives under `pricing/`, not `market/`).
 
@@ -45,8 +45,8 @@ Closed beyond the existing valuation LRU:
 
 ## Commands executed
 ```bash
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_curve_cache.py tests/test_scenario_memo.py tests/test_pricing_cache.py -q --tb=line
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_curve_cache.py tests/test_scenario_memo.py tests/test_pricing_cache.py -q --tb=line
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line
 ```
 
 ## Results

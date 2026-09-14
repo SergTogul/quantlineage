@@ -21,7 +21,7 @@ Replaced the QuantLib equity and FX option attached-surface path so matching `Ma
 
 ## Numerical conventions
 - Units: vols are absolute decimals in surface grids (`0.20` = 20%); scalar vol fallback retains existing trade / `MarketSnapshot.equity_vols` / `MarketSnapshot.fx_vols` units.
-- Surface coordinates: existing RiskForge expiry years and moneyness (`K/S`) are converted to QL dates and strikes (`spot * moneyness`) using the adapter's established `Actual365Fixed` / calendar-day maturity convention.
+- Surface coordinates: existing QuantLineage expiry years and moneyness (`K/S`) are converted to QL dates and strikes (`spot * moneyness`) using the adapter's established `Actual365Fixed` / calendar-day maturity convention.
 - Sign convention: valuation, cash delta/gamma, FX delta, and 1-vol-point vega conventions are unchanged.
 - Tolerances/reference: flat attached surfaces must match scalar `BlackConstantVol` valuation within `rel=1e-12, abs=1e-9`; smile/skew and term tests assert monotonic premium changes from higher interpolated vol. Existing full-suite option golden tolerances remain unchanged.
 
@@ -34,13 +34,13 @@ Replaced the QuantLib equity and FX option attached-surface path so matching `Ma
 ## Commands executed
 ```bash
 cd backend
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_pricing.py -q -k 'surface_term_structure_not_point_sigma or surface_term_structure_not_black_constant_vol or flat_surfaces_preserve_scalar_option_compatibility or surface_term_tilt_changes_longer_expiry_more'
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_pricing.py -q -k 'surface_term_structure_not_point_sigma or surface_term_structure_not_black_constant_vol or flat_surfaces_preserve_scalar_option_compatibility or surface_term_tilt_changes_longer_expiry_more'
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_pricing.py -q -k 'surface_term_structure_not_point_sigma or surface_term_structure_not_black_constant_vol or flat_surfaces_preserve_scalar_option_compatibility or surface_term_tilt_changes_longer_expiry_more'
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_pricing.py tests/test_surface_vol_pricing.py -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_pricing.py -q -k 'surface_term_structure_not_point_sigma or surface_term_structure_not_black_constant_vol or flat_surfaces_preserve_scalar_option_compatibility or surface_term_tilt_changes_longer_expiry_more'
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_pricing.py -q -k 'surface_term_structure_not_point_sigma or surface_term_structure_not_black_constant_vol or flat_surfaces_preserve_scalar_option_compatibility or surface_term_tilt_changes_longer_expiry_more'
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_pricing.py -q -k 'surface_term_structure_not_point_sigma or surface_term_structure_not_black_constant_vol or flat_surfaces_preserve_scalar_option_compatibility or surface_term_tilt_changes_longer_expiry_more'
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_pricing.py tests/test_surface_vol_pricing.py -q
 .venv/bin/ruff check app/pricing/quantlib.py tests/test_quantlib_pricing.py && .venv/bin/mypy app/pricing/quantlib.py
 .venv/bin/ruff check app/pricing/quantlib.py tests/test_quantlib_pricing.py && .venv/bin/mypy app/pricing/quantlib.py
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
 .venv/bin/ruff check app tests && .venv/bin/mypy app
 ```
 

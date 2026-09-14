@@ -316,7 +316,7 @@ def test_freeze_then_adapters_unloaded_same_riskrun_lineage_and_numbers(
         snapshot_id=snapshot_id,
     )
     monkeypatch.setenv(PUBLIC_HISTORY_CSV_ENV, str(artifact.csv_path))
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     engine = BuiltinPricingEngine()
     book = _cash_book()
     first_vals = {item.position_id: item.market_value for item in engine.value_portfolio(book, built.snapshot)}

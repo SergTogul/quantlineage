@@ -5,7 +5,7 @@
 Coordinate with Portfolio Risk **only** if `HistoricalRiskEngine` / risk-layer cache must change. Prefer pricing-layer `CachedPricingEngine` / valuation LRU.  
 **Finding:** RF-007 — keep **IN PROGRESS** (do not CLOSED)  
 **Milestone:** `reviews/REMEDIATION_MILESTONE.md` § R0.6.4  
-**Workspace:** `/Users/user/src/riskforge-mvp` branch `r0-core-remediation`  
+**Workspace:** `/Users/user/src/quantlineage` branch `r0-core-remediation`  
 **BASE:** `35bf9fa` (Task 1 APPROVE)
 
 ## Goal
@@ -35,7 +35,7 @@ Typical problem: generic pricing LRU keyed by snapshot has near-zero hit rate on
 ## Suggested tests
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_full_reval_bench.py \
   tests/test_quantlib_reuse.py \

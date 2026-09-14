@@ -1,8 +1,8 @@
-# RiskForge Performance Review
+# QuantLineage Performance Review
 
 Date: 2026-09-03  
 Owner: C++ / Senior Performance Engineering (review-only)  
-Scope: Independent performance review of the RiskForge repository. Production code was not modified. Temporary diagnostics were not committed.
+Scope: Independent performance review of the QuantLineage repository. Production code was not modified. Temporary diagnostics were not committed.
 
 **Host (this session):** Intel Core i7-7700HQ @ 2.80 GHz (4C/8T), macOS 13.7.8, Python 3.12.14, NumPy 2.5.2, QuantLib 1.43, Apple clang 14.0.3. Absolute times are laptop-specific and are **not** a production throughput claim.
 
@@ -10,7 +10,7 @@ Scope: Independent performance review of the RiskForge repository. Production co
 
 ## Executive Summary
 
-RiskForge can already run **LINEAR / DELTA_GAMMA Historical VaR on 10k–100k trades × ~1k aggregated scenarios** on the current approximate path. That path prices once, sums Greeks, then applies four factor series in NumPy (`O(N + S)` after aggregation). Measured: **10 000 equities × 750 scenarios in 30 ms** after warmup.
+QuantLineage can already run **LINEAR / DELTA_GAMMA Historical VaR on 10k–100k trades × ~1k aggregated scenarios** on the current approximate path. That path prices once, sums Greeks, then applies four factor series in NumPy (`O(N + S)` after aggregation). Measured: **10 000 equities × 750 scenarios in 30 ms** after warmup.
 
 It **cannot** efficiently execute the other target: **1k–100k trades × 100–10k full-revaluation or per-name scenario workloads**. Three architectural bottlenecks dominate:
 
@@ -89,7 +89,7 @@ Related product docs (not duplicated here): `docs/performance.md`, `benchmarks/R
 
 † NumPy harness uses algebraic strength reduction `O(E+S)`, not nested `O(E×S)`.
 
-Native `libriskkernel` is **not** installed under `backend/native/` in this checkout. The bench built a temporary copy. Product default remains `RISKFORGE_SCENARIO_KERNEL=python` (NumPy).
+Native `libriskkernel` is **not** installed under `backend/native/` in this checkout. The bench built a temporary copy. Product default remains `QUANTLINEAGE_SCENARIO_KERNEL=python` (NumPy).
 
 Commands executed (review-only):
 
@@ -155,7 +155,7 @@ backend/.venv/bin/python benchmarks/check_m6_sla.py
 
 - `full_revaluation_pnl_series` and `VaRAnalytics._full_reval_position_pnls` loop scenarios then trades.
 - `QuantLibPricingEngine.value` rebuilds `ZeroCurve` / `BlackVarianceSurface` / `BlackScholesMertonProcess` / `VanillaOption` / schedules per call (`backend/app/pricing/quantlib.py`).
-- Curve cache stores RiskForge `YieldCurve` only; QL handles are still rebuilt (`curve_rates.py` vs `_zero_curve_handle`).
+- Curve cache stores QuantLineage `YieldCurve` only; QL handles are still rebuilt (`curve_rates.py` vs `_zero_curve_handle`).
 - Measured 9-trade × 750: builtin **715 ms**, QuantLib **1301 ms**.
 - One QL equity option: **0.132 ms**. Estimate: 1 000 options × 1 000 scenarios ≈ **130 s** if every call reconstructs; 50k × 10k is not a batch job on this design.
 
@@ -263,7 +263,7 @@ backend/.venv/bin/python benchmarks/check_m6_sla.py
 **Numerical parity requirement:** Identical NPVs to inner engine; existing cache tests remain valid for **repeated base** valuations.
 
 **Estimated effort:** S  
-**Dependencies:** Pricing cache policy; env `RISKFORGE_PRICING_CACHE`.
+**Dependencies:** Pricing cache policy; env `QUANTLINEAGE_PRICING_CACHE`.
 
 ---
 
@@ -574,7 +574,7 @@ Follow **Measure → bottleneck → optimize → benchmark → numerical parity*
 8. **PERF-008/009** (contribution multipliers and dense matrices) when FULL_REVAL jobs exist.
 9. **Kernel** only if a new name-level `E×F×S` methodology is introduced; then batch ABI, not per-shock Python objects.
 
-Do **not** start with SIMD, OpenMP, or rewriting NumPy Δ-Γ — those are not the bottleneck for the workloads RiskForge claims to care about.
+Do **not** start with SIMD, OpenMP, or rewriting NumPy Δ-Γ — those are not the bottleneck for the workloads QuantLineage claims to care about.
 
 ---
 

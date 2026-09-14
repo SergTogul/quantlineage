@@ -58,11 +58,11 @@ Included in this Wave C C5 commit (`feat(wave-c): add Risk Query examples and MC
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/frontend
+cd /Users/user/src/quantlineage/frontend
 npm test -- src/components/RiskQuery.test.jsx src/components/Overview.test.jsx src/components/ScenarioBuilder.test.jsx src/lib/blockHelp.test.js src/lib/blockHelpWiring.test.js src/components/HedgeCompare.test.jsx src/components/ReverseStressMulti.test.jsx
 npx eslint src/components/ScenarioBuilder.jsx src/components/RiskQuery.test.jsx src/components/Overview.test.jsx src/lib/blockHelp.mjs --max-warnings 0
 
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_wave_c_grounding.py tests/test_wave_c_orchestration.py tests/test_ai_query_orchestration.py tests/test_wave_c_mcp.py tests/test_wave_c_tool_contracts.py
 .venv/bin/ruff check app/risk/query.py app/services/portfolio_service.py tests/test_wave_c_orchestration.py tests/test_wave_c_mcp.py
 ```

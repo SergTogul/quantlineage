@@ -7,7 +7,7 @@
 Market Data & Curves Engineer.
 
 ## Summary
-Implemented `MarketSnapshot.bump` / `apply` semantics so typed `EquityVol` and `FXVol` shocks update matching attached `vol_surfaces` payload grids as well as scalar ATM marks. Generic vol factors preserve existing relative scalar bump units; explicit expiry bucket bumps scale that expiry's nodes; `moneyness="SKEW"` and `expiry="TERM"` delegate to the existing RiskForge `VolSurface` skew / term-structure shock model.
+Implemented `MarketSnapshot.bump` / `apply` semantics so typed `EquityVol` and `FXVol` shocks update matching attached `vol_surfaces` payload grids as well as scalar ATM marks. Generic vol factors preserve existing relative scalar bump units; explicit expiry bucket bumps scale that expiry's nodes; `moneyness="SKEW"` and `expiry="TERM"` delegate to the existing QuantLineage `VolSurface` skew / term-structure shock model.
 
 ## Files changed
 - `backend/app/domain/models.py`
@@ -41,14 +41,14 @@ Implemented `MarketSnapshot.bump` / `apply` semantics so typed `EquityVol` and `
 ## Commands executed
 ```bash
 cd backend
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_market_snapshot.py tests/test_surface_vol_pricing.py -q
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_market_snapshot.py tests/test_vol_surfaces.py tests/test_surface_vol_pricing.py tests/test_scenarios.py tests/test_scenario_model.py tests/test_scenario_engine.py tests/test_sensitivities.py -q
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_pricing_cache.py tests/test_quantlib_pricing.py -q
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_market_snapshot.py tests/test_vol_surfaces.py tests/test_surface_vol_pricing.py tests/test_scenarios.py tests/test_scenario_model.py tests/test_scenario_engine.py tests/test_sensitivities.py tests/test_pricing_cache.py tests/test_quantlib_pricing.py -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_market_snapshot.py tests/test_surface_vol_pricing.py -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_market_snapshot.py tests/test_vol_surfaces.py tests/test_surface_vol_pricing.py tests/test_scenarios.py tests/test_scenario_model.py tests/test_scenario_engine.py tests/test_sensitivities.py -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_pricing_cache.py tests/test_quantlib_pricing.py -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest tests/test_market_snapshot.py tests/test_vol_surfaces.py tests/test_surface_vol_pricing.py tests/test_scenarios.py tests/test_scenario_model.py tests/test_scenario_engine.py tests/test_sensitivities.py tests/test_pricing_cache.py tests/test_quantlib_pricing.py -q
 .venv/bin/ruff check app tests
 .venv/bin/mypy app
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_risk_run_api.py::test_create_returns_202_queued tests/test_risk_run_api.py -q
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_risk_run_api.py::test_create_returns_202_queued tests/test_risk_run_api.py -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
 ```
 
 ## Results
@@ -60,7 +60,7 @@ PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
 - Backend static analysis: `ruff check app tests` passed; `mypy app` passed with no issues in 82 source files.
 - Full backend QuantLib suite: final run `639 passed, 1 warning in 96.80s`; warning is existing Starlette/httpx deprecation from `fastapi.testclient`.
 - One earlier full-suite run had a non-reproducing async timing failure in `test_create_returns_202_queued` where a queued risk run completed before assertion; targeted rerun of `tests/test_risk_run_api.py` passed (`10 passed, 1 warning`), and final full suite passed.
-- QuantLib: available locally; full backend suite ran with `RISKFORGE_PRICING_ENGINE=quantlib`.
+- QuantLib: available locally; full backend suite ran with `QUANTLINEAGE_PRICING_ENGINE=quantlib`.
 - Frontend: not affected, not run.
 - C++: not affected, not run.
 - Build: not affected, not run.

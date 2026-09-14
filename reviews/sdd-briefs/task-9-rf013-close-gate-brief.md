@@ -27,7 +27,7 @@ R0.8.3 already: create fails if id exists; update fails if missing; RiskRun subm
 
 ## Tests
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_portfolio_identity.py tests/test_same_spec_parity.py
 ```
 

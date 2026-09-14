@@ -11,13 +11,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: riskforge
+      POSTGRES_USER: quantlineage
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
-      POSTGRES_DB: riskforge
+      POSTGRES_DB: quantlineage
     volumes:
-      - riskforge_shared_pgdata:/var/lib/postgresql/data
+      - quantlineage_shared_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U riskforge -d riskforge"]
+      test: ["CMD-SHELL", "pg_isready -U quantlineage -d quantlineage"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -25,13 +25,13 @@ services:
   backend:
     build: ./backend
     environment:
-      RISKFORGE_PRICING_ENGINE: quantlib
-      RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:${POSTGRES_PASSWORD:?}@postgres:5432/riskforge
-      RISKFORGE_EXTERNAL_WORKER: "1"
-      RISKFORGE_SHARED_DEPLOYMENT: "1"
+      QUANTLINEAGE_PRICING_ENGINE: quantlib
+      QUANTLINEAGE_DATABASE_URL: postgresql+psycopg://quantlineage:${POSTGRES_PASSWORD:?}@postgres:5432/quantlineage
+      QUANTLINEAGE_EXTERNAL_WORKER: "1"
+      QUANTLINEAGE_SHARED_DEPLOYMENT: "1"
       # TOKEN is optional when TOKENS is set; boot fails closed if both empty.
-      RISKFORGE_API_TOKEN: ${RISKFORGE_API_TOKEN:-}
-      RISKFORGE_API_TOKENS: ${RISKFORGE_API_TOKENS:-}
+      QUANTLINEAGE_API_TOKEN: ${QUANTLINEAGE_API_TOKEN:-}
+      QUANTLINEAGE_API_TOKENS: ${QUANTLINEAGE_API_TOKENS:-}
     expose:
       - "8000"
     depends_on:
@@ -42,13 +42,13 @@ services:
     build: ./backend
     command: ["python", "-m", "app.worker"]
     environment:
-      RISKFORGE_PRICING_ENGINE: quantlib
-      RISKFORGE_DATABASE_URL: postgresql+psycopg://riskforge:${POSTGRES_PASSWORD:?}@postgres:5432/riskforge
-      RISKFORGE_WORKER_POLL_INTERVAL: "2"
-      RISKFORGE_WORKER_POLL_BATCH: "10"
-      RISKFORGE_SHARED_DEPLOYMENT: "1"
-      RISKFORGE_API_TOKEN: ${RISKFORGE_API_TOKEN:-}
-      RISKFORGE_API_TOKENS: ${RISKFORGE_API_TOKENS:-}
+      QUANTLINEAGE_PRICING_ENGINE: quantlib
+      QUANTLINEAGE_DATABASE_URL: postgresql+psycopg://quantlineage:${POSTGRES_PASSWORD:?}@postgres:5432/quantlineage
+      QUANTLINEAGE_WORKER_POLL_INTERVAL: "2"
+      QUANTLINEAGE_WORKER_POLL_BATCH: "10"
+      QUANTLINEAGE_SHARED_DEPLOYMENT: "1"
+      QUANTLINEAGE_API_TOKEN: ${QUANTLINEAGE_API_TOKEN:-}
+      QUANTLINEAGE_API_TOKENS: ${QUANTLINEAGE_API_TOKENS:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,4 +73,4 @@ services:
       - frontend
 
 volumes:
-  riskforge_shared_pgdata:
+  quantlineage_shared_pgdata:

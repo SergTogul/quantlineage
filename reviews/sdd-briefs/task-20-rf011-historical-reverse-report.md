@@ -71,7 +71,7 @@ passed.
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_scenarios.py tests/test_scenario_model.py \
   tests/test_scenario_engine.py tests/test_reverse_stress.py \

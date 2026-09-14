@@ -52,7 +52,7 @@ This is a documentation-only package. It does not change risk, pricing, API, fro
 ```bash
 docker compose up -d postgres
 # Default Compose publishes bind to loopback only (127.0.0.1).
-export RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+export QUANTLINEAGE_DATABASE_URL=postgresql+psycopg://quantlineage:quantlineage@localhost:5432/quantlineage
 # PATH must include backend/.venv (alembic, sqlalchemy, psycopg[binary])
 ./scripts/smoke_postgres.sh
 ```
@@ -62,19 +62,19 @@ Result: **exit 0**. Alembic applied `001_initial_persistence` → `002_risk_run_
 ### GitHub-hosted runners (green)
 
 - `.github/workflows/ci.yml` job `postgres-persistence-smoke` uses a `postgres:16-alpine` service + the same URL/script.
-- Green runner evidence is recorded in `ROADMAP.md`: https://github.com/SergTogul/riskforge-mvp/actions/runs/33712643872.
+- Green runner evidence is recorded in `ROADMAP.md`: https://github.com/SergTogul/quantlineage/actions/runs/33712643872.
 - The Postgres smoke remains the CI proof for the durable persistence path; unit tests use SQLite or in-memory repos for speed.
 
 ## Risk-run queue / worker residual (2026-09-03)
 
-- RiskForge does **not** ship Redis/RQ in the MVP. The accepted queue mechanism is `risk_runs` rows in Postgres, claimed by `python -m app.worker` via `SELECT ... FOR UPDATE SKIP LOCKED` and transitioned `QUEUED -> RUNNING`.
+- QuantLineage does **not** ship Redis/RQ in the MVP. The accepted queue mechanism is `risk_runs` rows in Postgres, claimed by `python -m app.worker` via `SELECT ... FOR UPDATE SKIP LOCKED` and transitioned `QUEUED -> RUNNING`.
 - Redis/RQ was evaluated as optional ops/fair-scheduling infrastructure, not as a claim-safety requirement. Adding it without priority, tenancy, retries, or observability semantics would be empty ceremony.
 - Compose still ships one worker for the demo. Additional Postgres-backed worker replicas are safe from double-claim; SQLite remains a single-writer/unit-test fallback without `SKIP LOCKED`.
 - API submit semantics remain stable: `POST /risk/runs` returns a queued acceptance snapshot, while `GET /risk/runs/{id}` reports current status/results.
 
 ### QuantLib install path (CI)
 
-- Main `backend` job: `pip install -r requirements.txt` (includes QuantLib); on failure, strip QuantLib line and continue with builtin (`RISKFORGE_PRICING_ENGINE` detected via import).
+- Main `backend` job: `pip install -r requirements.txt` (includes QuantLib); on failure, strip QuantLib line and continue with builtin (`QUANTLINEAGE_PRICING_ENGINE` detected via import).
 - `postgres-smoke` does not require QuantLib; same install fallback so persistence proof is independent of the QL wheel.
 
 ## Nightly / labeled runner (R0.12.4)
@@ -84,25 +84,25 @@ Heavier checks live in `.github/workflows/nightly.yml` (`schedule` daily 06:00 U
 What actually runs (not echo-only):
 
 - Native benchmark binary: compile `backend/native/src/benchmark.cpp` and run `10k × 1k` (`--threads 4 --json`) asserting `impl` / `checksum` identity (not SLA-K1/K2; `check_m6_sla.py` is not run on `ubuntu-latest`), then `benchmarks/run_scenario_bench.py --workload 1k_x_1k`.
-- Postgres two-worker claim: GHA `postgres:16-alpine` service + `scripts/smoke_postgres.sh` + `RISKFORGE_NIGHTLY=1 pytest tests/test_postgres_two_worker.py`.
-- Larger FULL_REVALUATION sample: `RISKFORGE_NIGHTLY=1 pytest tests/test_nightly_full_reval_sample.py` (120 observations).
-- QuantLib critical E2E (`quantlib-e2e`): mandatory `pip install -r requirements.txt` (no no-ql fallback) + `import QuantLib`, then Playwright `tests/r0-critical-journey.spec.ts` with `RISKFORGE_PRICING_ENGINE=quantlib` and `RISKFORGE_REQUIRE_QUANTLIB=1`. Missing QuantLib **fails** when `RISKFORGE_NIGHTLY=1` (no skip-green). Also runs `tests/test_qa024_ql_demo_range.py` (QA-024 bands vs `data/demo_risk_artifact.json`). PR `e2e-playwright` stays builtin.
+- Postgres two-worker claim: GHA `postgres:16-alpine` service + `scripts/smoke_postgres.sh` + `QUANTLINEAGE_NIGHTLY=1 pytest tests/test_postgres_two_worker.py`.
+- Larger FULL_REVALUATION sample: `QUANTLINEAGE_NIGHTLY=1 pytest tests/test_nightly_full_reval_sample.py` (120 observations).
+- QuantLib critical E2E (`quantlib-e2e`): mandatory `pip install -r requirements.txt` (no no-ql fallback) + `import QuantLib`, then Playwright `tests/r0-critical-journey.spec.ts` with `QUANTLINEAGE_PRICING_ENGINE=quantlib` and `QUANTLINEAGE_REQUIRE_QUANTLIB=1`. Missing QuantLib **fails** when `QUANTLINEAGE_NIGHTLY=1` (no skip-green). Also runs `tests/test_qa024_ql_demo_range.py` (QA-024 bands vs `data/demo_risk_artifact.json`). PR `e2e-playwright` stays builtin.
 - Hierarchy identity (`hierarchy-benchmark`): `benchmarks/run_hierarchy_bench.py --json` on a 64-trade / 94-node book. Asserts `impl`, `n_positions`, `n_nodes`, `market_value`, additive reconciliation, and SHA-256 checksum. Wall time is recorded, not SLA-gated (`check_m6_sla.py` is not run; a positive throughput reading is not an SLA).
 
 Labeled-runner SLA-K1/K2 is **post-R0** (still **not MET**). `benchmarks/check_m6_sla.py`, `docs/performance.md`, and `benchmarks/RESULTS.md` exist. This repo has no self-hosted Actions runner (`actions/runners total_count=0` as of 2026-09-09). Do not run `check_m6_sla.py` on `ubuntu-latest`. CI does not enforce host floors. QA-024 demo-artifact range is **MET** (R0.12.8 nightly QuantLib vs `data/demo_risk_artifact.json` bands).
 
-Local Docker/Postgres is **optional** for laptop pytest. `tests/test_postgres_two_worker.py` skips when `CI` and `RISKFORGE_NIGHTLY` are unset and `RISKFORGE_DATABASE_URL` is missing or unreachable. When `RISKFORGE_NIGHTLY` is set, a missing or unreachable DSN **fails**. When `CI` is set and a postgresql DSN is offered, an unreachable DSN **fails** (no skip-green). `CI` plus an unset DSN still skips so PR `backend-pytest` is not broken. That skip does **not** apply to PR `postgres-persistence-smoke`, which is unchanged. To run the two-worker test locally:
+Local Docker/Postgres is **optional** for laptop pytest. `tests/test_postgres_two_worker.py` skips when `CI` and `QUANTLINEAGE_NIGHTLY` are unset and `QUANTLINEAGE_DATABASE_URL` is missing or unreachable. When `QUANTLINEAGE_NIGHTLY` is set, a missing or unreachable DSN **fails**. When `CI` is set and a postgresql DSN is offered, an unreachable DSN **fails** (no skip-green). `CI` plus an unset DSN still skips so PR `backend-pytest` is not broken. That skip does **not** apply to PR `postgres-persistence-smoke`, which is unchanged. To run the two-worker test locally:
 
 ```bash
 docker compose up -d postgres
-export RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+export QUANTLINEAGE_DATABASE_URL=postgresql+psycopg://quantlineage:quantlineage@localhost:5432/quantlineage
 ./scripts/smoke_postgres.sh
 cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_postgres_two_worker.py
 ```
 
 ## Local Compose resource expectations (R0.11.6)
 
-Default `docker compose up` (Postgres 16 + API + one risk-run worker + nginx frontend) is a laptop demo, not a capacity SLA. Budget about **2 CPU cores and 2–3 GiB RAM** for idle/light dashboard traffic with the packaged books. FULL_REVALUATION, large `observations` counts, or enabling the native scenario kernel can use more CPU on the API/worker; Postgres stays small for the seeded demo schema. Images drop to a non-root `USER` where practical (backend `riskforge`, frontend `nginx`); Compose still publishes only on loopback (R0.11.1).
+Default `docker compose up` (Postgres 16 + API + one risk-run worker + nginx frontend) is a laptop demo, not a capacity SLA. Budget about **2 CPU cores and 2–3 GiB RAM** for idle/light dashboard traffic with the packaged books. FULL_REVALUATION, large `observations` counts, or enabling the native scenario kernel can use more CPU on the API/worker; Postgres stays small for the seeded demo schema. Images drop to a non-root `USER` where practical (backend `quantlineage`, frontend `nginx`); Compose still publishes only on loopback (R0.11.1).
 
 ## Local vs shared vs not production-like (R0.11.5)
 
@@ -110,16 +110,16 @@ Three deployment profiles, not a production IAM story:
 
 | Profile | How it is selected | Auth |
 |---|---|---|
-| **Local demo** | Default. Compose publishes `127.0.0.1` only. `RISKFORGE_BIND` unset or in `{127.0.0.1, localhost, ::1}`. `RISKFORGE_SHARED_DEPLOYMENT` unset. | None. Laptop `uvicorn` / default Compose stay unauthenticated. |
-| **Shared / non-loopback** | Set `RISKFORGE_SHARED_DEPLOYMENT=1`, or set `RISKFORGE_BIND` to a non-loopback address (e.g. `0.0.0.0`). Shared Compose: `docker compose --env-file .env.shared -f docker-compose.shared.yml up`. | Fail closed: process refuses to boot without `RISKFORGE_API_TOKEN` or `RISKFORGE_API_TOKENS` (`principal:token` map; overlapping `TOKEN` does not remap a `TOKENS` principal). `/api` and dual-mount routes require `Authorization: Bearer <token>` (401 otherwise). Authenticated principals cannot read/update another principal’s stored portfolio or its risk runs (403). Seed/demo catalog is owned by principal `demo` (readable; not writable by others). TLS terminator (Caddy) publishes 443; API stays on the compose network. Shared SPA is built with `VITE_API_BASE_URL=same-origin` so the browser uses Caddy `/api`, not host `:8000`. Shared DB password is `${POSTGRES_PASSWORD:?}` (see `.env.shared.example`). `/health`, `/docs`, `/redoc`, `/openapi.json` stay open. |
+| **Local demo** | Default. Compose publishes `127.0.0.1` only. `QUANTLINEAGE_BIND` unset or in `{127.0.0.1, localhost, ::1}`. `QUANTLINEAGE_SHARED_DEPLOYMENT` unset. | None. Laptop `uvicorn` / default Compose stay unauthenticated. |
+| **Shared / non-loopback** | Set `QUANTLINEAGE_SHARED_DEPLOYMENT=1`, or set `QUANTLINEAGE_BIND` to a non-loopback address (e.g. `0.0.0.0`). Shared Compose: `docker compose --env-file .env.shared -f docker-compose.shared.yml up`. | Fail closed: process refuses to boot without `QUANTLINEAGE_API_TOKEN` or `QUANTLINEAGE_API_TOKENS` (`principal:token` map; overlapping `TOKEN` does not remap a `TOKENS` principal). `/api` and dual-mount routes require `Authorization: Bearer <token>` (401 otherwise). Authenticated principals cannot read/update another principal’s stored portfolio or its risk runs (403). Seed/demo catalog is owned by principal `demo` (readable; not writable by others). TLS terminator (Caddy) publishes 443; API stays on the compose network. Shared SPA is built with `VITE_API_BASE_URL=same-origin` so the browser uses Caddy `/api`, not host `:8000`. Shared DB password is `${POSTGRES_PASSWORD:?}` (see `.env.shared.example`). `/health`, `/docs`, `/redoc`, `/openapi.json` stay open. |
 | **Not production-like** | Anything beyond the shared token/ACL/TLS profile. | Not provided. No OIDC/SSO, no in-app TLS, no cloud secret manager, no tenant isolation. Do not treat this repo as internet-ready. |
 
-In-container `uvicorn --host 0.0.0.0` (backend Dockerfile) is not a host publish. Default Compose still binds host ports to loopback and does **not** set the shared flag. Operators who publish the API beyond loopback must set `RISKFORGE_SHARED_DEPLOYMENT=1` (or `RISKFORGE_BIND=0.0.0.0`) **and** `RISKFORGE_API_TOKEN` (or `RISKFORGE_API_TOKENS`). Shared Compose publishes only 443 via Caddy.
+In-container `uvicorn --host 0.0.0.0` (backend Dockerfile) is not a host publish. Default Compose still binds host ports to loopback and does **not** set the shared flag. Operators who publish the API beyond loopback must set `QUANTLINEAGE_SHARED_DEPLOYMENT=1` (or `QUANTLINEAGE_BIND=0.0.0.0`) **and** `QUANTLINEAGE_API_TOKEN` (or `QUANTLINEAGE_API_TOKENS`). Shared Compose publishes only 443 via Caddy.
 
 ```bash
 # Shared profile example (still not OIDC / production IAM):
-export RISKFORGE_SHARED_DEPLOYMENT=1
-export RISKFORGE_API_TOKENS='alice:replace-me,bob:replace-me-too'
+export QUANTLINEAGE_SHARED_DEPLOYMENT=1
+export QUANTLINEAGE_API_TOKENS='alice:replace-me,bob:replace-me-too'
 # curl -H "Authorization: Bearer replace-me" http://127.0.0.1:8000/api/v1/portfolio
 # TLS compose: docker compose --env-file .env.shared -f docker-compose.shared.yml up
 ```

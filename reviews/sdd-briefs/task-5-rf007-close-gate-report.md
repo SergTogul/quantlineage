@@ -33,7 +33,7 @@ Independent QA score of landed R0.6.1–R0.6.6 work. **Recommendation: KEEP OPEN
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_full_reval_bench.py \
   tests/test_full_reval_golden.py \

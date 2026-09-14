@@ -53,7 +53,7 @@ Extended the G1 `HistoricalAnalyticsResult` with an optional nested `benchmark` 
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_historical_analytics.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_historical_analytics.py tests/test_endpoint_execution_class.py tests/test_api_v1_compatibility.py tests/test_api_router_decomposition.py tests/test_api.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line tests/test_historical_analytics.py tests/test_historical_data.py tests/test_factor_panel_historical.py

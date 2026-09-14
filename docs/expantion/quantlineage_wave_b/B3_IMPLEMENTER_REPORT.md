@@ -52,7 +52,7 @@ Added presentation-only contribution bars on Component VaR (`POST /risk/contribu
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/frontend
+cd /Users/user/src/quantlineage/frontend
 npm test -- src/lib/riskVisuals.test.js src/components/RiskVisuals.test.jsx src/components/RatesProvenance.test.jsx
 npm test
 npm run lint

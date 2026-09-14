@@ -30,7 +30,7 @@ Fix: statement-level `isinstance(risk, HistoricalRiskEngine)` then build `hist_k
 ## Commands executed
 ```bash
 # Local CI parity
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib python -m pytest -q
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib python -m pytest -q
 cd backend && ruff check app tests && mypy app
 # native g++ kernel_test + libriskkernel.so
 cd frontend && npm test && npm run lint && npm run build
@@ -52,7 +52,7 @@ gh run list -L 8 # Forbidden
 
 ## Known limitations / risks
 - Cannot confirm GHA all-jobs green via CLI until `gh` keyring token is repaired **once** by a human (no agent device-code loops).
-- Expected Actions URL pattern: https://github.com/SergTogul/riskforge-mvp/actions for SHA `11339c6`.
+- Expected Actions URL pattern: https://github.com/SergTogul/quantlineage/actions for SHA `11339c6`.
 
 ## Follow-up / next owner
 - Owner: whoever has a working `gh` session

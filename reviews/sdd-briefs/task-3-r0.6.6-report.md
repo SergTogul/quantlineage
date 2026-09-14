@@ -50,7 +50,7 @@ Stopped family-isolated whole-book repricing on full-reval contribution paths. E
 ## Commands Executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_contribution_reuse.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_contribution_reuse.py \
@@ -64,7 +64,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_shock_units.py
 .venv/bin/python -m ruff check app/risk/es.py app/risk/scenario_attribution.py tests/test_contribution_reuse.py tests/test_es_contributions.py tests/test_scenario_attribution.py
 .venv/bin/python -m mypy app/risk/es.py app/risk/scenario_attribution.py
-cd /Users/user/src/riskforge-mvp && /usr/bin/git diff --check
+cd /Users/user/src/quantlineage && /usr/bin/git diff --check
 ```
 
 `tests/test_es.py` / `tests/test_var.py` from the brief do not exist; `test_es_contributions.py` and `test_var_methodology.py` / `test_var_es_golden.py` are the focused stand-ins, plus new reuse tests.

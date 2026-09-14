@@ -10,7 +10,7 @@ Frontend/Risk UX Engineer (one implementer).
 **IN_PROGRESS — not DONE.** G6 is not marked DONE. Independent review and CI green are still required.
 
 ## Summary
-Wrote `docs/historical_analytics_demo.md` in golden-demo style (setup, hashes, button labels, APIs, units/sign from payloads, no memorized risk numbers). Demo-blocking polish: Historical related links no longer share `#var-es`. Contributors land on `#var-es/contributors`, waterfall on `#var-es/risk-change`, KR-DV01 on `#risk-factors/kr-dv01`. Parallel DV01 is labeled **Parallel DV01 (not KR-DV01)**. Residual remains a labeled waterfall step. Setup documents in-process API because HA is HEAVY and is not a RiskRun type under Compose `RISKFORGE_EXTERNAL_WORKER=1`. TRACKER G5 DONE / B6 IN_PROGRESS included. G6 stays NOT_STARTED.
+Wrote `docs/historical_analytics_demo.md` in golden-demo style (setup, hashes, button labels, APIs, units/sign from payloads, no memorized risk numbers). Demo-blocking polish: Historical related links no longer share `#var-es`. Contributors land on `#var-es/contributors`, waterfall on `#var-es/risk-change`, KR-DV01 on `#risk-factors/kr-dv01`. Parallel DV01 is labeled **Parallel DV01 (not KR-DV01)**. Residual remains a labeled waterfall step. Setup documents in-process API because HA is HEAVY and is not a RiskRun type under Compose `QUANTLINEAGE_EXTERNAL_WORKER=1`. TRACKER G5 DONE / B6 IN_PROGRESS included. G6 stays NOT_STARTED.
 
 ## Commits
 - Tracked copy: `docs/expantion/quantlineage_wave_b/B6_IMPLEMENTER_REPORT.md` (`.superpowers/sdd/` is gitignored)
@@ -48,7 +48,7 @@ Wrote `docs/historical_analytics_demo.md` in golden-demo style (setup, hashes, b
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/frontend
+cd /Users/user/src/quantlineage/frontend
 npm test -- src/lib/nav.test.js src/App.test.jsx src/components/HistoricalAnalytics.test.jsx src/components/RiskVisuals.test.jsx src/components/RiskChangeAttribution.test.jsx src/components/RatesProvenance.test.jsx
 npm test
 npm run lint
@@ -70,7 +70,7 @@ npm run build
 
 ## Known limitations / risks
 - G6 is **not DONE**: independent review + CI still required.
-- `POST /api/v1/risk/historical-analytics` is HEAVY and is not a RiskRun type. Compose `RISKFORGE_EXTERNAL_WORKER=1` 400s the Historical page. The demo script uses in-process uvicorn. Wiring a run_type was out of scope.
+- `POST /api/v1/risk/historical-analytics` is HEAVY and is not a RiskRun type. Compose `QUANTLINEAGE_EXTERNAL_WORKER=1` 400s the Historical page. The demo script uses in-process uvicorn. Wiring a run_type was out of scope.
 - Default HA window is still `2024-01-02`–`2024-11-15`.
 - G5 minors (Sharpe unit cell, in-flight previous result, `formatFraction` always ×100) were not reopened.
 

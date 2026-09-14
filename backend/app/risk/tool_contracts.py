@@ -75,7 +75,7 @@ class GetDataQualityArgs(BaseModel):
 
 
 class RunPortfolioRiskArgs(BaseModel):
-    """Enqueue a RiskRun (``summary`` / ``var``). Portfolio is bound by RiskForge."""
+    """Enqueue a RiskRun (``summary`` / ``var``). Portfolio is bound by QuantLineage."""
 
     model_config = ConfigDict(extra="forbid")
 

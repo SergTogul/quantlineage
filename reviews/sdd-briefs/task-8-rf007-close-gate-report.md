@@ -32,7 +32,7 @@ Independent close re-gate of RF-007 at BASE `78c1d0e` (Task 7 APPROVE). Implemen
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_full_reval_bench.py \
   tests/test_full_reval_golden.py \
@@ -46,7 +46,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_nightly_ci.py \
   tests/test_pr_full_ci.py
 
-RISKFORGE_NIGHTLY=1 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
+QUANTLINEAGE_NIGHTLY=1 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_nightly_full_reval_n100.py
 ```
 
@@ -76,7 +76,7 @@ Task 5 KEEP OPEN’d because cash-equity QuantLib, process-lifetime RSS, and N=1
 - Option A intra-run multiprocessing not implemented (P1)
 - QuantLib reconstruction checksum is version-sensitive
 - Independent review may still KEEP OPEN; CLOSED is a QA recommendation with placeholder
-- Nightly job `RISKFORGE_PRICING_ENGINE: builtin` is a carry-forward Minor (engines constructed directly)
+- Nightly job `QUANTLINEAGE_PRICING_ENGINE: builtin` is a carry-forward Minor (engines constructed directly)
 
 ## Follow-up / next owner
 - Owner: independent Task 8 reviewer, then Lead Architect

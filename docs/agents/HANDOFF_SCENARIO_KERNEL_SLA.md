@@ -39,7 +39,7 @@ Honest non-claims preserved: not HTTP end-to-end VaR latency; not FULL_REVALUATI
 
 ## Commands executed
 ```bash
-OMP_NUM_THREADS=1 RISKFORGE_KERNEL_THREADS=1 backend/.venv/bin/python \
+OMP_NUM_THREADS=1 QUANTLINEAGE_KERNEL_THREADS=1 backend/.venv/bin/python \
  benchmarks/run_scenario_bench.py --workload 1k_x_1k --workload 10k_x_1k --iters 1 --json
 backend/.venv/bin/python benchmarks/run_scenario_bench.py \
  --workload 10k_x_1k --threads 4 --parallel-compare --iters 1 --json

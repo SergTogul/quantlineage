@@ -14,7 +14,7 @@ R0.6.8 reconstruction benches on the existing full-reval harness:
 
 1. **Builtin vs QuantLib reconstruction** — same N×S (`10×50` in PR) on a European option book (`EuropeanOptionPosition`, live spot/vol/rate/div, pinned `as_of=2026-09-01`). Not cash equity `quantity * spot`. Identity checksum **per engine**. Skip-or-run if QuantLib is missing. P&L gap recorded at option-match `rel=2e-3`.
 2. **Isolated RSS** — peak RSS measured in a subprocess per impl (`--isolated-impl`) so QuantLib `ru_maxrss` does not include the builtin run (and vice versa). Still process-lifetime within that child → peak RSS stays **PARTIAL**.
-3. **N=100** — `tests/test_nightly_full_reval_n100.py` skips unless `RISKFORGE_NIGHTLY=1`. Sibling job `full-reval-n100` in `.github/workflows/nightly.yml`, pinned in `test_nightly_ci.py`. Not in PR-FULL `needs:`. N=1k left **UNMET**.
+3. **N=100** — `tests/test_nightly_full_reval_n100.py` skips unless `QUANTLINEAGE_NIGHTLY=1`. Sibling job `full-reval-n100` in `.github/workflows/nightly.yml`, pinned in `test_nightly_ci.py`. Not in PR-FULL `needs:`. N=1k left **UNMET**.
 4. Cash-equity 1×120 (`6602fa69…`) and 10×50 (`a28cf4ee…`) identity checksums **unchanged**.
 5. FINDINGS / milestone residual scores updated honestly. RF-007 stays **IN PROGRESS**. Do not close.
 
@@ -22,7 +22,7 @@ R0.6.8 reconstruction benches on the existing full-reval harness:
 
 ### Focused (brief)
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py
 ```
 
@@ -30,7 +30,7 @@ Final focused run is included in the covering command below (10 tests in `test_f
 
 ### Covering (before commit)
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py tests/test_nightly_ci.py tests/test_pr_full_ci.py
 ```
 ```
@@ -39,7 +39,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_benc
 ```
 
 ```bash
-RISKFORGE_NIGHTLY=1 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_nightly_full_reval_n100.py
+QUANTLINEAGE_NIGHTLY=1 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_nightly_full_reval_n100.py
 ```
 ```
 .                                                                        [100%]
@@ -60,7 +60,7 @@ No unexplained failures or skips. `test_nightly_full_reval_n100.py` is skipped i
 
 ### RED
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py tests/test_nightly_ci.py
 ```
 ```
@@ -79,7 +79,7 @@ Failures were missing feature (reconstruction / isolated RSS / nightly job), not
 
 ### GREEN
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py tests/test_nightly_ci.py
 ```
 After harness + nightly.yml + pinned checksums:

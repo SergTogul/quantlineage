@@ -47,7 +47,7 @@ TDD: 9 failed, 3 passed (P0/P1 already CLOSED; RF-016 pins already green). After
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_rf020_r0_exit.py tests/test_rf016_close_gate.py
 # RED: 9 failed, 3 passed

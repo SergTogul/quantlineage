@@ -76,7 +76,7 @@ pin (domain does not import FastAPI).
 Brief (required):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_domain_transport_split.py \
   tests/test_api_error_model.py tests/test_risk_run_api.py \

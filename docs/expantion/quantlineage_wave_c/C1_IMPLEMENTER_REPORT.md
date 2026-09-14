@@ -54,7 +54,7 @@ Included in this Wave C C1 commit (`feat(wave-c): freeze C1 deterministic tool c
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line tests/test_wave_c_tool_contracts.py tests/test_ai_query_orchestration.py
 .venv/bin/ruff check app/risk/query.py app/risk/tool_contracts.py tests/test_wave_c_tool_contracts.py
 ```

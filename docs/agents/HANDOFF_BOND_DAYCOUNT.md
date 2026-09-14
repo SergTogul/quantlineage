@@ -36,18 +36,18 @@ Tight Builtin↔QL parity and continuous golden tests use **rel=1e-10**. Histori
 
 ## Commands executed
 ```bash
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest \
  tests/test_quantlib_golden.py tests/test_curve_pricing.py tests/test_pricing.py \
  tests/test_quant_properties.py tests/test_quantlib_pricing.py -q --tb=short
 # → 86 passed
 
 cd backend && .venv/bin/python -m app.demo.run_demo_risk --check -o ../data/demo_risk_artifact.json
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_SCENARIO_KERNEL=python \
- RISKFORGE_PRICING_CACHE=0 .venv/bin/python -m pytest \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin QUANTLINEAGE_SCENARIO_KERNEL=python \
+ QUANTLINEAGE_PRICING_CACHE=0 .venv/bin/python -m pytest \
  tests/test_demo_scripts.py tests/test_quantlib_golden.py tests/test_curve_pricing.py -q --tb=line
 # → 67 passed
 
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line
 # → 614 passed; 2 failed unrelated (see Known limitations)
 ```
 
@@ -56,7 +56,7 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 - QuantLib: golden bond continuous + Builtin parity green (**rel=1e-10**)
 - Frontend / C++ / Build: not in scope
 - Pushed: `f39ba6a` ( parity) + `8d3d67a` (ROADMAP highest-risk note) on `origin/master`
- - https://github.com/SergTogul/riskforge-mvp/commit/f39ba6ad1e5294352b0e9597f354f682c1df5030
+ - https://github.com/SergTogul/quantlineage/commit/f39ba6ad1e5294352b0e9597f354f682c1df5030
 
 ## Known limitations / risks
 - Curve-attached Builtin bonds still discount at domain `maturity_years` (pillar T), not calendar-rounded Act/365; QL ZeroCurve pillars use calendar-rounded dates — residual can appear when curves are attached (covered by curve tests, not scalar gap).

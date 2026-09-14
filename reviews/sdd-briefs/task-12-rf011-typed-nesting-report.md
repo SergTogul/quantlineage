@@ -61,7 +61,7 @@ TDD red (new/updated cases, before production change): 12 failed as expected (su
 Brief (required):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_market_snapshot.py \
   tests/test_finite_scalars.py \
@@ -71,7 +71,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 Covering market/pricing:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_market_snapshot.py \
   tests/test_finite_scalars.py \

@@ -1,4 +1,4 @@
-# RiskForge Development Roadmap
+# QuantLineage Development Roadmap
 
 Authoritative backlog from 2026-09-02. `TASKS.md` is **absent**; do not recreate it. Use this file for historical workstreams and `reviews/FINDINGS.md` / `reviews/REMEDIATION_MILESTONE.md` for remediation.
 
@@ -14,8 +14,8 @@ Builtin **659** and QuantLib **688** are **not** contemporaneous two-engine resu
 
 | Check | Result | Notes |
 |-------|--------|-------|
-| Backend pytest `RISKFORGE_PRICING_ENGINE=builtin` | **659 passed** | Recorded baseline; **pre-insertion** (before new R0.1 test files) |
-| Backend pytest `RISKFORGE_PRICING_ENGINE=quantlib` `RISKFORGE_REQUIRE_QUANTLIB=1` | **688 passed**, **0 skipped** | Recorded baseline; **after R0.1.1–R0.1.6** |
+| Backend pytest `QUANTLINEAGE_PRICING_ENGINE=builtin` | **659 passed** | Recorded baseline; **pre-insertion** (before new R0.1 test files) |
+| Backend pytest `QUANTLINEAGE_PRICING_ENGINE=quantlib` `QUANTLINEAGE_REQUIRE_QUANTLIB=1` | **688 passed**, **0 skipped** | Recorded baseline; **after R0.1.1–R0.1.6** |
 | Ruff `ruff check app tests` | exit 0 | Recorded baseline |
 | mypy `mypy app` | exit 0 | Recorded baseline |
 | Frontend `npm test` | **74 passed** | Recorded baseline |
@@ -55,7 +55,7 @@ Workstreams 0–13 record historical MVP delivery completions. Workstream **COMP
 | Check | Result |
 |-------|--------|
 | QuantLib | 1.43 import OK |
-| Backend pytest (`RISKFORGE_PRICING_ENGINE=quantlib`) | **160 passed**, 1 Starlette/httpx deprecation warning |
+| Backend pytest (`QUANTLINEAGE_PRICING_ENGINE=quantlib`) | **160 passed**, 1 Starlette/httpx deprecation warning |
 | Frontend `npm test` | **10 passed** |
 | Frontend `npm run build` | **OK** |
 | C++ via `test_native_kernel` | **passed** (g++/Apple clang 14; earlier same-day baseline; not re-run in this acceptance pass) |
@@ -81,13 +81,13 @@ Trade (domain/models.py)
  ├─ StressEngine / ReverseStress / Compare
  ├─ Hierarchy / Attribution / Limits / Factors / Query
  → PortfolioService → FastAPI (app/api/* routers; canonical `/api/v1` + deprecated legacy dual-mount)
- → React SPA (single page cards) / optional NativeScenarioKernel (LINEAR/Δ-Γ via RISKFORGE_SCENARIO_KERNEL)
+ → React SPA (single page cards) / optional NativeScenarioKernel (LINEAR/Δ-Γ via QUANTLINEAGE_SCENARIO_KERNEL)
 ```
 
 ### Highest-risk gaps (post– progress)
 
 1. Caps/floors and vanilla European swaptions have a scoped flat Black-76 pricing slice; EquityVol/FXVol bumps now rewrite attached surface grids; QL still uses `BlackConstantVol` at point σ for equity/FX options (not full surface engine)
-2. **COMPLETE** (2026-09-02): GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125); caching polish **DONE** (valuation LRU + curve-construction + scenario memo)
+2. **COMPLETE** (2026-09-02): GHA `postgres-persistence-smoke` green (https://github.com/SergTogul/quantlineage/actions/runs/33673245125); caching polish **DONE** (valuation LRU + curve-construction + scenario memo)
 3. **COMPLETE** (2026-09-02 Lead Architect + C++ Performance): DONE; formal **scenario-kernel SLA** SLA-K1 ≥50× / SLA-K2 ≥1.3× on `10k_x_1k` (reference host; `benchmarks/RESULTS.md` + `benchmarks/check_m6_sla.py`); FULL_REVALUATION stays Python; **not** an HTTP end-to-end VaR latency claim
 4. **COMPLETE** (router split + dual-mount `/api/v1` + typed models + OpenAPI examples + `{code,message,details}` + canonical/sunset docs + legacy Deprecation headers); ** formal Scenario HTTP wire DONE** (legacy StressScenario endpoints retained)
 5. **COMPLETE** (2026-09-02): overview collage, scenario builder presets, Firm→trade hierarchy drill, P&L `/risk/attribution` UI, limits status+drill UX (plus prior nav/heatmaps/hedge/runs/analytics panels)
@@ -98,7 +98,7 @@ Trade (domain/models.py)
 
 | Check | Result |
 |-------|--------|
-| Backend pytest (`cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **519 passed** (2026-09-02 ), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
+| Backend pytest (`cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line`) | **519 passed** (2026-09-02 ), 1 Starlette/httpx deprecation warning, 0 failed, 0 skipped |
 | Frontend `npm test` | **56 passed**, 0 failed |
 | Frontend `npm run build` | **OK** (vite; 22 modules) |
 | workstream | **COMPLETE** — GHA green (run 33673245125); caching polish **DONE** |
@@ -133,7 +133,7 @@ Critical review items closed with code evidence:
 ### Tasks
 
 - [x] Local production dependency verification
- - Evidence (2026-09-02 acceptance): QuantLib 1.43; backend **160 passed** with `RISKFORGE_PRICING_ENGINE=quantlib`; frontend `npm test` **10 passed**; `npm run build` OK
+ - Evidence (2026-09-02 acceptance): QuantLib 1.43; backend **160 passed** with `QUANTLINEAGE_PRICING_ENGINE=quantlib`; frontend `npm test` **10 passed**; `npm run build` OK
 - [x] Complete QuantLib instrument coverage
  - EquityFuture / FXForward / FXOption: native QL paths (no Builtin fallback); tight parity tests
  - InterestRateFuture: domain + Builtin/QL adapters (algebraic STIR mark; full QL FRA still deferred)
@@ -276,7 +276,7 @@ Methodology-selectable VaR/ES with contribution reconciliation; what-if without 
 | Check | Result |
 |-------|--------|
 | checklist | All `[x]` with file/test evidence in ROADMAP |
-| Backend pytest (`RISKFORGE_PRICING_ENGINE=quantlib`) | **219 passed**, 1 Starlette/httpx deprecation warning |
+| Backend pytest (`QUANTLINEAGE_PRICING_ENGINE=quantlib`) | **219 passed**, 1 Starlette/httpx deprecation warning |
 | Frontend `npm test` | **10 passed** |
 | Frontend `npm run build` | **OK** |
 | API gap closed | `POST /risk/es` wired to `PortfolioService.es_contributions` |
@@ -341,7 +341,7 @@ Flagship stress with typed multi-factor shocks, honest crisis labeling, reconcil
 | Check | Result |
 |-------|--------|
 | checklist | All `[x]` with file/test evidence in ROADMAP; focused suite **78 passed** |
-| Backend pytest (`RISKFORGE_PRICING_ENGINE=quantlib`, QuantLib 1.43) | **282 passed**, 1 Starlette/httpx deprecation warning |
+| Backend pytest (`QUANTLINEAGE_PRICING_ENGINE=quantlib`, QuantLib 1.43) | **282 passed**, 1 Starlette/httpx deprecation warning |
 | Frontend `npm test` | **10 passed** |
 | Frontend `npm run build` | **OK** |
 | Breaking API shape | `POST /risk/stress/compare` returns `HedgeComparisonReport` object (not bare `ScenarioComparison[]`); legacy per-scenario fields live under `scenarios[]` |
@@ -411,7 +411,7 @@ Firm→trade hierarchy with additive MV/Greek/stress reconciliation; P&L Explain
 | Check | Result |
 |-------|--------|
 | checklist | All `[x]` with file/test evidence in ROADMAP |
-| Backend pytest (`RISKFORGE_PRICING_ENGINE=quantlib`, QuantLib 1.43) | **324 passed**, 1 Starlette/httpx deprecation warning |
+| Backend pytest (`QUANTLINEAGE_PRICING_ENGINE=quantlib`, QuantLib 1.43) | **324 passed**, 1 Starlette/httpx deprecation warning |
 | Frontend `npm test` | **22 passed** |
 | Integration unblock during acceptance | Renamed Alembic scripts dir `backend/alembic` → `backend/migrations` (avoids shadowing installed `alembic` package; `alembic.ini` + `test_persistence.py` updated) |
 | Known residual — P&L Explain | Taylor residual absorbs higher-order / duration–DV01 gaps; not a full-reval explain |
@@ -441,8 +441,8 @@ Task rollup: **DONE**; **DONE** (valuation LRU + curve-construction + scenario m
  - New package `backend/app/persistence/` (config, session, ORM models, repository ABCs + SQLAlchemy repos)
  - Tables: portfolios, trades, market_snapshots (meta + JSON data), scenario_definitions, risk_runs, risk_results, limit_definitions
  - Alembic initial revision `001_initial_persistence` under `backend/migrations/` (not `alembic/`, to avoid package shadowing); SQLite-capable unit tests (no live Postgres required in unit suite)
- - Compose `postgres` service + `RISKFORGE_DATABASE_URL` (psycopg3); ADR 005
- - Postgres CI: `postgres-persistence-smoke` job in `.github/workflows/ci.yml` + `scripts/smoke_postgres.sh` (wait-for-pg → Alembic `backend/migrations/` upgrade head → seed wiring). **Local Compose smoke green** (2026-09-02 DevOps). **GHA green** (2026-09-02): https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176) — residual **CLOSED**
+ - Compose `postgres` service + `QUANTLINEAGE_DATABASE_URL` (psycopg3); ADR 005
+ - Postgres CI: `postgres-persistence-smoke` job in `.github/workflows/ci.yml` + `scripts/smoke_postgres.sh` (wait-for-pg → Alembic `backend/migrations/` upgrade head → seed wiring). **Local Compose smoke green** (2026-09-02 DevOps). **GHA green** (2026-09-02): https://github.com/SergTogul/quantlineage/actions/runs/33673245125 (job https://github.com/SergTogul/quantlineage/actions/runs/33673245125/job/100391676176) — residual **CLOSED**
 - [x] RiskRun domain model — DONE
  - Domain DTOs: `RiskRunStatus`, `RiskResultRef`, `RiskRun` in `domain/models.py`
  - Lifecycle validation (QUEUED/RUNNING/COMPLETED/FAILED), computed `duration`
@@ -461,25 +461,25 @@ Task rollup: **DONE**; **DONE** (valuation LRU + curve-construction + scenario m
  - Default: `InMemoryRiskRunRepository`; optional `session_factory` → SQLAlchemy repos + result payloads
  - DTOs: `RiskRunCreateRequest` / `RiskRunView` (`from_risk_run`)
  - Evidence: `tests/test_risk_run_api.py`
- - Residuals deferred: optional Redis/RQ for fair scheduling / ops; wires default Postgres DI when ``RISKFORGE_DATABASE_URL`` is set
+ - Residuals deferred: optional Redis/RQ for fair scheduling / ops; wires default Postgres DI when ``QUANTLINEAGE_DATABASE_URL`` is set
  - Multi-worker claim safety landed under (`claim_queued` + `FOR UPDATE SKIP LOCKED`)
 - [x] Caching with invalidation tests — **DONE**
  - `CachedPricingEngine` in `backend/app/pricing/cache.py` wraps any `PricingEngine` (no QuantLib leakage)
  - Cache key = trade payload hash + `MarketSnapshot.content_hash` + `PricingConfiguration` (engine id / evaluation date / extras)
- - Factory opt-in via `RISKFORGE_PRICING_CACHE` (default on) + `RISKFORGE_PRICING_CACHE_SIZE`
+ - Factory opt-in via `QUANTLINEAGE_PRICING_CACHE` (default on) + `QUANTLINEAGE_PRICING_CACHE_SIZE`
  - Correctness: hit/miss, market-bump miss, config miss, LRU eviction, clear — `tests/test_pricing_cache.py`
- - Curve-construction LRU: `backend/app/pricing/curve_cache.py` memoizes `select_yield_curve` by currency-relevant market fingerprint; `RISKFORGE_CURVE_CACHE` (default on) + `RISKFORGE_CURVE_CACHE_SIZE`; evidence `tests/test_curve_cache.py`
- - Scenario-result memo: `backend/app/risk/scenario_memo.py` wraps `scenario_engine.apply_scenario` by base id + content hash + shock fingerprint + id tag; `RISKFORGE_SCENARIO_CACHE` (default on) + `RISKFORGE_SCENARIO_CACHE_SIZE`; evidence `tests/test_scenario_memo.py`
+ - Curve-construction LRU: `backend/app/pricing/curve_cache.py` memoizes `select_yield_curve` by currency-relevant market fingerprint; `QUANTLINEAGE_CURVE_CACHE` (default on) + `QUANTLINEAGE_CURVE_CACHE_SIZE`; evidence `tests/test_curve_cache.py`
+ - Scenario-result memo: `backend/app/risk/scenario_memo.py` wraps `scenario_engine.apply_scenario` by base id + content hash + shock fingerprint + id tag; `QUANTLINEAGE_SCENARIO_CACHE` (default on) + `QUANTLINEAGE_SCENARIO_CACHE_SIZE`; evidence `tests/test_scenario_memo.py`
 - [x] Wire persistence repositories into FastAPI DI / services — **DONE**
- - Optional DI: ``RISKFORGE_DATABASE_URL`` set → SQLAlchemy session factory + seeded sample portfolio / market snapshot / DEFAULT+THREAT scenarios / DEFAULT_LIMITS + ``RiskRunWorker(session_factory=…)``
+ - Optional DI: ``QUANTLINEAGE_DATABASE_URL`` set → SQLAlchemy session factory + seeded sample portfolio / market snapshot / DEFAULT+THREAT scenarios / DEFAULT_LIMITS + ``RiskRunWorker(session_factory=…)``
  - Unset → ``SAMPLE_PORTFOLIO`` + in-memory snapshot/scenario/limit repos (pre-seeded) + ``InMemoryRiskRunRepository`` (default tests unchanged)
  - ``Depends``: ``get_default_portfolio``, ``get_default_market_snapshot``, ``get_market_snapshot_repository``, ``get_scenario_definition_repository``, ``get_limit_definition_repository``, ``get_risk_run_worker``; repos also on ``app.state`` when memory-backed
  - Worker upserts portfolio on submit when SQLAlchemy-backed (FK to ``portfolios``)
  - Evidence: `tests/test_persistence_di.py`; ADR 005 updated
 - [x] Compose (or process) risk-run worker after stabilizes — **DONE**
- - Compose `worker` service: `python -m app.worker` claims `QUEUED` risk_runs from shared Postgres (`RISKFORGE_DATABASE_URL`)
+ - Compose `worker` service: `python -m app.worker` claims `QUEUED` risk_runs from shared Postgres (`QUANTLINEAGE_DATABASE_URL`)
  - Same `RiskRunWorker` + SQLAlchemy session factory as API lifespan; portfolio loaded from DB on cache miss
- - Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` (HTTP enqueues only); unset → in-process ThreadPoolExecutor (tests/local default)
+ - Compose `backend` sets `QUANTLINEAGE_EXTERNAL_WORKER=1` (HTTP enqueues only); unset → in-process ThreadPoolExecutor (tests/local default)
  - Repo `claim_queued` (memory + SQLAlchemy): QUEUED→RUNNING; **Postgres** uses `SELECT … FOR UPDATE SKIP LOCKED` so concurrent workers do not double-claim; SQLite/unit path is FIFO without skip-locked (documented)
  - Compose ships one worker by default (demo); Redis/RQ **not** required for claim safety
  - Evidence: `tests/test_durable_worker.py` (poll + memory exclusive claim + SQLite claim + mocked postgres `skip_locked`)
@@ -501,12 +501,12 @@ Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRu
 
 **Update same day (DevOps attempt):** Local `scripts/smoke_postgres.sh` against Compose `postgres:16-alpine` **passed** (Alembic 001→002 + seed portfolio/snapshot/scenarios/limits). CI workflow hardened (psycopg wait + version print). ** still NOT DONE** — this checkout has **no `git remote` / no `gh` CLI**, so no GitHub Actions run history and no push to obtain runner evidence. Do **not** mark Workstream 5 COMPLETE until a green `postgres-smoke` (and ideally full CI) GHA URL is recorded. alone remains non-blocking polish.
 
-**Update same day (DevOps close):** Origin https://github.com/SergTogul/riskforge-mvp ; push `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — jobs `postgres-persistence-smoke`, `backend-pytest`, `frontend-test-build` all green. ** DONE**; ** residual CLOSED**; Workstream 5 marked **COMPLETE**. stays non-blocking polish.
+**Update same day (DevOps close):** Origin https://github.com/SergTogul/quantlineage ; push `31228fb`; CI run **success** https://github.com/SergTogul/quantlineage/actions/runs/33673245125 — jobs `postgres-persistence-smoke`, `backend-pytest`, `frontend-test-build` all green. ** DONE**; ** residual CLOSED**; Workstream 5 marked **COMPLETE**. stays non-blocking polish.
 
 | Check (initial formal pass) | Result |
 |-------|--------|
 | QuantLib | 1.43 import OK |
-| Backend pytest (`RISKFORGE_PRICING_ENGINE=quantlib`) | **403 passed**, 1 Starlette/httpx deprecation warning |
+| Backend pytest (`QUANTLINEAGE_PRICING_ENGINE=quantlib`) | **403 passed**, 1 Starlette/httpx deprecation warning |
 | Frontend `npm test` | **26 passed** |
 | | **DONE** — domain, lifecycle, async APIs + tests |
 | | **PARTIAL** — schema/repos/Alembic/Compose Postgres; Postgres CI job was missing at formal pass |
@@ -534,7 +534,7 @@ Durable persistence + async risk-run platform: SQLAlchemy/Alembic schema, RiskRu
 
 ### Remaining items after COMPLETE
 
-1. ~~** (blocking):**~~ **CLOSED 2026-09-02** — GHA run https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 (`postgres-persistence-smoke` green).
+1. ~~** (blocking):**~~ **CLOSED 2026-09-02** — GHA run https://github.com/SergTogul/quantlineage/actions/runs/33673245125 (`postgres-persistence-smoke` green).
 2. ~~** (non-blocking polish):**~~ **CLOSED** — curve-construction cache + scenario-result memo (+ prior valuation LRU); does not reopen Workstream 5 COMPLETE.
 
 ~~** (blocking):** Wire market_snapshots / scenario_definitions / limit_definitions repositories into FastAPI DI~~ **CLOSED 2026-09-02.**
@@ -567,7 +567,7 @@ Lead Architect suite verify 2026-09-02: native path covered by green full backen
 
 | ID | Requirement | Floor |
 |----|-------------|------:|
-| **SLA-K1** | Native nested-loop `cpp_ctypes` vs pure-Python on workload `10k_x_1k` (10 000×1 000) — same ABI as `RISKFORGE_SCENARIO_KERNEL=native` LINEAR/DELTA_GAMMA aggregation | **≥ 50×** wall-time |
+| **SLA-K1** | Native nested-loop `cpp_ctypes` vs pure-Python on workload `10k_x_1k` (10 000×1 000) — same ABI as `QUANTLINEAGE_SCENARIO_KERNEL=native` LINEAR/DELTA_GAMMA aggregation | **≥ 50×** wall-time |
 | **SLA-K2** | `cpp_ctypes_t4` (`--threads 4 --parallel-compare`) vs serial `cpp_ctypes` on the same `10k_x_1k` run | **≥ 1.3×** wall-time |
 
 **Evidence method:**
@@ -606,7 +606,7 @@ Recorded evidence: `benchmarks/RESULTS.md` (Formal product SLA + tables). 2026-0
  - Documents NumPy strength-reduction caveat (rewrite ≠ nested-loop fair compare)
 - [x] Native scenario aggregation wired into risk path — DONE
  - `approximate_pnl_series` / `HistoricalRiskEngine` LINEAR & DELTA_GAMMA honor
- `RISKFORGE_SCENARIO_KERNEL=python|native` (+ optional `RISKFORGE_SCENARIO_KERNEL_LIB`)
+ `QUANTLINEAGE_SCENARIO_KERNEL=python|native` (+ optional `QUANTLINEAGE_SCENARIO_KERNEL_LIB`)
  - Default remains NumPy vectorized Python path; methodology / vol-point scaling stay in Python
  - **FULL_REVALUATION cannot use the kernel** (PricingEngine revaluation only; documented in
  `historical.py`, `compute/kernel.py`, `native/README.md`)
@@ -615,7 +615,7 @@ Recorded evidence: `benchmarks/RESULTS.md` (Formal product SLA + tables). 2026-0
  - **One strategy only:** C++20 stdlib thread pool over contiguous shock partitions
  (`std::jthread` when available, else `std::thread`+join; Apple libc++ often lacks
  jthread). Documented in `backend/native/README.md` — **not OpenMP**; no mixing.
- - Env `RISKFORGE_KERNEL_THREADS` (+ CLI `--threads`); serial path when `1` or `n_shocks≤1`
+ - Env `QUANTLINEAGE_KERNEL_THREADS` (+ CLI `--threads`); serial path when `1` or `n_shocks≤1`
  - Numerical parity: C++ `kernel_test` + `tests/test_native_kernel.py` (parallel ≈ serial)
  - Harness: `benchmarks/run_scenario_bench.py --threads N --parallel-compare`
  - Capture: `benchmarks/RESULTS.md` ( section; SLA-K2 evidence)
@@ -635,7 +635,7 @@ Recorded evidence: `benchmarks/RESULTS.md` (Formal product SLA + tables). 2026-0
 - [x] Prove native kernel hot-path equivalence on Historical VaR / scenario aggregation before claiming perf wins — DONE (parity gate)
  - NumPy vs pure-Python kernel ABI + NumPy vs native on LINEAR/DELTA_GAMMA P&L and VaR/ES
  - Explicit tolerances: `KERNEL_PNL_ABS_TOL=1e-9`, `KERNEL_PNL_REL_TOL=1e-12` (`historical.py`)
- - FULL_REVALUATION remains kernel-free even when `RISKFORGE_SCENARIO_KERNEL=native`
+ - FULL_REVALUATION remains kernel-free even when `QUANTLINEAGE_SCENARIO_KERNEL=native`
  - Product speed claim is scoped to SLA-K1/K2 (nested-loop `E×S` kernel); see Formal product SLA
 - [x] Formal scenario-kernel SLA + check harness — DONE (2026-09-02)
  - Floors + evidence in `benchmarks/RESULTS.md`; pass/fail: `benchmarks/check_m6_sla.py`
@@ -804,7 +804,7 @@ Status: **COMPLETE** (2026-09-03 — Redis/RQ residual resolved as accepted defe
 - [x] E2E Playwright — **DONE** (2026-09-02)
  - Local: 10 Playwright specs (`cd e2e && npm test`); macOS uses Chrome channel.
  - CI: job `e2e-playwright` (Chromium on ubuntu-latest; builtin API + Vite `webServer`) landed SHA `7f01407`.
- - GHA evidence: run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (head SHA `2f45e14`); job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499 — steps include green `Run Playwright E2E`.
+ - GHA evidence: run **success** https://github.com/SergTogul/quantlineage/actions/runs/33683725857 (head SHA `2f45e14`); job https://github.com/SergTogul/quantlineage/actions/runs/33683725857/job/100426208499 — steps include green `Run Playwright E2E`.
  - Residual breadth (multi-factor reverse E2E) tracked under , not .
 - [x] Backend property tests (Hypothesis) — **DONE** (2026-09-02, staged broaden)
  - Beyond pricing Greeks: `backend/tests/test_m9_risk_properties.py` — VaR/ES ordering, MV aggregation, component-VaR Euler reconciliation under Hypothesis.
@@ -813,7 +813,7 @@ Status: **COMPLETE** (2026-09-03 — Redis/RQ residual resolved as accepted defe
 - [x] Golden quant tests — **DONE** (2026-09-02, expand)
  - Expanded `backend/tests/test_quantlib_golden.py` (~49 cases): equity/FX options vs analytic BS/GK; CIP equity-future & FX-forward algebra (rel=1e-12); IR STIR algebra; continuous Actual365Fixed ZC bond golden (closes annual-compound day-count gap as documented); IRS payer/receiver + ATM residual; edge eval dates (weekend/leap/year-end); PricingEngine seam check.
  - Tolerances/reference documented in module docstring (QuantLib AnalyticEuropeanEngine / FlatForward; algebraic CIP/STIR identities shared with Builtin).
- - Local: `RISKFORGE_PRICING_ENGINE=quantlib pytest tests/test_quantlib_golden.py` → **49 passed**; full backend suite → **564 passed**.
+ - Local: `QUANTLINEAGE_PRICING_ENGINE=quantlib pytest tests/test_quantlib_golden.py` → **49 passed**; full backend suite → **564 passed**.
  - Residual (non-blocking): very short ``T ≲ 0.05`` option date-rounding bands remain in `test_quantlib_pricing.py`; IRS NPV not identical to Builtin annuity model.
 - [x] Stress invariants — **DONE** (2026-09-02, staged)
  - Hypothesis: stress pnl == Σ by_position; empty scenario list → []; long-equity equity-shock monotonicity (same file as ).
@@ -825,42 +825,42 @@ Status: **COMPLETE** (2026-09-03 — Redis/RQ residual resolved as accepted defe
  - Config: `backend/pyproject.toml`, `backend/requirements-dev.txt`, `frontend/eslint.config.js`.
  - **Honest staging (not full-strict):** Ruff selects E/F/I/B/UP/SIM/RUF with documented ignores (E501 line length, B008 FastAPI `Depends`, pyupgrade/SIM/RUF style debt, finance γ/Δ unicode). mypy runs with `disable_error_code` for known debt (`arg-type`, `assignment`, `var-annotated`, `no-redef`, `misc`) — still catches other errors; pay down by removing codes. ESLint: recommended + react/hooks; `prop-types` off (no TS yet).
  - Trivial fixes: Ruff autofix (imports/unused), F821 lambda closure in `risk_run_worker.py`, Analytics `useEffect` deps for exhaustive-deps; kernel P&L tol imports moved to `app.compute.kernel` in tests.
- - GHA evidence: push SHA `8d7a6f2`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 — includes green `lint-static-analysis`.
+ - GHA evidence: push SHA `8d7a6f2`; CI run **success** https://github.com/SergTogul/quantlineage/actions/runs/33683147903 — includes green `lint-static-analysis`.
  - Follow-up (non-blocking for ): enable ignored Ruff rules gradually; clear mypy `disable_error_code`; add Vitest/TS when advances.
 - [x] Containers — **DONE** (2026-09-02 Lead Architect disposition; queue residual clarified 2026-09-03)
- - **Acceptance (containers):** Compose ships `postgres` + `backend` + `worker` + `frontend` (`docker-compose.yml`); `backend` sets `RISKFORGE_EXTERNAL_WORKER=1`; `worker` runs `python -m app.worker` and claims via Postgres `FOR UPDATE SKIP LOCKED` ( / ADR 005). No VaR/pricing math changed.
+ - **Acceptance (containers):** Compose ships `postgres` + `backend` + `worker` + `frontend` (`docker-compose.yml`); `backend` sets `QUANTLINEAGE_EXTERNAL_WORKER=1`; `worker` runs `python -m app.worker` and claims via Postgres `FOR UPDATE SKIP LOCKED` ( / ADR 005). No VaR/pricing math changed.
  - **Redis/RQ — RESOLVED AS ACCEPTED DEFERRAL (2026-09-03):** Fair scheduling / ops queue remains out of scope because current MVP semantics are covered by durable Postgres `risk_runs`, API enqueue-only mode, out-of-process `python -m app.worker`, FIFO bounded polling, and PostgreSQL `FOR UPDATE SKIP LOCKED`. No fake Redis service or RQ worker was added.
  - Follow-on (optional ops): introduce Redis/RQ or equivalent only with testable new semantics such as priority classes, tenant fairness, retry/dead-letter policy, or queue observability.
 
 - [x] Validate CI on GitHub-hosted runners (fix workflow green; document QuantLib install path) — **DONE** (2026-09-02)
- - Local evidence (2026-09-02, DevOps): `docker compose up -d postgres` + `RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge ./scripts/smoke_postgres.sh` → **exit 0** (`postgres smoke OK`; Alembic head `002_risk_run_domain_fields`). Idempotent re-run OK. See `BUILD_NOTES.md`.
+ - Local evidence (2026-09-02, DevOps): `docker compose up -d postgres` + `QUANTLINEAGE_DATABASE_URL=postgresql+psycopg://quantlineage:quantlineage@localhost:5432/quantlineage ./scripts/smoke_postgres.sh` → **exit 0** (`postgres smoke OK`; Alembic head `002_risk_run_domain_fields`). Idempotent re-run OK. See `BUILD_NOTES.md`.
  - CI hardening: smoke waits up to 60s for psycopg `SELECT 1`; job prints sqlalchemy/alembic/psycopg versions; QuantLib optional for `postgres-smoke` (full `requirements.txt` preferred; strip QuantLib on wheel failure). Main `backend` job still prefers QuantLib wheel on `ubuntu-latest`, falls back to builtin.
- - GHA evidence: repo https://github.com/SergTogul/riskforge-mvp ; push SHA `31228fb`; CI run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125 — `postgres-persistence-smoke` https://github.com/SergTogul/riskforge-mvp/actions/runs/33673245125/job/100391676176 ; also `backend-pytest` + `frontend-test-build` green. QuantLib path: backend job prefers wheel on ubuntu-latest with builtin fallback (see workflow).
+ - GHA evidence: repo https://github.com/SergTogul/quantlineage ; push SHA `31228fb`; CI run **success** https://github.com/SergTogul/quantlineage/actions/runs/33673245125 — `postgres-persistence-smoke` https://github.com/SergTogul/quantlineage/actions/runs/33673245125/job/100391676176 ; also `backend-pytest` + `frontend-test-build` green. QuantLib path: backend job prefers wheel on ubuntu-latest with builtin fallback (see workflow).
  - Workstream 5 COMPLETE cleared on this evidence; caching polish **DONE**.
 - [x] E2E coverage for post- endpoints — **DONE** (2026-09-02 QA reverse-multi close)
  - Done: ES contributions (`POST /risk/es`), change-attribution waterfall, VaR methodology compare, hedge-compare (`POST /risk/stress/compare`), overview collage → VaR & ES nav; risk-runs hash fix (`/#risk-runs`) after sectioning
  - Frontend UI: Stress-section **Multi-Factor Reverse Stress** → `POST /api/v1/risk/stress/reverse/multi` (helpers + Vitest/RTL/MSW)
  - QA E2E close: `e2e/tests/reverse-stress.spec.ts` — navigate `#stress`, fill target/max-shock/weights + factor toggles, assert Status Converged/Not converged + factor table rows; client validation for fewer than two factors; **no invented PnL/shock numbers**
  - Local evidence: `cd e2e && npm test` → **12 passed** (2026-09-02 QA); Chrome channel locally; CI stays Chromium via `CI=true` (`e2e/playwright.config.js`)
- - CI close: push SHA `a61c29a` — run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 ; job `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 (also fixed Frontend `8409b7e` regression: single-factor heading strict-mode collision)
- - Prior gate: https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (job https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499)
+ - CI close: push SHA `a61c29a` — run **success** https://github.com/SergTogul/quantlineage/actions/runs/33700677387 ; job `e2e-playwright` https://github.com/SergTogul/quantlineage/actions/runs/33700677387/job/100479144624 (also fixed Frontend `8409b7e` regression: single-factor heading strict-mode collision)
+ - Prior gate: https://github.com/SergTogul/quantlineage/actions/runs/33683725857 (job https://github.com/SergTogul/quantlineage/actions/runs/33683725857/job/100426208499)
  - Prior note: Workstream 9 stayed PARTIAL until Lead Architect disposition (below).
 
 - [x] CI failure triage (e2e-playwright reverse-stress heading collision) — **DONE** (2026-09-02 DevOps/QA)
- - **Do not hide:** GHA run **failure** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700340552 (SHA `8409b7e`, “Add multi-factor reverse-stress UI”) — job **`e2e-playwright` failed**; siblings green (`backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`).
+ - **Do not hide:** GHA run **failure** https://github.com/SergTogul/quantlineage/actions/runs/33700340552 (SHA `8409b7e`, “Add multi-factor reverse-stress UI”) — job **`e2e-playwright` failed**; siblings green (`backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`).
  - Root cause: single-factor locator `.card` + heading `Reverse Stress` also matched **Multi-Factor Reverse Stress** card (`strict mode violation` → 2 elements).
  - Fix (already on master via close, hardened here): `exact: true` heading match + durable `data-testid="reverse-stress"` on single-factor card; multi keeps `data-testid="reverse-stress-multi"`.
- - Older historical failure ( land): https://github.com/SergTogul/riskforge-mvp/actions/runs/33680821074 (`backend-pytest` + `lint-static-analysis`) — subsequently fixed; not reopened.
+ - Older historical failure ( land): https://github.com/SergTogul/quantlineage/actions/runs/33680821074 (`backend-pytest` + `lint-static-analysis`) — subsequently fixed; not reopened.
  - Local evidence (this triage): backend `pytest -q` **571 passed** (QuantLib); frontend `npm test` **61+9 passed**; `ruff`/`mypy`/`eslint` OK; native kernel compile OK.
- - HEAD at triage start: SHA `f74b528` — full CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33701266538 (all five jobs green). Hardening push SHA `16c91cc` — CI **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33703670779 (all five jobs green, including `e2e-playwright`).
+ - HEAD at triage start: SHA `f74b528` — full CI **success** https://github.com/SergTogul/quantlineage/actions/runs/33701266538 (all five jobs green). Hardening push SHA `16c91cc` — CI **success** https://github.com/SergTogul/quantlineage/actions/runs/33703670779 (all five jobs green, including `e2e-playwright`).
 
 - [x] CI lint mypy regression (PortfolioService HistoricalRiskEngine narrowing) — **DONE** (2026-09-03 Lead Architect: GHA confirmed green)
  - **Local root cause (reproduced with CI commands):** `lint-static-analysis` / `mypy app` failed on `backend/app/services/portfolio_service.py` — ternary `isinstance(...)` did not narrow `risk: RiskEngine`, so `.seed` / `.observations` were attr-defined errors.
  - **Fix:** SHA `11339c6` on `master` — statement-level `isinstance(risk, HistoricalRiskEngine)` before accessing attrs (PricingEngine seams untouched).
  - **Local evidence before push:** backend `pytest -q` **619 passed** (QuantLib 1.43); `ruff`/`mypy` OK; frontend `npm test` **70 passed** + lint + build OK; native `risk_kernel_ok` + shared lib OK.
- - **Push:** `git push` succeeded (`8d3d67a..11339c6`). Expected CI run URL: https://github.com/SergTogul/riskforge-mvp/actions (filter SHA `11339c6`).
+ - **Push:** `git push` succeeded (`8d3d67a..11339c6`). Expected CI run URL: https://github.com/SergTogul/quantlineage/actions (filter SHA `11339c6`).
  - ~~**Blocked:** `gh run list` / `gh run watch` returned `Forbidden` from an invalid keyring token.~~ **CLEARED 2026-09-03** — `gh auth status` OK.
- - **GHA evidence (2026-09-03):** the mypy fix `11339c6` is contained in current master `9818d58`; run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33712643872 — all five jobs green, including `lint-static-analysis` https://github.com/SergTogul/riskforge-mvp/actions/runs/33712643872/job/100515202600.
+ - **GHA evidence (2026-09-03):** the mypy fix `11339c6` is contained in current master `9818d58`; run **success** https://github.com/SergTogul/quantlineage/actions/runs/33712643872 — all five jobs green, including `lint-static-analysis` https://github.com/SergTogul/quantlineage/actions/runs/33712643872/job/100515202600.
 
 ### Progress update (2026-09-02, Lead Architect — disposition + Workstream 9 COMPLETE)
 
@@ -898,7 +898,7 @@ Status: **COMPLETE** (2026-09-03 — Redis/RQ residual resolved as accepted defe
 ### Progress update (2026-09-02, DevOps — static analysis)
 
 - Owner: DevOps / Platform
-- Landed CI `lint-static-analysis` (Ruff + mypy + ESLint) with staged configs; GHA green https://github.com/SergTogul/riskforge-mvp/actions/runs/33683147903 (SHA `8d7a6f2`)
+- Landed CI `lint-static-analysis` (Ruff + mypy + ESLint) with staged configs; GHA green https://github.com/SergTogul/quantlineage/actions/runs/33683147903 (SHA `8d7a6f2`)
 - Follow-up SHA `8d7a6f2`: restore Historical VaR kernel test imports after Ruff F401 cleanup; `FloatArray` PEP 695 alias + numpy in `requirements-dev.txt` so lint-job mypy matches CI
 - Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE (, reverse-multi E2E still open; Playwright GHA job landed below — runner proof pending)
 
@@ -914,8 +914,8 @@ Status: **COMPLETE** (2026-09-03 — Redis/RQ residual resolved as accepted defe
 
 - Owner: DevOps / Platform
 - Restored `gh` auth (`repo` + `workflow` scopes) and verified latest master CI.
-- GHA run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857 (head SHA `2f45e14`, title: Document honest Playwright CI status pending runner proof.)
-- Job `e2e-playwright` **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33683725857/job/100426208499 (including step `Run Playwright E2E`). Sibling jobs also green: `backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`.
+- GHA run **success** https://github.com/SergTogul/quantlineage/actions/runs/33683725857 (head SHA `2f45e14`, title: Document honest Playwright CI status pending runner proof.)
+- Job `e2e-playwright` **success** https://github.com/SergTogul/quantlineage/actions/runs/33683725857/job/100426208499 (including step `Run Playwright E2E`). Sibling jobs also green: `backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`.
 - ** DONE** on this evidence. Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE ( Vitest/RTL, broaden, Redis optional, reverse-multi E2E still open). Do **not** start in this task.
 
 ### Progress update (2026-09-02, QA — Vitest/RTL/MSW)
@@ -937,7 +937,7 @@ Status: **COMPLETE** (2026-09-03 — Redis/RQ residual resolved as accepted defe
 
 - Owner: QA & Quant Validation (PricingEngine seams preserved; no adapter code changes)
 - Expanded `test_quantlib_golden.py` with IRS/FX/futures/bond continuous DF goldens, edge evaluation dates, documented tolerances (analytic BS/GK, CIP/STIR algebra, Actual365Fixed continuous bond vs annual-compound gap).
-- Local: `RISKFORGE_PRICING_ENGINE=quantlib pytest tests/test_quantlib_golden.py` → **49 passed**; full `pytest` → **564 passed**, 1 warning.
+- Local: `QUANTLINEAGE_PRICING_ENGINE=quantlib pytest tests/test_quantlib_golden.py` → **49 passed**; full `pytest` → **564 passed**, 1 warning.
 - ** DONE**. Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE ( Redis optional; reverse-multi UI/E2E still open — Frontend multi-factor reverse panel required before QA E2E close).
 
 ### Progress update (2026-09-02, Frontend — multi-factor reverse stress UI)
@@ -953,7 +953,7 @@ Status: **COMPLETE** (2026-09-03 — Redis/RQ residual resolved as accepted defe
 - Owner: QA & Quant Validation
 - Closed reverse-multi live E2E gap: fill controls (target loss %, max shock %, weights, factor checkboxes), assert Status Converged/Not converged + shock table factor rows; validation path for fewer than two factors; fixed single-factor card selector (`exact: true`) after Multi-Factor heading collision.
 - Local: `cd e2e && npm test` → **12 passed** (no unexpected skips). Spec/selectors only — no UI product changes.
-- GHA: run **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387 (head `a61c29a`); `e2e-playwright` https://github.com/SergTogul/riskforge-mvp/actions/runs/33700677387/job/100479144624 — also clears the `8409b7e` single-factor heading strict-mode failure.
+- GHA: run **success** https://github.com/SergTogul/quantlineage/actions/runs/33700677387 (head `a61c29a`); `e2e-playwright` https://github.com/SergTogul/quantlineage/actions/runs/33700677387/job/100479144624 — also clears the `8409b7e` single-factor heading strict-mode failure.
 - ** DONE**. Workstream 9 remains **PARTIAL** — do **not** mark COMPLETE ( Redis/RQ optional still open). Next: Lead Architect decide deferral vs implement; then SLA / .
 
 ---
@@ -971,7 +971,7 @@ Status: **COMPLETE** (2026-09-02 — DONE)
 - [x] Demo historical market dataset — **DONE** (2026-09-02)
  - Packaged CSV `data/demo_historical_factors.csv` (750 obs; frozen replay of `SyntheticHistoricalDataset(seed=7)`)
  - Loaders: `load_factor_observations_csv` / `load_demo_historical_dataset` / `create_historical_dataset`
- - Env `RISKFORGE_HISTORICAL_DATASET=demo|synthetic|/path.csv`; API DI defaults to demo CSV
+ - Env `QUANTLINEAGE_HISTORICAL_DATASET=demo|synthetic|/path.csv`; API DI defaults to demo CSV
  - Removed unused orphan `data/sample_portfolio.csv` (portfolios are in-code since )
  - Docs: `data/README.md`; evidence `tests/test_demo_historical_dataset.py`
 - [x] Deterministic demo scripts — **DONE** (2026-09-02)
@@ -1021,7 +1021,7 @@ Status: **COMPLETE** (2026-09-03 — deterministic tools plus provider-agnostic 
  - Evidence: `backend/app/risk/query.py` `RiskToolName` / `RiskToolContract` / `tool_contract_schemas`; `backend/tests/test_ai_query_orchestration.py`
 - [x] LLM orchestration — DONE (2026-09-03)
  - Added provider-agnostic model/tool-loop contracts: `RiskAssistantModelRequest`, `RiskAssistantModelResponse`, `RiskAssistantModel`, `DeterministicRiskAssistantModel`, and `RiskQueryEngine.answer_with_model(...)`.
- - A model adapter can request exactly one supported deterministic tool, ask for clarification, or refuse unsupported/advisory prompts; RiskForge executes known deterministic tools and ignores model-proposed answer text until tool payloads return.
+ - A model adapter can request exactly one supported deterministic tool, ask for clarification, or refuse unsupported/advisory prompts; QuantLineage executes known deterministic tools and ignores model-proposed answer text until tool payloads return.
  - No live provider adapter or credentials are required for local tests; network-backed provider wiring remains future product scope.
 - [x] Risk assistant evaluation suite — DONE for current M11 scope (2026-09-03)
  - Expanded eval coverage for deterministic tool selection, grounded answer behavior, model/tool-loop execution, clarification, refusal, and malicious/model-invented numeric text suppression.
@@ -1041,7 +1041,7 @@ Status: **COMPLETE** (2026-09-03 — deterministic tools plus provider-agnostic 
 ### Progress update (2026-09-03, AI Orchestration — model/tool loop close)
 
 - Owner: AI Orchestration Engineer; consumed existing deterministic `PortfolioService` tool boundary only.
-- Completed provider-agnostic one-turn model/tool orchestration over existing RiskForge tools; no pricing, VaR/ES, stress, market-data, or UI formulas changed.
+- Completed provider-agnostic one-turn model/tool orchestration over existing QuantLineage tools; no pricing, VaR/ES, stress, market-data, or UI formulas changed.
 - Guardrails: model-selected tools must be known `RiskToolName` values; clarification/refusal responses do not call numerical tools; final numeric answers are grounded only in deterministic `tool_result` payloads.
 - Local evidence: focused `tests/test_ai_query_orchestration.py` **10 passed**; scoped Ruff passed; `mypy app` passed; full backend pytest **659 passed** (1 existing Starlette/httpx warning).
 - Handoff: `docs/agents/HANDOFF_AI_ORCHESTRATION_M11.md`.
@@ -1088,7 +1088,7 @@ Status: **COMPLETE** (2026-09-03 — deterministic runbook, screenshots/ranges, 
  - Reuses demo portfolios (`equity-vol`, `rates-macro`, `global-macro`), packaged historical CSV, and `run_demo_risk`; no live vendors and no invented risk numbers
  - Demo risk values are read from generated/committed artifacts only (`data/demo_risk_artifact.json`)
 - [x] Screenshots + demo instructions + expected output ranges — DONE (2026-09-03)
- - Screenshots: `docs/demo/riskforge_demo_01_overview.png`, `docs/demo/riskforge_demo_02_portfolio.png`, `docs/demo/riskforge_demo_03_var_es.png`, `docs/demo/riskforge_demo_04_stress.png`
+ - Screenshots: `docs/demo/quantlineage_demo_01_overview.png`, `docs/demo/quantlineage_demo_02_portfolio.png`, `docs/demo/quantlineage_demo_03_var_es.png`, `docs/demo/quantlineage_demo_04_stress.png`
  - Expected ranges are derived from `data/demo_risk_artifact.json`, not invented in prose
 - [x] Clean-checkout verification of demo path — DONE (2026-09-03)
  - CI-style local smoke: `PYTHONPATH=backend backend/.venv/bin/python scripts/check_final_demo.py`

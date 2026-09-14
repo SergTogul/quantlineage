@@ -1,4 +1,4 @@
-# RiskForge Agent Operating Manual
+# QuantLineage Agent Operating Manual
 
 This repository is developed by a coordinated set of specialized subagents. Each agent owns a bounded area of the architecture and must avoid making unrelated changes outside that area without an explicit handoff.
 
@@ -6,11 +6,11 @@ Cursor startup prompts and orchestration tips: `docs/agents/CURSOR_SETUP.md`. Wo
 
 ## Product mission
 
-RiskForge is an institutional-style multi-asset portfolio and derivatives risk-management platform. Mature pricing libraries such as QuantLib provide instrument pricing; RiskForge owns portfolio aggregation, market snapshots, risk factors, VaR/Expected Shortfall, stress testing, reverse stress, P&L/risk attribution, limits, hierarchy, scenario computation, and the user workflow.
+QuantLineage is an institutional-style multi-asset portfolio and derivatives risk-management platform. Mature pricing libraries such as QuantLib provide instrument pricing; QuantLineage owns portfolio aggregation, market snapshots, risk factors, VaR/Expected Shortfall, stress testing, reverse stress, P&L/risk attribution, limits, hierarchy, scenario computation, and the user workflow.
 
 Core rule:
 
-> The pricing library prices. RiskForge manages portfolio risk. The LLM orchestrates deterministic tools; it never calculates financial risk itself.
+> The pricing library prices. QuantLineage manages portfolio risk. The model orchestrates deterministic tools; it never calculates financial risk itself.
 
 ## Non-goals
 

@@ -1,10 +1,10 @@
-# RiskForge 10/10 Subagent Rules
+# QuantLineage 10/10 Subagent Rules
 
 Lead Architect owns sequencing. Each implementer owns one task. Do not dual-own the same files in parallel.
 
 ## Product rules
 
-- QuantLib prices. RiskForge manages portfolio risk.
+- QuantLib prices. QuantLineage manages portfolio risk.
 - LLM orchestrates deterministic tools. It never calculates financial risk.
 - Correctness before performance.
 - `MarketSnapshot` is authoritative market state.

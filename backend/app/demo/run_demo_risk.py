@@ -5,8 +5,8 @@ then runs summary VaR + default stress through ``PortfolioService``. Numbers
 come only from deterministic engines — no live market vendors, no LLM math.
 
 Default pricing adapter for artifact stability is **builtin** (override with
-``RISKFORGE_PRICING_ENGINE``). Historical source is the per-factor demo panel
-unless ``--dataset`` / ``RISKFORGE_HISTORICAL_DATASET`` is overridden. The
+``QUANTLINEAGE_PRICING_ENGINE``). Historical source is the per-factor demo panel
+unless ``--dataset`` / ``QUANTLINEAGE_HISTORICAL_DATASET`` is overridden. The
 four-macro CSV remains available as ``--dataset demo``.
 """
 
@@ -45,7 +45,7 @@ def default_artifact_path() -> Path:
 
 
 def _pricing_engine_name() -> str:
-    return os.getenv("RISKFORGE_PRICING_ENGINE", "builtin").strip().lower() or "builtin"
+    return os.getenv("QUANTLINEAGE_PRICING_ENGINE", "builtin").strip().lower() or "builtin"
 
 
 def _make_pricing(*, prefer_builtin: bool = True):
@@ -79,7 +79,7 @@ def build_demo_risk_artifact(
         without cache wrapper for stable dumps.
     """
     # Native kernel can change float paths; keep demo scripts on Python reference.
-    os.environ.setdefault("RISKFORGE_SCENARIO_KERNEL", "python")
+    os.environ.setdefault("QUANTLINEAGE_SCENARIO_KERNEL", "python")
 
     if dataset_source is None:
         risk = build_historical_risk_engine()
@@ -234,8 +234,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     # Default CLI pricing to builtin unless caller already set the env.
-    os.environ.setdefault("RISKFORGE_PRICING_ENGINE", "builtin")
-    os.environ.setdefault("RISKFORGE_SCENARIO_KERNEL", "python")
+    os.environ.setdefault("QUANTLINEAGE_PRICING_ENGINE", "builtin")
+    os.environ.setdefault("QUANTLINEAGE_SCENARIO_KERNEL", "python")
 
     artifact = run_demo_risk(
         output=args.output,

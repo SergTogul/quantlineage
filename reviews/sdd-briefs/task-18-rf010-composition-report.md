@@ -69,7 +69,7 @@ singleton still served HTTP).
 Brief (required):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_application_composition.py tests/test_api_error_model.py \
   tests/test_risk_run_api.py tests/test_persistence_di.py \
@@ -79,7 +79,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 Covering:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line
 ```
 
@@ -125,7 +125,7 @@ annotated assigns). RF-010 remains **IN PROGRESS**.
 Covering (after follow-up):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_application_composition.py tests/test_api_error_model.py \
   tests/test_risk_run_api.py tests/test_persistence_di.py
@@ -150,7 +150,7 @@ no-lifespan 503 tests so later cases are not poisoned. RF-010 remains
 Required:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_application_composition.py \
   tests/test_stress_scenarios_di.py \
@@ -173,7 +173,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 Broader API set:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_api_error_model.py \
   tests/test_api_v1_compatibility.py \

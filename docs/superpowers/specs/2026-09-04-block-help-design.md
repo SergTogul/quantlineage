@@ -14,7 +14,7 @@ Add a small `?` helper next to every titled analysis card (e.g. Stress P&L heatm
 |---|---|
 | Scope | Every titled analysis card (`h3` cards), not overview KPI tiles, Terminal map, or nav section `h2`s |
 | Interaction | Click `?` to toggle; click outside or Esc to dismiss; only one popover open at a time |
-| Copy tone | Technical: what the block shows + how RiskForge calculates it |
+| Copy tone | Technical: what the block shows + how QuantLineage calculates it |
 | Structure | Separate component file + separate copy file (no inline help strings in cards) |
 
 ## Architecture

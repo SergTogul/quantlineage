@@ -1,4 +1,4 @@
-# Using the RiskForge Subagents in Cursor
+# Using the QuantLineage Subagents in Cursor
 
 ## Recommended setup
 

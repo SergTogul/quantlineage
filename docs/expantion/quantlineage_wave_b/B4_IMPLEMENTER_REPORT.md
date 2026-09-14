@@ -46,7 +46,7 @@ Flagship Compare T0/T1 now charts API waterfall steps in order: T0 risk → port
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/frontend
+cd /Users/user/src/quantlineage/frontend
 npm test -- src/lib/riskVisuals.test.js src/components/RiskChangeAttribution.test.jsx
 npm test
 npm run lint

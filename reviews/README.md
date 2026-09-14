@@ -1,4 +1,4 @@
-# RiskForge independent reviews
+# QuantLineage independent reviews
 
 Review-only artifacts from 2026-09-03. None of these files change application, test, CI, or roadmap code.
 

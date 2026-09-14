@@ -5,7 +5,7 @@ Run from ``backend``::
 
     PYTHONPATH=. python ../docs/examples/mcp_stdio_client.py
 
-Auth for shared deployments: export ``RISKFORGE_MCP_AUTHORIZATION``.
+Auth for shared deployments: export ``QUANTLINEAGE_MCP_AUTHORIZATION``.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def main() -> int:
         init = _rpc(
             proc,
             "initialize",
-            {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "riskforge-example"}},
+            {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "quantlineage-example"}},
             1,
         )
         listed = _rpc(proc, "tools/list", None, 2)

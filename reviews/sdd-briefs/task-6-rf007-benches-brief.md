@@ -38,7 +38,7 @@ Record FINDINGS RF-007 acceptance evidence **without inventing SLAs**:
 ## Suggested tests
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py
 ```
 Plus any new bench tests. Skip rules must not hide missing fields when the bench runs.

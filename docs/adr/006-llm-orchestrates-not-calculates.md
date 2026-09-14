@@ -10,16 +10,16 @@ Natural-language risk questions are a product goal (Workstream 11), but LLMs mus
 
 Evidence in repo:
 
-- `AGENTS.md` core rule: “The LLM orchestrates deterministic tools; it never calculates financial risk itself.”
+- `AGENTS.md` core rule: “The model orchestrates deterministic tools; it never calculates financial risk itself.”
 - Agent rules: no risk/pricing numbers computed in LLM prompts or model output; AI code must call deterministic APIs.
-- `docs/agents/09_AI_ORCHESTRATION_ENGINEER.md`: “LLM orchestrates; deterministic RiskForge functions calculate.”
+- `docs/agents/09_AI_ORCHESTRATION_ENGINEER.md`: “LLM orchestrates; deterministic QuantLineage functions calculate.”
 - `backend/app/risk/query.py`: `RiskQueryEngine` — keyword intent router; docstring states an LLM can later call the same service methods as tools.
 - `POST /risk/query` wires through `PortfolioService` → `RiskQueryEngine.answer(...)`, which invokes `threat_evaluation`, `contributors`, `summary`, `limits`, etc.
 - ROADMAP PARTIAL (keyword engine + service methods); LLM orchestration NOT STARTED.
 
 ## Decision
 
-1. All numerical risk and pricing results originate from **deterministic** RiskForge/QuantLib code paths (services, risk engines, `PricingEngine`).
+1. All numerical risk and pricing results originate from **deterministic** QuantLineage/QuantLib code paths (services, risk engines, `PricingEngine`).
 2. NL / LLM layers may only **select tools, bind arguments, and format grounded answers** from tool/API results.
 3. The existing `RiskQueryEngine` is the interim deterministic router; a future LLM must call the same (or schema-equivalent) service tools, not replace them with model arithmetic.
 4. Missing or ambiguous inputs must yield explicit uncertainty / refusal behavior (target for ), never fabricated numbers.

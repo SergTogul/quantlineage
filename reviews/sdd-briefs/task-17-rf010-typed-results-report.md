@@ -69,7 +69,7 @@ TDD red (new file, before production change): 2 failed as expected
 Brief (required):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_typed_risk_results.py tests/test_omit_market.py \
   tests/test_var_es_golden.py tests/test_incremental_var.py \

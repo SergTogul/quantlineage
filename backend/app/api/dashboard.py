@@ -71,7 +71,7 @@ def risk_dashboard(
     default demo book (same as ``GET /portfolio``). Dual-mounted at
     ``/risk/dashboard`` and ``/api/v1/risk/dashboard``.
 
-    When ``RISKFORGE_EXTERNAL_WORKER=1`` or ``RISKFORGE_HEAVY_INLINE=0``,
+    When ``QUANTLINEAGE_EXTERNAL_WORKER=1`` or ``QUANTLINEAGE_HEAVY_INLINE=0``,
     this HEAVY batch refuses request-thread compute (R0.10.3) and points
     clients at ``POST /risk/runs``.
     """

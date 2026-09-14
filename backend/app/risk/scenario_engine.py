@@ -180,7 +180,7 @@ def apply_scenario(
     paths share ``scenario_model.apply_scenario``. Explicit shock lists apply
     non-zero amounts in caller order via ``MarketSnapshot.apply``.
 
-    When ``RISKFORGE_SCENARIO_CACHE`` is enabled (default), results are memoized
+    When ``QUANTLINEAGE_SCENARIO_CACHE`` is enabled (default), results are memoized
     by base id + content hash + expanded shock fingerprint + scenario id tag.
     """
     from app.risk.scenario_memo import (

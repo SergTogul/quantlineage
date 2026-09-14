@@ -1,4 +1,4 @@
-# RiskForge Consolidated Engineering Findings
+# QuantLineage Consolidated Engineering Findings
 
 Date: 2026-09-09  
 Status: **Milestone R0 COMPLETE** (2026-09-09) — all P0/P1 CLOSED. RF-014 shared ACLs/TLS/secrets **MET**. RF-017 ABI, RF-018 frontend contracts, RF-019 tool schemas/evals, QA-024 range **MET**. Labeled-runner SLA-K1/K2 is **post-R0** (still not MET; not an R0 leftover).  
@@ -25,7 +25,7 @@ Those findings are collapsed here into **20 root findings**.
 
 ### P0 — Correctness / architectural blockers
 
-Must be resolved before RiskForge should be trusted as the foundation for additional product features. These findings can cause materially incorrect risk results, cross-request contamination, non-reproducible runs, or an execution architecture that cannot support the stated product model.
+Must be resolved before QuantLineage should be trusted as the foundation for additional product features. These findings can cause materially incorrect risk results, cross-request contamination, non-reproducible runs, or an execution architecture that cannot support the stated product model.
 
 ### P1 — Production-quality blockers
 
@@ -86,7 +86,7 @@ Several findings are different manifestations of the same architectural issue: c
 
 ## B. There is more than one risk-calculation path
 
-RiskForge currently has analytical Greeks, bump/revalue sensitivities, reference/builtin pricing, QuantLib pricing, macro historical P&L approximations, full revaluation, and native approximations. The seams are reasonable individually, but units and market ownership are not yet guaranteed to be identical across all paths.
+QuantLineage currently has analytical Greeks, bump/revalue sensitivities, reference/builtin pricing, QuantLib pricing, macro historical P&L approximations, full revaluation, and native approximations. The seams are reasonable individually, but units and market ownership are not yet guaranteed to be identical across all paths.
 
 ## C. Scenario representation and application are fragmented
 
@@ -785,7 +785,7 @@ production-like deployment
 
 Missing auth is not called a vulnerability for strict loopback use, but public exposure is blocked by configuration and documentation.
 
-Close-gate scores (2026-09-09, R0.11.7 local-demo + R0.11.8 shared leftovers): local-demo loopback / finite numbers / payload caps / sanitization **MET**; shared-token gate **MET**. Object ACLs **MET** (Bearer principal map, IDOR 403 on stored books/runs; seed/demo catalog owned by principal `demo`). TLS/reverse-proxy **MET** (`docker-compose.shared.yml` Caddy terminator publishes 443; backend stays internal). Secret management **MET** for the shared profile (`${POSTGRES_PASSWORD:?}` + `.env.shared.example`; local Compose may keep demo `riskforge`). Not OIDC/SSO. Named leftover (not blocking close): HTTP enqueue queue-depth. Labeled-runner SLA remains RF-016, not MET.
+Close-gate scores (2026-09-09, R0.11.7 local-demo + R0.11.8 shared leftovers): local-demo loopback / finite numbers / payload caps / sanitization **MET**; shared-token gate **MET**. Object ACLs **MET** (Bearer principal map, IDOR 403 on stored books/runs; seed/demo catalog owned by principal `demo`). TLS/reverse-proxy **MET** (`docker-compose.shared.yml` Caddy terminator publishes 443; backend stays internal). Secret management **MET** for the shared profile (`${POSTGRES_PASSWORD:?}` + `.env.shared.example`; local Compose may keep demo `quantlineage`). Not OIDC/SSO. Named leftover (not blocking close): HTTP enqueue queue-depth. Labeled-runner SLA remains RF-016, not MET.
 
 ---
 
@@ -883,7 +883,7 @@ Close-gate scoring (R0.12.7): PR-FAST **MET**; PR-FULL QuantLib hard-gate / nati
 
 ### Acceptance evidence
 
-A broken QuantLib installation cannot produce a green "full" CI run. — **MET** (R0.1.6 `backend-quantlib-hard-gate` is a required `pr-full` need; `RISKFORGE_REQUIRE_QUANTLIB`; no `requirements-no-ql` fallback; no `continue-on-error`). Labeled-runner SLA-K1/K2 is **post-R0** (still not MET). QA-024 demo-artifact range check is **MET**.
+A broken QuantLib installation cannot produce a green "full" CI run. — **MET** (R0.1.6 `backend-quantlib-hard-gate` is a required `pr-full` need; `QUANTLINEAGE_REQUIRE_QUANTLIB`; no `requirements-no-ql` fallback; no `continue-on-error`). Labeled-runner SLA-K1/K2 is **post-R0** (still not MET). QA-024 demo-artifact range check is **MET**.
 
 ---
 
@@ -911,7 +911,7 @@ At the same time, the reviews agree that the native kernel is not the dominant b
 
 ### Required direction
 
-- ABI version — **MET** (`RISKFORGE_KERNEL_ABI` / `riskforge_kernel_abi_version`, Python `KERNEL_ABI_VERSION`);
+- ABI version — **MET** (`QUANTLINEAGE_KERNEL_ABI` / `quantlineage_kernel_abi_version`, Python `KERNEL_ABI_VERSION`);
 - status/error return — **MET** (`KERNEL_OK` / `KERNEL_ERR_ABI` / `KERNEL_ERR_NULL` / `KERNEL_ERR_LENGTH`);
 - explicit shape/length validation — **MET** (fail-closed before any buffer walk; QA-025 mismatch in `kernel_test.cpp` and Python ctypes wrapper);
 - direct contiguous NumPy buffer path — **MET** (`NativeScenarioKernel.pnl_from_arrays`);
@@ -920,7 +920,7 @@ At the same time, the reviews agree that the native kernel is not the dominant b
 
 ### Decision
 
-**Do not move VaR business logic or QuantLib pricing into C++ merely to chase speed.** Default `RISKFORGE_SCENARIO_KERNEL=python` remains the product Historical VaR path.
+**Do not move VaR business logic or QuantLib pricing into C++ merely to chase speed.** Default `QUANTLINEAGE_SCENARIO_KERNEL=python` remains the product Historical VaR path.
 
 ### Acceptance evidence
 

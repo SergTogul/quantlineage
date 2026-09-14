@@ -45,16 +45,16 @@ TDD: missing snapshot/module and missing wire guards failed first; then green.
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/frontend && npm test
+cd /Users/user/src/quantlineage/frontend && npm test
 # 16 files / 114 passed
 
-cd /Users/user/src/riskforge-mvp/frontend && npm run lint
+cd /Users/user/src/quantlineage/frontend && npm run lint
 # exit 0
 
-cd /Users/user/src/riskforge-mvp/frontend && npm run build
+cd /Users/user/src/quantlineage/frontend && npm run build
 # vite build OK
 
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_rf018_frontend_openapi_snapshot.py \
   tests/test_rf020_r0_exit.py \

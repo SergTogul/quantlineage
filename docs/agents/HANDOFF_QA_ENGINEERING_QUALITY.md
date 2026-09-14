@@ -39,13 +39,13 @@ QA & Quant Validation Engineer
 
 ## Commands executed
 ```bash
-cd backend && RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_golden.py -v
+cd backend && QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_golden.py -v
 # → 49 passed
 
-cd backend && RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_golden.py tests/test_quantlib_pricing.py -q
+cd backend && QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_quantlib_golden.py tests/test_quantlib_pricing.py -q
 # → 60 passed
 
-cd backend && RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
+cd backend && QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
 # → 564 passed, 1 warning (Starlette/httpx deprecation)
 ```
 

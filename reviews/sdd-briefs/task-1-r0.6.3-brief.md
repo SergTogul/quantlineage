@@ -4,7 +4,7 @@
 **Owner agent:** Quant Pricing Engineer — read `docs/agents/02_QUANT_PRICING_ENGINEER.md`, `AGENTS.md`, `docs/agents/WORKFLOW.md`, `docs/agents/DEFINITION_OF_DONE.md`  
 **Finding:** RF-007 — keep **IN PROGRESS** (do not CLOSED)  
 **Milestone:** `reviews/REMEDIATION_MILESTONE.md` § R0.6.3  
-**Workspace:** `/Users/user/src/riskforge-mvp` branch `r0-core-remediation`  
+**Workspace:** `/Users/user/src/quantlineage` branch `r0-core-remediation`  
 **BASE (record before start):** use current `HEAD` at dispatch time
 
 ## Goal
@@ -39,7 +39,7 @@ Evaluate and implement **safe** reuse of QuantLib structures across shocked full
 ## Suggested tests
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_full_reval_bench.py \
   tests/test_historical_scenario_kernel.py \

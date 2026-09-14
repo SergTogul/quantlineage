@@ -10,7 +10,7 @@ Backend / API Engineer.
 
 ## Summary
 
-Chose **option B**. HEAVY `FULL_REVALUATION` already runs out of the request thread via RiskRun (`RF-015` CLOSED; `RISKFORGE_EXTERNAL_WORKER` / `run_type` paths). Proof tests pin that summary/var are HEAVY and refuse inline when the gate is on (`details.use=/risk/runs`), that RiskRun stays `QUEUED` in the API process, and that R0.6.1 `pnl_checksum` `6602fa69…` is identity evidence (`wall_ms` recorded, not an SLA). No chunked `ProcessPoolExecutor`. RF-007 remains `IN PROGRESS`.
+Chose **option B**. HEAVY `FULL_REVALUATION` already runs out of the request thread via RiskRun (`RF-015` CLOSED; `QUANTLINEAGE_EXTERNAL_WORKER` / `run_type` paths). Proof tests pin that summary/var are HEAVY and refuse inline when the gate is on (`details.use=/risk/runs`), that RiskRun stays `QUEUED` in the API process, and that R0.6.1 `pnl_checksum` `6602fa69…` is identity evidence (`wall_ms` recorded, not an SLA). No chunked `ProcessPoolExecutor`. RF-007 remains `IN PROGRESS`.
 
 ## Files Changed
 
@@ -27,7 +27,7 @@ Chose **option B**. HEAVY `FULL_REVALUATION` already runs out of the request thr
 ## Public / Interface Changes
 
 - None. No new env flag, DTO, or multiprocessing API.
-- Existing gate (`RISKFORGE_EXTERNAL_WORKER` / `RISKFORGE_HEAVY_INLINE`) and RiskRun `run_type=summary|var` remain the partition.
+- Existing gate (`QUANTLINEAGE_EXTERNAL_WORKER` / `QUANTLINEAGE_HEAVY_INLINE`) and RiskRun `run_type=summary|var` remain the partition.
 
 ## Numerical Conventions
 
@@ -52,7 +52,7 @@ Chose **option B**. HEAVY `FULL_REVALUATION` already runs out of the request thr
 ## Commands Executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_r065_process_partition.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_full_reval_bench.py \
@@ -62,7 +62,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_r065_process_partition.py \
   tests/test_quantlib_process_parallelism.py
 .venv/bin/python -m ruff check tests/test_r065_process_partition.py app/services/risk_run_worker.py
-cd /Users/user/src/riskforge-mvp && /usr/bin/git diff --check
+cd /Users/user/src/quantlineage && /usr/bin/git diff --check
 ```
 
 ## Results

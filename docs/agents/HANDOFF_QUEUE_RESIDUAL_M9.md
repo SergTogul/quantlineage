@@ -7,9 +7,9 @@ Resolve Redis/RQ-or-equivalent queue residual.
 Backend/API Engineer + DevOps/Platform Engineer
 
 ## Summary
-Investigated the remaining Redis/RQ residual and found no MVP product/ops semantic gap requiring a new dependency. RiskForge already has a real queue-equivalent for the current product scope: durable `risk_runs` rows in Postgres, API-side enqueue-only mode in Compose, out-of-process `python -m app.worker`, FIFO claims bounded by poll batch, and PostgreSQL `FOR UPDATE SKIP LOCKED` for multi-worker claim safety.
+Investigated the remaining Redis/RQ residual and found no MVP product/ops semantic gap requiring a new dependency. QuantLineage already has a real queue-equivalent for the current product scope: durable `risk_runs` rows in Postgres, API-side enqueue-only mode in Compose, out-of-process `python -m app.worker`, FIFO claims bounded by poll batch, and PostgreSQL `FOR UPDATE SKIP LOCKED` for multi-worker claim safety.
 
-Redis/RQ remains an accepted deferral, not a hidden incomplete feature. It should be introduced only when RiskForge needs semantics Postgres row claiming does not currently provide, such as priority classes, tenant fairness, retry policy/dead-lettering, or queue observability.
+Redis/RQ remains an accepted deferral, not a hidden incomplete feature. It should be introduced only when QuantLineage needs semantics Postgres row claiming does not currently provide, such as priority classes, tenant fairness, retry policy/dead-lettering, or queue observability.
 
 ## Files changed
 - `backend/tests/test_durable_worker.py`
@@ -38,10 +38,10 @@ python3 -m pytest -q tests/test_durable_worker.py tests/test_risk_run_api.py
 python3.12 -m pip install -r requirements-dev.txt
 python3.12 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python -m pip install -r requirements.txt
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest -q tests/test_durable_worker.py tests/test_risk_run_api.py
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest -q tests/test_durable_worker.py tests/test_risk_run_api.py
 .venv/bin/ruff check app/services/risk_run_worker.py app/persistence/sqlalchemy_repos.py tests/test_durable_worker.py
 .venv/bin/mypy app
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
 ```
 
 ## Results

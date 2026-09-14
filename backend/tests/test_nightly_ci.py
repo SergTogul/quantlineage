@@ -99,7 +99,7 @@ def test_nightly_runs_postgres_two_worker():
     assert "postgres:16-alpine" in text
     block = _job_block(text, "postgres-two-worker")
     assert "continue-on-error" not in block
-    assert "RISKFORGE_NIGHTLY" in block
+    assert "QUANTLINEAGE_NIGHTLY" in block
 
 
 def test_nightly_native_asserts_checksum_identity_not_sla():
@@ -116,24 +116,24 @@ def test_two_worker_fails_when_ci_set_and_dsn_unreachable(monkeypatch):
     from tests.test_postgres_two_worker import require_live_postgres
 
     monkeypatch.setenv("CI", "1")
-    monkeypatch.delenv("RISKFORGE_NIGHTLY", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_NIGHTLY", raising=False)
     monkeypatch.setenv(
-        "RISKFORGE_DATABASE_URL",
-        "postgresql+psycopg://riskforge:riskforge@127.0.0.1:1/riskforge",
+        "QUANTLINEAGE_DATABASE_URL",
+        "postgresql+psycopg://quantlineage:quantlineage@127.0.0.1:1/quantlineage",
     )
     with pytest.raises(pytest.fail.Exception):
         require_live_postgres()
 
 
 def test_two_worker_skips_locally_when_dsn_unreachable(monkeypatch):
-    """Local-optional skip when CI and RISKFORGE_NIGHTLY are unset."""
+    """Local-optional skip when CI and QUANTLINEAGE_NIGHTLY are unset."""
     from tests.test_postgres_two_worker import require_live_postgres
 
     monkeypatch.delenv("CI", raising=False)
-    monkeypatch.delenv("RISKFORGE_NIGHTLY", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_NIGHTLY", raising=False)
     monkeypatch.setenv(
-        "RISKFORGE_DATABASE_URL",
-        "postgresql+psycopg://riskforge:riskforge@127.0.0.1:1/riskforge",
+        "QUANTLINEAGE_DATABASE_URL",
+        "postgresql+psycopg://quantlineage:quantlineage@127.0.0.1:1/quantlineage",
     )
     with pytest.raises(pytest.skip.Exception):
         require_live_postgres()
@@ -144,9 +144,9 @@ def test_nightly_runs_quantlib_critical_e2e():
     block = _job_block(text, "quantlib-e2e")
     assert "r0-critical-journey.spec.ts" in block
     assert "playwright" in block
-    assert "RISKFORGE_PRICING_ENGINE: quantlib" in block
-    assert "RISKFORGE_REQUIRE_QUANTLIB" in block
-    assert "RISKFORGE_NIGHTLY" in block
+    assert "QUANTLINEAGE_PRICING_ENGINE: quantlib" in block
+    assert "QUANTLINEAGE_REQUIRE_QUANTLIB" in block
+    assert "QUANTLINEAGE_NIGHTLY" in block
     assert "pip install -r requirements.txt" in block
     assert "import QuantLib" in block
     assert "requirements-no-ql" not in block
@@ -158,23 +158,23 @@ def test_nightly_runs_quantlib_critical_e2e():
 
 def test_playwright_config_honors_pricing_engine_env():
     text = PLAYWRIGHT_CONFIG.read_text(encoding="utf-8")
-    assert "process.env.RISKFORGE_PRICING_ENGINE" in text
+    assert "process.env.QUANTLINEAGE_PRICING_ENGINE" in text
     assert re.search(
-        r"process\.env\.RISKFORGE_PRICING_ENGINE\s*\|\|\s*'builtin'",
+        r"process\.env\.QUANTLINEAGE_PRICING_ENGINE\s*\|\|\s*'builtin'",
         text,
     ), "PR e2e must default to builtin; nightly may override to quantlib"
     assert not re.search(
-        r"RISKFORGE_PRICING_ENGINE:\s*'builtin'",
+        r"QUANTLINEAGE_PRICING_ENGINE:\s*'builtin'",
         text,
-    ), "must not unconditionally overwrite RISKFORGE_PRICING_ENGINE to builtin"
+    ), "must not unconditionally overwrite QUANTLINEAGE_PRICING_ENGINE to builtin"
 
 
 def test_require_quantlib_fails_when_nightly_and_missing(monkeypatch):
-    """RISKFORGE_NIGHTLY=1 + missing QuantLib must fail, not skip-green."""
+    """QUANTLINEAGE_NIGHTLY=1 + missing QuantLib must fail, not skip-green."""
     from tests.quantlib_gate import require_quantlib_for_nightly
 
-    monkeypatch.setenv("RISKFORGE_NIGHTLY", "1")
-    monkeypatch.delenv("RISKFORGE_REQUIRE_QUANTLIB", raising=False)
+    monkeypatch.setenv("QUANTLINEAGE_NIGHTLY", "1")
+    monkeypatch.delenv("QUANTLINEAGE_REQUIRE_QUANTLIB", raising=False)
 
     def _missing():
         raise ImportError("simulated missing QuantLib")
@@ -184,11 +184,11 @@ def test_require_quantlib_fails_when_nightly_and_missing(monkeypatch):
 
 
 def test_require_quantlib_skips_locally_when_missing(monkeypatch):
-    """Local-optional skip when RISKFORGE_NIGHTLY and REQUIRE_QUANTLIB are unset."""
+    """Local-optional skip when QUANTLINEAGE_NIGHTLY and REQUIRE_QUANTLIB are unset."""
     from tests.quantlib_gate import require_quantlib_for_nightly
 
-    monkeypatch.delenv("RISKFORGE_NIGHTLY", raising=False)
-    monkeypatch.delenv("RISKFORGE_REQUIRE_QUANTLIB", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_NIGHTLY", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_REQUIRE_QUANTLIB", raising=False)
     monkeypatch.delenv("CI", raising=False)
 
     def _missing():
@@ -207,7 +207,7 @@ def test_nightly_runs_hierarchy_benchmark():
     assert "checksum" in block
     assert "n_nodes" in block
     assert "n_positions" in block
-    assert "RISKFORGE_NIGHTLY" in block
+    assert "QUANTLINEAGE_NIGHTLY" in block
     assert "continue-on-error" not in block
     assert "echo-only" not in block.lower()
     assert "check_m6_sla.py" not in block
@@ -243,7 +243,7 @@ def test_nightly_runs_full_reval_n100():
     text = _text(NIGHTLY_YML)
     block = _job_block(text, "full-reval-n100")
     assert "tests/test_nightly_full_reval_n100.py" in block
-    assert "RISKFORGE_NIGHTLY" in block
+    assert "QUANTLINEAGE_NIGHTLY" in block
     assert "continue-on-error" not in block
     assert "echo-only" not in block.lower()
     assert "check_m6_sla.py" not in block
@@ -257,7 +257,7 @@ def test_nightly_full_reval_n100_is_identity_not_sla():
     path = REPO_ROOT / "backend" / "tests" / "test_nightly_full_reval_n100.py"
     assert path.is_file(), "expected backend/tests/test_nightly_full_reval_n100.py"
     text = path.read_text(encoding="utf-8")
-    assert "RISKFORGE_NIGHTLY" in text
+    assert "QUANTLINEAGE_NIGHTLY" in text
     assert "skipif" in text
     assert "n_positions" in text
     assert "100" in text

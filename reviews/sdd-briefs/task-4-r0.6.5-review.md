@@ -29,10 +29,10 @@ Checked against the task brief and binding global constraints. Implementer repor
 | Requirement | Evidence in diff | Status |
 |---|---|---|
 | Processes, not threads, for QuantLib scenario partitions | No thread pool for pricing. Production change is a docstring on `risk_run_worker.py` stating HEAVY full-reval stays on the Compose `worker` OS process. In-process `ThreadPoolExecutor` remains job scheduling only. | Met |
-| Pick A (opt-in chunked multiprocess with exact P&L identity) **or** B (document RiskRun as the partition + HEAVY proof tests; do not add unused multiprocessing) | **B.** No `ProcessPoolExecutor` / multiprocessing added. ADR 007 + milestone + `reviews/r0.6.5-process-parallelism-report.md` document Compose `worker` / `RISKFORGE_EXTERNAL_WORKER` as the partition. | Met |
+| Pick A (opt-in chunked multiprocess with exact P&L identity) **or** B (document RiskRun as the partition + HEAVY proof tests; do not add unused multiprocessing) | **B.** No `ProcessPoolExecutor` / multiprocessing added. ADR 007 + milestone + `reviews/r0.6.5-process-parallelism-report.md` document Compose `worker` / `QUANTLINEAGE_EXTERNAL_WORKER` as the partition. | Met |
 | Prefer B unless A can land with identity tests without C++ / methodology change | B chosen; ADR records why A is not cheap (pickle/reconstruct QuantLib per chunk; R0.6.1 is identity-not-SLA). | Met |
 | Proof: FULL_REVALUATION summary/var is HEAVY | `test_full_revaluation_summary_and_var_are_heavy` calls `classify(..., methodology=FULL_REVALUATION)` on both mounts. | Met |
-| Proof: refused inline when the gate is on (`details.use=/risk/runs`) | Parametrized TestClient posts to summary/var (v1 + legacy) under `RISKFORGE_EXTERNAL_WORKER=1` and `RISKFORGE_HEAVY_INLINE=0`; asserts 400 / `use=/risk/runs`. | Met |
+| Proof: refused inline when the gate is on (`details.use=/risk/runs`) | Parametrized TestClient posts to summary/var (v1 + legacy) under `QUANTLINEAGE_EXTERNAL_WORKER=1` and `QUANTLINEAGE_HEAVY_INLINE=0`; asserts 400 / `use=/risk/runs`. | Met |
 | Record R0.6.1 checksum/identity as scaling evidence, not an SLA | Report + ADR + FINDINGS pin `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`; test asserts checksum constant, `wall_ms` not SLA-gated, `check_m6_sla.py` not imported. | Met |
 | FINDINGS RF-007 stays IN PROGRESS; milestone § R0.6.5 COMPLETE pending review | Status line still **IN PROGRESS** / “Do not close”; § R0.6.5 titled COMPLETE pending review. | Met |
 | Write `reviews/r0.6.5-process-parallelism-report.md` (short ADR only if A) | Report added. Existing ADR 007 updated rather than a new ADR — matches plan exit (“RiskRun worker is the partition” ADR/milestone text), not a new option-A ADR. | Met (justified extra) |
@@ -50,7 +50,7 @@ This review did not re-run the suite.
 
 - Right call for this slice: option B documents an existing, already-shipped partition (RF-015 CLOSED) instead of adding a pickle-heavy scenario `ProcessPoolExecutor` that would not be cheap or justified by R0.6.1.
 - The required HTTP proof is real behavior, not grepping: TestClient posts FULL_REVALUATION summary/var on both mounts, both gates, and asserts `details.use=/risk/runs`.
-- The partition’s two sides are both pinned: API process stays `QUEUED` under `RISKFORGE_EXTERNAL_WORKER=1`; `execute_run_type` still accepts `methodology=FULL_REVALUATION` (would fail if dispatch dropped it to `DELTA_GAMMA`).
+- The partition’s two sides are both pinned: API process stays `QUEUED` under `QUANTLINEAGE_EXTERNAL_WORKER=1`; `execute_run_type` still accepts `methodology=FULL_REVALUATION` (would fail if dispatch dropped it to `DELTA_GAMMA`).
 - RF-007 hygiene is correct: FINDINGS stays IN PROGRESS with “Do not close”; milestone is COMPLETE *pending review*; N×S joint pricing and N=100/1k remain explicit residuals.
 - No SLA invention; checksum is recorded as identity, `wall_ms` as telemetry.
 - Ownership stayed on Backend/API (`risk_run_worker` docstring + tests + ADR/findings). Portfolio Risk loops and native kernels were not dual-owned.
@@ -72,7 +72,7 @@ None.
 1. **Several “proof” tests re-pin contracts already owned by R0.3.5 / RF-015 suites**  
    - File: `backend/tests/test_r065_process_partition.py`  
    - Overlap: `test_endpoint_execution_class.py::test_full_revaluation_is_never_interactive_only`; `test_backpressure.py` already refuses FULL_REVALUATION summary and leftover HEAVY `/risk/var`; `test_full_reval_bench.py::test_full_reval_bench_script_is_identity_not_sla`; `test_quantlib_process_parallelism.py` already pins Compose worker vs API and `full_revaluation_pnl_series` has no executor.  
-   - Unique coverage that does belong here: FULL_REVALUATION summary under `RISKFORGE_HEAVY_INLINE=0` (summary is INTERACTIVE unless methodology upgrades it); RiskRun `QUEUED` with FULL_REVALUATION; `execute_run_type` FULL_REVALUATION dispatch.  
+   - Unique coverage that does belong here: FULL_REVALUATION summary under `QUANTLINEAGE_HEAVY_INLINE=0` (summary is INTERACTIVE unless methodology upgrades it); RiskRun `QUEUED` with FULL_REVALUATION; `execute_run_type` FULL_REVALUATION dispatch.  
    - Why it matters: a dedicated R0.6.5 file is fine as a named pin, but the AST/compose/checksum copies will drift in two places.  
    - Fix (optional): keep the HTTP + QUEUED + dispatch tests; drop or import the R0.3.5 compose/AST helpers instead of cloning them.
 

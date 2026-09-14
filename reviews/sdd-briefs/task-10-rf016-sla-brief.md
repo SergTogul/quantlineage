@@ -25,7 +25,7 @@ RF-016 remaining line: labeled-runner SLA-K1/K2. Nightly already exists (`nightl
 
 ## Tests
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_nightly_ci.py tests/test_pr_full_ci.py tests/test_pr_fast_ci.py
 ```
 

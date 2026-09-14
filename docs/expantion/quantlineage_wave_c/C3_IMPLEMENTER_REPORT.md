@@ -56,7 +56,7 @@ Included in this Wave C C3 commit (`feat(wave-c): map C3 intents onto allowliste
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_wave_c_orchestration.py tests/test_ai_query_orchestration.py tests/test_wave_c_mcp.py tests/test_wave_c_tool_contracts.py
 .venv/bin/ruff check app/risk/query.py tests/test_wave_c_orchestration.py
 ```

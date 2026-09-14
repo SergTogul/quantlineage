@@ -193,6 +193,23 @@ describe('HistoricalAnalytics page', () => {
     expect(screen.getByTestId('ha-var-es')).toHaveTextContent('currency_loss')
   })
 
+  it('shows Sharpe unit as an em dash, not the volatility unit', async () => {
+    stubAnalytics(() => HttpResponse.json(fixture()))
+    render(<HistoricalAnalytics portfolio={demoPortfolio} />)
+    await screen.findByTestId('ha-sharpe')
+    expect(screen.getByTestId('ha-sharpe-unit')).toHaveTextContent('—')
+    expect(screen.getByTestId('ha-sharpe-unit')).not.toHaveTextContent('annualized_fraction')
+  })
+
+  it('shows the backend data_source_label badge', async () => {
+    stubAnalytics(() => HttpResponse.json(fixture({
+      data_source_label: 'Synthetic replay · demo-multi-factor-history/abc123',
+    })))
+    render(<HistoricalAnalytics portfolio={demoPortfolio} />)
+    const badge = await screen.findByTestId('data-source-badge')
+    expect(badge).toHaveTextContent('Synthetic replay · demo-multi-factor-history/abc123')
+  })
+
   it('shows Sharpe as undefined when the API returns null, not zero', async () => {
     stubAnalytics(() => HttpResponse.json(fixture({ sharpe: null, notes: ['sharpe_undefined_zero_volatility'] })))
     render(<HistoricalAnalytics portfolio={demoPortfolio} />)
@@ -209,7 +226,7 @@ describe('HistoricalAnalytics page', () => {
     const values = [...chart.querySelectorAll('[data-value]')].map((n) => Number(n.getAttribute('data-value')))
     expect(values).toEqual([0, -0.083, -0.02])
     expect(values.every((v) => v <= 0)).toBe(true)
-    expect(chart).toHaveTextContent('-0.083')
+    expect(chart).toHaveTextContent('-8.30%')
   })
 
   it('renders nested SPY benchmark fields and does not invent beta on 400', async () => {

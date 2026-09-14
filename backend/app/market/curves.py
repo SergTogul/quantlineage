@@ -1,6 +1,6 @@
 """Yield-curve scaffolding (M1.4).
 
-RiskForge-owned curve types. Interpolation is linear in continuous zeros
+QuantLineage-owned curve types. Interpolation is linear in continuous zeros
 (Actual/365-style year fractions). QuantLib is not required on the public
 surface; adapters may consume ``to_dict()`` / ``df`` / ``zero`` later.
 

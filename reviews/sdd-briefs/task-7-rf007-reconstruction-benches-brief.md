@@ -15,7 +15,7 @@ The last close gate KEEP OPEN’d because:
 
 1. **Builtin vs QuantLib reconstruction:** same N×S full-reval on a **European option** book (not cash equity `quantity * spot`). Fixture pattern: `EuropeanOptionPosition` like `backend/tests/test_quantlib_reuse.py` (spot/vol/rate/div live). Record wall_ms, scenarios/sec, identity checksum **per engine**. Skip-or-run if QuantLib missing (`tests.quantlib_gate`). Builtin vs QuantLib P&L need not share one SHA; record gap and use the existing option-match tolerance (`rel=2e-3` in `test_european_option_matches_builtin_closely`) or document a series-level tolerance. Pin each engine’s checksum.
 2. **Isolated RSS:** measure peak RSS in a **subprocess per impl** so QuantLib `ru_maxrss` does not include the builtin run (and vice versa). Label honestly if still PARTIAL (process-lifetime within that child is OK).
-3. **N=100:** record at least N=100 × modest S (e.g. 50) **outside default PR**. Pytest skip unless `RISKFORGE_NIGHTLY=1`; fail in nightly if missing. Add a sibling job in `.github/workflows/nightly.yml` and pin it in `backend/tests/test_nightly_ci.py` the same way as `hierarchy-benchmark` / `full-reval-sample`. N=1k optional same skip rule. No wall-time SLA floors. Do not add to PR-FULL `needs:`.
+3. **N=100:** record at least N=100 × modest S (e.g. 50) **outside default PR**. Pytest skip unless `QUANTLINEAGE_NIGHTLY=1`; fail in nightly if missing. Add a sibling job in `.github/workflows/nightly.yml` and pin it in `backend/tests/test_nightly_ci.py` the same way as `hierarchy-benchmark` / `full-reval-sample`. N=1k optional same skip rule. No wall-time SLA floors. Do not add to PR-FULL `needs:`.
 4. Keep R0.6.1 1×120 and R0.6.7 10×50 cash-equity identity tests unchanged (checksums `6602fa69…` / `a28cf4ee…`).
 5. Update FINDINGS residual scores honestly. Still do **not** CLOSE RF-007. N=1k may stay UNMET.
 6. Write `reviews/r0.6.8-reconstruction-benches-report.md`.
@@ -28,7 +28,7 @@ The last close gate KEEP OPEN’d because:
 
 ## Tests
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py
 ```
 

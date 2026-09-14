@@ -19,14 +19,14 @@ If a number is not on the screen from an API response, do not say it.
 
 ## Fresh setup (inline HEAVY)
 
-`POST /api/v1/risk/historical-analytics` is **HEAVY** and is **not** a RiskRun type. Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1`, which refuses that POST with HTTP 400 (`details.use=/risk/runs`). Do not quote a VaR from that error.
+`POST /api/v1/risk/historical-analytics` is **HEAVY** and is **not** a RiskRun type. Compose `backend` sets `QUANTLINEAGE_EXTERNAL_WORKER=1`, which refuses that POST with HTTP 400 (`details.use=/risk/runs`). Do not quote a VaR from that error.
 
 For this walkthrough, run the API **in-process** so inline HEAVY is allowed (flags unset):
 
 ```bash
 # API — 127.0.0.1:8000. Lifespan seeds demo books when DATABASE_URL is unset.
 cd backend
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 ```bash

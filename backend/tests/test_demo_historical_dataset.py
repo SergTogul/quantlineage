@@ -91,7 +91,7 @@ def test_demo_csv_matches_synthetic_seed_seven_replay():
 
 
 def test_create_historical_dataset_demo_and_synthetic(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     syn = create_historical_dataset("synthetic", seed=3, observations=20)
     assert isinstance(syn, SyntheticHistoricalDataset)
     assert syn.factor_observations().n_observations == 20
@@ -99,7 +99,7 @@ def test_create_historical_dataset_demo_and_synthetic(monkeypatch: pytest.Monkey
     demo = create_historical_dataset("demo")
     assert demo.factor_observations().n_observations == 750
 
-    monkeypatch.setenv("RISKFORGE_HISTORICAL_DATASET", "demo")
+    monkeypatch.setenv("QUANTLINEAGE_HISTORICAL_DATASET", "demo")
     via_env = create_historical_dataset()
     np.testing.assert_array_equal(
         via_env.factor_observations().equity_returns,
@@ -138,7 +138,7 @@ def test_demo_dataset_feeds_historical_var_and_scenarios():
 
 def test_api_portfolio_service_uses_configured_historical_dataset(monkeypatch: pytest.MonkeyPatch):
     """deps wires create_historical_dataset so risk APIs can select demo/synthetic."""
-    monkeypatch.setenv("RISKFORGE_HISTORICAL_DATASET", "demo")
+    monkeypatch.setenv("QUANTLINEAGE_HISTORICAL_DATASET", "demo")
     # Re-import wiring after env is set would be brittle; call factory the same way deps does.
     from app.risk.historical_data import create_historical_dataset as factory
 

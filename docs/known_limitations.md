@@ -1,6 +1,6 @@
 # Known Limitations
 
-This catalog is part of the portfolio-presentation package. It is intentionally explicit so RiskForge is not over-claimed in interviews, demos, or future docs.
+This catalog is part of the portfolio-presentation package. It is intentionally explicit so QuantLineage is not over-claimed in interviews, demos, or future docs.
 
 ## Market Data
 
@@ -58,14 +58,14 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - The accepted performance claim is limited to the native scenario-kernel SLA in [`performance.md`](performance.md) and [`benchmarks/RESULTS.md`](../benchmarks/RESULTS.md).
 - No HTTP risk-run latency, multi-tenant capacity, or FULL_REVALUATION performance SLA is claimed. Stage 10.3 [`benchmarks/FULL_REVAL_RESULTS.md`](../benchmarks/FULL_REVAL_RESULTS.md) records host wall/RSS/parity for QuantLib full revaluation; those cells are observations, not floors.
-- In-process QuantLib is serialized by `_QL_PROCESS_LOCK`; valuation cache keys include parseable snapshot as-of (ISO `YYYY-MM-DD` or `date`; labels such as `current` / `t0` stay equivalent and use the engine evaluation date). Parallel full revaluation is process-partitioned (R0.3.5 / R0.6.5 option B): Compose `worker` (`python -m app.worker`) is a separate OS process from the API; HEAVY `FULL_REVALUATION` summary/var refuse the request thread when `RISKFORGE_EXTERNAL_WORKER=1` (`details.use=/risk/runs`); native kernels stay QuantLib-free; there is no in-process QuantLib thread pool and no unused `ProcessPoolExecutor` job platform. R0.6.1 `pnl_checksum` is identity evidence, not a FULL_REVALUATION SLA. Stage 10.3 checksums are the same class of identity/parity evidence.
+- In-process QuantLib is serialized by `_QL_PROCESS_LOCK`; valuation cache keys include parseable snapshot as-of (ISO `YYYY-MM-DD` or `date`; labels such as `current` / `t0` stay equivalent and use the engine evaluation date). Parallel full revaluation is process-partitioned (R0.3.5 / R0.6.5 option B): Compose `worker` (`python -m app.worker`) is a separate OS process from the API; HEAVY `FULL_REVALUATION` summary/var refuse the request thread when `QUANTLINEAGE_EXTERNAL_WORKER=1` (`details.use=/risk/runs`); native kernels stay QuantLib-free; there is no in-process QuantLib thread pool and no unused `ProcessPoolExecutor` job platform. R0.6.1 `pnl_checksum` is identity evidence, not a FULL_REVALUATION SLA. Stage 10.3 checksums are the same class of identity/parity evidence.
 
 ## Persistence And Workers
 
 - Postgres-backed risk-run claim safety uses `SELECT ... FOR UPDATE SKIP LOCKED` when configured.
 - Compose ships one worker for the demo. Additional Postgres-backed replicas should not double-claim the same row, but broader operations concerns such as fairness, retries across hosts, observability, and queue management are not a full production job platform.
 - Redis/RQ is explicitly deferred and should not be described as implemented.
-- RiskRun provenance (`GET /api/v1/risk/runs/{id}/provenance` and the nested GET-run object) copies persisted run identity fields plus an optional `RISKFORGE_RELEASE_SHA` / git describe. It does not expose secrets and does not invent a SHA when none is available.
+- RiskRun provenance (`GET /api/v1/risk/runs/{id}/provenance` and the nested GET-run object) copies persisted run identity fields plus an optional `QUANTLINEAGE_RELEASE_SHA` / git describe. It does not expose secrets and does not invent a SHA when none is available.
 
 ## API And Compatibility
 
@@ -76,8 +76,8 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 ## Local Demo Security
 
 - Default Compose binds published Postgres (`5432`), API (`8000`), and frontend (`5173`) ports to loopback (`127.0.0.1`). The local/demo profile is still unauthenticated and is not internet-ready; it must not be treated as a production security or IAM deployment (RF-014).
-- A shared / non-loopback profile (`RISKFORGE_SHARED_DEPLOYMENT=1` or non-loopback `RISKFORGE_BIND`) fails closed without `RISKFORGE_API_TOKEN` or `RISKFORGE_API_TOKENS` and requires Bearer auth on API routes. Object ACLs, TLS terminator (`docker-compose.shared.yml` Caddy on 443; SPA `VITE_API_BASE_URL=same-origin`), and shared-profile secret placeholders are **MET**. That is not OIDC, SSO, in-app TLS, or a cloud secret manager. See `BUILD_NOTES.md` (R0.11.5 / R0.11.8).
-- Seed/demo catalog books are owned by principal `demo` (readable; updates by other principals return 403). Local Compose may keep the demo `POSTGRES_PASSWORD=riskforge`.
+- A shared / non-loopback profile (`QUANTLINEAGE_SHARED_DEPLOYMENT=1` or non-loopback `QUANTLINEAGE_BIND`) fails closed without `QUANTLINEAGE_API_TOKEN` or `QUANTLINEAGE_API_TOKENS` and requires Bearer auth on API routes. Object ACLs, TLS terminator (`docker-compose.shared.yml` Caddy on 443; SPA `VITE_API_BASE_URL=same-origin`), and shared-profile secret placeholders are **MET**. That is not OIDC, SSO, in-app TLS, or a cloud secret manager. See `BUILD_NOTES.md` (R0.11.5 / R0.11.8).
+- Seed/demo catalog books are owned by principal `demo` (readable; updates by other principals return 403). Local Compose may keep the demo `POSTGRES_PASSWORD=quantlineage`.
 
 ## Frontend
 

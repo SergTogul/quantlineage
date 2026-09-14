@@ -231,7 +231,7 @@ def _vol_surface_matches_asset_class(payload: Mapping, asset_class: str) -> bool
 
 
 def _bump_vol_surface_payload(payload: Mapping, factor, amount: float) -> dict:
-    """Copy and shock one vol surface payload using RiskForge surface semantics."""
+    """Copy and shock one vol surface payload using QuantLineage surface semantics."""
     from app.market.vol_surfaces import EXPIRY_YEARS, vol_surface_from_dict
 
     surface = vol_surface_from_dict(payload, default_name=getattr(factor, "underlying", getattr(factor, "pair", "")))
@@ -475,7 +475,7 @@ class Portfolio(FiniteInputMixin):
     id: str
     name: str
     positions: list[Position]
-    firm: str = "RiskForge"
+    firm: str = "QuantLineage"
     desk: str = "Global Macro"
     strategy: str = "Multi-Asset"
     # Server-owned monotonic identity (R0.8.8). Create starts at 1; clients may
@@ -1636,6 +1636,7 @@ class RiskRunIdentitySnapshot(BaseModel):
     as_of: str | None = None
     historical_dataset_id: str | None = None
     historical_dataset_version: str | None = None
+    data_source_label: str | None = None
     pricing_engine_version: str | None = None
     methodology: str | None = None
     scenario_set: list[str] = Field(default_factory=list)

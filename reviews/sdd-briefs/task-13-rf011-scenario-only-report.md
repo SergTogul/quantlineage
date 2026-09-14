@@ -82,7 +82,7 @@ pins (attribution already converted; P&L/`content_hash` identity).
 Brief (required):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_scenario_engine.py tests/test_stress.py \
   tests/test_scenario_attribution.py tests/test_shock_units.py \
@@ -92,7 +92,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 Covering wire / omit-market / stress callers:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_scenario_wire_api.py tests/test_omit_market.py \
   tests/test_risk.py tests/test_crisis_library.py \

@@ -10,7 +10,7 @@ QA & Quant Validation Engineer
 **DONE_WITH_CONCERNS**
 
 ## Summary
-Extended `benchmarks/run_full_reval_bench.py --json` so the payload still emits the R0.6.1 1×120 builtin identity (`checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`) and adds a PR-safe **10×50** `acceptance` object: `wall_ms` / `wall_ms_cold` / `wall_ms_warm`, `peak_rss_kib`, `scenarios_per_sec`, builtin vs QuantLib at the same N×S (skip-or-run / `RISKFORGE_REQUIRE_QUANTLIB=1` fail-closed). Pytest asserts those values are finite, **not** floors. No `throughput` key. `check_m6_sla.py` is not invoked. RF-007 stays **IN PROGRESS**. Do not close.
+Extended `benchmarks/run_full_reval_bench.py --json` so the payload still emits the R0.6.1 1×120 builtin identity (`checksum` `6602fa6906f2579f5c89af72a41ab274c07650234fff69387bc2202b5a40534f`) and adds a PR-safe **10×50** `acceptance` object: `wall_ms` / `wall_ms_cold` / `wall_ms_warm`, `peak_rss_kib`, `scenarios_per_sec`, builtin vs QuantLib at the same N×S (skip-or-run / `QUANTLINEAGE_REQUIRE_QUANTLIB=1` fail-closed). Pytest asserts those values are finite, **not** floors. No `throughput` key. `check_m6_sla.py` is not invoked. RF-007 stays **IN PROGRESS**. Do not close.
 
 ## Files changed
 - `benchmarks/run_full_reval_bench.py`
@@ -38,14 +38,14 @@ Extended `benchmarks/run_full_reval_bench.py --json` so the payload still emits 
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_full_reval_bench.py \
   tests/test_full_reval_golden.py \
   tests/test_r065_process_partition.py::test_r061_checksum_is_identity_scaling_evidence_not_sla
 .venv/bin/python -m ruff check tests/test_full_reval_bench.py ../benchmarks/run_full_reval_bench.py
-cd /Users/user/src/riskforge-mvp && /usr/bin/git diff --check
+cd /Users/user/src/quantlineage && /usr/bin/git diff --check
 ```
 
 RED (tests before harness): 3 failed (`KeyError: acceptance` / missing 10×50 checksum in source), 1 passed.

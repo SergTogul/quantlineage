@@ -58,7 +58,7 @@ TDD: seven new cases failed first; after the gates, they passed. No plugin frame
 TDD red (new cases, before production change):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_instrument_capabilities.py \
   tests/test_quantlib_unknown_instrument.py
@@ -67,7 +67,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 Brief (required):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_instrument_capabilities.py \
   tests/test_quantlib_unknown_instrument.py \
@@ -77,7 +77,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 Affected extra:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_instrument_capabilities.py \
   tests/test_quantlib_unknown_instrument.py \

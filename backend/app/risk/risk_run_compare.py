@@ -63,6 +63,7 @@ from app.domain.models import (
     as_of_wire,
 )
 from app.interfaces.pricing import PricingEngine
+from app.market.history.data_mode import data_source_label
 from app.risk.factor_types import (
     EquitySpot,
     EquityVol,
@@ -241,6 +242,9 @@ def _identity_snapshot(bound: BoundRiskRun) -> RiskRunIdentitySnapshot:
         as_of=as_of,
         historical_dataset_id=run.historical_dataset_id,
         historical_dataset_version=run.historical_dataset_version,
+        data_source_label=data_source_label(
+            run.historical_dataset_id, run.historical_dataset_version
+        ),
         pricing_engine_version=run.pricing_engine_version,
         methodology=methodology,
         scenario_set=list(run.scenario_set),

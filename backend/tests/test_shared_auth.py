@@ -2,7 +2,7 @@
 
 Local demo (unset shared flag, loopback bind, default Compose) stays
 unauthenticated. A shared / non-loopback profile fails closed without
-``RISKFORGE_API_TOKEN`` and requires ``Authorization: Bearer`` on API routes.
+``QUANTLINEAGE_API_TOKEN`` and requires ``Authorization: Bearer`` on API routes.
 """
 
 from __future__ import annotations
@@ -73,9 +73,9 @@ def test_shared_profile_without_token_refuses_to_boot(
 ) -> None:
     _enable_shared(monkeypatch, token=None)
     assert auth_mod.is_shared_deployment() is True
-    with pytest.raises(RuntimeError, match="RISKFORGE_API_TOKEN"):
+    with pytest.raises(RuntimeError, match="QUANTLINEAGE_API_TOKEN"):
         auth_mod.require_shared_auth_configured()
-    with pytest.raises(RuntimeError, match="RISKFORGE_API_TOKEN"), TestClient(app):
+    with pytest.raises(RuntimeError, match="QUANTLINEAGE_API_TOKEN"), TestClient(app):
         pass
 
 
@@ -85,7 +85,7 @@ def test_non_loopback_bind_without_token_refuses_to_boot(
     _clear_gate(monkeypatch)
     monkeypatch.setenv(auth_mod.ENV_BIND, "0.0.0.0")
     assert auth_mod.is_shared_deployment() is True
-    with pytest.raises(RuntimeError, match="RISKFORGE_API_TOKEN"):
+    with pytest.raises(RuntimeError, match="QUANTLINEAGE_API_TOKEN"):
         auth_mod.require_shared_auth_configured()
 
 
@@ -160,9 +160,9 @@ def test_shared_health_and_docs_stay_open(monkeypatch: pytest.MonkeyPatch) -> No
 def test_default_compose_stays_unauthenticated_local_demo() -> None:
     """Default Compose must not assign the shared-profile env vars."""
     text = COMPOSE_PATH.read_text(encoding="utf-8")
-    assert "RISKFORGE_SHARED_DEPLOYMENT:" not in text
-    assert "RISKFORGE_API_TOKEN:" not in text
-    assert "RISKFORGE_BIND:" not in text
+    assert "QUANTLINEAGE_SHARED_DEPLOYMENT:" not in text
+    assert "QUANTLINEAGE_API_TOKEN:" not in text
+    assert "QUANTLINEAGE_BIND:" not in text
 
 
 def test_overlapping_token_keeps_tokens_map_principal(

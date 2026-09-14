@@ -59,7 +59,7 @@ Added one canonical historical-analytics result that powers summary metrics and 
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_historical_analytics.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_historical_analytics.py tests/test_endpoint_execution_class.py tests/test_api_v1_compatibility.py tests/test_api_router_decomposition.py tests/test_api.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line tests/test_historical_analytics.py tests/test_historical_data.py tests/test_factor_panel_historical.py
@@ -87,7 +87,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line tests/test_historical_analy
 - Wealth compounds independent snapshot P&L / MV as a return series (B0: engine paths are not a path-dependent reval walk).
 - Return-series VaR is not a separate metric; portfolio VaR/ES are engine currency-loss numbers on the sliced window.
 - Default missing-date policy drops absent weekdays with a note; holidays look like missing weekdays.
-- `POST /historical-analytics` is HEAVY inline (refuses when external worker / `RISKFORGE_HEAVY_INLINE=0`); not a RiskRun job type yet.
+- `POST /historical-analytics` is HEAVY inline (refuses when external worker / `QUANTLINEAGE_HEAVY_INLINE=0`); not a RiskRun job type yet.
 - Benchmark/beta (B2), charts (B3/B5), waterfall UI (B4) are non-goals.
 
 ## Follow-up / next owner

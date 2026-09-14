@@ -94,7 +94,7 @@ legacy expand, P&L/`content_hash` identity, HTTP list).
 Brief (required):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_stress.py tests/test_stress_scenarios_di.py \
   tests/test_scenario_only_engine.py tests/test_scenario_wire_api.py \
@@ -104,7 +104,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 Plus new library/repo pins and covering callers:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_canonical_scenario_store.py tests/test_crisis_library.py \
   tests/test_scenario_model.py tests/test_omit_market.py \

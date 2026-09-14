@@ -29,7 +29,7 @@ Independent re-score of RF-014 against FINDINGS local-demo vs shared vs producti
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_compose_loopback.py \
   tests/test_finite_scalars.py \
@@ -64,7 +64,7 @@ Loopback, finite numbers, caps, sanitization, and the token gate are MET on disk
 ## Known limitations / risks
 - Object ACLs / IDOR with the shared token
 - No TLS / reverse-proxy
-- No secret manager; Compose `POSTGRES_PASSWORD=riskforge`
+- No secret manager; Compose `POSTGRES_PASSWORD=quantlineage`
 - No HTTP queued-run depth cap
 - `docker run -p 8000:8000` without shared flag still serves unauthenticated API (not default Compose)
 - Deferred minors: `is_public_path` `..`; dual-book per-list cap; `model_copy` finite re-check

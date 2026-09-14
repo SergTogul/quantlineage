@@ -1,7 +1,7 @@
 """R0.10.3 / RF-015 leftover: HEAVY work must not monopolize the request thread.
 
-When Compose / production-shaped deploys set ``RISKFORGE_EXTERNAL_WORKER=1``
-(or ``RISKFORGE_HEAVY_INLINE=0``), HEAVY ``/risk/*`` handlers refuse
+When Compose / production-shaped deploys set ``QUANTLINEAGE_EXTERNAL_WORKER=1``
+(or ``QUANTLINEAGE_HEAVY_INLINE=0``), HEAVY ``/risk/*`` handlers refuse
 request-thread compute and point clients at ``POST /risk/runs``.
 INTERACTIVE LINEAR / DELTA_GAMMA summary, stress scenario GETs, and
 ``/limits/drilldown`` stay sync.
@@ -31,7 +31,7 @@ def _assert_refused_inline(response) -> None:
 def test_full_revaluation_summary_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         response = client.post(
@@ -45,7 +45,7 @@ def test_full_revaluation_summary_refused_when_external_worker(
 def test_full_revaluation_summary_refused_on_legacy_mount(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/portfolio").json()
         response = client.post(
@@ -59,7 +59,7 @@ def test_full_revaluation_summary_refused_on_legacy_mount(
 def test_dashboard_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         response = client.post("/api/v1/risk/dashboard")
         _assert_refused_inline(response)
@@ -68,8 +68,8 @@ def test_dashboard_refused_when_external_worker(
 def test_dashboard_refused_when_heavy_inline_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
-    monkeypatch.setenv("RISKFORGE_HEAVY_INLINE", "0")
+    monkeypatch.delenv("QUANTLINEAGE_EXTERNAL_WORKER", raising=False)
+    monkeypatch.setenv("QUANTLINEAGE_HEAVY_INLINE", "0")
     with TestClient(app) as client:
         response = client.post("/risk/dashboard")
         _assert_refused_inline(response)
@@ -78,16 +78,16 @@ def test_dashboard_refused_when_heavy_inline_disabled(
 def test_heavy_inline_allowed_defaults_and_flags(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
-    monkeypatch.delenv("RISKFORGE_HEAVY_INLINE", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_EXTERNAL_WORKER", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HEAVY_INLINE", raising=False)
     assert heavy_inline_allowed() is True
     assert RISK_RUNS_PATH == "/risk/runs"
 
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     assert heavy_inline_allowed() is False
 
-    monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
-    monkeypatch.setenv("RISKFORGE_HEAVY_INLINE", "0")
+    monkeypatch.delenv("QUANTLINEAGE_EXTERNAL_WORKER", raising=False)
+    monkeypatch.setenv("QUANTLINEAGE_HEAVY_INLINE", "0")
     assert heavy_inline_allowed() is False
 
 
@@ -96,7 +96,7 @@ def test_interactive_summary_stays_sync_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
     methodology: str,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         response = client.post(
@@ -126,7 +126,7 @@ def test_leftover_heavy_portfolio_routes_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
     path: str,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         response = client.post(path, json=book)
@@ -137,7 +137,7 @@ def test_var_linear_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``POST /risk/var`` is HEAVY even with LINEAR (unlike summary)."""
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         response = client.post(
@@ -151,7 +151,7 @@ def test_var_linear_refused_when_external_worker(
 def test_what_if_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         body = {
@@ -166,7 +166,7 @@ def test_what_if_refused_when_external_worker(
 def test_query_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         response = client.post(
@@ -179,8 +179,8 @@ def test_query_refused_when_external_worker(
 def test_leftover_heavy_refused_when_heavy_inline_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
-    monkeypatch.setenv("RISKFORGE_HEAVY_INLINE", "0")
+    monkeypatch.delenv("QUANTLINEAGE_EXTERNAL_WORKER", raising=False)
+    monkeypatch.setenv("QUANTLINEAGE_HEAVY_INLINE", "0")
     with TestClient(app) as client:
         book = client.get("/portfolio").json()
         response = client.post("/risk/es", json=book)
@@ -190,7 +190,7 @@ def test_leftover_heavy_refused_when_heavy_inline_disabled(
 def test_interactive_factors_stays_sync_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         response = client.post("/api/v1/risk/factors", json=book)
@@ -216,7 +216,7 @@ def test_stress_attr_limits_portfolio_routes_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
     path: str,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         response = client.post(path, json=book)
@@ -226,7 +226,7 @@ def test_stress_attr_limits_portfolio_routes_refused_when_external_worker(
 def test_stress_custom_routes_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     scenario = {
         "name": "Custom",
         "equity_shock": -0.1,
@@ -269,7 +269,7 @@ def test_stress_custom_routes_refused_when_external_worker(
 def test_stress_reverse_and_compare_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         hedged = {
@@ -352,7 +352,7 @@ def test_stress_reverse_and_compare_refused_when_external_worker(
 def test_attribution_routes_refused_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         _assert_refused_inline(
@@ -383,8 +383,8 @@ def test_attribution_routes_refused_when_external_worker(
 def test_stress_attr_limits_refused_when_heavy_inline_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
-    monkeypatch.setenv("RISKFORGE_HEAVY_INLINE", "0")
+    monkeypatch.delenv("QUANTLINEAGE_EXTERNAL_WORKER", raising=False)
+    monkeypatch.setenv("QUANTLINEAGE_HEAVY_INLINE", "0")
     with TestClient(app) as client:
         book = client.get("/portfolio").json()
         _assert_refused_inline(client.post("/risk/stress", json=book))
@@ -394,7 +394,7 @@ def test_stress_attr_limits_refused_when_heavy_inline_disabled(
 def test_interactive_stress_scenarios_stay_sync_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         default = client.get("/api/v1/risk/stress/scenarios")
         formal = client.get("/api/v1/risk/stress/scenarios/formal")
@@ -409,7 +409,7 @@ def test_interactive_stress_scenarios_stay_sync_when_external_worker(
 def test_interactive_limits_drilldown_stays_sync_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         payload = {

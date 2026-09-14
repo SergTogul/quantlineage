@@ -24,12 +24,12 @@ from app.sample import DEMO_PORTFOLIOS
 
 @pytest.fixture(autouse=True)
 def _deterministic_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RISKFORGE_PRICING_ENGINE", "builtin")
-    monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "python")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_ENGINE", "builtin")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_KERNEL", "python")
     # Avoid cache wrapper nondeterminism from env toggles.
-    monkeypatch.setenv("RISKFORGE_PRICING_CACHE", "0")
-    monkeypatch.setenv("RISKFORGE_CURVE_CACHE", "0")
-    monkeypatch.setenv("RISKFORGE_SCENARIO_CACHE", "0")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_CACHE", "0")
+    monkeypatch.setenv("QUANTLINEAGE_CURVE_CACHE", "0")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_CACHE", "0")
 
 
 def test_build_artifact_covers_all_demo_portfolios():

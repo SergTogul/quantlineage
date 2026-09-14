@@ -45,7 +45,7 @@ TDD: RED 6 failed / 3 passed (then 5 failed after `var_99` band). GREEN after ni
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_qa024_ql_demo_range.py tests/test_rf016_close_gate.py \
   tests/test_nightly_ci.py tests/test_pr_full_ci.py

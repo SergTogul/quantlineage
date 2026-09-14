@@ -61,7 +61,7 @@ TDD: version/CAS/alembic pins failed first (no field, alembic still 003). Then g
 TDD red (new pins, before production change):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line \
   tests/test_portfolio_identity.py tests/test_persistence.py \
   -k "version or alembic or schema_has_expected"
@@ -72,7 +72,7 @@ Result: **7 failed, 15 deselected** (no `version` field; alembic head still `003
 Brief + covering (after implement):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_persistence.py \
   tests/test_portfolio_identity.py \

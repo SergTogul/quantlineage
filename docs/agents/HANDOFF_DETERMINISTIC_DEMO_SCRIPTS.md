@@ -8,7 +8,7 @@ Backend/API Engineer (Lead Architect coordinating; Market Data / Frontend not re
 
 ## Summary
 - Shipped `backend/app/demo/run_demo_risk.py` (+ `scripts/run_demo_risk.py` shim) that loads demo portfolios and the demo factor CSV, runs summary VaR + `DEFAULT_SCENARIOS` stress via `PortfolioService`, and emits sorted-key JSON.
-- Defaults: `RISKFORGE_PRICING_ENGINE=builtin`, `RISKFORGE_SCENARIO_KERNEL=python` for cross-run byte parity; `--check` asserts two consecutive builds match.
+- Defaults: `QUANTLINEAGE_PRICING_ENGINE=builtin`, `QUANTLINEAGE_SCENARIO_KERNEL=python` for cross-run byte parity; `--check` asserts two consecutive builds match.
 - Frozen reference artifact committed at `data/demo_risk_artifact.json`.
 - No live vendors. PricingEngine seams untouched. Workstream 10 marked **COMPLETE** .
 
@@ -37,12 +37,12 @@ Backend/API Engineer (Lead Architect coordinating; Market Data / Frontend not re
 
 ## Commands executed
 ```bash
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_PRICING_CACHE=0 \
- RISKFORGE_SCENARIO_KERNEL=python .venv/bin/python -m app.demo.run_demo_risk \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin QUANTLINEAGE_PRICING_CACHE=0 \
+ QUANTLINEAGE_SCENARIO_KERNEL=python .venv/bin/python -m app.demo.run_demo_risk \
  --check -o ../data/demo_risk_artifact.json
 
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_PRICING_CACHE=0 \
- RISKFORGE_SCENARIO_KERNEL=python .venv/bin/python -m pytest \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin QUANTLINEAGE_PRICING_CACHE=0 \
+ QUANTLINEAGE_SCENARIO_KERNEL=python .venv/bin/python -m pytest \
  tests/test_demo_scripts.py tests/test_demo_historical_dataset.py \
  tests/test_demo_portfolios.py tests/test_api.py tests/test_risk.py \
  tests/test_historical_data.py -q --tb=line
@@ -56,7 +56,7 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_PRICING_CA
 - QuantLib: not required for artifact path (builtin default)
 - C++: N/A (kernel forced to python)
 - Workstream 10: **COMPLETE**
-- Push: SHA `bca5427d3fdd85b06b5a87c76763518744916e30` on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
+- Push: SHA `bca5427d3fdd85b06b5a87c76763518744916e30` on `origin/master` (https://github.com/SergTogul/quantlineage)
 
 ## Known limitations / risks
 - Artifact omits VaR contributions and stress `by_position` (size); use API for drill-down

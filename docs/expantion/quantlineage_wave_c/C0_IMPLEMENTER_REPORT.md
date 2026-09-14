@@ -39,7 +39,7 @@ None required. Reuse evidence: existing RF-019 query tests.
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line tests/test_ai_query_orchestration.py
 ```
 

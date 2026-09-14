@@ -68,25 +68,25 @@ dataset = load_demo_historical_dataset()
 dataset = create_historical_dataset("demo")
 
 # Factory / env
-# RISKFORGE_HISTORICAL_DATASET=demo-multi-factor-history|demo|synthetic|/path/to.csv
+# QUANTLINEAGE_HISTORICAL_DATASET=demo-multi-factor-history|demo|synthetic|/path/to.csv
 dataset = create_historical_dataset()  # default: per-factor demo CSV
 ```
 
 Risk HTTP routers construct the stack via `build_portfolio_service()`, so the
-API default is the per-factor demo panel (`RISKFORGE_HISTORICAL_DATASET` overrides).
+API default is the per-factor demo panel (`QUANTLINEAGE_HISTORICAL_DATASET` overrides).
 
 ## Deterministic demo scripts CLI / module: `backend/app/demo/run_demo_risk.py` (shim: `scripts/run_demo_risk.py`).
 
 Loads all demo portfolios + the production historical panel, runs summary VaR and
 `DEFAULT_SCENARIOS` stress through `PortfolioService`, and writes sorted-key
 JSON. Default pricing for artifacts is **builtin** (set
-`RISKFORGE_PRICING_ENGINE`); scenario kernel forced to Python for parity.
+`QUANTLINEAGE_PRICING_ENGINE`); scenario kernel forced to Python for parity.
 
 Frozen reference artifact: [`demo_risk_artifact.json`](demo_risk_artifact.json)
 
 ```bash
 cd backend
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_PRICING_CACHE=0 \
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin QUANTLINEAGE_PRICING_CACHE=0 \
  .venv/bin/python -m app.demo.run_demo_risk --check -o ../data/demo_risk_artifact.json
 ```
 

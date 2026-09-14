@@ -93,7 +93,7 @@ def test_cpp_kernel_compiles_and_executes(tmp_path):
 
 def test_native_ctypes_kernel_matches_python(native_scenario_lib, monkeypatch):
     # Force serial path for a clean single-thread baseline compare.
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     lib = native_scenario_lib
     exposures = [Exposure(1000, 200, 30, -10, 500), Exposure(-300, 80, 10, 5, -200)]
     shocks = [Shock(-0.1, 5, 20, -0.02), Shock(0.03, -2, -10, 0.01)]
@@ -114,17 +114,17 @@ def test_native_ctypes_parallel_matches_serial(native_scenario_lib, monkeypatch)
         Shock(-0.01 + 0.0001 * k, 2.0 - 0.01 * k, 5.0 + 0.1 * k, -0.002 + 0.00005 * k)
         for k in range(2048)
     ]
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     serial = NativeScenarioKernel(lib).pnl(exposures, shocks)
     for thr in ("2", "3", "4", "8"):
-        monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", thr)
+        monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", thr)
         # Reloading CDLL reuses the process image; env is read per call in C++.
         parallel = NativeScenarioKernel(lib).pnl(exposures, shocks)
         assert _approx(parallel, serial)
 
 def test_native_empty_shocks_and_exposures(native_scenario_lib, monkeypatch):
     """M6.5: empty inputs — length-0 out; zero exposures → zeros per shock."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     lib = native_scenario_lib
     native = NativeScenarioKernel(lib)
     py = PythonScenarioKernel()
@@ -140,7 +140,7 @@ def test_native_empty_shocks_and_exposures(native_scenario_lib, monkeypatch):
 
 def test_native_single_shock_and_zero_greeks(native_scenario_lib, monkeypatch):
     """M6.5: one-element path (forces serial even if threads>1) and all-zero Greeks."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "4")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "4")
     lib = native_scenario_lib
     native = NativeScenarioKernel(lib)
     py = PythonScenarioKernel()
@@ -151,7 +151,7 @@ def test_native_single_shock_and_zero_greeks(native_scenario_lib, monkeypatch):
 
 def test_native_nan_propagates_like_python(native_scenario_lib, monkeypatch):
     """M6.5: NaN is not sanitized; both backends must propagate."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     lib = native_scenario_lib
     exposures = [Exposure(1.0, 0.0, 0.0, 0.0, 0.0)]
     shocks = [Shock(float("nan"), 0.0, 0.0, 0.0)]
@@ -162,7 +162,7 @@ def test_native_nan_propagates_like_python(native_scenario_lib, monkeypatch):
 
 def test_native_multi_exposure_matrix_matches_python(native_scenario_lib, monkeypatch):
     """M6.5: denser book × shock matrix beyond the two-row smoke case."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     lib = native_scenario_lib
     exposures = [
         Exposure(
@@ -194,9 +194,9 @@ def test_native_abi_version_readable(native_scenario_lib):
     assert KERNEL_ABI_VERSION == 1
     assert native.abi_version == KERNEL_ABI_VERSION
     raw = ctypes.CDLL(str(lib))
-    raw.riskforge_kernel_abi_version.argtypes = []
-    raw.riskforge_kernel_abi_version.restype = ctypes.c_int
-    assert raw.riskforge_kernel_abi_version() == KERNEL_ABI_VERSION
+    raw.quantlineage_kernel_abi_version.argtypes = []
+    raw.quantlineage_kernel_abi_version.restype = ctypes.c_int
+    assert raw.quantlineage_kernel_abi_version() == KERNEL_ABI_VERSION
 
 def test_native_constructor_rejects_abi_mismatch(native_scenario_lib, monkeypatch):
     """R0.12.5: a stale Python ABI expectation must fail closed at load."""
@@ -208,7 +208,7 @@ def test_native_constructor_rejects_abi_mismatch(native_scenario_lib, monkeypatc
 
 def test_native_wrong_abi_arg_fails_closed(native_scenario_lib, monkeypatch):
     """R0.12.5: compute entry rejects a mismatched ABI argument and does not write."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
     s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
@@ -219,7 +219,7 @@ def test_native_wrong_abi_arg_fails_closed(native_scenario_lib, monkeypatch):
 
 def test_native_length_mismatch_fails_closed(native_scenario_lib, monkeypatch):
     """R0.12.5: mismatched exposure/shock/out lengths return an error, no overrun."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
     s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
@@ -247,7 +247,7 @@ def test_native_wrap_sized_counts_fail_closed(native_scenario_lib, monkeypatch):
     those wrapped products as n_*_doubles (and n_out == wrap n_shocks) means a
     deleted overflow guard would treat lengths as matching and walk huge n_*.
     """
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
     s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
@@ -266,7 +266,7 @@ def test_native_wrap_sized_counts_fail_closed(native_scenario_lib, monkeypatch):
 
 def test_native_tight_buffer_mismatch_fails_closed(native_scenario_lib, monkeypatch):
     """R0.12.5: tight out/exposure buffers so a skipped predicate is an ASan overrun."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     e = (ctypes.c_double * 5)(1000.0, 200.0, 30.0, -10.0, 500.0)
     two_s = (ctypes.c_double * 8)(-0.1, 5.0, 20.0, -0.02, 0.03, -2.0, -10.0, 0.01)
@@ -282,7 +282,7 @@ def test_native_tight_buffer_mismatch_fails_closed(native_scenario_lib, monkeypa
 
 def test_native_null_pointer_nonzero_count_fails_closed(native_scenario_lib, monkeypatch):
     """R0.12.5: NULL + count > 0 is an error; out is not written."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     s = (ctypes.c_double * 4)(-0.1, 5.0, 20.0, -0.02)
     out = (ctypes.c_double * 1)(99.0)
@@ -300,7 +300,7 @@ def test_native_null_pointer_nonzero_count_fails_closed(native_scenario_lib, mon
 
 def test_native_empty_null_pointers_ok(native_scenario_lib, monkeypatch):
     """R0.12.5: count == 0 may pass NULL; empty book writes zeros per shock."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     rc = native.fn(KERNEL_ABI_VERSION, None, 0, 0, None, 0, 0, None, 0)
     assert rc == KERNEL_OK
@@ -336,7 +336,7 @@ def _spy_native_fn(native: NativeScenarioKernel) -> list[dict]:
 
 def test_native_contiguous_numpy_no_copy_matches_python(native_scenario_lib, monkeypatch):
     """R0.17: C-contiguous float64 buffers go to the kernel without a pack copy."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     exposures = [
         Exposure(1000, 200, 30, -10, 500),
@@ -363,7 +363,7 @@ def test_native_contiguous_numpy_no_copy_matches_python(native_scenario_lib, mon
 
 def test_native_flat_1d_contiguous_numpy_no_copy(native_scenario_lib, monkeypatch):
     """R0.17: packed 1-D C-contiguous float64 is the same ABI layout, no copy."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     e = np.array([1000.0, 200.0, 30.0, -10.0, 500.0], dtype=np.float64)
     s = np.array([-0.1, 5.0, 20.0, -0.02], dtype=np.float64)
@@ -378,7 +378,7 @@ def test_native_flat_1d_contiguous_numpy_no_copy(native_scenario_lib, monkeypatc
 
 def test_native_numpy_out_buffer_no_copy(native_scenario_lib, monkeypatch):
     """R0.17: caller-supplied C-contiguous float64 out is written in place."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     e = np.array([[1000.0, 200.0, 30.0, -10.0, 500.0]], dtype=np.float64)
     s = np.array([[-0.1, 5.0, 20.0, -0.02]], dtype=np.float64)
@@ -394,7 +394,7 @@ def test_native_numpy_out_buffer_no_copy(native_scenario_lib, monkeypatch):
 
 def test_native_noncontiguous_numpy_matches_python(native_scenario_lib, monkeypatch):
     """R0.17: Fortran / strided arrays still match; they may copy."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     e_c = np.array(
         [[1000.0, 200.0, 30.0, -10.0, 500.0], [-300.0, 80.0, 10.0, 5.0, -200.0]],
@@ -420,7 +420,7 @@ def test_native_noncontiguous_numpy_matches_python(native_scenario_lib, monkeypa
 
 def test_native_numpy_empty_and_shape_mismatch(native_scenario_lib, monkeypatch):
     """R0.17: empty arrays follow the ABI; wrong stride is KERNEL_ERR_LENGTH."""
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "1")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "1")
     native = NativeScenarioKernel(native_scenario_lib)
     e = np.zeros((0, 5), dtype=np.float64)
     s = np.array([[0.01, 1.0, 2.0, -0.01]], dtype=np.float64)
@@ -435,7 +435,7 @@ def test_native_numpy_empty_and_shape_mismatch(native_scenario_lib, monkeypatch)
 def test_native_tiny_workload_matches_python_with_many_threads(native_scenario_lib, monkeypatch):
     """R0.17: 1×S Historical-VaR shape stays correct when THREADS>1 (serial path)."""
     assert KERNEL_PARALLEL_MIN_WORK == 4096
-    monkeypatch.setenv("RISKFORGE_KERNEL_THREADS", "8")
+    monkeypatch.setenv("QUANTLINEAGE_KERNEL_THREADS", "8")
     native = NativeScenarioKernel(native_scenario_lib)
     exposures = [Exposure(1000, 200, 30, -10, 500)]
     shocks = [Shock(-0.01 + 0.0001 * k, 2.0, 5.0, -0.002) for k in range(64)]

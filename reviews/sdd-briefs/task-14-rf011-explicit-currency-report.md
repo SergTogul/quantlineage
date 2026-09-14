@@ -68,7 +68,7 @@ constructor default, demo ids).
 Brief (required):
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_omit_market.py tests/test_builtin_pricing.py \
   tests/test_curve_pricing.py tests/test_quantlib_terms_value.py \
@@ -78,7 +78,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 Covering:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_market_authority.py tests/test_quantlib_pricing.py \
   tests/test_attribution.py tests/test_builtin_terms_value.py \

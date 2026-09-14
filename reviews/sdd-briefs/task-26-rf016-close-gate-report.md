@@ -39,7 +39,7 @@ TDD: residual-marker tests failed first (2 failed, 30 passed). After docs, full 
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_pr_full_ci.py tests/test_pr_fast_ci.py tests/test_nightly_ci.py \
   tests/test_rf016_close_gate.py
@@ -57,7 +57,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 ## Results
 - Backend required suite: **32 passed** in 3.51s. Ruff: all checks passed.
 - Frontend: n/a
-- QuantLib: not exercised numerically. Hard-gate job and `RISKFORGE_REQUIRE_QUANTLIB` left intact.
+- QuantLib: not exercised numerically. Hard-gate job and `QUANTLINEAGE_REQUIRE_QUANTLIB` left intact.
 - C++: n/a this slice (native compile remains inside `backend-pytest`; SLA-K1/K2 not CI-enforced)
 - Build: n/a
 - All tests pass (all applicable/affected suites required by the task): **yes**
@@ -78,7 +78,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 | QA-024 demo-artifact range | **UNMET** leftover | no QL range gate vs `data/demo_risk_artifact.json` |
 
 ## Why CLOSE (not KEEP OPEN)
-QuantLib cannot be skipped in PR-FULL (`backend-quantlib-hard-gate` is a required need; `RISKFORGE_REQUIRE_QUANTLIB`; no `requirements-no-ql`). KEEP OPEN would be required if that hole remained. Labeled-runner SLA-K1/K2 is still unimplemented in CI; calling it MET would be a rubber-stamp. It is an accepted R0 residual because Milestone R0 is a GitHub-hosted verification matrix, not a self-hosted SLA farm. QA-024 range is named leftover, not MET. Same standard as RF-014 ACLs/TLS.
+QuantLib cannot be skipped in PR-FULL (`backend-quantlib-hard-gate` is a required need; `QUANTLINEAGE_REQUIRE_QUANTLIB`; no `requirements-no-ql`). KEEP OPEN would be required if that hole remained. Labeled-runner SLA-K1/K2 is still unimplemented in CI; calling it MET would be a rubber-stamp. It is an accepted R0 residual because Milestone R0 is a GitHub-hosted verification matrix, not a self-hosted SLA farm. QA-024 range is named leftover, not MET. Same standard as RF-014 ACLs/TLS.
 
 ## Known limitations / risks
 - No self-hosted labeled runner; SLA-K1/K2 not a CI gate

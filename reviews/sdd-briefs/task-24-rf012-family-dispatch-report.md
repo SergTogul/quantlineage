@@ -56,7 +56,7 @@ Not edited: `models.py` / `instrument_terms.py` unions, C++, frontend, demo snap
 TDD red:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_instrument_capabilities.py \
   -k "snapshot_overlay or family_keyed or position_label" \
@@ -66,7 +66,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 Required + overlay/label/goldens:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_instrument_capabilities.py \
   tests/test_quantlib_unknown_instrument.py \
@@ -135,7 +135,7 @@ Fix (no RF-012 scope reopen): keep the frozen family map, store method **names**
 ### Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_quantlib_process_state.py \
   tests/test_quantlib_process_parallelism.py \

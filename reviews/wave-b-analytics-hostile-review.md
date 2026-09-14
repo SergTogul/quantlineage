@@ -32,7 +32,7 @@ G1–G6 ledger (not reopened unless they fail a named attack — they did not, e
 - `risk_free_rate` unit is implicit (same fraction as CAGR). Default `0`.
 - Date-intersection for SPY inside `compute()` is applied to a rectangular panel (`spy_dates == portfolio_dates`). Shifted-date protection is the helper `align_dated_series` used by the compute path; the distinguishing zip-vs-intersection case is pinned on that helper.
 - VaR/ES trend skipped in B3 (no stored RiskRun time series). N/A for this matrix.
-- Historical Analytics is HEAVY and is not a RiskRun type. Compose `RISKFORGE_EXTERNAL_WORKER=1` 400s the page (demo script uses in-process uvicorn).
+- Historical Analytics is HEAVY and is not a RiskRun type. Compose `QUANTLINEAGE_EXTERNAL_WORKER=1` 400s the page (demo script uses in-process uvicorn).
 - Frontend `eslint` `react-hooks/set-state-in-effect` in `Analytics.jsx` (pre-existing; not Wave B math).
 
 ## 4. Rejected false positives

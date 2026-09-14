@@ -1,8 +1,8 @@
-# RiskForge QA Review
+# QuantLineage QA Review
 
 Independent test-quality review. No application, test, CI, roadmap, or dependency files were modified.
 
-Review date: 2026-09-03. Workspace: `/Users/user/src/riskforge-mvp`. QuantLib 1.43 and `g++` (Apple clang 14.0.3) were available locally.
+Review date: 2026-09-03. Workspace: `/Users/user/src/quantlineage`. QuantLib 1.43 and `g++` (Apple clang 14.0.3) were available locally.
 
 ## Executive Summary
 
@@ -14,8 +14,8 @@ The highest-value question this review answers: **a wrong-tail or off-by-one His
 
 Executed baseline:
 
-- Backend: `cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q` → **659 passed**, 0 failed, **0 skipped**, 0 xfailed, 1 Starlette/httpx deprecation warning, 36.38s. Collect-only: **659 tests**. QuantLib adapter tests executed (not skipped). Native kernel tests compiled and ran (`g++` present).
-- QuantLib: Installed **1.43**. `tests/test_quantlib_golden.py` **54 tests**, `tests/test_quantlib_pricing.py` **17 tests**, plus QL cases in curve/surface pricing. File-level `pytest.importorskip("QuantLib")` did not skip in this environment. `conftest.py` still defaults `RISKFORGE_PRICING_ENGINE=builtin` via `setdefault` when the env var is unset.
+- Backend: `cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q` → **659 passed**, 0 failed, **0 skipped**, 0 xfailed, 1 Starlette/httpx deprecation warning, 36.38s. Collect-only: **659 tests**. QuantLib adapter tests executed (not skipped). Native kernel tests compiled and ran (`g++` present).
+- QuantLib: Installed **1.43**. `tests/test_quantlib_golden.py` **54 tests**, `tests/test_quantlib_pricing.py` **17 tests**, plus QL cases in curve/surface pricing. File-level `pytest.importorskip("QuantLib")` did not skip in this environment. `conftest.py` still defaults `QUANTLINEAGE_PRICING_ENGINE=builtin` via `setdefault` when the env var is unset.
 - Frontend: `cd frontend && npm test` → **74 passed** (8 files). `npm run build` → **OK** (Vite; `dist/assets/index-D0rofwo0.js` 253.11 kB). `npm run lint` → **OK** (`eslint src --max-warnings 0`).
 - Frontend build: **passed** (see above).
 - Native C++: `g++ -std=c++20 -O2 -pthread -I native/include native/tests/kernel_test.cpp` → printed `risk_kernel_ok`. Shared lib built. Pytest `test_native_kernel.py` / `test_historical_scenario_kernel.py` included in the 659.
@@ -33,7 +33,7 @@ Top escaped-defect risks:
 
 1. Historical VaR/ES computed on the **profit** tail or with a **wrong percentile** still satisfy `ES ≥ VaR99 ≥ VaR95 ≥ 0`.
 2. Approximate VaR **vol-point** (`×100`) or **DV01×bp** scaling is wrong while kernel-vs-NumPy parity and ES ordering still pass.
-3. CI remains green if the QuantLib wheel fails to install (`RISKFORGE_PRICING_ENGINE=builtin`; QL tests `importorskip`).
+3. CI remains green if the QuantLib wheel fails to install (`QUANTLINEAGE_PRICING_ENGINE=builtin`; QL tests `importorskip`).
 4. `VaRAnalytics` LINEAR/DELTA_GAMMA **ignores** a provided `MarketSnapshot`; Greeks come from trade-local marks.
 5. Scenario Builder / reverse-stress **percent → fraction** lives only in helper unit tests; component and E2E would still show a “Loss” if the widget sent raw `20` instead of `0.20`.
 
@@ -309,7 +309,7 @@ Location:
 - `backend/tests/test_surface_vol_pricing.py:182`
 
 Evidence:
-CI installs `requirements.txt` including QuantLib, but on failure strips QuantLib and continues. Detection sets `RISKFORGE_PRICING_ENGINE` to `builtin` and warns. Adapter tests use `pytest.importorskip` / `skipif`. There is **no** required job that fails if `import QuantLib` fails. E2E forces builtin. Postgres smoke does not need QL. Locally this review ran 659 tests with QL 1.43 and **0 skips**; that does not bind CI.
+CI installs `requirements.txt` including QuantLib, but on failure strips QuantLib and continues. Detection sets `QUANTLINEAGE_PRICING_ENGINE` to `builtin` and warns. Adapter tests use `pytest.importorskip` / `skipif`. There is **no** required job that fails if `import QuantLib` fails. E2E forces builtin. Postgres smoke does not need QL. Locally this review ran 659 tests with QL 1.43 and **0 skips**; that does not bind CI.
 
 Failure that could escape:
 A QuantLib adapter regression (wrong surface engine, eval-date, fallback to Builtin) never runs on GitHub if the wheel is missing, while README still presents QuantLib as the production adapter.
@@ -694,7 +694,7 @@ Location:
 - `e2e/tests/dashboard.spec.ts`
 - `e2e/tests/scenario-builder.spec.ts`
 - `e2e/tests/m8-panels.spec.ts`
-- `e2e/playwright.config.js` (`RISKFORGE_PRICING_ENGINE: builtin`)
+- `e2e/playwright.config.js` (`QUANTLINEAGE_PRICING_ENGINE: builtin`)
 
 Evidence:
 12 Playwright tests passed locally (Chrome channel). They assert headings, tables nonempty, “Loss”, “Converged”, COMPLETED/FAILED. No test: load portfolio → read VaR → run custom scenario → inspect contributors → apply hedge → rerun → assert VaR changed. No test asserts request bodies. E2E never uses QuantLib.
@@ -1078,7 +1078,7 @@ Affected capability:
 E2E / production adapter
 
 Location:
-- `e2e/playwright.config.js` env `RISKFORGE_PRICING_ENGINE: builtin`
+- `e2e/playwright.config.js` env `QUANTLINEAGE_PRICING_ENGINE: builtin`
 - README demo smoke uses packaged artifact
 
 Evidence:
@@ -1205,7 +1205,7 @@ The pyramid is not “E2E-heavy.” It is “unit-heavy with a VaR hole at the g
 
 ### PR-FAST
 
-- `cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin pytest -q -m "not slow"` (if a slow mark is added later) **or** current full pytest minus native compile if split.
+- `cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin pytest -q -m "not slow"` (if a slow mark is added later) **or** current full pytest minus native compile if split.
 - `tests/test_quant_properties.py`, `test_pricing.py`, `test_var_methodology.py`, `test_market_snapshot.py`, `test_hierarchy.py`, `test_attribution.py`, `test_limits.py` — until marks exist, keep **full 659** given ~36s locally.
 - `cd frontend && npm test && npm run lint`
 

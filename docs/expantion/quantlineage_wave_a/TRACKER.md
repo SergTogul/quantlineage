@@ -57,14 +57,14 @@ Do not mark DONE without gate evidence.
 | A8.1 | Unit/date/missing attacks | DONE | `tests/test_wave_a_hostile.py`: as_of-before-history, Saturday last-print, UTC dates / `retrieved_at` | |
 | A8.2 | Lineage/repro attacks | DONE | Canonical mapping + provider metadata fail-closed; snapshot id/as_of bind check; freeze→unload adapters→same RiskRun/hash/numbers | |
 | A8.3 | Provider/security attacks | DONE | CI workflow parse offline; `YAHOO_BASE`/`FRED_BASE` constants; FRED key absent from 403/provenance; FX/vol N/A | |
-| A8.4 | Full regression/CI | DONE | Local pytest **1749 passed**, 9 skipped. Frontend 165 + lint + build. GitHub CI `d73e7df` PR-FULL green: https://github.com/SergTogul/riskforge-mvp/actions/runs/34728082547 | |
+| A8.4 | Full regression/CI | DONE | Local pytest **1749 passed**, 9 skipped. Frontend 165 + lint + build. GitHub CI `d73e7df` PR-FULL green: https://github.com/SergTogul/quantlineage/actions/runs/34728082547 | |
 | A8.5 | Final hostile review | DONE | `reviews/wave-a-real-data-hostile-review.md`; G8 FAIL on red suite then fix `51b5869`; ruff `caad046`; mypy `d73e7df` | |
 | G8 | Wave A final gate | DONE | commit `d73e7df`; CI green run 34728082547; red tests treated as blockers | |
 
 ## Completion summary
 - Overall: `DONE` (G1–G8)
 - Latest verified commit: `d73e7df`
-- Latest green CI: https://github.com/SergTogul/riskforge-mvp/actions/runs/34728082547
+- Latest green CI: https://github.com/SergTogul/quantlineage/actions/runs/34728082547
 - Public providers chosen: Yahoo Finance public JSON (equity/ETF) + FRED (USD rates/macro)
 - Frozen public dataset id/version: `real:public:wave-a` / SHA-256 of transformed panel + transform_config (not `retrieved_at`). Bytes live at `data/public_history/real-public-wave-a/<dataset_version>.csv` + sidecar; a later freeze with different content writes a new hash file and does not overwrite prior versions.
 - Public snapshot id/as_of: `real:public:wave-a:{as_of ISO}:{content_hash}`; snapshot `as_of` is the requested date; lineage `source_observation_date` is last print ≤ as_of. Same calendar date with revised Yahoo/FRED marks gets a new id.

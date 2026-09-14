@@ -39,17 +39,17 @@ def test_default_caps_match_documented_env_defaults() -> None:
     assert workload_mod.max_request_bytes() == 1048576
 
 def test_caps_read_env_at_call_time(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('RISKFORGE_MAX_POSITIONS', '3')
-    monkeypatch.setenv('RISKFORGE_MAX_SCENARIOS', '7')
-    monkeypatch.setenv('RISKFORGE_MAX_REQUEST_BYTES', '2048')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_POSITIONS', '3')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_SCENARIOS', '7')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_REQUEST_BYTES', '2048')
     assert workload_mod.max_positions() == 3
     assert workload_mod.max_scenarios() == 7
     assert workload_mod.max_request_bytes() == 2048
 
 def test_invalid_or_non_positive_env_falls_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('RISKFORGE_MAX_POSITIONS', 'nope')
-    monkeypatch.setenv('RISKFORGE_MAX_SCENARIOS', '0')
-    monkeypatch.setenv('RISKFORGE_MAX_REQUEST_BYTES', '-1')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_POSITIONS', 'nope')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_SCENARIOS', '0')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_REQUEST_BYTES', '-1')
     assert workload_mod.max_positions() == workload_mod.DEFAULT_MAX_POSITIONS
     assert workload_mod.max_scenarios() == workload_mod.DEFAULT_MAX_SCENARIOS
     assert workload_mod.max_request_bytes() == workload_mod.DEFAULT_MAX_REQUEST_BYTES
@@ -93,7 +93,7 @@ def test_sample_portfolio_still_accepted_on_portfolio_bearing_routes() -> None:
     assert custom.status_code == 200
 
 def test_oversize_positions_rejected_with_envelope(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('RISKFORGE_MAX_POSITIONS', '2')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_POSITIONS', '2')
     with TestClient(app) as client:
         resp = client.post('/api/v1/market/snapshot', json=_book(3))
     assert resp.status_code == 413
@@ -107,14 +107,14 @@ def test_oversize_positions_rejected_with_envelope(monkeypatch: pytest.MonkeyPat
 
 def test_oversize_positions_rejected_on_legacy_risk_route(monkeypatch: pytest.MonkeyPatch) -> None:
     """risk.py is not edited; the shared dependency still covers it."""
-    monkeypatch.setenv('RISKFORGE_MAX_POSITIONS', '2')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_POSITIONS', '2')
     with TestClient(app) as client:
         resp = client.post('/risk/var', json=_book(3))
     assert resp.status_code == 413
     _assert_error_shape(resp.json())
 
 def test_exactly_max_positions_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('RISKFORGE_MAX_POSITIONS', '2')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_POSITIONS', '2')
     from tests.market_fixtures import FixedMarketProvider, equity_spot_market
 
     with TestClient(app) as client:
@@ -128,7 +128,7 @@ def test_exactly_max_positions_is_allowed(monkeypatch: pytest.MonkeyPatch) -> No
     assert resp.status_code == 200
 
 def test_oversize_scenarios_rejected_on_custom_stress(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('RISKFORGE_MAX_SCENARIOS', '1')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_SCENARIOS', '1')
     payload = {'portfolio': _book(1), 'scenarios': [_scenario(0), _scenario(1)]}
     with TestClient(app) as client:
         resp = client.post('/api/v1/risk/stress/evaluate/custom', json=payload)
@@ -142,7 +142,7 @@ def test_oversize_scenarios_rejected_on_custom_stress(monkeypatch: pytest.Monkey
     assert body['details']['actual'] == 2
 
 def test_oversized_request_body_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('RISKFORGE_MAX_REQUEST_BYTES', '64')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_REQUEST_BYTES', '64')
     raw = b'{"id":"x","name":"x","positions":[],"pad":"' + b'a' * 200 + b'"}'
     with TestClient(app) as client:
         resp = client.post('/api/v1/market/snapshot', content=raw, headers={'Content-Type': 'application/json'})
@@ -176,7 +176,7 @@ def test_payload_inspector_rejects_what_if_adds_that_grow_book_past_cap() -> Non
     assert exc.value.limit == 2
 
 def test_what_if_adds_over_position_cap_rejected_http(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('RISKFORGE_MAX_POSITIONS', '2')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_POSITIONS', '2')
     payload = {'portfolio': _book(1), 'changes': [{'operation': 'add', 'position': _equity(10).model_dump(mode='json')}, {'operation': 'add', 'position': _equity(11).model_dump(mode='json')}, {'operation': 'add', 'position': _equity(12).model_dump(mode='json')}]}
     with TestClient(app) as client:
         resp = client.post('/api/v1/risk/what-if', json=payload)
@@ -241,7 +241,7 @@ def test_full_app_chunked_typed_body_stops_before_fastapi_joins(monkeypatch: pyt
     every chunk. A stream cap 413s after the first oversize chunk and does not
     retain the tail.
     """
-    monkeypatch.setenv('RISKFORGE_MAX_REQUEST_BYTES', '64')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_REQUEST_BYTES', '64')
     raw = _padded_snapshot_bytes(270)
     assert len(raw) >= 270
     chunks = [raw[i:i + 80] for i in range(0, len(raw), 80)]
@@ -267,7 +267,7 @@ def test_full_app_chunked_invalid_json_over_cap_is_413_not_422(monkeypatch: pyte
 
     FastAPI body parsing first yields 422 and never runs the dependency.
     """
-    monkeypatch.setenv('RISKFORGE_MAX_REQUEST_BYTES', '64')
+    monkeypatch.setenv('QUANTLINEAGE_MAX_REQUEST_BYTES', '64')
     chunks = [b'x' * 80, b'x' * 80, b'x' * 80, b'x' * 5]
     offered = sum(len(c) for c in chunks)
     status, body, receive_log = _asgi_post_chunked_typed_body(chunks)

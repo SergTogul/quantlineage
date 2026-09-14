@@ -10,7 +10,7 @@ Inspected on branch `feat/quantlineage-wave-a` at `974798e`. This is the reuse m
 | Snapshot resolver | `MarketDataProvider` / `FixedMarketDataProvider` (`backend/app/market/snapshot.py`) | Portfolio→snapshot binding for RiskRun. **Not** a public HTTP provider. Do not overload this ABC for Yahoo/FRED. |
 | Demo marks | `demo_market_snapshot` (`backend/app/sample.py`) | Canned demo books only. Public-data snapshots must be built separately, then persisted and bound by id. |
 | Historical source protocol | `HistoricalMarketDataset` (`backend/app/risk/historical_data.py`) | `factor_observations()` + `projection`. Production demo is `PerFactorFileHistoricalDataset` (`demo-multi-factor-history` / `v1`). |
-| Dataset factory | `create_historical_dataset` + `resolve_dataset_source` / `build_historical_risk_engine` (`historical_data.py`, `risk_factories.py`) | Env `RISKFORGE_HISTORICAL_DATASET`. Known ids: demo-multi-factor, demo four-macro, synthetic, `file:<csv>`. Wave A adds frozen public dataset ids here — never HTTP. |
+| Dataset factory | `create_historical_dataset` + `resolve_dataset_source` / `build_historical_risk_engine` (`historical_data.py`, `risk_factories.py`) | Env `QUANTLINEAGE_HISTORICAL_DATASET`. Known ids: demo-multi-factor, demo four-macro, synthetic, `file:<csv>`. Wave A adds frozen public dataset ids here — never HTTP. |
 | Factor panel | `HistoricalFactorPanel` + `factor_panel_from_dataset` | Per-name / per-tenor. Projection must not be `four_macro_demo`. |
 | Units | `app.risk.shock_units` | Equity/FX = relative return; historical rates = bp; snapshot rates = decimal. Reuse `bps_to_decimal_rate` / `decimal_rate_to_bps`. |
 | Risk engine | `HistoricalRiskEngine` | Consumes dataset + optional panel + explicit `MarketSnapshot`. Never call providers. |
@@ -63,7 +63,7 @@ Browser MUST NOT call providers.
 ### G6–G7
 - Extend `backend/app/api/market.py` or add `api/instruments.py` / `api/data.py`
 - Frontend nav (`frontend/src/lib/nav.mjs`) — **collision risk:** working tree has uncommitted Overview/theme edits on this branch. Wave A UI must not revert or restyle those files except to add a nav section/route.
-- `QUANTLINEAGE_DATA_MODE` / keep `RISKFORGE_HISTORICAL_DATASET` as-is (AD-A13)
+- `QUANTLINEAGE_DATA_MODE` / keep `QUANTLINEAGE_HISTORICAL_DATASET` as-is (AD-A13)
 
 ### G8
 - Hostile tests + `reviews/wave-a-real-data-hostile-review.md`

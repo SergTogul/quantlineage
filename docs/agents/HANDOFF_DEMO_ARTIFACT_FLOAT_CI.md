@@ -7,7 +7,7 @@ Fix `backend-pytest` failure on master: `test_committed_artifact_matches_rebuild
 Backend/API + QA (DevOps for push/watch)
 
 ## Failure (exact)
-- CI run: https://github.com/SergTogul/riskforge-mvp/actions/runs/33708507094
+- CI run: https://github.com/SergTogul/quantlineage/actions/runs/33708507094
 - Job: `backend-pytest` / Run pytest
 - Test: `tests/test_demo_scripts.py::test_committed_artifact_matches_rebuild`
 - Cause: exact JSON equality between committed `data/demo_risk_artifact.json` (macOS rebuild after ) and Linux GHA rebuild differed by ~1e-11–1e-14 ULP on stress PnLs (e.g. `4861.095921907545` vs `4861.095921907533`). Other jobs (lint, frontend, e2e, postgres) were green.
@@ -34,11 +34,11 @@ Round floats to 8 decimal places in `dumps_demo_artifact` via `_stabilize_floats
 gh run list -L 5 # worked after sibling re-auth
 gh run view 33708507094 --log-failed
 
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_PRICING_CACHE=0 \
- RISKFORGE_CURVE_CACHE=0 RISKFORGE_SCENARIO_CACHE=0 RISKFORGE_SCENARIO_KERNEL=python \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin QUANTLINEAGE_PRICING_CACHE=0 \
+ QUANTLINEAGE_CURVE_CACHE=0 QUANTLINEAGE_SCENARIO_CACHE=0 QUANTLINEAGE_SCENARIO_KERNEL=python \
  .venv/bin/python -m app.demo.run_demo_risk --check -o ../data/demo_risk_artifact.json
 
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=line
 cd backend && .venv/bin/ruff check app tests && .venv/bin/mypy app
 cd frontend && npm test && npm run lint && npm run build
 ```
@@ -50,7 +50,7 @@ cd frontend && npm test && npm run lint && npm run build
 - Push: `926ed55` → `origin/master`
 
 ## Results (GHA)
-- **success** — https://github.com/SergTogul/riskforge-mvp/actions/runs/33709089560
+- **success** — https://github.com/SergTogul/quantlineage/actions/runs/33709089560
 - Jobs: backend-pytest, lint-static-analysis, frontend-test-build, e2e-playwright, postgres-persistence-smoke — all success
 - Head SHA: `926ed55181e558e995e529a5c02afd9b875afac4`
 

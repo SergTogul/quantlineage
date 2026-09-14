@@ -50,11 +50,11 @@ Included in this Wave C C7 commit (`feat(wave-c): add AI/MCP demo script and hos
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=line tests/test_wave_c_tool_contracts.py tests/test_wave_c_mcp.py tests/test_wave_c_orchestration.py tests/test_wave_c_grounding.py tests/test_wave_c_evals.py tests/test_ai_query_orchestration.py tests/test_shared_auth.py
 .venv/bin/ruff check app/risk/query.py app/services/portfolio_service.py app/main.py app/mcp.py tests/test_wave_c_orchestration.py
 
-cd /Users/user/src/riskforge-mvp/frontend
+cd /Users/user/src/quantlineage/frontend
 npm test -- src/components/RiskQuery.test.jsx src/components/Overview.test.jsx
 ```
 
@@ -69,7 +69,7 @@ npm test -- src/components/RiskQuery.test.jsx src/components/Overview.test.jsx
 
 ## Known limitations / risks
 - HTTP quality reuses the Wave A fetch path (may contact the catalog provider). MCP stdio still lacks `get_data_quality`, so MCP cannot fetch quality that way.
-- Enqueue tools need the lifespan worker; Compose `RISKFORGE_EXTERNAL_WORKER=1` still refuses HEAVY query.
+- Enqueue tools need the lifespan worker; Compose `QUANTLINEAGE_EXTERNAL_WORKER=1` still refuses HEAVY query.
 - KR-DV01 top-level card metric/value/unit can be `not on this payload` (G4 copy-only).
 - Demo does not freeze dollar VaR, DV01, or `content_hash`.
 

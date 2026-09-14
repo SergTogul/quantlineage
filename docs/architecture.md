@@ -1,8 +1,8 @@
-# RiskForge Architecture
+# QuantLineage Architecture
 
-RiskForge is organized around one product boundary:
+QuantLineage is organized around one product boundary:
 
-> Pricing adapters produce instrument values. RiskForge owns portfolio risk, scenario state, aggregation, persistence, API workflow, UI presentation, and deterministic AI orchestration.
+> Pricing adapters produce instrument values. QuantLineage owns portfolio risk, scenario state, aggregation, persistence, API workflow, UI presentation, and deterministic AI orchestration.
 
 ## System Shape
 
@@ -31,7 +31,7 @@ Optional native scenario kernel
   LINEAR / DELTA_GAMMA aggregation only
 ```
 
-Persistence is a separate boundary under `backend/app/persistence/`. When `RISKFORGE_DATABASE_URL` is configured, FastAPI wires SQLAlchemy repositories and a Postgres-backed risk-run worker. Without it, the app uses in-memory/sample defaults for local development and unit tests.
+Persistence is a separate boundary under `backend/app/persistence/`. When `QUANTLINEAGE_DATABASE_URL` is configured, FastAPI wires SQLAlchemy repositories and a Postgres-backed risk-run worker. Without it, the app uses in-memory/sample defaults for local development and unit tests.
 
 ## Dependency Direction
 

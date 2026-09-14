@@ -6,4 +6,4 @@ from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
-    """Metadata root for RiskForge persistence tables."""
+    """Metadata root for QuantLineage persistence tables."""

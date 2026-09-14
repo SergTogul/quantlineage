@@ -582,7 +582,7 @@ test('riskChangeReportSummary passes run identity / contributors / residual thro
       t1: { run_id: 'run-t1', portfolio_id: 'demo', portfolio_version: 2 },
     },
     factor_contributors: [{ factor_id: 'EquitySpot:SPY', factor_type: 'equity', factor: 'SPY', bucket: 'SPY', delta_risk: 14 }],
-    hierarchy_contributors: [{ level: 'trade', name: 'eq-spy', path: 'RiskForge/Global Macro/Equity/eq-spy', position_id: 'eq-spy', delta_risk: 25, children: [] }],
+    hierarchy_contributors: [{ level: 'trade', name: 'eq-spy', path: 'QuantLineage/Global Macro/Equity/eq-spy', position_id: 'eq-spy', delta_risk: 25, children: [] }],
     items: [{ driver: 'Position changes', delta_risk: 25 }],
   }
   const s = riskChangeReportSummary(report)

@@ -18,7 +18,7 @@ from app.market.ingestion.errors import (
 
 DEFAULT_TIMEOUT = 10.0
 MAX_RETRIES = 2
-_USER_AGENT = "RiskForge/wave-a (public-data ingestion)"
+_USER_AGENT = "QuantLineage/wave-a (public-data ingestion)"
 
 
 def new_client() -> httpx.Client:

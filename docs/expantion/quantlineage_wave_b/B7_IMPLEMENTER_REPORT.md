@@ -40,11 +40,11 @@ Attacked every B7 named item with file:line evidence. A red test is a blocker. C
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short
 .venv/bin/ruff check tests/test_historical_analytics.py app/risk/historical_analytics.py
 
-cd /Users/user/src/riskforge-mvp/frontend
+cd /Users/user/src/quantlineage/frontend
 npm test -- src/components/HistoricalAnalytics.test.jsx
 npm test && npm run lint
 ```

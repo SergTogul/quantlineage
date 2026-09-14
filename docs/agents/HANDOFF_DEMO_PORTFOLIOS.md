@@ -9,7 +9,7 @@ Lead Architect / Orchestrator (+ Market Data for snapshot-from-positions seeding
 ## Summary
 - Expanded in-code demo books to three themed portfolios: `equity-vol`, `rates-macro`, `global-macro` (Cross-Asset theme).
 - `SAMPLE_PORTFOLIO` remains the Cross-Asset book (`id=global-macro`, name `Global Macro Demo`) for DI / default `GET /portfolio` / E2E compatibility.
-- Catalog helpers + dual-mounted `GET /portfolios` and `GET /portfolios/{id}`; SQLAlchemy seed inserts all three demos when `RISKFORGE_DATABASE_URL` is set.
+- Catalog helpers + dual-mounted `GET /portfolios` and `GET /portfolios/{id}`; SQLAlchemy seed inserts all three demos when `QUANTLINEAGE_DATABASE_URL` is set.
 - No live market vendor feeds. PricingEngine seams untouched.
 - Workstream 10 stays **PARTIAL** ( still open).
 
@@ -43,13 +43,13 @@ Lead Architect / Orchestrator (+ Market Data for snapshot-from-positions seeding
 
 ## Commands executed
 ```bash
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest \
  tests/test_demo_portfolios.py tests/test_api_router_decomposition.py \
  tests/test_api_v1_compatibility.py tests/test_api_legacy_deprecation.py \
  tests/test_persistence_di.py -q --tb=short
 # → 46 passed, 1 Starlette/httpx warning
 
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest \
  tests/test_demo_portfolios.py tests/test_next_phase.py tests/test_persistence_di.py \
  tests/test_api.py tests/test_api_router_decomposition.py \
  tests/test_api_v1_compatibility.py tests/test_api_legacy_deprecation.py \
@@ -64,11 +64,11 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 ## Results
 - Backend: focused + affected suite **74 passed** (1 known Starlette/httpx deprecation warning)
 - Frontend: unchanged
-- QuantLib: used for broader suite (`RISKFORGE_PRICING_ENGINE=quantlib`)
+- QuantLib: used for broader suite (`QUANTLINEAGE_PRICING_ENGINE=quantlib`)
 - C++: N/A
 - Build: N/A
 - Workstream 10: **PARTIAL** ( DONE only)
-- Push: SHA `1fd27b9` on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
+- Push: SHA `1fd27b9` on `origin/master` (https://github.com/SergTogul/quantlineage)
 
 ## Known limitations / risks
 - UI still loads default Cross-Asset book only (no portfolio picker wired to `/portfolios`)

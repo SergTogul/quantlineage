@@ -10,33 +10,33 @@ AI Orchestration Engineer (one implementer).
 **C6 IN_PROGRESS** (Important items closed). G6 remains **NOT_STARTED**. C7 remains **NOT_STARTED**.
 
 ## Summary
-Added `RISKFORGE_MCP_AUTHORIZATION` to `_SECRET_ENV_NAMES` so a VaR-question model refusal that copies that env value is discarded the same way as `FRED_API_KEY` / `RISKFORGE_API_TOKEN`. Tightened `_assert_tool_digits_only` so every `\d+` token in `answer` must appear in `json.dumps(tool_result)`, while still forbidding `999`.
+Added `QUANTLINEAGE_MCP_AUTHORIZATION` to `_SECRET_ENV_NAMES` so a VaR-question model refusal that copies that env value is discarded the same way as `FRED_API_KEY` / `QUANTLINEAGE_API_TOKEN`. Tightened `_assert_tool_digits_only` so every `\d+` token in `answer` must appear in `json.dumps(tool_result)`, while still forbidding `999`.
 
 ## Commits
 Included in this Wave C follow-up commit on `feat/quantlineage-wave-c` (parent `1a8aa48`).
 
 ## Files changed
-- `backend/app/risk/query.py` — add `RISKFORGE_MCP_AUTHORIZATION` to `_SECRET_ENV_NAMES`
+- `backend/app/risk/query.py` — add `QUANTLINEAGE_MCP_AUTHORIZATION` to `_SECRET_ENV_NAMES`
 - `backend/tests/test_wave_c_evals.py` — MCP-auth refusal eval; payload-digit scan in `_assert_tool_digits_only`; helper regression for invented `888`
 - `docs/expantion/quantlineage_wave_c/task-c6-important-fix-report.md` (this tracked copy)
 - `.superpowers/sdd/task-c6-important-fix-report.md` (local; `.superpowers/sdd/` is gitignored)
 
 ## Public / interface changes
-- Model refusals that echo `RISKFORGE_MCP_AUTHORIZATION` are no longer used as `answer`
+- Model refusals that echo `QUANTLINEAGE_MCP_AUTHORIZATION` are no longer used as `answer`
 - No HTTP, MCP, or UI changes. TRACKER G6 left unmarked. C7 not started
 
 ## Numerical conventions
 - Unchanged. Grounded evals now reject any answer digit token absent from the tool payload dump. `999` remains forbidden.
 
 ## Tests added/updated
-- `test_c6_mcp_authorization_env_refusal_is_discarded` — `answer_with_model("What is 99% VaR?")` with a refusal copying `RISKFORGE_MCP_AUTHORIZATION` discards that refusal
+- `test_c6_mcp_authorization_env_refusal_is_discarded` — `answer_with_model("What is 99% VaR?")` with a refusal copying `QUANTLINEAGE_MCP_AUTHORIZATION` discards that refusal
 - `test_c6_assert_tool_digits_only_rejects_invented_payload_digits` — extra `888` fails the helper
 - Existing grounded `_assert_tool_digits_only` callers now scan every answer digit against `json.dumps(tool_result)`
 
 ## Commands executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_wave_c_evals.py tests/test_ai_query_orchestration.py
 .venv/bin/ruff check app/risk/query.py tests/test_wave_c_evals.py
 ```

@@ -10,7 +10,7 @@ C++ Performance Engineer (`docs/agents/06_CPP_PERFORMANCE_ENGINEER.md`)
 **CLOSED** as **MET** for ABI. Named residual: product Historical VaR stays python/NumPy **by design**. Not ACCEPTED / DEFERRED. Milestone R0 leftover wave stays **IN PROGRESS** (not restored COMPLETE).
 
 ## Summary
-Verified on disk (BASE `90e40a2`): ABI version, status/error return, length validation, contiguous `pnl_from_arrays`, and serial-below-4096. QA-025 caller-length mismatch is already pinned in `kernel_test.cpp` and the Python ctypes wrapper (`test_native_length_mismatch_fails_closed`); no hole, so no new wrapper pin. Default `RISKFORGE_SCENARIO_KERNEL=python` is the Decision (“do not move VaR into C++”), not an open ABI gap. No QuantLib or VaR kernels added in C++. FINDINGS RF-017 **CLOSED** as MET; `OPEN_LEFTOVERS` dropped RF-017.
+Verified on disk (BASE `90e40a2`): ABI version, status/error return, length validation, contiguous `pnl_from_arrays`, and serial-below-4096. QA-025 caller-length mismatch is already pinned in `kernel_test.cpp` and the Python ctypes wrapper (`test_native_length_mismatch_fails_closed`); no hole, so no new wrapper pin. Default `QUANTLINEAGE_SCENARIO_KERNEL=python` is the Decision (“do not move VaR into C++”), not an open ABI gap. No QuantLib or VaR kernels added in C++. FINDINGS RF-017 **CLOSED** as MET; `OPEN_LEFTOVERS` dropped RF-017.
 
 ## Files changed
 - `backend/tests/test_rf020_r0_exit.py` — drop RF-017 from `OPEN_LEFTOVERS`; CLOSED-as-MET pin (TDD: failed first)
@@ -39,7 +39,7 @@ TDD: close-gate test failed first (`Status: **CLOSED**` missing). After FINDINGS
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_rf020_r0_exit.py
 # RED: 1 failed, 5 passed (FINDINGS still IN PROGRESS)
 
@@ -66,7 +66,7 @@ PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
 
 | Cell | Score | Evidence |
 |---|---|---|
-| ABI version | **MET** | `RISKFORGE_KERNEL_ABI` / `riskforge_kernel_abi_version` / `KERNEL_ABI_VERSION` |
+| ABI version | **MET** | `QUANTLINEAGE_KERNEL_ABI` / `quantlineage_kernel_abi_version` / `KERNEL_ABI_VERSION` |
 | Status/error return | **MET** | `KERNEL_OK` / `KERNEL_ERR_*` |
 | Length validation | **MET** | fail-closed before buffer walk; wrap/tight-buffer pins |
 | QA-025 mismatch | **MET** | `kernel_test.cpp` + Python `test_native_length_mismatch_fails_closed` |

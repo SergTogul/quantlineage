@@ -1,4 +1,4 @@
-# RiskForge Definition of Done
+# QuantLineage Definition of Done
 
 A task is not done because code was written. It is done when behavior, correctness, integration and reproducibility are demonstrated.
 

@@ -10,7 +10,7 @@ Canonical HTTP prefix is `/api/v1`. Legacy dual-mount without the prefix still e
 
 | Concern | Reuse | Notes |
 |---|---|---|
-| RF-019 allowlist | `RiskToolName`, `TOOL_CONTRACTS`, `validate_tool_call`, `tool_json_schemas` (`backend/app/risk/query.py`) | Six tools today. Extra keys forbidden. Unknown names refused. Portfolio is bound by RiskForge, never the LLM (`RiskToolArgs` is empty). |
+| RF-019 allowlist | `RiskToolName`, `TOOL_CONTRACTS`, `validate_tool_call`, `tool_json_schemas` (`backend/app/risk/query.py`) | Six tools today. Extra keys forbidden. Unknown names refused. Portfolio is bound by QuantLineage, never the LLM (`RiskToolArgs` is empty). |
 | Keyword + optional model | `RiskQueryEngine.route` / `answer` / `answer_with_model`; `DeterministicRiskAssistantModel` | Keyword path calls `_execute_tool` with `{}` except `explain_risk_change` (always clarification until ids are supplied). `answer_with_model` still executes **service methods**, not model arithmetic. |
 | NL HTTP | `POST /api/v1/risk/query` → `PortfolioService.query` | Body `RiskQueryRequest {portfolio, question}` → `RiskQueryResponse`. HEAVY. |
 | Instrument search | `search_catalog` (`app.market.catalog.service`) | Curated Wave A universe wins identity; Yahoo search is injected hits only. |

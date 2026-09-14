@@ -16,10 +16,10 @@ Lead Architect / Orchestrator coordinating Frontend / Risk UX, DevOps / Platform
 - `docs/demo/final_demo.md`
 - `scripts/check_final_demo.py`
 - `backend/tests/test_final_demo_check.py`
-- `docs/demo/riskforge_demo_01_overview.png`
-- `docs/demo/riskforge_demo_02_portfolio.png`
-- `docs/demo/riskforge_demo_03_var_es.png`
-- `docs/demo/riskforge_demo_04_stress.png`
+- `docs/demo/quantlineage_demo_01_overview.png`
+- `docs/demo/quantlineage_demo_02_portfolio.png`
+- `docs/demo/quantlineage_demo_03_var_es.png`
+- `docs/demo/quantlineage_demo_04_stress.png`
 - `docs/agents/HANDOFF_FINAL_DEMO_SMOKE.md`
 - `ROADMAP.md`
 
@@ -40,7 +40,7 @@ Lead Architect / Orchestrator coordinating Frontend / Risk UX, DevOps / Platform
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python scripts/check_final_demo.py
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin RISKFORGE_SCENARIO_KERNEL=python .venv/bin/python -m pytest tests/test_final_demo_check.py tests/test_demo_scripts.py tests/test_demo_historical_dataset.py tests/test_demo_portfolios.py -q --tb=line
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin QUANTLINEAGE_SCENARIO_KERNEL=python .venv/bin/python -m pytest tests/test_final_demo_check.py tests/test_demo_scripts.py tests/test_demo_historical_dataset.py tests/test_demo_portfolios.py -q --tb=line
 cd backend && .venv/bin/ruff check ../scripts/check_final_demo.py tests/test_final_demo_check.py
 cd e2e && npm test
 ```
@@ -49,7 +49,7 @@ cd e2e && npm test
 - Final-demo smoke: exit 0; JSON included `"status": "ok"`, portfolios `["equity-vol", "rates-macro", "global-macro"]`, `pricing_engine="builtin"`, `historical_dataset="demo-historical-factors"`, `methodology="DELTA_GAMMA"`, `scenario_count=5`.
 - Focused demo pytest: initial run exposed one expected-string mismatch; fixed to the committed dataset id. Re-run: **9 passed** .
 - Affected demo suite: **26 passed** , 1 existing Starlette/httpx deprecation warning.
-- Documented artifact command: exit 0; wrote `/tmp/riskforge_demo_risk_artifact.json`; stderr summary `portfolios=3 pricing=builtin dataset=demo-historical-factors`.
+- Documented artifact command: exit 0; wrote `/tmp/quantlineage_demo_risk_artifact.json`; stderr summary `portfolios=3 pricing=builtin dataset=demo-historical-factors`.
 - Ruff: final touched-file check passed.
 - Backend: affected demo tests passed.
 - Frontend: UI screenshot pass captured live app views for the demo runbook; parent integration ran frontend tests/lint/build successfully.

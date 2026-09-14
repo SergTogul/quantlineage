@@ -1,12 +1,12 @@
-# RiskForge Architecture Review
+# QuantLineage Architecture Review
 
-Independent Principal / Senior Staff architecture review of the RiskForge repository as implemented on 2026-09-03.
+Independent Principal / Senior Staff architecture review of the QuantLineage repository as implemented on 2026-09-03.
 
 Review only. No application source was modified as part of the review. ROADMAP task completion statuses were not updated.
 
 Core product rule used as the review standard:
 
-> The pricing library prices. RiskForge manages portfolio risk. The LLM orchestrates deterministic tools; it never calculates financial risk itself.
+> The pricing library prices. QuantLineage manages portfolio risk. The model orchestrates deterministic tools; it never calculates financial risk itself.
 
 ## Executive Summary
 
@@ -42,7 +42,7 @@ React SPA (frontend/src)
           → PricingEngine (CachedPricingEngine → QuantLib | Builtin)
           → MarketSnapshot.bump / apply
           → optional NativeScenarioKernel (LINEAR / DELTA_GAMMA only)
-    → optional SQLAlchemy JSON repos (when RISKFORGE_DATABASE_URL set)
+    → optional SQLAlchemy JSON repos (when QUANTLINEAGE_DATABASE_URL set)
     → RiskRunWorker (in-process threads or Compose process + SKIP LOCKED)
 ```
 
@@ -218,7 +218,7 @@ Evidence:
 
 Problem: Named `RiskFactor` types exist (ADR 003) but historical VaR does not use them. Default methodology is a one-factor-per-asset-class proxy. The C++ kernel hard-wires that proxy.
 
-Why it matters: A long AAPL vs short SPY book has perfectly correlated historical equity risk. Tenor-specific rates are ignored in approximate VaR. Native acceleration cannot be extended to per-name shocks without an ABI break. This is the ceiling on “RiskForge owns risk factors.”
+Why it matters: A long AAPL vs short SPY book has perfectly correlated historical equity risk. Tenor-specific rates are ignored in approximate VaR. Native acceleration cannot be extended to per-name shocks without an ABI break. This is the ceiling on “QuantLineage owns risk factors.”
 
 Recommendation: Historical dataset keyed by `RiskFactor.key` (sparse panel). Approximate P&L is Σ_i exposure_i × shock_i (with gamma on spot factors). Keep a documented 4-column demo dataset as a projection of that panel, not the engine’s native input. Extend `RiskFactor` for IR vol / caplet / swaption.
 
@@ -315,7 +315,7 @@ Evidence:
 
 Problem: The adapter isolates QuantLib **types** but not QuantLib **semantics**. Market is smuggled via Position fields. Greeks are not the same object as NPV (curve PV vs yield DV01). Builtin fallback can silently change methodology if a new `Position` type is added. Equity rates are USD-only.
 
-Why it matters: Engine switches (`RISKFORGE_PRICING_ENGINE`) will not stay equivalent as products grow. Sensitivity vs VaR already diverge (ARCH-008). Multi-currency equity is wrong by construction.
+Why it matters: Engine switches (`QUANTLINEAGE_PRICING_ENGINE`) will not stay equivalent as products grow. Sensitivity vs VaR already diverge (ARCH-008). Multi-currency equity is wrong by construction.
 
 Recommendation: QuantLib adapter should build QL market objects from `MarketSnapshot` (curves, surfaces, FX) and quotes from trade terms only. Report DV01 as bump of the same curve used for NPV. Fail closed on unknown instruments. Drop hardcoded USD; key rates by currency on the trade/snapshot.
 
@@ -390,9 +390,9 @@ Problem: The numerical boundary is narrow (good) but unsafe and coupled to ARCH-
 
 Why it matters: ABI evolution for per-name factors will be a silent mismatch. Hard crashes on bad pointers rather than Python errors.
 
-Recommendation: Versioned header (`RISKFORGE_KERNEL_ABI=1`), return `int` error codes, length validation. Don’t put business policy in C++ (already avoided).
+Recommendation: Versioned header (`QUANTLINEAGE_KERNEL_ABI=1`), return `int` error codes, length validation. Don’t put business policy in C++ (already avoided).
 
-Suggested task: Add ABI version + error return to `riskforge_portfolio_scenarios`; reject length mismatches in the ctypes wrapper.
+Suggested task: Add ABI version + error return to `quantlineage_portfolio_scenarios`; reject length mismatches in the ctypes wrapper.
 Estimated effort: S
 Dependencies: ARCH-007
 
@@ -532,7 +532,7 @@ Why it matters: Small deploy footgun, not a domain issue.
 
 Recommendation: Configure origins from env.
 
-Suggested task: `RISKFORGE_CORS_ORIGINS` env list.
+Suggested task: `QUANTLINEAGE_CORS_ORIGINS` env list.
 Estimated effort: S
 Dependencies: None
 

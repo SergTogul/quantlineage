@@ -32,7 +32,7 @@ G1–G6 ledger (not reopened unless they fail a named attack — they did not):
 - AD-C13 is one-shot `answer_with_model` (`complete()` exactly once). There is no named `MAX_MODEL_TURNS` constant (G6 minor, out of C7 scope).
 - Keyword `estimate_var` / `shell` / secret markers remain heuristic.
 - HTTP `get_data_quality` reuses the Wave A fetch path. That is not a second quality engine. MCP stdio still has **no** `get_data_quality` method, so MCP cannot call Yahoo/FRED for quality (missing method → typed failure / no invented hash).
-- `run portfolio risk` / `Run equity-down stress.` need the lifespan worker (`submit`). Compose `RISKFORGE_EXTERNAL_WORKER=1` still 400s HEAVY query; demo uses in-process uvicorn.
+- `run portfolio risk` / `Run equity-down stress.` need the lifespan worker (`submit`). Compose `QUANTLINEAGE_EXTERNAL_WORKER=1` still 400s HEAVY query; demo uses in-process uvicorn.
 - Sync `get_var_es` / `get_contributors` cards still label missing RiskRun identity `not on this payload`.
 
 ## 4. Rejected false positives
@@ -56,7 +56,7 @@ G1–G6 ledger (not reopened unless they fail a named attack — they did not):
 | stale ids | **held** | `RiskRunNotFound` → `_TOOL_FAILURE_ANSWER` | `test_c6_stale_mismatched_run_ids` GREEN. Keyword/MCP missing `stale-run` / mismatched compare: no tool_result, no `999`, no digits. MCP `code=not_found`. |
 | missing data | **held** | history/quality clarify; missing methods fail closed | `test_c6_missing_data_hallucination` GREEN. `show data quality for the book` still fail-closed. `test_c7_data_quality_without_instrument_clarifies` GREEN. `test_c6_ad_c14_tool_failure_has_no_hidden_estimate` GREEN. |
 | auth bypass | **held** | MCP `_principal_or_error`; FastAPI `SharedTokenMiddleware` | `test_shared_token_rules_pass_principal_into_worker` GREEN (shared env, no Bearer → `unauthorized`, no worker call; Bearer accepted). `test_shared_with_token_rejects_unauthenticated_api` GREEN. Local loopback stays open: `test_local_default_has_no_auth` GREEN. |
-| secret exfiltration | **held** | `_SECRET_REFUSAL_ANSWER`; MCP auth denylist | `test_c6_api_key_secret_request` GREEN. `test_c6_mcp_authorization_env_refusal_is_discarded` GREEN (`RISKFORGE_MCP_AUTHORIZATION` not echoed). |
+| secret exfiltration | **held** | `_SECRET_REFUSAL_ANSWER`; MCP auth denylist | `test_c6_api_key_secret_request` GREEN. `test_c6_mcp_authorization_env_refusal_is_discarded` GREEN (`QUANTLINEAGE_MCP_AUTHORIZATION` not echoed). |
 | infinite loop | **held** | one-turn `answer_with_model` | `test_c6_ad_c13_one_turn_no_tool_loop` GREEN (`turns == 1`, payload digits only). |
 | numeric response without tool evidence | **held** | ungrounded paths digit-free; `_assert_tool_digits_only` | `test_c6_ad_c14_tool_failure_has_no_hidden_estimate` GREEN. `test_c6_assert_tool_digits_only_rejects_invented_payload_digits` GREEN (harness rejects answer digits absent from payload). `test_c4_ungrounded_paths_remain_digit_free` still in suite. |
 | FastAPI without MCP | **held** | `app.main` wiring | `test_fastapi_main_imports_when_mcp_unused` GREEN. `app.mcp` not in `sys.modules`. |

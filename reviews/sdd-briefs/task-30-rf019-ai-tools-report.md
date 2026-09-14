@@ -49,7 +49,7 @@ TDD: schema/unknown-tool/injection tests failed first (ImportError, then tool ex
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_ai_query_orchestration.py tests/test_rf020_r0_exit.py
 .venv/bin/python -m ruff check app/risk/query.py \
@@ -71,7 +71,7 @@ RED: collection ImportError for missing `tool_json_schemas`; injection prompt pr
 ## Known limitations / risks
 - No live LLM provider. Offline/scripted model only.
 - Keyword router remains conservative; broader-charter tools (hedge compare, P&L explain, factor risk, risk-run lookup) stay future scope.
-- Model-bindable tool args are empty objects (`extra='forbid'`); portfolio is bound by RiskForge, not the LLM.
+- Model-bindable tool args are empty objects (`extra='forbid'`); portfolio is bound by QuantLineage, not the LLM.
 
 ## Follow-up / next owner
 - Owner: Lead Architect / remaining leftover owners (RF-014 ACLs/TLS)

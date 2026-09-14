@@ -34,7 +34,7 @@ R0.8.3 already stopped RiskRun submit from upserting a stored book. This slice a
 
 ## Commands executed
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_portfolio_identity.py \
   tests/test_same_spec_parity.py
@@ -89,7 +89,7 @@ Independent review KEEP OPEN. Implementer CLOSE was a rubber-stamp. Corrected on
 Tests re-run after the docs correction:
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_portfolio_identity.py \
   tests/test_same_spec_parity.py

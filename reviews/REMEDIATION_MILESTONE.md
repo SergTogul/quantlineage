@@ -6,7 +6,7 @@ Current phase: **exit** — labeled-runner SLA-K1/K2 is **post-R0** (still not M
 Branch: `r0-core-remediation`  
 Date: 2026-09-09
 
-This milestone is inserted **before any net-new RiskForge feature development**.
+This milestone is inserted **before any net-new QuantLineage feature development**.
 
 Its purpose is not to redesign the entire repository. It is to remove the correctness, architecture, reproducibility, and execution-model risks identified by the independent architecture, performance, security, and QA reviews.
 
@@ -37,8 +37,8 @@ Host: Darwin 22.6.0 · Python 3.12 (`backend/.venv`) · QuantLib **1.43** · num
 
 | Check | Result | Notes |
 |---|---|---|
-| Backend pytest `RISKFORGE_PRICING_ENGINE=builtin` | **659 passed**, 1 Starlette/httpx deprecation warning, 48.00s | Before new R0.1 test files |
-| Backend pytest `RISKFORGE_PRICING_ENGINE=quantlib` `RISKFORGE_REQUIRE_QUANTLIB=1` | **688 passed**, **0 skipped**, 63.79s | After R0.1.1–R0.1.6 test/CI helper insertion |
+| Backend pytest `QUANTLINEAGE_PRICING_ENGINE=builtin` | **659 passed**, 1 Starlette/httpx deprecation warning, 48.00s | Before new R0.1 test files |
+| Backend pytest `QUANTLINEAGE_PRICING_ENGINE=quantlib` `QUANTLINEAGE_REQUIRE_QUANTLIB=1` | **688 passed**, **0 skipped**, 63.79s | After R0.1.1–R0.1.6 test/CI helper insertion |
 | Ruff `ruff check app tests` | exit 0 | staged rule set |
 | mypy `mypy app` | exit 0 | staged `disable_error_code` list |
 | Frontend `npm test` | **74 passed** (8 files) | vitest |
@@ -50,8 +50,8 @@ Host: Darwin 22.6.0 · Python 3.12 (`backend/.venv`) · QuantLib **1.43** · num
 | Playwright E2E | **12 passed**, 1.1m | local Chrome channel; builtin pricing |
 
 ```bash
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest -q --tb=line
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib RISKFORGE_REQUIRE_QUANTLIB=1 .venv/bin/python -m pytest -q --tb=line
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/python -m pytest -q --tb=line
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib QUANTLINEAGE_REQUIRE_QUANTLIB=1 .venv/bin/python -m pytest -q --tb=line
 cd backend && .venv/bin/ruff check app tests && .venv/bin/mypy app
 cd frontend && npm test && npm run lint && npm run build
 cd backend && g++ -std=c++20 -O2 -pthread -I native/include native/tests/kernel_test.cpp -o /tmp/kernel_test && /tmp/kernel_test
@@ -659,7 +659,7 @@ Independent review **APPROVE** (`reviews/sdd-briefs/task-4-r0.6.5-review.md`). C
 
 Partition independent scenario blocks across worker processes when profiling shows value.
 
-Option B: HEAVY full-reval already runs out-of-request-thread via RiskRun (`RF-015` CLOSED). Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1` so HTTP enqueues; Compose `worker` (`python -m app.worker`) is the OS-process QuantLib partition. `POST /risk/summary?methodology=FULL_REVALUATION` and `POST /risk/var` refuse inline when the gate is on (`details.use=/risk/runs`). No unused `ProcessPoolExecutor` / multiprocessing chunking: R0.6.1 identity bench (`pnl_checksum` `6602fa69…`, `wall_ms` recorded only) does not justify in-process scenario-block multiprocessing. In-process QuantLib stays serialized by `_QL_PROCESS_LOCK`. Evidence: `backend/tests/test_r065_process_partition.py`; focused brief suite; report `reviews/r0.6.5-process-parallelism-report.md`. Intra-run scenario-block multiprocessing (option A) remains PARTIAL and may stay P1 after benches. RF-007 stays open pending acceptance benches.
+Option B: HEAVY full-reval already runs out-of-request-thread via RiskRun (`RF-015` CLOSED). Compose `backend` sets `QUANTLINEAGE_EXTERNAL_WORKER=1` so HTTP enqueues; Compose `worker` (`python -m app.worker`) is the OS-process QuantLib partition. `POST /risk/summary?methodology=FULL_REVALUATION` and `POST /risk/var` refuse inline when the gate is on (`details.use=/risk/runs`). No unused `ProcessPoolExecutor` / multiprocessing chunking: R0.6.1 identity bench (`pnl_checksum` `6602fa69…`, `wall_ms` recorded only) does not justify in-process scenario-block multiprocessing. In-process QuantLib stays serialized by `_QL_PROCESS_LOCK`. Evidence: `backend/tests/test_r065_process_partition.py`; focused brief suite; report `reviews/r0.6.5-process-parallelism-report.md`. Intra-run scenario-block multiprocessing (option A) remains PARTIAL and may stay P1 after benches. RF-007 stays open pending acceptance benches.
 
 ## R0.6.6 Contribution reuse — COMPLETE (2026-09-09)
 
@@ -671,13 +671,13 @@ Full-reval ES factor contributions and scenario-attribution factor buckets reuse
 
 ## R0.6.7 Acceptance benches — COMPLETE pending review (2026-09-09)
 
-`benchmarks/run_full_reval_bench.py --json` now includes an `acceptance` object. PR-safe default **N=10 × S=50** (above 1×120). Each engine row records `wall_ms`, `wall_ms_cold`, `wall_ms_warm`, `peak_rss_kib`, `scenarios_per_sec` as finite numbers — pytest asserts presence/finiteness, **not** a floor. Builtin vs QuantLib at the same N×S; QuantLib skip-or-run (`RISKFORGE_REQUIRE_QUANTLIB=1` fail-closed). Identity: R0.6.1 `6602fa69…` (1×120) and `a28cf4ee6199bf40da3f2598f4241fc85fa4adc4f86bccbbd97e4938047d7537` (10×50). Close-matrix: N×S **PARTIAL**; wall **MET** at 10×50; peak RSS **PARTIAL** (process-lifetime `ru_maxrss`; QuantLib includes prior builtin); scenarios/sec **MET** at 10×50; builtin vs QuantLib **PARTIAL** (cash equity `quantity * spot`, not reconstruction); warm vs cold **MET** at 10×50; identity **MET**. N=100/1k remain **UNMET** in default PR. No `throughput` key; `check_m6_sla.py` not invoked. Not added to nightly/PR-FULL. Evidence: `backend/tests/test_full_reval_bench.py`; report `reviews/r0.6.7-acceptance-benches-report.md`. RF-007 stays **IN PROGRESS**.
+`benchmarks/run_full_reval_bench.py --json` now includes an `acceptance` object. PR-safe default **N=10 × S=50** (above 1×120). Each engine row records `wall_ms`, `wall_ms_cold`, `wall_ms_warm`, `peak_rss_kib`, `scenarios_per_sec` as finite numbers — pytest asserts presence/finiteness, **not** a floor. Builtin vs QuantLib at the same N×S; QuantLib skip-or-run (`QUANTLINEAGE_REQUIRE_QUANTLIB=1` fail-closed). Identity: R0.6.1 `6602fa69…` (1×120) and `a28cf4ee6199bf40da3f2598f4241fc85fa4adc4f86bccbbd97e4938047d7537` (10×50). Close-matrix: N×S **PARTIAL**; wall **MET** at 10×50; peak RSS **PARTIAL** (process-lifetime `ru_maxrss`; QuantLib includes prior builtin); scenarios/sec **MET** at 10×50; builtin vs QuantLib **PARTIAL** (cash equity `quantity * spot`, not reconstruction); warm vs cold **MET** at 10×50; identity **MET**. N=100/1k remain **UNMET** in default PR. No `throughput` key; `check_m6_sla.py` not invoked. Not added to nightly/PR-FULL. Evidence: `backend/tests/test_full_reval_bench.py`; report `reviews/r0.6.7-acceptance-benches-report.md`. RF-007 stays **IN PROGRESS**.
 
 ## R0.6.8 Reconstruction benches + N=100 nightly — COMPLETE (2026-09-09)
 
 Independent review **APPROVE** (`reviews/sdd-briefs/task-7-rf007-reconstruction-benches-review.md`).
 
-`benchmarks/run_full_reval_bench.py --json` adds a nested `reconstruction` object at PR-safe **N=10 × S=50** European options (`EuropeanOptionPosition`, live spot/vol/rate/div — not cash equity `quantity * spot`). Builtin checksum `3148a41a0b3b4bb515c75d07991a96ecc186fb9d2294ccb20347df8f5322526e`; QuantLib checksum `0594ecd65f68e33a800dbf5c331ead44b1fd353dadb198591721cc445f745eef` (pinned per engine; they need not match). P&L gap recorded at option-match `rel=2e-3` (`max_rel` ~3e-13 on this host). Peak RSS is measured in a **subprocess per impl**. Nightly sibling job `full-reval-n100` runs N=100×50 when `RISKFORGE_NIGHTLY=1` (skipped in default PR; not in PR-FULL `needs:`). Cash-equity identity pins `6602fa69…` / `a28cf4ee…` unchanged. No `throughput` key; `check_m6_sla.py` not invoked. Close-matrix: N×S **PARTIAL** (N=100 nightly; N=1k **UNMET**); wall **MET**; peak RSS **PARTIAL** (isolated child still process-lifetime `ru_maxrss`); scenarios/sec **MET**; builtin vs QuantLib **MET** on the option book; warm vs cold **MET**; identity **MET**. Evidence: `backend/tests/test_full_reval_bench.py`, `backend/tests/test_nightly_full_reval_n100.py`, `backend/tests/test_nightly_ci.py`; report `reviews/r0.6.8-reconstruction-benches-report.md`.
+`benchmarks/run_full_reval_bench.py --json` adds a nested `reconstruction` object at PR-safe **N=10 × S=50** European options (`EuropeanOptionPosition`, live spot/vol/rate/div — not cash equity `quantity * spot`). Builtin checksum `3148a41a0b3b4bb515c75d07991a96ecc186fb9d2294ccb20347df8f5322526e`; QuantLib checksum `0594ecd65f68e33a800dbf5c331ead44b1fd353dadb198591721cc445f745eef` (pinned per engine; they need not match). P&L gap recorded at option-match `rel=2e-3` (`max_rel` ~3e-13 on this host). Peak RSS is measured in a **subprocess per impl**. Nightly sibling job `full-reval-n100` runs N=100×50 when `QUANTLINEAGE_NIGHTLY=1` (skipped in default PR; not in PR-FULL `needs:`). Cash-equity identity pins `6602fa69…` / `a28cf4ee…` unchanged. No `throughput` key; `check_m6_sla.py` not invoked. Close-matrix: N×S **PARTIAL** (N=100 nightly; N=1k **UNMET**); wall **MET**; peak RSS **PARTIAL** (isolated child still process-lifetime `ru_maxrss`); scenarios/sec **MET**; builtin vs QuantLib **MET** on the option book; warm vs cold **MET**; identity **MET**. Evidence: `backend/tests/test_full_reval_bench.py`, `backend/tests/test_nightly_full_reval_n100.py`, `backend/tests/test_nightly_ci.py`; report `reviews/r0.6.8-reconstruction-benches-report.md`.
 
 ## R0.6 close gate — CLOSED pending independent review (2026-09-09)
 
@@ -971,7 +971,7 @@ Prefer one completed risk-run artifact or a coherent batch service.
 
 ## R0.10.3 Queue/backpressure — COMPLETE (refuse-gate, 2026-09-04)
 
-When `RISKFORGE_EXTERNAL_WORKER=1` or `RISKFORGE_HEAVY_INLINE=0`, FULL_REVALUATION summary, dashboard, leftover `risk.py` HEAVY routes, and HEAVY stress / attribution / limits refuse request-thread compute (HTTP 400 `Invalid request`, `details.use=/risk/runs`). `run_type=dashboard` on `POST /risk/runs` returns the coherent batch payload (lists stay arrays). Compose `loadDashboard()` falls back to that RiskRun path on refuse. Remaining HEAVY UI POSTs addressed in R0.10.4.
+When `QUANTLINEAGE_EXTERNAL_WORKER=1` or `QUANTLINEAGE_HEAVY_INLINE=0`, FULL_REVALUATION summary, dashboard, leftover `risk.py` HEAVY routes, and HEAVY stress / attribution / limits refuse request-thread compute (HTTP 400 `Invalid request`, `details.use=/risk/runs`). `run_type=dashboard` on `POST /risk/runs` returns the coherent batch payload (lists stay arrays). Compose `loadDashboard()` falls back to that RiskRun path on refuse. Remaining HEAVY UI POSTs addressed in R0.10.4.
 
 Bound:
 
@@ -1059,7 +1059,7 @@ Do not overbuild enterprise auth for the local demo profile.
 
 QA local-demo close gate **CLOSE** (`reviews/r0.11.7-rf014-close-gate-report.md`). Independent review **pending**. **RF-014 CLOSED** (not final until Task 15 review APPROVE).
 
-R0.11.1–R0.11.6 APPROVE. Local-demo required direction **MET**: Compose loopback publishes; finite financial numbers; positions/scenarios/body caps; failed-run sanitization; local demo unauthenticated by design. Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** are **accepted residuals** (not MET). Do not invent IAM. Named leftovers (not MET): HTTP enqueue queue-depth; Compose `POSTGRES_PASSWORD=riskforge`; `docker run -p 8000:8000` without `RISKFORGE_SHARED_DEPLOYMENT=1` still unauthenticated.
+R0.11.1–R0.11.6 APPROVE. Local-demo required direction **MET**: Compose loopback publishes; finite financial numbers; positions/scenarios/body caps; failed-run sanitization; local demo unauthenticated by design. Shared-profile **object ACLs**, **TLS/reverse-proxy**, and **secret management** are **accepted residuals** (not MET). Do not invent IAM. Named leftovers (not MET): HTTP enqueue queue-depth; Compose `POSTGRES_PASSWORD=quantlineage`; `docker run -p 8000:8000` without `QUANTLINEAGE_SHARED_DEPLOYMENT=1` still unauthenticated.
 
 Evidence: `reviews/r0.11.7-rf014-close-gate-report.md`; focused suite 87 passed.
 
@@ -1218,7 +1218,7 @@ Deferred until deterministic tools are stable.
 
 ## Labeled-runner SLA-K1/K2
 
-**Post-R0.** Related: RF-016. Still **not MET**. Needs a registered `self-hosted, riskforge-sla` runner. Do not run `check_m6_sla.py` on `ubuntu-latest`. Not an R0 leftover.
+**Post-R0.** Related: RF-016. Still **not MET**. Needs a registered `self-hosted, quantlineage-sla` runner. Do not run `check_m6_sla.py` on `ubuntu-latest`. Not an R0 leftover.
 
 ---
 

@@ -10,7 +10,7 @@ QA & Quant Validation Engineer
 **IN PROGRESS** (KEEP OPEN; do not CLOSE RF-016)
 
 ## Summary
-No labeled/self-hosted runner is configured in this repo (`gh api repos/SergTogul/riskforge-mvp/actions/runners` → `total_count=0`). This slice does **not** add `benchmarks/check_m6_sla.py` on `ubuntu-latest` and does **not** invent host SLA floors. SLA-K1/K2 is **PARTIAL**: harness + `docs/performance.md` + `benchmarks/RESULTS.md` exist; CI does not enforce host floors. Pytest pins the residual (TDD: residual markers failed first). PR-FAST, QuantLib hard-gate, and `postgres-persistence-smoke` are unchanged. FINDINGS RF-016 stays **IN PROGRESS**.
+No labeled/self-hosted runner is configured in this repo (`gh api repos/SergTogul/quantlineage/actions/runners` → `total_count=0`). This slice does **not** add `benchmarks/check_m6_sla.py` on `ubuntu-latest` and does **not** invent host SLA floors. SLA-K1/K2 is **PARTIAL**: harness + `docs/performance.md` + `benchmarks/RESULTS.md` exist; CI does not enforce host floors. Pytest pins the residual (TDD: residual markers failed first). PR-FAST, QuantLib hard-gate, and `postgres-persistence-smoke` are unchanged. FINDINGS RF-016 stays **IN PROGRESS**.
 
 ## Files changed
 - `backend/tests/test_nightly_ci.py`
@@ -42,9 +42,9 @@ No labeled/self-hosted runner is configured in this repo (`gh api repos/SergTogu
 
 ## Commands executed
 ```bash
-gh api repos/SergTogul/riskforge-mvp/actions/runners
+gh api repos/SergTogul/quantlineage/actions/runners
 
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short \
   tests/test_nightly_ci.py tests/test_pr_full_ci.py tests/test_pr_fast_ci.py
 

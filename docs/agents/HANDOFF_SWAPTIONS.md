@@ -42,15 +42,15 @@ Added a vanilla `SwaptionPosition` and priced long payer/receiver swaptions as f
 ## Commands executed
 
 ```bash
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py::test_swaption_matches_builtin_without_fallback -q --tb=short
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py::test_swaption_matches_builtin_without_fallback -q --tb=short
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py tests/test_pricing.py tests/test_curve_pricing.py tests/test_surface_vol_pricing.py tests/test_quant_properties.py tests/test_quantlib_golden.py tests/test_sensitivities.py -q --tb=short
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py tests/test_pricing.py tests/test_curve_pricing.py tests/test_quant_properties.py tests/test_quantlib_golden.py tests/test_sensitivities.py -q --tb=short
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py::test_swaption_matches_builtin_without_fallback -q --tb=short
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py::test_swaption_matches_builtin_without_fallback -q --tb=short
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py tests/test_pricing.py tests/test_curve_pricing.py tests/test_surface_vol_pricing.py tests/test_quant_properties.py tests/test_quantlib_golden.py tests/test_sensitivities.py -q --tb=short
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py tests/test_pricing.py tests/test_curve_pricing.py tests/test_quant_properties.py tests/test_quantlib_golden.py tests/test_sensitivities.py -q --tb=short
 cd backend && .venv/bin/ruff check app tests && .venv/bin/mypy app
 cd backend && .venv/bin/ruff check app tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py && .venv/bin/mypy app
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=short
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_surface_vol_pricing.py -q --tb=short
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py tests/test_pricing.py tests/test_curve_pricing.py tests/test_surface_vol_pricing.py tests/test_quant_properties.py tests/test_quantlib_golden.py tests/test_sensitivities.py -q --tb=short
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q --tb=short
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_surface_vol_pricing.py -q --tb=short
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest tests/test_ir_options_pricing.py tests/test_quantlib_pricing.py tests/test_pricing.py tests/test_curve_pricing.py tests/test_surface_vol_pricing.py tests/test_quant_properties.py tests/test_quantlib_golden.py tests/test_sensitivities.py -q --tb=short
 
 ```
 

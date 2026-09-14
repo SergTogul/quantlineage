@@ -13,10 +13,10 @@ User reported failing pipelines. Audited recent GHA runs on `master`.
 
 | Run | SHA | Failed job(s) | Root cause |
 |-----|-----|---------------|------------|
-| [33700340552](https://github.com/SergTogul/riskforge-mvp/actions/runs/33700340552) | `8409b7e` | **e2e-playwright** | Heading locator `Reverse Stress` matched both single-factor and multi-factor cards (strict mode) |
-| [33680821074](https://github.com/SergTogul/riskforge-mvp/actions/runs/33680821074) | `68322c7` | backend-pytest + lint-static-analysis | Early land (fixed in later commits) |
+| [33700340552](https://github.com/SergTogul/quantlineage/actions/runs/33700340552) | `8409b7e` | **e2e-playwright** | Heading locator `Reverse Stress` matched both single-factor and multi-factor cards (strict mode) |
+| [33680821074](https://github.com/SergTogul/quantlineage/actions/runs/33680821074) | `68322c7` | backend-pytest + lint-static-analysis | Early land (fixed in later commits) |
 
-**HEAD at triage:** `f74b528` — [33701266538](https://github.com/SergTogul/riskforge-mvp/actions/runs/33701266538) **success** — all jobs: `backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`, `e2e-playwright`.
+**HEAD at triage:** `f74b528` — [33701266538](https://github.com/SergTogul/quantlineage/actions/runs/33701266538) **success** — all jobs: `backend-pytest`, `frontend-test-build`, `lint-static-analysis`, `postgres-persistence-smoke`, `e2e-playwright`.
 
 This change: ROADMAP (honest failure record), `data-testid="reverse-stress"` on single-factor card, E2E uses testid (durable vs heading substring).
 
@@ -37,10 +37,10 @@ This change: ROADMAP (honest failure record), `data-testid="reverse-stress"` on 
 
 ## Commands executed
 ```bash
-gh run list --repo SergTogul/riskforge-mvp --branch master --limit 12
+gh run list --repo SergTogul/quantlineage --branch master --limit 12
 gh run view 33701266538 --json conclusion,jobs,...
 gh run view 33700340552 --log-failed
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest -q
 cd backend && ruff check app tests && mypy app
 cd frontend && npm test && npm run lint
 # native g++ kernel_test + shared lib (CI parity)
@@ -51,7 +51,7 @@ cd frontend && npm test && npm run lint
 - Frontend: **61** node:test + **9** Vitest passed; ESLint OK
 - QuantLib: 1.43
 - C++: `risk_kernel_ok` + shared lib OK
-- GHA HEAD: success run 33701266538 (pre-hardening); post-hardening **success** https://github.com/SergTogul/riskforge-mvp/actions/runs/33703670779 (SHA `16c91cc`; all five jobs green)
+- GHA HEAD: success run 33701266538 (pre-hardening); post-hardening **success** https://github.com/SergTogul/quantlineage/actions/runs/33703670779 (SHA `16c91cc`; all five jobs green)
 
 ## Known limitations / risks
 - Local Playwright under Cursor sandbox aborts Chrome (`kill EPERM`); trust GHA `e2e-playwright` + prior green evidence for E2E.

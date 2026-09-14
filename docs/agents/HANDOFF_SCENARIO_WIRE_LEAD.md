@@ -41,7 +41,7 @@ cd backend && PYTHONPATH=. .venv/bin/python -m pytest \
  tests/test_scenario_wire_api.py tests/test_durable_worker.py -q --tb=short
 # → 15 passed
 
-cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest \
+cd backend && PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=quantlib .venv/bin/python -m pytest \
  tests/test_scenario_wire_api.py tests/test_durable_worker.py tests/test_api.py \
  tests/test_scenario_model.py tests/test_scenario_engine.py tests/test_stress_scenarios_di.py \
  tests/test_reverse_stress.py tests/test_hedge_comparison.py -q --tb=line
@@ -53,13 +53,13 @@ cd backend && PYTHONPATH=. RISKFORGE_PRICING_ENGINE=quantlib .venv/bin/python -m
 ## Results
 - Backend: focused + durable worker **15 passed**; stress/API suite **72 passed** (1 Starlette/httpx deprecation warning)
 - Frontend: unchanged
-- QuantLib: preferred for broader suite when `RISKFORGE_PRICING_ENGINE=quantlib`
+- QuantLib: preferred for broader suite when `QUANTLINEAGE_PRICING_ENGINE=quantlib`
 - C++: N/A
 - Build: N/A
 - Ruff: clean on new/changed API + test files
 - Workstream 9: **COMPLETE** (Redis/RQ deferred residual)
 - **DONE**
-- CI/push: feature SHA `9fd2884` (handoff note `0d87f0f`) on `origin/master` (https://github.com/SergTogul/riskforge-mvp)
+- CI/push: feature SHA `9fd2884` (handoff note `0d87f0f`) on `origin/master` (https://github.com/SergTogul/quantlineage)
 
 ## Known limitations / risks
 - Redis/RQ still not implemented — deferred for fair scheduling/ops only; Postgres SKIP LOCKED remains the claim path

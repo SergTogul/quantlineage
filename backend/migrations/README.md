@@ -7,7 +7,7 @@ Named `migrations/` (not `alembic/`) so the directory does not shadow the instal
 Before starting `backend` / `worker` against Compose Postgres:
 
 ```bash
-export RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+export QUANTLINEAGE_DATABASE_URL=postgresql+psycopg://quantlineage:quantlineage@localhost:5432/quantlineage
 alembic upgrade head
 # or: docker compose run --rm backend alembic upgrade head
 ```

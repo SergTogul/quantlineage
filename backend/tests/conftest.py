@@ -7,13 +7,13 @@ import pytest
 
 # Unit/API tests must not depend on an optional native QuantLib wheel being
 # present in the execution environment. QuantLib has its own adapter tests.
-# The R0.1.6 hard-gate job sets RISKFORGE_REQUIRE_QUANTLIB=1 so QL skips fail.
-os.environ.setdefault("RISKFORGE_PRICING_ENGINE", "builtin")
+# The R0.1.6 hard-gate job sets QUANTLINEAGE_REQUIRE_QUANTLIB=1 so QL skips fail.
+os.environ.setdefault("QUANTLINEAGE_PRICING_ENGINE", "builtin")
 
 
 def pytest_sessionfinish(session, exitstatus):
     """R0.1.6: QuantLib skips must not green the mandatory QuantLib CI job."""
-    required = os.environ.get("RISKFORGE_REQUIRE_QUANTLIB", "").strip().lower() in {
+    required = os.environ.get("QUANTLINEAGE_REQUIRE_QUANTLIB", "").strip().lower() in {
         "1",
         "true",
         "yes",

@@ -1,8 +1,8 @@
-# RiskForge Subagent Team Structure
+# QuantLineage Subagent Team Structure
 
 ## Recommended team
 
-RiskForge benefits from specialist subagents because pricing, market data, portfolio risk, scenario analytics, native performance, API work, UI, AI orchestration, and numerical validation have different failure modes. The goal is not maximum agent count; it is clear ownership and controlled handoffs.
+QuantLineage benefits from specialist subagents because pricing, market data, portfolio risk, scenario analytics, native performance, API work, UI, AI orchestration, and numerical validation have different failure modes. The goal is not maximum agent count; it is clear ownership and controlled handoffs.
 
 ### 1. Lead Architect / Orchestrator
 Coordinates the team, decomposes workstreams, protects module boundaries, approves interface changes, integrates cross-cutting work, and maintains ADRs.

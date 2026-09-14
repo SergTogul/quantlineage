@@ -41,13 +41,13 @@ Implemented safe QuantLib adapter reuse for scalar equity/FX option full-revalua
 ## Commands Executed
 
 ```bash
-cd /Users/user/src/riskforge-mvp/backend
+cd /Users/user/src/quantlineage/backend
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_quantlib_reuse.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_quantlib_reuse.py tests/test_quantlib_pricing.py tests/test_quantlib_terms_value.py
 PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py tests/test_historical_scenario_kernel.py tests/test_quantlib_*.py tests/test_pricing*.py
 .venv/bin/python -m ruff check app/pricing/quantlib.py tests/test_quantlib_reuse.py && .venv/bin/python -m mypy app
 .venv/bin/python -m mypy app/pricing/quantlib.py
-PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py tests/test_historical_scenario_kernel.py tests/test_quantlib_*.py tests/test_pricing*.py && .venv/bin/python -m ruff check app/pricing/quantlib.py tests/test_quantlib_reuse.py && cd /Users/user/src/riskforge-mvp && /usr/bin/git diff --check
+PYTHONPATH=. .venv/bin/python -m pytest -q --tb=short tests/test_full_reval_bench.py tests/test_historical_scenario_kernel.py tests/test_quantlib_*.py tests/test_pricing*.py && .venv/bin/python -m ruff check app/pricing/quantlib.py tests/test_quantlib_reuse.py && cd /Users/user/src/quantlineage && /usr/bin/git diff --check
 ```
 
 ## Results
