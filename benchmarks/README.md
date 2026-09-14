@@ -59,7 +59,7 @@ Implementations:
 - **numpy** — vectorized aggregate-then-scale (optional; skipped if NumPy missing)
 - **cpp_ctypes** — builds `risk_kernel_capi.cpp`, calls via `NativeScenarioKernel`
 - **cpp_header** — builds/runs enhanced `backend/native/src/benchmark.cpp`
-- **cpp_*_tN** — same kernels with `RISKFORGE_KERNEL_THREADS=N` / `--threads N`
+- **cpp_*_tN** — same kernels with `QUANTLINEAGE_KERNEL_THREADS=N` / `--threads N`
 
 ## Workloads
 
@@ -77,7 +77,7 @@ project venv so NumPy is available:
 
 ```bash
 # Defaults: 1k×1k and 10k×1k, all impls (single-thread)
-RISKFORGE_KERNEL_THREADS=1 backend/.venv/bin/python benchmarks/run_scenario_bench.py
+QUANTLINEAGE_KERNEL_THREADS=1 backend/.venv/bin/python benchmarks/run_scenario_bench.py
 
 # serial + 4-thread stdlib pool on the same run
 backend/.venv/bin/python benchmarks/run_scenario_bench.py \
@@ -112,7 +112,7 @@ python3 -m pytest benchmarks/test_bench_smoke.py -q
  Formal claim is **SLA-K1/K2** relative floors in [`RESULTS.md`](RESULTS.md).
 - **Single-process microbench.** No concurrent tenants, no QuantLib pricing, no
  DB/API, no risk-run worker. risk-path wiring uses
- `RISKFORGE_SCENARIO_KERNEL` in product code — this harness measures the shared
+ `QUANTLINEAGE_SCENARIO_KERNEL` in product code — this harness measures the shared
  kernel ABI, not HTTP Historical VaR end-to-end.
 - **Parallel C++ .** Stdlib shock-partition thread pool only (`std::jthread`
  when `__cpp_lib_jthread` is available, else `std::thread`+join — Apple clang 14
@@ -156,20 +156,20 @@ treat a positive throughput reading as a floor.
 R0.6.7 adds a nested `acceptance` object at PR-safe **N=10 × S=50** (above
 1×120): `peak_rss_kib`, `scenarios_per_sec`, `wall_ms_cold` / `wall_ms_warm`,
 and builtin vs QuantLib at the same N×S (cash equity). QuantLib is skip-or-run
-(fail-closed when `RISKFORGE_REQUIRE_QUANTLIB=1`). Pytest asserts those values
+(fail-closed when `QUANTLINEAGE_REQUIRE_QUANTLIB=1`). Pytest asserts those values
 are finite numbers, not floors. Operators may pass `--acceptance-n` /
 `--acceptance-s`; do not use N=1000 in PR CI.
 
 R0.6.8 adds a nested `reconstruction` object: European options with live
 spot/vol/rate/div, checksums **per engine**, isolated RSS via `--isolated-impl`
 subprocess, and a recorded P&L gap at option-match `rel=2e-3`. N=100×50 is
-nightly-only (`RISKFORGE_NIGHTLY=1`; job `full-reval-n100`). Not in PR-FULL
+nightly-only (`QUANTLINEAGE_NIGHTLY=1`; job `full-reval-n100`). Not in PR-FULL
 `needs:`.
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python benchmarks/run_full_reval_bench.py --json
 python3 -m pytest backend/tests/test_full_reval_bench.py -q
-RISKFORGE_NIGHTLY=1 python3 -m pytest backend/tests/test_nightly_full_reval_n100.py -q
+QUANTLINEAGE_NIGHTLY=1 python3 -m pytest backend/tests/test_nightly_full_reval_n100.py -q
 ```
 
 ## Stage 10.3 FULL_REVALUATION matrix (not an HTTP / kernel SLA)

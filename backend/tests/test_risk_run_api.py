@@ -186,7 +186,7 @@ def test_typed_request_accepts_matching_dataset_id(client, tiny_portfolio):
 
 def test_typed_request_rebinds_synthetic_dataset_id(client, tiny_portfolio, monkeypatch):
     """Client-supplied synthetic id must select that dataset, not silently keep demo."""
-    monkeypatch.delenv('RISKFORGE_HISTORICAL_DATASET', raising=False)
+    monkeypatch.delenv('QUANTLINEAGE_HISTORICAL_DATASET', raising=False)
     from app.services.risk_factories import SYNTHETIC_HISTORICAL_DATASET_ID
 
     created = client.post(
@@ -226,7 +226,7 @@ def test_typed_request_rejects_missing_csv_dataset_path(client, tiny_portfolio, 
 
 
 def test_typed_request_rejects_ambiguous_file_dataset_id(client, tiny_portfolio, monkeypatch):
-    monkeypatch.delenv('RISKFORGE_HISTORICAL_DATASET', raising=False)
+    monkeypatch.delenv('QUANTLINEAGE_HISTORICAL_DATASET', raising=False)
     resp = client.post(
         '/risk/runs',
         json={
@@ -242,7 +242,7 @@ def test_typed_request_rejects_ambiguous_file_dataset_id(client, tiny_portfolio,
 
 def test_typed_request_rebinds_csv_path_dataset(client, tiny_portfolio, tmp_path, monkeypatch):
     """Process CSV A + request CSV B must COMPLETE on B's identity, never A's."""
-    monkeypatch.delenv('RISKFORGE_HISTORICAL_DATASET', raising=False)
+    monkeypatch.delenv('QUANTLINEAGE_HISTORICAL_DATASET', raising=False)
     from app.risk.historical_data import file_csv_dataset_id
     from app.services.risk_factories import build_portfolio_service
 

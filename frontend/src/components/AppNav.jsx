@@ -5,8 +5,8 @@ export default function AppNav({ active, onSelect, theme = 'dark', onThemeChange
   return (
     <nav className="app-nav" aria-label="Main">
       <div className="app-nav-brand">
-        <strong>RISKFORGE</strong>
-        <span>Risk Terminal</span>
+        <strong>QUANTLINEAGE</strong>
+        <span>Risk & Attribution</span>
       </div>
       <ul className="app-nav-list">
         {NAV_SECTIONS.map((s) => {

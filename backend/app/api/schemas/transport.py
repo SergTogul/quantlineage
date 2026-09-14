@@ -363,6 +363,7 @@ class RiskRunProvenance(BaseModel):
     as_of: str | None = None
     historical_dataset_id: str | None = None
     historical_dataset_version: str | None = None
+    data_source_label: str | None = None
     pricing_engine_version: str | None = None
     methodology: str | None = None
     scenario_set: list[str] = Field(default_factory=list)

@@ -37,6 +37,7 @@ from app.domain.models import (
     VaRMethodology,
 )
 from app.interfaces.pricing import PricingEngine
+from app.market.history.data_mode import data_source_label
 from app.market.history.spec import WAVE_A_FACTOR_MAPPINGS
 from app.risk.factor_panel import HistoricalFactorPanel, panel_factor_identity
 from app.risk.factor_types import RiskFactor, factor_column_id, parse_factor_column_id
@@ -169,6 +170,7 @@ class HistoricalAnalyticsResult(BaseModel):
     dropped_dates: list[date]
     observation_count: int
     units: dict[str, str]
+    data_source_label: str
     benchmark: BenchmarkRelativeRisk | None = None
 
 
@@ -567,5 +569,9 @@ def compute_historical_analytics(
             "var_es": "currency_loss",
             "wealth": "end_of_period_index",
         },
+        data_source_label=data_source_label(
+            historical_dataset_id, historical_dataset_version
+        )
+        or f"Synthetic replay · {historical_dataset_id}/{historical_dataset_version}",
         benchmark=benchmark,
     )

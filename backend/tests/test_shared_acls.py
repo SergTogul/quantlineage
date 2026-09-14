@@ -41,18 +41,18 @@ def _clear_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(auth_mod.ENV_API_TOKEN, raising=False)
     monkeypatch.delenv(auth_mod.ENV_API_TOKENS, raising=False)
     monkeypatch.delenv(auth_mod.ENV_BIND, raising=False)
-    monkeypatch.delenv("RISKFORGE_DATABASE_URL", raising=False)
-    monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_DATABASE_URL", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_EXTERNAL_WORKER", raising=False)
 
 
 def _enable_shared_sqlite(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     db_path = tmp_path / "rf014_acls.db"
-    monkeypatch.setenv("RISKFORGE_DATABASE_URL", f"sqlite:///{db_path}")
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_DATABASE_URL", f"sqlite:///{db_path}")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     monkeypatch.setenv(auth_mod.ENV_SHARED_DEPLOYMENT, "1")
     monkeypatch.delenv(auth_mod.ENV_BIND, raising=False)
     monkeypatch.delenv(auth_mod.ENV_API_TOKEN, raising=False)
-    monkeypatch.setenv("RISKFORGE_API_TOKENS", TOKEN_MAP)
+    monkeypatch.setenv("QUANTLINEAGE_API_TOKENS", TOKEN_MAP)
 
 
 def _auth(token: str) -> dict[str, str]:

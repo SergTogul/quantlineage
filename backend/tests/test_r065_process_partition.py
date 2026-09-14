@@ -67,7 +67,7 @@ def test_full_revaluation_summary_and_var_refused_when_external_worker(
     path: str,
     params: dict[str, str],
 ) -> None:
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         response = client.post(path, params=params, json=book)
@@ -80,8 +80,8 @@ def test_full_revaluation_summary_and_var_refused_when_heavy_inline_disabled(
     path: str,
     params: dict[str, str],
 ) -> None:
-    monkeypatch.delenv("RISKFORGE_EXTERNAL_WORKER", raising=False)
-    monkeypatch.setenv("RISKFORGE_HEAVY_INLINE", "0")
+    monkeypatch.delenv("QUANTLINEAGE_EXTERNAL_WORKER", raising=False)
+    monkeypatch.setenv("QUANTLINEAGE_HEAVY_INLINE", "0")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         response = client.post(path, params=params, json=book)
@@ -94,7 +94,7 @@ def test_full_revaluation_risk_run_stays_queued_when_external_worker(
     run_type: str,
 ) -> None:
     """Gate-on HTTP does not price FULL_REVALUATION; RiskRun is the partition."""
-    monkeypatch.setenv("RISKFORGE_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
     with TestClient(app) as client:
         book = client.get("/api/v1/portfolio").json()
         created = client.post(
@@ -204,8 +204,8 @@ def test_compose_worker_is_the_full_reval_process_partition() -> None:
     assert bodies is not None
     backend = "\n".join(bodies["backend"])
     worker = "\n".join(bodies["worker"])
-    assert "RISKFORGE_EXTERNAL_WORKER" in backend
+    assert "QUANTLINEAGE_EXTERNAL_WORKER" in backend
     assert re.search(r'python",\s*"-m",\s*"app\.worker"', worker) or "python -m app.worker" in worker
-    assert "RISKFORGE_EXTERNAL_WORKER" not in worker
+    assert "QUANTLINEAGE_EXTERNAL_WORKER" not in worker
     assert "app.worker" not in backend
     assert _MP_IMPORT.search(inspect.getsource(full_revaluation_pnl_series)) is None

@@ -16,7 +16,7 @@ Usage (Compose)::
 
     python -m app.worker
 
-Requires ``RISKFORGE_DATABASE_URL``. Pair with ``RISKFORGE_EXTERNAL_WORKER=1``
+Requires ``QUANTLINEAGE_DATABASE_URL``. Pair with ``QUANTLINEAGE_EXTERNAL_WORKER=1``
 on the API so HTTP only enqueues (the API process must not execute those runs
 in-thread against the same QuantLib state). Apply migrations first::
 
@@ -41,11 +41,11 @@ from app.persistence.wiring import build_persistence_wiring
 from app.services.risk_factories import build_portfolio_service
 from app.services.risk_run_worker import RiskRunWorker
 
-logger = logging.getLogger("riskforge.worker")
+logger = logging.getLogger("quantlineage.worker")
 
 
 def _poll_interval_s() -> float:
-    raw = os.environ.get("RISKFORGE_WORKER_POLL_INTERVAL", "2").strip()
+    raw = os.environ.get("QUANTLINEAGE_WORKER_POLL_INTERVAL", "2").strip()
     try:
         return max(0.1, float(raw))
     except ValueError:
@@ -53,7 +53,7 @@ def _poll_interval_s() -> float:
 
 
 def _poll_batch() -> int:
-    raw = os.environ.get("RISKFORGE_WORKER_POLL_BATCH", "10").strip()
+    raw = os.environ.get("QUANTLINEAGE_WORKER_POLL_BATCH", "10").strip()
     try:
         return max(1, int(raw))
     except ValueError:
@@ -66,7 +66,7 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
     if not get_configured_database_url():
-        logger.error("RISKFORGE_DATABASE_URL is required for riskforge-worker")
+        logger.error("QUANTLINEAGE_DATABASE_URL is required for quantlineage-worker")
         return 2
 
     wiring = build_persistence_wiring(seed_sample=True, ensure_schema=True)
@@ -93,7 +93,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _handle_stop)
 
     logger.info(
-        "riskforge-worker started (poll_interval=%ss batch=%s)",
+        "quantlineage-worker started (poll_interval=%ss batch=%s)",
         interval,
         batch,
     )
@@ -109,7 +109,7 @@ def main() -> int:
             # else drain backlog without sleeping
     finally:
         worker.shutdown(wait=True)
-        logger.info("riskforge-worker stopped")
+        logger.info("quantlineage-worker stopped")
     return 0
 
 

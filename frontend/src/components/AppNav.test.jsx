@@ -12,6 +12,7 @@ describe('AppNav', () => {
     }
     expect(screen.getByRole('button', { name: /Stress/ })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: /Overview/ })).not.toHaveAttribute('aria-current')
+    expect(screen.getByText('QUANTLINEAGE')).toBeInTheDocument()
   })
 
   it('notifies parent when a section is selected', async () => {

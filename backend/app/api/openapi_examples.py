@@ -19,7 +19,7 @@ _ILLUSTRATIVE = (
 EXAMPLE_PORTFOLIO: dict[str, Any] = {
     "id": "demo-book",
     "name": "Demo Book",
-    "firm": "RiskForge",
+    "firm": "QuantLineage",
     "desk": "Global Macro",
     "strategy": "Multi-Asset",
     "positions": [
@@ -665,7 +665,7 @@ EXAMPLE_LIMITS_DRILLDOWN_REQUEST: dict[str, Any] = {
     "metric": "var_99",
     "hierarchy": {
         "level": "desk",
-        "firm": "RiskForge",
+        "firm": "QuantLineage",
         "desk": "Global Macro",
     },
     "top_n": 5,
@@ -674,11 +674,11 @@ EXAMPLE_LIMITS_DRILLDOWN_REQUEST: dict[str, Any] = {
 
 EXAMPLE_LIMITS_DRILLDOWN_RESPONSE: dict[str, Any] = {
     "portfolio_id": "demo-book",
-    "hierarchy_node": "RiskForge / Global Macro",
+    "hierarchy_node": "QuantLineage / Global Macro",
     "hierarchy_level": "desk",
     "items": [
         {
-            "hierarchy_node": "RiskForge / Global Macro",
+            "hierarchy_node": "QuantLineage / Global Macro",
             "hierarchy_level": "desk",
             "metric": "var_99",
             "value": 12500.0,
@@ -854,8 +854,8 @@ EXAMPLE_RISK_CHANGE_REPORT: dict[str, Any] = {
     "hierarchy_contributors": [
         {
             "level": "firm",
-            "name": "RiskForge",
-            "path": "RiskForge",
+            "name": "QuantLineage",
+            "path": "QuantLineage",
             "delta_risk": 1800.0,
             "position_id": None,
             "children": [],

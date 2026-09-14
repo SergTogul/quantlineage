@@ -206,7 +206,7 @@ def approximate_pnl_series(
       ``vol_points = base_vol × relative × 100`` (default ``base_vol=0`` → 0 vol P&L)
     - rates: parallel bp moves × DV01
 
-    Kernel backend (M6.3): default NumPy (``RISKFORGE_SCENARIO_KERNEL=python``).
+    Kernel backend (M6.3): default NumPy (``QUANTLINEAGE_SCENARIO_KERNEL=python``).
     When ``native`` is selected (or ``scenario_kernel`` is injected), P&L is
     evaluated via the linear Δ-Γ scenario kernel. Native kernels receive
     C-contiguous float64 exposure/shock arrays (``pnl_from_arrays``); the
@@ -497,7 +497,7 @@ class HistoricalRiskEngine(RiskEngine):
     - ``FULL_REVALUATION`` — reprice via ``PricingEngine`` on M2.2 shocked snapshots
 
     Approximate modes (LINEAR / DELTA_GAMMA) may evaluate scenario P&L via the
-    optional native kernel when ``RISKFORGE_SCENARIO_KERNEL=native`` (or an
+    optional native kernel when ``QUANTLINEAGE_SCENARIO_KERNEL=native`` (or an
     injected ``scenario_kernel``). FULL_REVALUATION never uses that kernel.
 
     Default dataset is :class:`SyntheticHistoricalDataset` (deterministic RNG)

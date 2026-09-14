@@ -33,6 +33,8 @@ describe('Overview', () => {
     expect(screen.getByRole('heading', { name: 'Terminal map' })).toBeInTheDocument()
     expect(screen.getByTestId('overview-layout-status')).toBeInTheDocument()
     expect(screen.queryByRole('tablist', { name: 'Overview composition' })).not.toBeInTheDocument()
+    const hero = screen.getByRole('link', { name: /Why did my risk change\?/i })
+    expect(hero).toHaveAttribute('href', '#var-es/risk-change')
     const where = screen.getByRole('region', { name: 'Exceptions' })
     const metrics = screen.getByTestId('golden-demo-metrics')
     expect(status.compareDocumentPosition(where) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()

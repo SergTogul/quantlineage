@@ -18,8 +18,8 @@ Header: `include/risk_kernel_capi.h`. Python constants live in `app.compute.kern
 
 | Symbol | Role |
 |---|---|
-| `RISKFORGE_KERNEL_ABI` / `riskforge_kernel_abi_version()` | Version **1**. Python refuses to load a mismatch. |
-| `riskforge_portfolio_scenarios` | Returns `int` (`OK=0`, `ERR_ABI=1`, `ERR_NULL=2`, `ERR_LENGTH=3`). |
+| `QUANTLINEAGE_KERNEL_ABI` / `quantlineage_kernel_abi_version()` | Version **1**. Python refuses to load a mismatch. |
+| `quantlineage_portfolio_scenarios` | Returns `int` (`OK=0`, `ERR_ABI=1`, `ERR_NULL=2`, `ERR_LENGTH=3`). |
 | Exposure stride | 5 doubles (`delta, gamma, vega, dv01, fx_delta`) |
 | Shock stride | 4 doubles (`equity, vol_points, rates_bps, fx`) |
 
@@ -63,8 +63,8 @@ Thread count:
 
 | Env / API | Effect |
 |---|---|
-| `RISKFORGE_KERNEL_THREADS=1` | Serial nested loops (parity / baseline) |
-| `RISKFORGE_KERNEL_THREADS=N` (`N>1`) | Up to `N` workers (capped by `n_shocks`) |
+| `QUANTLINEAGE_KERNEL_THREADS=1` | Serial nested loops (parity / baseline) |
+| `QUANTLINEAGE_KERNEL_THREADS=N` (`N>1`) | Up to `N` workers (capped by `n_shocks`) |
 | unset | `std::thread::hardware_concurrency` (min 1) |
 | C++ CLI `--threads T` | Same resolution (`0` = auto via env/hw) |
 | `n_exposures * n_shocks < 4096` | Always serial (R0.17; no per-call spawn) |
@@ -78,16 +78,16 @@ parity with single-thread (see `tests/kernel_test.cpp`,
 `backend/tests/test_native_kernel.py`).
 
 **Do not add OpenMP or a second pool.** Product risk path still selects Python vs
-native via `RISKFORGE_SCENARIO_KERNEL` only; parallelism is internal to the .so.
+native via `QUANTLINEAGE_SCENARIO_KERNEL` only; parallelism is internal to the .so.
 
 ## Risk-path wiring Historical VaR / scenario P&L for **LINEAR** and **DELTA_GAMMA** may evaluate the
 linear Δ-Γ kernel via:
 
 | Env | Effect |
 |---|---|
-| `RISKFORGE_SCENARIO_KERNEL=python` (default) | NumPy vectorized formula in `approximate_pnl_series` |
-| `RISKFORGE_SCENARIO_KERNEL=native` | ctypes `NativeScenarioKernel` |
-| `RISKFORGE_SCENARIO_KERNEL_LIB` | Optional absolute path to the shared library |
+| `QUANTLINEAGE_SCENARIO_KERNEL=python` (default) | NumPy vectorized formula in `approximate_pnl_series` |
+| `QUANTLINEAGE_SCENARIO_KERNEL=native` | ctypes `NativeScenarioKernel` |
+| `QUANTLINEAGE_SCENARIO_KERNEL_LIB` | Optional absolute path to the shared library |
 
 Methodology selection, vol-point scaling (`vol_move × 100`), and LINEAR γ=0 remain
 in Python (`app.risk.historical`). Business logic is not moved into C++.
@@ -96,7 +96,7 @@ in Python (`app.risk.historical`). Business logic is not moved into C++.
 
 `VaRMethodology.FULL_REVALUATION` reprices each shocked `MarketSnapshot` through
 `PricingEngine`. That path is outside the Exposure/Shock ABI (no Greeks-only
-approximation). Setting `RISKFORGE_SCENARIO_KERNEL=native` does **not** accelerate
+approximation). Setting `QUANTLINEAGE_SCENARIO_KERNEL=native` does **not** accelerate
 or alter full revaluation.
 
 ## Parity & tolerances | Layer | Tests | Abs / rel |
@@ -117,7 +117,7 @@ Prefer the repo-root harness for Python / NumPy / ctypes / C++ comparison:
 
 ```bash
 # from repo root — serial baseline
-RISKFORGE_KERNEL_THREADS=1 python3 benchmarks/run_scenario_bench.py --workload 1k_x_1k
+QUANTLINEAGE_KERNEL_THREADS=1 python3 benchmarks/run_scenario_bench.py --workload 1k_x_1k
 
 # parallel vs serial (same host)
 python3 benchmarks/run_scenario_bench.py --workload 10k_x_1k \

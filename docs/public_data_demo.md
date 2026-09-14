@@ -1,6 +1,6 @@
 # Optional public-data demo (Wave A)
 
-RiskForge can freeze **public end-of-day** equity/ETF prints (Yahoo Finance public JSON)
+QuantLineage can freeze **public end-of-day** equity/ETF prints (Yahoo Finance public JSON)
 and **public FRED** USD Treasury yields into the existing historical-dataset and
 `MarketSnapshot` path. This is **not** an institutional vendor feed, not Bloomberg,
 not Refinitiv, not streaming, and not a licensed entitlements plant.
@@ -25,7 +25,7 @@ QUANTLINEAGE_DATA_MODE=synthetic
 loads the packaged per-factor replay (`data/demo_multi_factor_history.csv`,
 id `demo-multi-factor-history`). No Yahoo/FRED import or HTTP.
 
-`RISKFORGE_HISTORICAL_DATASET` is unchanged. Do not rename it for Wave A.
+`QUANTLINEAGE_HISTORICAL_DATASET` is unchanged. Do not rename it for Wave A.
 
 `docker-compose.yml` does **not** set `QUANTLINEAGE_DATA_MODE=public`. Default
 Compose / API lifespan starts on the demo CSV even if Yahoo/FRED are down.

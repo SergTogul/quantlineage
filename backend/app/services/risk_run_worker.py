@@ -5,14 +5,14 @@ parallelize QuantLib. That pool is not a distributed queue and must not call
 ``ql.Settings`` (or otherwise price QuantLib) except through
 ``PricingEngine.value`` → ``_session`` → ``_QL_PROCESS_LOCK``.
 
-When ``RISKFORGE_EXTERNAL_WORKER=1``, ``submit`` only enqueues QUEUED rows;
+When ``QUANTLINEAGE_EXTERNAL_WORKER=1``, ``submit`` only enqueues QUEUED rows;
 ``poll_once`` (Compose ``worker`` / ``python -m app.worker``) drains them from
 shared Postgres via ``claim_queued`` (Postgres: ``FOR UPDATE SKIP LOCKED``).
 The Compose worker is a **separate OS process** with its own QuantLib globals.
 Additional worker replicas are the supported parallel full-revaluation scale-out.
 This module does not start a ``ProcessPoolExecutor`` or a job platform.
 R0.6.5 keeps HEAVY full-reval on this worker process (Compose ``worker`` /
-``RISKFORGE_EXTERNAL_WORKER``); it does not add unused scenario-block
+``QUANTLINEAGE_EXTERNAL_WORKER``); it does not add unused scenario-block
 multiprocessing.
 Redis/RQ is not required for safe multi-worker claim.
 
@@ -442,7 +442,7 @@ class RiskRunWorker:
     ) -> RiskRunView:
         """Create a QUEUED run; optionally schedule background execution.
 
-        ``execute=None`` follows ``RISKFORGE_EXTERNAL_WORKER`` (Compose backend
+        ``execute=None`` follows ``QUANTLINEAGE_EXTERNAL_WORKER`` (Compose backend
         defers to the ``worker`` service). Explicit ``execute=True/False``
         overrides the env flag (tests).
         """

@@ -47,7 +47,7 @@ def test_worker_main_constructs_via_shared_factory():
 def test_build_portfolio_service_wires_create_historical_dataset(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     expected = create_historical_dataset()
     service = build_portfolio_service()
 
@@ -59,7 +59,7 @@ def test_build_portfolio_service_wires_create_historical_dataset(
 
 
 def test_factory_default_spec_is_demo_dataset(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service()
     spec = resolve_run_spec(risk_engine=service.risk)
 
@@ -72,7 +72,7 @@ def test_factory_default_spec_is_demo_dataset(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_factory_synthetic_env_uses_stable_id(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("RISKFORGE_HISTORICAL_DATASET", "synthetic")
+    monkeypatch.setenv("QUANTLINEAGE_HISTORICAL_DATASET", "synthetic")
     service = build_portfolio_service()
     spec = resolve_run_spec(risk_engine=service.risk)
 
@@ -85,7 +85,7 @@ def test_factory_synthetic_env_uses_stable_id(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_resolve_run_spec_rejects_unknown_dataset_id(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service()
     with pytest.raises(ValueError, match="historical_dataset_id"):
         resolve_run_spec(
@@ -97,7 +97,7 @@ def test_resolve_run_spec_rejects_unknown_dataset_id(monkeypatch: pytest.MonkeyP
 def test_resolve_run_spec_rebinds_synthetic_from_demo_engine(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service()
     assert service.risk.dataset.dataset_id == DEMO_MULTI_FACTOR_DATASET_ID
 
@@ -146,7 +146,7 @@ def test_portfolio_service_for_spec_rebinds_between_csv_paths(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ):
     """Process CSV A + request CSV B must rebind to B — never silently keep A."""
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     path_a = tmp_path / "engine_a.csv"
     path_b = tmp_path / "request_b.csv"
     _write_mini_csv(path_a, equity_return=0.01)
@@ -184,7 +184,7 @@ def test_resolve_dataset_source_rejects_missing_csv(tmp_path):
 def test_resolve_run_spec_rejects_bare_file_against_demo_engine(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service()
     with pytest.raises(ValueError, match="ambiguous historical_dataset_id 'file'"):
         resolve_run_spec(
@@ -202,7 +202,7 @@ def test_resolve_execute_spec_prefers_persisted_columns(
     from app.domain.models import RiskRun, RiskRunCalculationConfig, RiskRunStatus
     from app.services.risk_factories import resolve_execute_spec
 
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     service = build_portfolio_service()
     run = RiskRun(
         id="exec-cols",

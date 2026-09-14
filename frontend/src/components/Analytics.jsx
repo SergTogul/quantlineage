@@ -4,6 +4,7 @@ import {
   explainPnLDemo, getRatesShowcase, getRiskRun, getRiskRunProvenance, API_V1,
 } from '../api'
 import BlockHelp from './BlockHelp'
+import DataSourceBadge from './DataSourceBadge.jsx'
 import { ContributionBars, KeyRateDv01Curve } from './RiskVisuals.jsx'
 import { riskChangeWaterfallSteps } from '../lib/riskVisuals.mjs'
 import {
@@ -184,7 +185,8 @@ export function RunProvenance({ runId, embedded, provenance }) {
         <h3>Calculation provenance</h3>
         <BlockHelp id="run-provenance" />
       </div>
-      <div className="muted">Persisted RiskRun lineage — displayed fields equal the backend payload</div>
+      <p className="muted">Lineage of the completed calculation — book, snapshot, dataset, and methodology.</p>
+      <DataSourceBadge payload={s} />
       {!runId && <div className="muted foot">Start a risk run to load lineage</div>}
       {error && <div className="error">{error}</div>}
       {s && (
@@ -521,7 +523,12 @@ export function RiskRuns({ portfolio }) {
         <h3>Risk Runs</h3>
         <BlockHelp id="risk-runs" />
       </div>
-      <div className="muted">Async POST/GET /api/v1/risk/runs — poll until COMPLETED or FAILED</div>
+      <p className="muted">Queued calculations with dataset, snapshot, and methodology lineage.</p>
+      <details className="tech-details">
+        <summary>Run protocol</summary>
+        <p className="muted">Async POST/GET /api/v1/risk/runs — poll until COMPLETED or FAILED.</p>
+      </details>
+      <DataSourceBadge payload={run?.provenance || s} />
       <div className="inline-form risk-run-form">
         <select
           value={runType}
@@ -649,10 +656,17 @@ export function RiskChangeAttribution({ portfolio }) {
         <h3>Risk Change Attribution</h3>
         <BlockHelp id="risk-change-attribution" />
       </div>
-      <div className="muted">
-        Why did my risk change — two COMPLETED RiskRuns (POST /api/v1/risk/runs/compare) or SPY×1.5 waterfall.
-        UI displays the backend payload only.
-      </div>
+      <p className="muted">
+        Why did my risk change? Compare two completed runs to separate trades, markets, and residual.
+      </p>
+      <details className="tech-details">
+        <summary>How this attribution is produced</summary>
+        <p className="muted">
+          Two COMPLETED RiskRuns (POST /api/v1/risk/runs/compare) or a SPY×1.5 waterfall.
+          The UI displays the backend payload only.
+        </p>
+      </details>
+      <DataSourceBadge payload={flagship?.identity?.t1 || summary} />
       <div className="inline-form risk-run-form">
         <select
           value={metric}
@@ -804,6 +818,7 @@ function RiskChangeFlagshipPanel({ report }) {
 
   return (
     <div className="risk-panel-result" data-testid="golden-demo-risk-change-result">
+      <DataSourceBadge payload={report.identity?.t1 || report} />
       <div className="muted foot">
         {report.metric} · {report.unit}
       </div>

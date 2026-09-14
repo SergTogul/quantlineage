@@ -6,7 +6,7 @@ bands. Builtin golden is not bit-identical for swaps/QL. Market value and
 named stress P&Ls use relative 25% with a $1 abs floor; ``var_99`` uses
 ``[0.25×, 4×]`` of the builtin artifact (see ``docs/demo/final_demo.md``).
 
-Skip-unless-QuantLib locally. Nightly / ``RISKFORGE_REQUIRE_QUANTLIB``
+Skip-unless-QuantLib locally. Nightly / ``QUANTLINEAGE_REQUIRE_QUANTLIB``
 fail-closes via ``require_quantlib_for_nightly``. Do not treat this as a
 labeled-runner SLA or run ``check_m6_sla.py``.
 """
@@ -93,11 +93,11 @@ def test_quantlib_demo_books_key_numbers_within_artifact_bands(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     require_quantlib_for_nightly()
-    monkeypatch.setenv("RISKFORGE_PRICING_ENGINE", "quantlib")
-    monkeypatch.setenv("RISKFORGE_SCENARIO_KERNEL", "python")
-    monkeypatch.setenv("RISKFORGE_PRICING_CACHE", "0")
-    monkeypatch.setenv("RISKFORGE_CURVE_CACHE", "0")
-    monkeypatch.setenv("RISKFORGE_SCENARIO_CACHE", "0")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_ENGINE", "quantlib")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_KERNEL", "python")
+    monkeypatch.setenv("QUANTLINEAGE_PRICING_CACHE", "0")
+    monkeypatch.setenv("QUANTLINEAGE_CURVE_CACHE", "0")
+    monkeypatch.setenv("QUANTLINEAGE_SCENARIO_CACHE", "0")
 
     golden_path = default_artifact_path()
     assert golden_path.is_file()

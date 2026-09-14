@@ -1,6 +1,6 @@
 """Optional SQLAlchemy wiring for FastAPI (M5.6).
 
-When ``RISKFORGE_DATABASE_URL`` is set, build a session factory and seed the
+When ``QUANTLINEAGE_DATABASE_URL`` is set, build a session factory and seed the
 demo portfolios (M10.1 themed books), market snapshot, scenario definitions,
 and limit definitions. When unset, callers stay on sample / in-memory backends
 so existing unit tests remain unchanged.

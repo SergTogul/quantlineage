@@ -1,6 +1,6 @@
 # Public data sources (Wave A)
 
-RiskForge Wave A can ingest **public end-of-day equity/ETF history** and **public FRED
+QuantLineage Wave A can ingest **public end-of-day equity/ETF history** and **public FRED
 macro/rates series**. This is not a licensed market-data vendor plant, not a real-time
 feed, and not institutional entitlements infrastructure.
 

@@ -51,7 +51,7 @@ def _select_yield_curve_uncached(
     *,
     prefer_projection: bool = False,
 ) -> YieldCurve | None:
-    """Pick the best RiskForge curve for ``currency``, or synthesize from key rates."""
+    """Pick the best QuantLineage curve for ``currency``, or synthesize from key rates."""
     ccy = currency.upper()
     candidates: list[YieldCurve] = []
     for name, payload in market.curves.items():
@@ -93,9 +93,9 @@ def select_yield_curve(
     *,
     prefer_projection: bool = False,
 ) -> YieldCurve | None:
-    """Pick the best RiskForge curve for ``currency``, or synthesize from key rates.
+    """Pick the best QuantLineage curve for ``currency``, or synthesize from key rates.
 
-    When ``RISKFORGE_CURVE_CACHE`` is enabled (default), constructed ``YieldCurve``
+    When ``QUANTLINEAGE_CURVE_CACHE`` is enabled (default), constructed ``YieldCurve``
     instances are memoized by currency-relevant market fingerprint.
     """
     from app.pricing.curve_cache import (

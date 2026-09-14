@@ -2,12 +2,12 @@
 # Minimal Postgres persistence smoke (M5.1 / M5.6 / M9.9).
 #
 # Requires:
-#   - RISKFORGE_DATABASE_URL pointing at a reachable Postgres (psycopg3 URL)
+#   - QUANTLINEAGE_DATABASE_URL pointing at a reachable Postgres (psycopg3 URL)
 #   - backend deps installed (sqlalchemy, alembic, psycopg, …)
 #
 # Usage (local Compose):
 #   docker compose up -d postgres
-#   export RISKFORGE_DATABASE_URL=postgresql+psycopg://riskforge:riskforge@localhost:5432/riskforge
+#   export QUANTLINEAGE_DATABASE_URL=postgresql+psycopg://quantlineage:quantlineage@localhost:5432/quantlineage
 #   ./scripts/smoke_postgres.sh
 #
 # CI: GitHub Actions service container sets the URL and runs this script.
@@ -16,13 +16,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT/backend"
 
-URL="${RISKFORGE_DATABASE_URL:-}"
+URL="${QUANTLINEAGE_DATABASE_URL:-}"
 if [[ -z "${URL// }" ]]; then
-  echo "ERROR: RISKFORGE_DATABASE_URL must be set (postgresql+psycopg://…)" >&2
+  echo "ERROR: QUANTLINEAGE_DATABASE_URL must be set (postgresql+psycopg://…)" >&2
   exit 1
 fi
 
-export RISKFORGE_DATABASE_URL="$URL"
+export QUANTLINEAGE_DATABASE_URL="$URL"
 export PYTHONPATH="${PYTHONPATH:-.}"
 
 # Wait for Postgres (Compose health / GHA service container can lag first connect).
@@ -37,7 +37,7 @@ import time
 import psycopg
 from sqlalchemy.engine.url import make_url
 
-url = make_url(os.environ["RISKFORGE_DATABASE_URL"])
+url = make_url(os.environ["QUANTLINEAGE_DATABASE_URL"])
 # SQLAlchemy uses postgresql+psycopg://…; psycopg.connect wants postgresql://…
 dsn = url.set(drivername="postgresql").render_as_string(hide_password=False)
 deadline = time.monotonic() + 60
@@ -57,7 +57,7 @@ print(f"ERROR: Postgres not ready within 60s: {last_err}", file=sys.stderr)
 sys.exit(1)
 PY
 
-echo "==> alembic upgrade head ($RISKFORGE_DATABASE_URL)"
+echo "==> alembic upgrade head ($QUANTLINEAGE_DATABASE_URL)"
 alembic upgrade head
 
 echo "==> Python wiring / seed / repo smoke"

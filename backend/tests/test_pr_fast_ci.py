@@ -61,8 +61,8 @@ def test_quantlib_hard_gate_not_weakened():
     text = _workflow_text()
     assert "name: backend-quantlib-hard-gate" in text
     block = _job_block(text, "backend-quantlib")
-    assert "RISKFORGE_REQUIRE_QUANTLIB" in block
-    assert "RISKFORGE_PRICING_ENGINE: quantlib" in block
+    assert "QUANTLINEAGE_REQUIRE_QUANTLIB" in block
+    assert "QUANTLINEAGE_PRICING_ENGINE: quantlib" in block
     assert "tests/test_quantlib_golden.py" in block
     assert "tests/test_quantlib_gate.py" in block
     # Hard-gate must not strip QuantLib on install failure.

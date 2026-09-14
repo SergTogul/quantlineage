@@ -5,7 +5,7 @@
 // Usage:
 //   scenario_bench [--exposures N] [--shocks M] [--iters K] [--threads T] [--json]
 //
-// ``--threads 0`` (default) uses RISKFORGE_KERNEL_THREADS or hardware_concurrency.
+// ``--threads 0`` (default) uses QUANTLINEAGE_KERNEL_THREADS or hardware_concurrency.
 // ``--threads 1`` forces the serial path (M6.2 baseline).
 // Defaults: 1000 exposures × 1000 shocks × 1 iteration.
 
@@ -43,7 +43,7 @@ void print_usage(const char* argv0) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  using namespace riskforge;
+  using namespace quantlineage;
   std::size_t n_exposures = 1000;
   std::size_t n_shocks = 1000;
   int iters = 1;
@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
               << "\"threads_requested\":" << threads << ","
               << "\"threads_resolved\":" << resolved << ","
               << "\"parallel_strategy\":\"std_thread_shock_partition\","
-              << "\"has_jthread\":" << (RISKFORGE_HAS_JTHREAD ? "true" : "false") << ","
+              << "\"has_jthread\":" << (QUANTLINEAGE_HAS_JTHREAD ? "true" : "false") << ","
               << "\"wall_ms\":" << elapsed_ms << ","
               << "\"throughput_ops_per_s\":" << throughput_ops_s << ","
               << "\"scenarios_per_s\":" << scenarios_per_s << ","
@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
               << " threads_requested=" << threads
               << " threads_resolved=" << resolved
               << " parallel_strategy=std_thread_shock_partition"
-              << " has_jthread=" << (RISKFORGE_HAS_JTHREAD ? 1 : 0)
+              << " has_jthread=" << (QUANTLINEAGE_HAS_JTHREAD ? 1 : 0)
               << " wall_ms=" << elapsed_ms
               << " throughput_ops_per_s=" << throughput_ops_s
               << " scenarios_per_s=" << scenarios_per_s

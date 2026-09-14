@@ -12,17 +12,17 @@ QuantLib globals (ADR 007).
 
 Backend selection (M6.3):
 
-- ``RISKFORGE_SCENARIO_KERNEL=python`` (default) — risk path keeps the NumPy
+- ``QUANTLINEAGE_SCENARIO_KERNEL=python`` (default) — risk path keeps the NumPy
   vectorized formula in ``approximate_pnl_series``
-- ``RISKFORGE_SCENARIO_KERNEL=native`` — load ``NativeScenarioKernel`` via ctypes
-- ``RISKFORGE_SCENARIO_KERNEL_LIB`` — optional explicit shared-library path
+- ``QUANTLINEAGE_SCENARIO_KERNEL=native`` — load ``NativeScenarioKernel`` via ctypes
+- ``QUANTLINEAGE_SCENARIO_KERNEL_LIB`` — optional explicit shared-library path
 
 Tolerances (M6.5): ``KERNEL_ABI_*`` for direct ABI compares; ``KERNEL_PNL_*`` for
 NumPy risk-path vs kernel (also re-exported from ``app.risk.historical``).
 
 C ABI (R0.12.5)
-- ``riskforge_kernel_abi_version()`` must equal ``KERNEL_ABI_VERSION`` (1).
-- ``riskforge_portfolio_scenarios`` returns ``KERNEL_OK`` / ``KERNEL_ERR_*``.
+- ``quantlineage_kernel_abi_version()`` must equal ``KERNEL_ABI_VERSION`` (1).
+- ``quantlineage_portfolio_scenarios`` returns ``KERNEL_OK`` / ``KERNEL_ERR_*``.
 - Lengths: ``n_exposure_doubles == n_exposures * 5``,
   ``n_shock_doubles == n_shocks * 4``, ``n_out == n_shocks``.
 - Null/empty: count 0 may pass NULL; count > 0 and NULL is ``KERNEL_ERR_NULL``.
@@ -49,8 +49,8 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-SCENARIO_KERNEL_ENV = "RISKFORGE_SCENARIO_KERNEL"
-SCENARIO_KERNEL_LIB_ENV = "RISKFORGE_SCENARIO_KERNEL_LIB"
+SCENARIO_KERNEL_ENV = "QUANTLINEAGE_SCENARIO_KERNEL"
+SCENARIO_KERNEL_LIB_ENV = "QUANTLINEAGE_SCENARIO_KERNEL_LIB"
 
 # M6.5 / M6.7 numerical tolerances (currency P&L units on the Exposure/Shock ABI).
 #
@@ -77,7 +77,7 @@ KERNEL_ERR_LENGTH = 3
 
 # R0.17: must match native/include/risk_kernel.hpp KERNEL_PARALLEL_MIN_WORK.
 # Work items are n_exposures * n_shocks; below this the C++ kernel stays serial
-# even when RISKFORGE_KERNEL_THREADS > 1 (avoids per-call thread spawn).
+# even when QUANTLINEAGE_KERNEL_THREADS > 1 (avoids per-call thread spawn).
 KERNEL_PARALLEL_MIN_WORK = 4096
 
 _KERNEL_ERR_NAMES = {
@@ -177,12 +177,12 @@ class NativeScenarioKernel(ScenarioKernel):
     def __init__(self, library_path: str | Path):
         self.library_path = Path(library_path)
         self.lib = ctypes.CDLL(str(self.library_path))
-        if not hasattr(self.lib, "riskforge_kernel_abi_version"):
+        if not hasattr(self.lib, "quantlineage_kernel_abi_version"):
             raise NativeKernelError(
                 KERNEL_ERR_ABI,
-                "native library missing riskforge_kernel_abi_version",
+                "native library missing quantlineage_kernel_abi_version",
             )
-        ver_fn = self.lib.riskforge_kernel_abi_version
+        ver_fn = self.lib.quantlineage_kernel_abi_version
         ver_fn.argtypes = []
         ver_fn.restype = ctypes.c_int
         self.abi_version = int(ver_fn())
@@ -191,7 +191,7 @@ class NativeScenarioKernel(ScenarioKernel):
                 KERNEL_ERR_ABI,
                 f"native ABI {self.abi_version} != Python KERNEL_ABI_VERSION {KERNEL_ABI_VERSION}",
             )
-        self.fn = self.lib.riskforge_portfolio_scenarios
+        self.fn = self.lib.quantlineage_portfolio_scenarios
         self.fn.argtypes = [
             ctypes.c_int,
             ctypes.POINTER(ctypes.c_double),
@@ -229,7 +229,7 @@ class NativeScenarioKernel(ScenarioKernel):
         )
         if rc != KERNEL_OK:
             name = _KERNEL_ERR_NAMES.get(rc, "unknown")
-            raise NativeKernelError(rc, f"riskforge_portfolio_scenarios failed: {name} ({rc})")
+            raise NativeKernelError(rc, f"quantlineage_portfolio_scenarios failed: {name} ({rc})")
 
     def pnl(self, exposures, shocks):
         n_e = len(exposures)

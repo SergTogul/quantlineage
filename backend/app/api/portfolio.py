@@ -32,7 +32,7 @@ def _demo_not_found(portfolio_id: str) -> HTTPException:
 
 @router.get("/portfolio", response_model=Portfolio)
 def portfolio(portfolio: Portfolio = Depends(get_default_portfolio)) -> Portfolio:
-    """Default demo portfolio: SQLAlchemy when RISKFORGE_DATABASE_URL set, else SAMPLE."""
+    """Default demo portfolio: SQLAlchemy when QUANTLINEAGE_DATABASE_URL set, else SAMPLE."""
     return portfolio
 
 

@@ -1,4 +1,4 @@
-"""LRU cache for RiskForge ``YieldCurve`` construction (M5.5).
+"""LRU cache for QuantLineage ``YieldCurve`` construction (M5.5).
 
 Keys bind currency-relevant market marks (rates / key_rates / curves /
 projection for that currency) plus ``prefer_projection``. Equity/FX/vol bumps
@@ -120,11 +120,11 @@ _CACHE_LOCK = threading.RLock()
 
 
 def curve_cache_enabled() -> bool:
-    return _env_flag("RISKFORGE_CURVE_CACHE", default=True)
+    return _env_flag("QUANTLINEAGE_CURVE_CACHE", default=True)
 
 
 def _cache_maxsize() -> int:
-    raw = os.getenv("RISKFORGE_CURVE_CACHE_SIZE", "256").strip()
+    raw = os.getenv("QUANTLINEAGE_CURVE_CACHE_SIZE", "256").strip()
     try:
         return max(1, int(raw))
     except ValueError:

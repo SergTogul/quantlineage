@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
-import { contributionBarPct, contributionBarRows, datedSeriesChart, keyRateDv01Chart, riskChangeWaterfallSteps } from './riskVisuals.mjs'
+import { contributionBarPct, contributionBarRows, datedSeriesChart, formatChartValue, keyRateDv01Chart, riskChangeWaterfallSteps } from './riskVisuals.mjs'
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'riskVisuals.mjs'), 'utf8')
 
@@ -91,4 +91,18 @@ test('datedSeriesChart copies API values and scales display y only', () => {
   assert.equal(chart.rows[1].y, 50)
   assert.equal(chart.rows[0].y, 0)
   assert.equal(datedSeriesChart(null).rows.length, 0)
+})
+
+test('datedSeriesChart formats percent extrema and first/last dates', () => {
+  const chart = datedSeriesChart([
+    { as_of: '2024-01-02', value: 0 },
+    { as_of: '2024-01-15', value: -0.083 },
+    { as_of: '2024-03-29', value: -0.02 },
+  ], { unit: 'fraction' })
+  assert.equal(chart.firstDate, '2024-01-02')
+  assert.equal(chart.lastDate, '2024-03-29')
+  assert.equal(chart.minLabel, '-8.30%')
+  assert.equal(chart.maxLabel, '0.00%')
+  assert.equal(formatChartValue(-0.083, 'fraction'), '-8.30%')
+  assert.equal(formatChartValue(44100, 'currency_loss'), '$44.1K')
 })

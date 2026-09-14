@@ -1,4 +1,4 @@
-"""Alembic environment — uses RISKFORGE_DATABASE_URL when set."""
+"""Alembic environment — uses QUANTLINEAGE_DATABASE_URL when set."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Prefer env var (Compose Postgres DSN or CI SQLite).
-_db_url = os.environ.get("RISKFORGE_DATABASE_URL")
+_db_url = os.environ.get("QUANTLINEAGE_DATABASE_URL")
 if _db_url:
     config.set_main_option("sqlalchemy.url", _db_url)
 

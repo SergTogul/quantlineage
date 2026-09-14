@@ -1,6 +1,6 @@
 """R0.12.4 nightly — hierarchy identity (checksum / nodes / MV), not a host SLA.
 
-Skipped unless ``RISKFORGE_NIGHTLY=1`` so PR-FAST / backend-pytest stay fast.
+Skipped unless ``QUANTLINEAGE_NIGHTLY=1`` so PR-FAST / backend-pytest stay fast.
 Does not change pricing engines or risk formulas. Does not invoke
 ``benchmarks/check_m6_sla.py``.
 """
@@ -17,8 +17,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 BENCH_PATH = REPO_ROOT / "benchmarks" / "run_hierarchy_bench.py"
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("RISKFORGE_NIGHTLY") != "1",
-    reason="nightly-only hierarchy identity (set RISKFORGE_NIGHTLY=1)",
+    os.environ.get("QUANTLINEAGE_NIGHTLY") != "1",
+    reason="nightly-only hierarchy identity (set QUANTLINEAGE_NIGHTLY=1)",
 )
 
 

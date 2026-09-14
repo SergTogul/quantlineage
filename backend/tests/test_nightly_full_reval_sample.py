@@ -1,6 +1,6 @@
 """R0.12.4 nightly — larger FULL_REVALUATION sample than the R0.1.4 goldens.
 
-Skipped unless ``RISKFORGE_NIGHTLY=1`` so PR-FAST / backend-pytest stay fast.
+Skipped unless ``QUANTLINEAGE_NIGHTLY=1`` so PR-FAST / backend-pytest stay fast.
 Uses the same shocked-PV − base-PV identity as ``test_full_reval_golden.py``.
 Does not change pricing engines.
 """
@@ -18,7 +18,7 @@ from app.risk.historical_data import ArrayHistoricalDataset, FactorObservationSe
 from app.risk.scenarios import historical_shocked_snapshots
 
 N_OBS = 120
-pytestmark = pytest.mark.skipif(os.environ.get('RISKFORGE_NIGHTLY') != '1', reason='nightly-only larger FULL_REVALUATION sample (set RISKFORGE_NIGHTLY=1)')
+pytestmark = pytest.mark.skipif(os.environ.get('QUANTLINEAGE_NIGHTLY') != '1', reason='nightly-only larger FULL_REVALUATION sample (set QUANTLINEAGE_NIGHTLY=1)')
 
 def test_larger_full_reval_sample_matches_shocked_minus_base_pv():
     pos = EquityPosition(type='equity', id='eq', symbol='UNIT', quantity=10.0)

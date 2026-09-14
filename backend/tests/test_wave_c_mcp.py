@@ -206,7 +206,7 @@ def test_c5_mcp_docs_exist_and_omit_forbidden_tools() -> None:
     text = docs.read_text(encoding="utf-8")
     lowered = text.lower()
     assert "python -m app.mcp" in lowered
-    assert "riskforge_mcp_authorization" in lowered
+    assert "quantlineage_mcp_authorization" in lowered
     assert "allowlist" in lowered
     for banned in ("shell_exec", "sql tool", "filesystem tool", "general http", "yahoo"):
         assert banned not in lowered

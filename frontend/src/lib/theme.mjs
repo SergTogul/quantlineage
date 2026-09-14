@@ -1,6 +1,6 @@
 /** Display theme only — no risk math. */
 export const DEFAULT_THEME = 'dark'
-export const THEME_STORAGE_KEY = 'riskforge-theme'
+export const THEME_STORAGE_KEY = 'quantlineage-theme'
 
 export function parseTheme(value) {
   return value === 'light' ? 'light' : 'dark'

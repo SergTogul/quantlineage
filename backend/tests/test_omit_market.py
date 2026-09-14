@@ -38,7 +38,7 @@ HIERARCHY = HierarchyEngine(HistoricalRiskEngine(seed=1, observations=8))
 STRESS = StressEngine()
 REVERSE = ReverseStressEngine()
 REVERSE_MULTI = MultiFactorReverseStressEngine()
-FIRM_REF = HierarchyRef(level=HierarchyLevel.FIRM, firm="RiskForge")
+FIRM_REF = HierarchyRef(level=HierarchyLevel.FIRM, firm="QuantLineage")
 
 
 def test_historical_engine_calculate_omitted_market_raises() -> None:

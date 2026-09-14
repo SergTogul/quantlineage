@@ -1,6 +1,6 @@
 #pragma once
 
-// RiskForge scenario aggregation kernel (M6).
+// QuantLineage scenario aggregation kernel (M6).
 //
 // Parallel strategy (M6.4 / R0.17): ONE approach only — C++20 standard-library
 // thread pool over contiguous shock partitions (std::jthread when available,
@@ -19,12 +19,12 @@
 #include <vector>
 
 #if defined(__cpp_lib_jthread) && __cpp_lib_jthread >= 201911L
-#define RISKFORGE_HAS_JTHREAD 1
+#define QUANTLINEAGE_HAS_JTHREAD 1
 #else
-#define RISKFORGE_HAS_JTHREAD 0
+#define QUANTLINEAGE_HAS_JTHREAD 0
 #endif
 
-namespace riskforge {
+namespace quantlineage {
 
 struct Exposure {
   double delta, gamma, vega, dv01, fx_delta;
@@ -33,8 +33,8 @@ struct Shock {
   double equity_return, vol_points, rates_bps, fx_return;
 };
 
-/// Env override for auto thread count: RISKFORGE_KERNEL_THREADS (unsigned > 0).
-inline constexpr const char* KERNEL_THREADS_ENV = "RISKFORGE_KERNEL_THREADS";
+/// Env override for auto thread count: QUANTLINEAGE_KERNEL_THREADS (unsigned > 0).
+inline constexpr const char* KERNEL_THREADS_ENV = "QUANTLINEAGE_KERNEL_THREADS";
 
 /// Below this E×S product the kernel stays serial (R0.17). Avoids per-call
 /// thread spawn on tiny books / short histories. Must match Python
@@ -72,7 +72,7 @@ inline unsigned hardware_threads_or_1() noexcept {
   return hc == 0 ? 1u : hc;
 }
 
-/// Resolve worker count. ``requested == 0`` → env ``RISKFORGE_KERNEL_THREADS`` if set,
+/// Resolve worker count. ``requested == 0`` → env ``QUANTLINEAGE_KERNEL_THREADS`` if set,
 /// else ``std::thread::hardware_concurrency()`` (minimum 1).
 inline unsigned resolve_kernel_threads(unsigned requested = 0) noexcept {
   if (requested > 0) {
@@ -141,7 +141,7 @@ inline void portfolio_scenarios_into(const Exposure* exposures, std::size_t n_ex
   kernel_last_used_workers_flag() = true;
   const unsigned use = static_cast<unsigned>(
       std::min<std::size_t>(workers, n_shocks));
-#if RISKFORGE_HAS_JTHREAD
+#if QUANTLINEAGE_HAS_JTHREAD
   std::vector<std::jthread> pool;
   pool.reserve(use);
   for (unsigned tid = 0; tid < use; ++tid) {
@@ -191,7 +191,7 @@ inline void portfolio_scenarios_flat_into(const double* exposures, std::size_t n
   kernel_last_used_workers_flag() = true;
   const unsigned use = static_cast<unsigned>(
       std::min<std::size_t>(workers, n_shocks));
-#if RISKFORGE_HAS_JTHREAD
+#if QUANTLINEAGE_HAS_JTHREAD
   std::vector<std::jthread> pool;
   pool.reserve(use);
   for (unsigned tid = 0; tid < use; ++tid) {
@@ -251,4 +251,4 @@ inline std::vector<double> portfolio_scenarios(const std::vector<Exposure>& ex,
   return out;
 }
 
-}  // namespace riskforge
+}  // namespace quantlineage

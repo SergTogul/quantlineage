@@ -1,7 +1,7 @@
 """Stable RiskRun calculation-lineage payload (Stage 10.5).
 
 Displayed lineage must equal persisted/executed run fields. Release SHA is
-taken from ``RISKFORGE_RELEASE_SHA`` or ``git describe``; it is omitted rather
+taken from ``QUANTLINEAGE_RELEASE_SHA`` or ``git describe``; it is omitted rather
 than faked. Secrets are never included.
 """
 
@@ -14,13 +14,14 @@ from pathlib import Path
 from typing import Any
 
 from app.domain.models import RiskRun, as_of_wire
+from app.market.history.data_mode import data_source_label
 
 _FAKE_SHA = frozenset({"unknown", "dev", "local", "none", "n/a"})
 
 
 def resolve_release_sha() -> str | None:
     """Return a real release identifier, or None. Never invent a placeholder."""
-    env = os.environ.get("RISKFORGE_RELEASE_SHA", "").strip()
+    env = os.environ.get("QUANTLINEAGE_RELEASE_SHA", "").strip()
     if env:
         return None if env.lower() in _FAKE_SHA else env
     return _git_describe()
@@ -59,6 +60,9 @@ def provenance_from_risk_run(run: RiskRun, *, duration_seconds: float | None = N
         "as_of": as_of_wire(run.as_of) if run.as_of is not None else None,
         "historical_dataset_id": run.historical_dataset_id,
         "historical_dataset_version": run.historical_dataset_version,
+        "data_source_label": data_source_label(
+            run.historical_dataset_id, run.historical_dataset_version
+        ),
         "pricing_engine_version": run.pricing_engine_version,
         "methodology": run.methodology.value if run.methodology is not None else None,
         "scenario_set": list(run.scenario_set),

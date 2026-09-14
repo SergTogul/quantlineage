@@ -107,8 +107,9 @@ export function DatedSeriesChart({
   ariaLabel,
   testId,
   className = '',
+  unit = '',
 }) {
-  const chart = datedSeriesChart(series)
+  const chart = datedSeriesChart(series, { unit })
   if (!chart.rows.length) return null
   const W = 640
   const H = 96
@@ -120,6 +121,9 @@ export function DatedSeriesChart({
         role="img"
         aria-label={ariaLabel}
       >
+        <text className="ha-series-y" x="8" y="12">{chart.maxLabel}</text>
+        <text className="ha-series-y" x="8" y="52">{chart.midLabel}</text>
+        <text className="ha-series-y" x="8" y="90">{chart.minLabel}</text>
         <polyline
           fill="none"
           stroke="currentColor"
@@ -137,12 +141,12 @@ export function DatedSeriesChart({
         ))}
       </svg>
       <p className="ha-series-extrema">
-        {chart.rows[0].as_of}
-        {chart.rows.length > 1 ? ` → ${chart.rows[chart.rows.length - 1].as_of}` : ''}
+        {chart.firstDate}
+        {chart.lastDate && chart.lastDate !== chart.firstDate ? ` → ${chart.lastDate}` : ''}
         {' · min '}
-        {String(chart.min)}
+        {chart.minLabel}
         {' · max '}
-        {String(chart.max)}
+        {chart.maxLabel}
       </p>
     </div>
   )

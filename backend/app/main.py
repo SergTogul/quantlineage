@@ -1,4 +1,4 @@
-"""RiskForge FastAPI application — wiring only (M7.1–M7.2 dual-mount; M7.5–M7.6)."""
+"""QuantLineage FastAPI application — wiring only (M7.1–M7.2 dual-mount; M7.5–M7.6)."""
 
 from contextlib import asynccontextmanager
 
@@ -44,12 +44,12 @@ _DOMAIN_ROUTERS = (
 async def lifespan(app: FastAPI):
     """Wire optional SQLAlchemy persistence; else sample / memory backends.
 
-    When ``RISKFORGE_DATABASE_URL`` is set, seeds portfolio + market snapshot +
+    When ``QUANTLINEAGE_DATABASE_URL`` is set, seeds portfolio + market snapshot +
     scenario / limit definitions and exposes SQLAlchemy via session factory.
     When unset, in-memory repos (pre-seeded) live on ``app.state`` for Depends.
 
-    Shared / non-loopback profiles fail closed here unless ``RISKFORGE_API_TOKEN``
-    or ``RISKFORGE_API_TOKENS`` is set (R0.11.5 / RF-014). Local loopback /
+    Shared / non-loopback profiles fail closed here unless ``QUANTLINEAGE_API_TOKEN``
+    or ``QUANTLINEAGE_API_TOKENS`` is set (R0.11.5 / RF-014). Local loopback /
     default Compose stays unauthenticated.
 
     ``PortfolioService`` is constructed here via ``build_portfolio_service()``
@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="RiskForge API",
+    title="QuantLineage API",
     version="0.3.0",
     lifespan=lifespan,
     dependencies=[Depends(enforce_workload_limits)],

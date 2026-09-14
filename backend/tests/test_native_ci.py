@@ -2,8 +2,8 @@
 
 The backend-pytest "Native C++ compile and smoke" step must link both
 ``kernel_test.cpp`` and ``risk_kernel_capi.cpp``. The old one-file compile
-is a documented fail: it does not define ``riskforge_kernel_abi_version`` /
-``riskforge_portfolio_scenarios``. Scan YAML text like ``test_pr_full_ci.py``
+is a documented fail: it does not define ``quantlineage_kernel_abi_version`` /
+``quantlineage_portfolio_scenarios``. Scan YAML text like ``test_pr_full_ci.py``
 (PyYAML is not a dependency).
 """
 
@@ -67,8 +67,8 @@ def test_native_smoke_gpp_lists_both_translation_units():
             "native-smoke g++ argv must list risk_kernel_capi.cpp with "
             "kernel_test.cpp. The old one-file compile "
             "(g++ … native/tests/kernel_test.cpp -o /tmp/kernel_test) is a "
-            "documented fail: undefined _riskforge_kernel_abi_version and "
-            "_riskforge_portfolio_scenarios."
+            "documented fail: undefined _quantlineage_kernel_abi_version and "
+            "_quantlineage_portfolio_scenarios."
         )
         assert "-std=c++20" in cmd
         assert "-O2" in cmd

@@ -1,7 +1,7 @@
 """Correctness tests for YieldCurve construction cache (M5.5).
 
 Invariant: cached ``select_yield_curve`` matches uncached; rate bump → miss;
-equity bump (same rates) → hit; ``RISKFORGE_CURVE_CACHE=0`` disables memo.
+equity bump (same rates) → hit; ``QUANTLINEAGE_CURVE_CACHE=0`` disables memo.
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ from app.risk.factor_types import EquitySpot, RateZero
 
 @pytest.fixture(autouse=True)
 def _fresh_curve_cache(monkeypatch):
-    monkeypatch.setenv("RISKFORGE_CURVE_CACHE", "1")
-    monkeypatch.setenv("RISKFORGE_CURVE_CACHE_SIZE", "64")
+    monkeypatch.setenv("QUANTLINEAGE_CURVE_CACHE", "1")
+    monkeypatch.setenv("QUANTLINEAGE_CURVE_CACHE_SIZE", "64")
     reset_curve_construction_cache()
     yield
     reset_curve_construction_cache()
@@ -115,7 +115,7 @@ def test_curve_cache_prefer_projection_separate_key():
 
 
 def test_curve_cache_disabled(monkeypatch):
-    monkeypatch.setenv("RISKFORGE_CURVE_CACHE", "0")
+    monkeypatch.setenv("QUANTLINEAGE_CURVE_CACHE", "0")
     reset_curve_construction_cache()
     market = _usd_market()
 

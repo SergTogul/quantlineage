@@ -1,6 +1,6 @@
 """R0.6.8 nightly — N=100 × S=50 reconstruction full-reval (not a host SLA).
 
-Skipped unless ``RISKFORGE_NIGHTLY=1`` so PR-FAST / backend-pytest stay fast.
+Skipped unless ``QUANTLINEAGE_NIGHTLY=1`` so PR-FAST / backend-pytest stay fast.
 Records wall / RSS / scenarios/sec / checksums; does not invent floors.
 Does not invoke ``benchmarks/check_m6_sla.py``.
 """
@@ -20,8 +20,8 @@ NIGHTLY_N_POSITIONS = 100
 NIGHTLY_N_OBS = 50
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("RISKFORGE_NIGHTLY") != "1",
-    reason="nightly-only N=100 reconstruction bench (set RISKFORGE_NIGHTLY=1)",
+    os.environ.get("QUANTLINEAGE_NIGHTLY") != "1",
+    reason="nightly-only N=100 reconstruction bench (set QUANTLINEAGE_NIGHTLY=1)",
 )
 
 

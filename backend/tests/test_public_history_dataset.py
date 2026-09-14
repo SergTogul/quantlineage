@@ -424,7 +424,7 @@ def test_dataset_id_plus_version_resolves_immutable_bytes(
     first = _freeze(tmp_path)
     second = _freeze(tmp_path, history=FakeHistoryProvider(_mutated_aapl_catalog()))
     monkeypatch.delenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", raising=False)
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     monkeypatch.setenv(PUBLIC_HISTORY_DIR_ENV, str(tmp_path))
 
     older = resolve_public_history_csv(dataset_version=first.dataset_version)
@@ -479,7 +479,7 @@ def test_freeze_then_factory_loads_by_id_without_providers(
     assert macro.calls > 0
 
     monkeypatch.setenv(PUBLIC_HISTORY_CSV_ENV, str(artifact.csv_path))
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
 
     exploding_history = ExplodingHistoryProvider()
     exploding_macro = ExplodingMacroProvider()
@@ -511,7 +511,7 @@ def test_riskrun_factory_identity_matches_frozen_artifact(
 
     artifact = _freeze(tmp_path)
     monkeypatch.setenv(PUBLIC_HISTORY_CSV_ENV, str(artifact.csv_path))
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
 
     spec = resolve_run_spec({"historical_dataset_id": WAVE_A_DATASET_ID})
     assert spec.historical_dataset_id == WAVE_A_DATASET_ID
@@ -524,7 +524,7 @@ def test_riskrun_factory_identity_matches_frozen_artifact(
 
 
 def test_default_dataset_stays_demo_multi_factor(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("RISKFORGE_HISTORICAL_DATASET", raising=False)
+    monkeypatch.delenv("QUANTLINEAGE_HISTORICAL_DATASET", raising=False)
     monkeypatch.delenv("QUANTLINEAGE_PUBLIC_HISTORY_CSV", raising=False)
     dataset = create_historical_dataset()
     engine = build_historical_risk_engine()

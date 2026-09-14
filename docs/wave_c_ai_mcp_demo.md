@@ -19,14 +19,14 @@ If a number is not on the screen from `data.card` / `data.provenance` / `data.to
 
 ## Fresh setup (inline HEAVY)
 
-`POST /api/v1/risk/query` is **HEAVY**. Compose `backend` sets `RISKFORGE_EXTERNAL_WORKER=1`, which refuses that POST with HTTP 400 (`details.use=/risk/runs`). Do not quote a VaR from that error.
+`POST /api/v1/risk/query` is **HEAVY**. Compose `backend` sets `QUANTLINEAGE_EXTERNAL_WORKER=1`, which refuses that POST with HTTP 400 (`details.use=/risk/runs`). Do not quote a VaR from that error.
 
 For this walkthrough, run the API **in-process** so inline HEAVY is allowed (flags unset). Lifespan binds `RiskRunWorker` onto `PortfolioService`, which is what lets **run portfolio risk** / **Run equity-down stress.** enqueue instead of fail-closed.
 
 ```bash
 # API — 127.0.0.1:8000. Lifespan seeds demo books when DATABASE_URL is unset.
 cd backend
-PYTHONPATH=. RISKFORGE_PRICING_ENGINE=builtin .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+PYTHONPATH=. QUANTLINEAGE_PRICING_ENGINE=builtin .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 ```bash
@@ -79,7 +79,7 @@ Copy identities from the JSON the UI already rendered (`data.card`, `data.proven
 
 **Expect:** `tool_name=run_portfolio_risk`. Copy `id` / `status` / `run_type` / `portfolio_id` from `data.tool_result`. Do not read VaR from this queued payload.
 
-If the answer is the digit-free tool-failure sentence, the API is not the in-process worker (Compose `RISKFORGE_EXTERNAL_WORKER=1` or worker unbound). Fix setup; do not invent VaR.
+If the answer is the digit-free tool-failure sentence, the API is not the in-process worker (Compose `QUANTLINEAGE_EXTERNAL_WORKER=1` or worker unbound). Fix setup; do not invent VaR.
 
 ### 4. Contributors (~30s)
 

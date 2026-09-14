@@ -42,7 +42,7 @@ DEMO_HISTORICAL_CSV_NAME = "demo_historical_factors.csv"
 DEMO_MULTI_FACTOR_DATASET_ID = "demo-multi-factor-history"
 DEMO_MULTI_FACTOR_CSV_NAME = "demo_multi_factor_history.csv"
 DEMO_MULTI_FACTOR_DATASET_VERSION = "v1"
-HISTORICAL_DATASET_ENV = "RISKFORGE_HISTORICAL_DATASET"
+HISTORICAL_DATASET_ENV = "QUANTLINEAGE_HISTORICAL_DATASET"
 DEFAULT_HISTORICAL_DATASET_SOURCE = DEMO_MULTI_FACTOR_DATASET_ID
 
 # MVP aggregate factor names matching FactorObservationSeries columns.
@@ -482,7 +482,7 @@ def create_historical_dataset(
 ) -> HistoricalMarketDataset:
     """Resolve a historical factor source for risk engines / API DI.
 
-    ``source`` (or env ``RISKFORGE_HISTORICAL_DATASET``) may be:
+    ``source`` (or env ``QUANTLINEAGE_HISTORICAL_DATASET``) may be:
 
     - unset / ``demo-multi-factor-history`` — packaged per-factor demo panel
     - ``demo`` / ``demo-historical-factors`` — labeled four-macro fixture CSV
@@ -491,7 +491,7 @@ def create_historical_dataset(
       or hashed files under ``data/public_history/real-public-wave-a/``)
     - path to a ``.csv`` file (four-macro or per-factor headers)
 
-    When ``source`` and ``RISKFORGE_HISTORICAL_DATASET`` are unset,
+    When ``source`` and ``QUANTLINEAGE_HISTORICAL_DATASET`` are unset,
     ``QUANTLINEAGE_DATA_MODE=public`` selects ``real:public:wave-a`` (fails closed
     if the CSV is missing). Unset / ``synthetic`` keeps the demo panel.
 

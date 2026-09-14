@@ -95,4 +95,13 @@ describe('ScenarioBuilder', () => {
 
     expect(await screen.findByText(/500 Internal Server Error/)).toBeInTheDocument()
   })
+
+  it('keeps the API payload conversion preview collapsed behind details', () => {
+    render(<ScenarioBuilder portfolio={demoPortfolio} />)
+    const details = screen.getByTestId('scenario-api-payload')
+    expect(details.tagName).toBe('DETAILS')
+    expect(details).not.toHaveAttribute('open')
+    expect(details).toHaveTextContent(/API payload/i)
+    expect(details).toHaveTextContent(/API shocks/i)
+  })
 })
