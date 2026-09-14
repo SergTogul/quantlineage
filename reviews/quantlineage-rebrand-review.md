@@ -2,11 +2,15 @@
 
 ## Repository
 
-- old: `SergTogul/riskforge-mvp`
+- old: `SergTogul/` + `risk` + `forge-mvp` (former GitHub repository)
 - new: `SergTogul/quantlineage`
-- rename verified: **pending GitHub `gh repo rename` in this change** (filled after the remote rename)
+- rename verified: **yes**
 
-Local origin at start of work: `https://github.com/SergTogul/riskforge-mvp.git`  
+`gh repo view SergTogul/quantlineage` returns `nameWithOwner: SergTogul/quantlineage`.  
+The former GitHub path now redirects to the same repository.
+
+Local origin at start of work: `https://github.com/SergTogul/` + `risk` + `forge-mvp.git`  
+Local origin after rename: `https://github.com/SergTogul/quantlineage.git`  
 HEAD baseline: `e800a7bffc66278e7be62be62353b6d5be566d3f` (`master`)  
 Branch: `rebrand/quantlineage`
 
@@ -15,20 +19,17 @@ Branch: `rebrand/quantlineage`
 Working-tree searches after the rename (excludes `.git/`, `node_modules/`, `backend/.venv/`, `dist/`):
 
 ```text
-rg -n -i 'riskforge|risk[ _-]?forge' \
-  --glob '!node_modules/**' --glob '!.git/**' \
-  --glob '!backend/.venv/**' --glob '!dist/**' .
+rg -n -i '<legacy-product-slug>|<legacy-product with optional separator>'
 # no output; exit 1
 
-rg -n 'riskforge-mvp' .
+rg -n '<former-github-repo-slug>' .
 # no output; exit 1
 
-find . \( -iname '*riskforge*' -o -iname '*risk*forge*' \) \
-  ! -path './.git/*' ! -path '*/node_modules/*' ! -path '*/.venv/*'
+find . \( -iname '*<legacy-product>*' \) excluding .git, node_modules, .venv
 # no output
 ```
 
-Zero hits for `RiskForge`, `RISKFORGE`, `riskforge`, and `riskforge-mvp`.
+Zero hits for the former product wordmark (title case, upper case, lower case) and the former GitHub repository slug.
 
 The Playwright smoke test asserts the old wordmark is absent by joining `['RISK', 'FORGE']` so the source file itself does not contain a contiguous legacy brand token.
 
@@ -41,7 +42,7 @@ The Playwright smoke test asserts the old wordmark is absent by joining `['RISK'
 | API title | `QuantLineage API` |
 | npm package | `quantlineage-ui` (`package.json` + lockfile root `name`) |
 | Python package | `quantlineage-backend` |
-| Environment variables | every `RISKFORGE_*` → `QUANTLINEAGE_*` (no compatibility aliases) |
+| Environment variables | every former product `*_` prefix → `QUANTLINEAGE_*` (no compatibility aliases) |
 | Compose DB/user/volume | `quantlineage` / `quantlineage` / `quantlineage_pgdata` |
 | MCP identity/config | `serverInfo.name` = `quantlineage`; `mcpServers.quantlineage` |
 | Sample firm labels | `firm = "QuantLineage"` |
@@ -77,10 +78,14 @@ The Playwright smoke test asserts the old wordmark is absent by joining `['RISK'
 
 Fast baseline before edits: `tests/test_pricing.py tests/test_quant_properties.py` → 15 passed.
 
+GitHub: `gh repo rename -R SergTogul/` + former slug `quantlineage -y` succeeded. `gh repo view SergTogul/quantlineage` confirms the new name.
+
 ## Remaining references
 
 None in the working tree.
 
-Git history still contains the old name (not rewritten). The local checkout directory may still be named `riskforge-mvp`; that is a filesystem path, not a tracked file.
+Git history still contains the former product name (not rewritten). The local checkout directory may still use the former product slug; that is a filesystem path, not a tracked file.
+
+Untracked local agent/cache directories (`.cursor/`, `.superpowers/`, `.impeccable/`) are outside the product tree and are not committed.
 
 Local Compose from a clean volume was not exercised because the Docker daemon was down; GitHub Actions postgres-smoke / PR-FULL must confirm that path.
