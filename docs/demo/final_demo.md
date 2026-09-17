@@ -48,11 +48,21 @@ The screenshots below were captured from the local app against the deterministic
 
 ![Overview](quantlineage_demo_01_overview.png)
 
+![Risk-change waterfall](quantlineage_demo_02_risk_change.png)
+
+![Historical Analytics](quantlineage_demo_03_historical.png)
+
+![Risk Query](quantlineage_demo_04_query_provenance.png)
+
+![Calculation provenance](quantlineage_demo_06_provenance.png)
+
 ![Portfolio](quantlineage_demo_02_portfolio.png)
 
 ![VaR and ES](quantlineage_demo_03_var_es.png)
 
 ![Stress](quantlineage_demo_04_stress.png)
+
+![KR-DV01](quantlineage_demo_05_kr_dv01.png)
 
 ## Expected Ranges
 

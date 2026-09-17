@@ -2,7 +2,7 @@
 
 Presenter script: [`../demo_script.md`](../demo_script.md).
 
-This folder’s screenshots (`quantlineage_demo_01_overview.png` …) were captured against the local deterministic API. They are **demo** illustrations, not observed-market evidence. Prefer live UI numbers over screenshot figures.
+This folder’s screenshots (`quantlineage_demo_01_overview.png`, risk-change, historical, query, provenance, and sibling captures) were captured against the local deterministic API. They are **demo** illustrations, not observed-market evidence. Prefer live UI numbers over screenshot figures.
 
 ## Seed
 

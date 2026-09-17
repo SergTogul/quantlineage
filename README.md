@@ -1,31 +1,56 @@
 # QuantLineage
 
-**AI-Powered Multi-Asset Risk & Attribution Platform**
+**Every risk number has a lineage. Every change has an explanation.**
 
-QuantLineage is an institutional-style portfolio risk platform that calculates risk deterministically, preserves the lineage of every calculation, and explains why risk changed across markets, trades, and factors.
+QuantLineage is a portfolio risk terminal that answers one question first: *why did the book’s risk change?* It compares two immutable RiskRuns, splits the move into trades, markets, and residual, and shows the dataset, snapshot, and methodology that produced the figure.
 
-> The pricing library prices. QuantLineage manages portfolio risk.
-> The model orchestrates deterministic tools; it never calculates financial risk itself.
+The pricing library prices. QuantLineage manages portfolio risk. The model routes deterministic tools; it never invents VaR, ES, or DV01.
 
-## Why QuantLineage
+Repo: [github.com/SergTogul/quantlineage](https://github.com/SergTogul/quantlineage)
 
-- Multi-asset pricing through a clean `PricingEngine` boundary
+![Overview — Why did my risk change?](docs/demo/quantlineage_demo_01_overview.png)
+
+## Demo (5–6 minutes)
+
+One path. Local demo book. No live vendors.
+
+1. **Overview** — Global Macro Demo, breaches, KPIs. Click **Why did my risk change?**
+2. **Risk-change waterfall** — **Compare T0/T1**. Trades vs markets vs residual, with dataset/snapshot identity.
+3. **Historical Analytics** — wealth, drawdown, Sharpe (dimensionless), data-source badge.
+4. **Stress / KR-DV01** — named shocks, then the USD rates KR-DV01 tenor curve.
+5. **Provenance** — Risk Runs → completed run: portfolio, snapshot, dataset, methodology, release SHA.
+6. **AI / MCP** — Risk Query (“Why did my risk change?”) asks for two RiskRun ids and **does not invent VaR**. Optional MCP tools over the same services.
+
+```bash
+docker compose up --build
+# or local uvicorn + Vite → http://127.0.0.1:5173
+```
+
+![Risk-change waterfall](docs/demo/quantlineage_demo_02_risk_change.png)
+
+![Historical Analytics](docs/demo/quantlineage_demo_03_historical.png)
+
+![Risk Query](docs/demo/quantlineage_demo_04_query_provenance.png)
+
+![Calculation provenance](docs/demo/quantlineage_demo_06_provenance.png)
+
+Inputs are packaged: demo books from `GET /api/v1/portfolios`, synthetic panel `data/demo_multi_factor_history.csv`, optional public EOD freeze in [`docs/public_data_demo.md`](docs/public_data_demo.md). Artifact check:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/check_final_demo.py
+```
+
+Longer walkthroughs: [`docs/demo_script.md`](docs/demo_script.md) (institutional UI story) and [`docs/demo/final_demo.md`](docs/demo/final_demo.md) (artifact path).
+
+## What the terminal shows
+
+- Immutable RiskRuns with dataset / snapshot / methodology lineage
+- “Why did my risk change?” attribution (trades, markets, residual)
 - Historical VaR / ES: Linear, Delta-Gamma, Full Revaluation
-- Greeks, DV01 and KR-DV01
+- Greeks, DV01, KR-DV01
 - Stress and reverse stress
-- Firm → Desk → Book → Trade risk hierarchy
-- “Why did my risk change?” attribution
-- Immutable RiskRuns with dataset/snapshot/methodology lineage
-- Public EOD equity/rates ingestion + deterministic offline demo
-- Typed AI/MCP tools over deterministic risk services
-
-## Signature Workflow — Why Did My Risk Change?
-
-Open the terminal on the default **status** Overview. The hero action **Why did my risk change?** jumps to the Risk Change Attribution waterfall (`#var-es/risk-change`).
-
-That panel compares two completed RiskRuns (T0 → T1) and attributes the change to trades, markets, and residual. Drivers, residual, and identity come from `POST /api/v1/risk/runs/compare`. The UI never recomputes VaR.
-
-Talk track: the book moved; here is whether it was the inventory, the market, or leftover interaction — with the dataset and snapshot that produced the numbers.
+- Firm → Desk → Book → Trade hierarchy
+- Typed AI/MCP tools over the same risk services
 
 ## Architecture
 
@@ -40,29 +65,9 @@ Portfolio / Position
   -> Optional MCP/tool router over the same deterministic services
 ```
 
-The pricing library prices. QuantLineage owns aggregation, snapshots, risk, lineage, and workflow. Native C++ accelerates LINEAR/DELTA_GAMMA scenario aggregation only; FULL_REVALUATION stays on `PricingEngine`.
+QuantLineage owns aggregation, snapshots, risk, lineage, and workflow. Native C++ accelerates LINEAR/DELTA_GAMMA scenario aggregation only; FULL_REVALUATION stays on `PricingEngine`.
 
 See [`docs/architecture.md`](docs/architecture.md) and [`docs/adr/README.md`](docs/adr/README.md).
-
-## Demo
-
-Five to eight minutes from a clean checkout:
-
-1. `docker compose up --build` (or local uvicorn + Vite). Open `http://127.0.0.1:5173` — default Overview is the **status** blotter.
-2. Confirm **QUANTLINEAGE** in the nav and **Global Macro Demo** as the book heading.
-3. Click **Why did my risk change?** → Risk Change Attribution. Run **Compare T0/T1**.
-4. Historical Analytics: wealth, drawdown, Sharpe (dimensionless), data-source badge.
-5. Scenario Builder, Risk Query (“Why did my risk change?”), then Risk Runs provenance.
-
-Inputs are local: demo books from `GET /api/v1/portfolios`, packaged synthetic history at `data/demo_historical_factors.csv` / `data/demo_multi_factor_history.csv`, optional public EOD freeze in [`docs/public_data_demo.md`](docs/public_data_demo.md). Artifact: `data/demo_risk_artifact.json`.
-
-Walkthroughs: [`docs/demo/final_demo.md`](docs/demo/final_demo.md) (3–5 min artifact path) and [`docs/demo_script.md`](docs/demo_script.md) (institutional UI story).
-
-```bash
-PYTHONPATH=backend backend/.venv/bin/python scripts/check_final_demo.py
-```
-
-![Overview](docs/demo/quantlineage_demo_01_overview.png)
 
 ## Quant Methodology
 

@@ -1,6 +1,8 @@
 # Golden Institutional Demo Script (Stage 10.4)
 
-One **5–8 minute** walkthrough from a fresh checkout. All risk numbers come from the backend. This script records **clicks**, **talking points**, and **expected relationships** — it does not invent VaR, ES, or P&L figures.
+Canonical **5–6 minute** interview path (README): Overview → Why did my risk change? → Historical Analytics → Stress / KR-DV01 → Provenance → AI/MCP.
+
+This file is the longer institutional UI story from a fresh checkout. All risk numbers come from the backend. It records **clicks**, **talking points**, and **expected relationships** — it does not invent VaR, ES, or P&L figures.
 
 ## Demo vs observed data
 

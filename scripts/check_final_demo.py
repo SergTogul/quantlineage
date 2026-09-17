@@ -32,8 +32,13 @@ REQUIRED_PATHS = (
     "docs/demo/final_demo.md",
     "docs/demo/quantlineage_demo_01_overview.png",
     "docs/demo/quantlineage_demo_02_portfolio.png",
+    "docs/demo/quantlineage_demo_02_risk_change.png",
     "docs/demo/quantlineage_demo_03_var_es.png",
+    "docs/demo/quantlineage_demo_03_historical.png",
     "docs/demo/quantlineage_demo_04_stress.png",
+    "docs/demo/quantlineage_demo_04_query_provenance.png",
+    "docs/demo/quantlineage_demo_05_kr_dv01.png",
+    "docs/demo/quantlineage_demo_06_provenance.png",
     "backend/app/demo/run_demo_risk.py",
     "scripts/run_demo_risk.py",
 )
