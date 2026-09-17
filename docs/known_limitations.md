@@ -101,6 +101,5 @@ This catalog is part of the portfolio-presentation package. It is intentionally 
 
 - Repository docs record specific local and GitHub Actions verification evidence where available.
 - This limitations catalog is not a live CI badge. Before claiming a branch is merge-ready, rerun the relevant local checks and verify required CI is green.
-- Suite counts in `ROADMAP.md` Current gate are the recorded Phase A baseline (**not a live** re-run).
 - Labeled-runner SLA-K1 and SLA-K2 are **post-R0** (still **not MET**): no labeled runner; SLA-K1/K2 not CI-enforced; do not run `check_m6_sla.py` on `ubuntu-latest`.
 - QA-024 demo-artifact range check against QuantLib is **MET** (relative 25% on market value / named stress P&Ls; `var_99` in `[0.25×, 4×]` of `data/demo_risk_artifact.json`; nightly `tests/test_qa024_ql_demo_range.py`). Not byte-equality.

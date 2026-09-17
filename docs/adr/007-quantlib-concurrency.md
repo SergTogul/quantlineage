@@ -1,6 +1,6 @@
 # ADR 007: QuantLib concurrency — RLock, process isolation, native kernels
 
-- Status: Accepted (codifies existing adapter + worker design; closes ROADMAP )
+- Status: Accepted (codifies existing adapter + worker design)
 - Date: 2026-09-02
 - Owners: Lead Architect; C++ Performance Engineer; Quant Pricing Engineer
 
@@ -135,4 +135,3 @@ process — not more threads in that loop.
 - `backend/tests/test_quantlib_process_parallelism.py` (R0.3.5 pins)
 - `backend/tests/test_r065_process_partition.py` (R0.6.5 HEAVY / RiskRun proof)
 - `backend/native/README.md` (kernel parallelism; FULL_REVAL out of scope)
-- ROADMAP

@@ -4,7 +4,7 @@ These helpers name dual conventions without changing numerical semantics.
 Call sites must convert at the boundary rather than scattering ``/ 10_000`` or
 ``* 100`` literals.
 
-Frozen internal conventions (from ``reviews/r0.4-architecture-brief.md``):
+Frozen internal conventions:
 
 | Factor family | Engine-facing amount | Notes |
 |---|---|---|

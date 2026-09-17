@@ -139,10 +139,7 @@ python3 -m pytest benchmarks/test_bench_smoke.py -q
  Python/NumPy only. Shared builds need `-I backend/native/include -pthread`.
 - **Do not fight .** This directory must not depend on risk-run HTTP APIs.
 
-## Ownership
-
-Owned by the C++ Performance Engineer (`docs/agents/06_CPP_PERFORMANCE_ENGINEER.md`).
-Benchmark scripts stay separate from product unit tests; equivalence stays in
+Benchmark scripts stay separate from product unit tests. Equivalence stays in
 `backend/tests/test_native_kernel.py` and Historical VaR parity in
 `backend/tests/test_historical_scenario_kernel.py`.
 

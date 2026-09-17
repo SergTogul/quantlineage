@@ -77,22 +77,6 @@ The React terminal is presentation and workflow. It calls `/api/v1` endpoints, d
 
 Natural-language risk query code is deterministic today. It selects tool contracts backed by `PortfolioService`, executes those tools, and formats grounded results. A future external LLM loop must preserve the same rule: tool selection and narration only, no model-computed risk numbers.
 
-## Ownership Map
-
-| Area | Owner | Typical paths |
-|---|---|---|
-| Architecture, contracts, ADRs | Lead Architect | `docs/`, `backend/app/domain/`, `backend/app/interfaces/` |
-| Quant pricing | Quant Pricing Engineer | `backend/app/pricing/` |
-| Market data and curves | Market Data & Curves Engineer | `backend/app/market/`, `backend/app/risk/factor_types.py` |
-| Portfolio risk | Portfolio Risk Engineer | `backend/app/risk/var.py`, `historical.py`, `hierarchy.py`, `attribution.py`, `limits.py` |
-| Stress and scenarios | Stress & Scenario Engineer | `backend/app/risk/stress.py`, `scenario_model.py`, `reverse_stress*.py` |
-| Native performance | C++ Performance Engineer | `backend/native/`, `backend/app/compute/` |
-| Backend/API | Backend/API Engineer | `backend/app/api/`, `backend/app/services/`, `backend/app/persistence/` |
-| Frontend | Frontend/Risk UX Engineer | `frontend/` |
-| AI orchestration | AI Orchestration Engineer | `backend/app/risk/query.py` |
-| QA and validation | QA & Quant Validation Engineer | `backend/tests/`, `frontend/**/*.test.*`, `e2e/` |
-| DevOps/platform | DevOps/Platform Engineer | `.github/`, `docker-compose.yml`, build/test tooling |
-
 ## Architectural Decisions
 
 The decision record index lives at [`docs/adr/README.md`](adr/README.md). The current ADR set records decisions already evidenced in code/docs; it does not speculate about future choices.

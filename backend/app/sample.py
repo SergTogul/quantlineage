@@ -4,7 +4,7 @@ No live market-data vendor feeds. Demo positions carry contractual economics onl
 exclusively in ``_DEMO_MARKETS`` / ``_DEMO_AGGREGATE_MARKETS``
 (and explicit test snapshots).
 
-Themes (ROADMAP M10.1):
+Themes:
 - Equity Vol — cash equity + options + index future (vol / skew book)
 - Rates Macro — bonds, swaps, IR future (rates DV01 book)
 - Cross-Asset — multi-asset macro book (default ``SAMPLE_PORTFOLIO``)

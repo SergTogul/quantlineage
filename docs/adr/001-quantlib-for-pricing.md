@@ -14,7 +14,7 @@ Evidence in repo:
 - `backend/app/pricing/quantlib.py` implements `QuantLibPricingEngine` (default production path).
 - `backend/app/pricing/builtin.py` implements `BuiltinPricingEngine` as a full-coverage reference / test fallback.
 - `backend/app/pricing/factory.py` selects the engine via `QUANTLINEAGE_PRICING_ENGINE` (default `"quantlib"`; tests force `"builtin"` in `conftest.py`).
-- QuantLib coverage is partial: unsupported instruments fall back to Builtin inside the QuantLib adapter (documented in `ROADMAP.md` ).
+- QuantLib coverage is partial: unsupported instruments fall back to Builtin inside the QuantLib adapter.
 - Risk modules depend on `PricingEngine`, not QuantLib types (e.g. sensitivities docstring / imports).
 
 ## Decision

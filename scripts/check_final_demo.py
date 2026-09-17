@@ -25,7 +25,6 @@ if str(BACKEND) not in sys.path:
 
 REQUIRED_PATHS = (
     "README.md",
-    "ROADMAP.md",
     "data/demo_historical_factors.csv",
     "data/demo_multi_factor_history.csv",
     "data/demo_risk_artifact.json",

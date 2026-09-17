@@ -30,7 +30,7 @@ This is a documentation-only package. It does not change risk, pricing, API, fro
 - Backend: `pip install -r requirements-dev.txt` then `ruff check app tests` and `mypy app` (config in `backend/pyproject.toml`).
 - Frontend: `npm run lint` (`eslint.config.js`; `--max-warnings 0`).
 - CI: `.github/workflows/ci.yml` job `lint-static-analysis`.
-- Staged: not full-strict — see ROADMAP for ignored Ruff rules and mypy `disable_error_code` debt list.
+- Staged: not full-strict — ignored Ruff rules and mypy `disable_error_code` live in `backend/pyproject.toml`.
 - Follow-up `8d7a6f2`: lint CI installs numpy (mypy `numpy.typing`); Historical VaR kernel tests keep absolute `TOL` / `assert_allclose` imports.
 
 ## Frontend Vitest / RTL / MSW (2026-09-02, QA)
@@ -62,7 +62,7 @@ Result: **exit 0**. Alembic applied `001_initial_persistence` → `002_risk_run_
 ### GitHub-hosted runners (green)
 
 - `.github/workflows/ci.yml` job `postgres-persistence-smoke` uses a `postgres:16-alpine` service + the same URL/script.
-- Green runner evidence is recorded in `ROADMAP.md`: https://github.com/SergTogul/quantlineage/actions/runs/33712643872.
+- Green runner evidence: https://github.com/SergTogul/quantlineage/actions/runs/33712643872.
 - The Postgres smoke remains the CI proof for the durable persistence path; unit tests use SQLite or in-memory repos for speed.
 
 ## Risk-run queue / worker residual (2026-09-03)

@@ -10,12 +10,10 @@ Natural-language risk questions are a product goal (Workstream 11), but LLMs mus
 
 Evidence in repo:
 
-- `AGENTS.md` core rule: “The model orchestrates deterministic tools; it never calculates financial risk itself.”
-- Agent rules: no risk/pricing numbers computed in LLM prompts or model output; AI code must call deterministic APIs.
-- `docs/agents/09_AI_ORCHESTRATION_ENGINEER.md`: “LLM orchestrates; deterministic QuantLineage functions calculate.”
+- Product rule: the model orchestrates deterministic tools; it never calculates financial risk itself.
+- No risk/pricing numbers are computed in LLM prompts or model output; AI code must call deterministic APIs.
 - `backend/app/risk/query.py`: `RiskQueryEngine` — keyword intent router; docstring states an LLM can later call the same service methods as tools.
 - `POST /risk/query` wires through `PortfolioService` → `RiskQueryEngine.answer(...)`, which invokes `threat_evaluation`, `contributors`, `summary`, `limits`, etc.
-- ROADMAP PARTIAL (keyword engine + service methods); LLM orchestration NOT STARTED.
 
 ## Decision
 

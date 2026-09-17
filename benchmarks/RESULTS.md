@@ -1,8 +1,6 @@
 # scenario-kernel benchmarks + formal product SLA
 
-**Owner:** C++ Performance Engineer (`docs/agents/06_CPP_PERFORMANCE_ENGINEER.md`).
-**Workstream status:COMPLETE** (2026-09-02) under the formal scenario-kernel
-SLA below — not under an HTTP end-to-end VaR latency claim.
+Measured under the formal scenario-kernel SLA below — not an HTTP end-to-end VaR latency claim.
 
  wires this kernel into LINEAR/DELTA_GAMMA approximate P&L behind
 `QUANTLINEAGE_SCENARIO_KERNEL`. parallel results follow the serial baseline.

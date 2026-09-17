@@ -30,7 +30,7 @@ a single canonical prefix without breaking existing callers in this workstream.
 | Remove legacy immediately | Breaks SPA and any external callers; violates non-breaking preference. |
 | Version only risk-runs | Superseded by full dual-mount; incomplete as a long-term story. |
 | Skip deprecation headers | Harder for clients to discover the successor; headers are low-risk. |
-| Force SPA migrate in same PR | Optional per ROADMAP; higher blast radius for close-out; hand off to . |
+| Force SPA migrate in same PR | Higher blast radius for close-out. |
 
 ## Consequences
 

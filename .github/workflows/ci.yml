@@ -271,8 +271,8 @@ jobs:
       - name: Production build
         run: npm run build
 
-  # M9.7: Ruff + mypy (backend) and ESLint (frontend). Staged rule sets — see
-  # backend/pyproject.toml and frontend/eslint.config.js; ROADMAP documents debt.
+  # Ruff + mypy (backend) and ESLint (frontend). Staged rule sets live in
+  # backend/pyproject.toml and frontend/eslint.config.js.
   lint:
     name: lint-static-analysis
     runs-on: ubuntu-latest

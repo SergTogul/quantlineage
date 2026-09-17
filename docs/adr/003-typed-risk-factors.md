@@ -13,7 +13,7 @@ Evidence in repo:
 - `backend/app/risk/factor_types.py`: `EquitySpot`, `EquityVol`, `RateZero`, `FXSpot`, `FXVol`; union `RiskFactor`; `FactorType = Literal["equity", "vol", "rate", "fx"]`.
 - Stable string keys via `.key` (e.g. `{underlying}:VOL`, `{currency}:RATE`, `{pair}:VOL`) and `parse_risk_factor` for legacy `(factor, factor_type, bucket)` triples.
 - `RiskFactorEngine` aggregates on typed `RiskFactor` instances; API DTO `RiskFactorExposure` still exposes `factor: str`.
-- `ROADMAP.md` marks complete with tests (`test_factor_types.py` and related).
+- Coverage is in `test_factor_types.py` and related tests.
 
 ## Decision
 

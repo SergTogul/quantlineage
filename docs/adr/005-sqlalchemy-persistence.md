@@ -73,5 +73,4 @@ QuantLib at runtime; those handles are not serializable and must not be stored.
 - Apply Alembic before first use: ``alembic upgrade head`` (or
  ``docker compose run --rm backend alembic upgrade head``).
 - Local / CI Postgres smoke: ``./scripts/smoke_postgres.sh`` (requires
- ``QUANTLINEAGE_DATABASE_URL``). GitHub-hosted runner evidence is recorded in
- ``ROADMAP.md``.
+ ``QUANTLINEAGE_DATABASE_URL``).

@@ -64,7 +64,7 @@ Removal is **not** automatic on the Sunset date. Gates before unmounting legacy:
 
 1. Frontend Risk UX (Agent 08) migrated `api.js` to `/api/v1` (**DONE** 2026-09-02). E2E / scripts / Compose smoke may still use legacy until updated.
 2. No remaining in-repo callers on unversioned paths (scripts, Compose smoke, docs examples updated).
-3. Lead Architect signs off on a breaking-change note in ROADMAP / release notes.
+3. A breaking-change note lands in the release notes.
 
 ## How UI / clients should migrate
 
