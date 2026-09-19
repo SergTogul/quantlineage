@@ -391,7 +391,7 @@ python3 -m pytest tests/test_ai_evals.py -q
 
 Evidence:
 
-- Commit `2cbe476` — Add fixed evaluation suite (T12)
+- Commit `c7ebd5c` — Add fixed evaluation suite (T12)
 - Checks: `cd backend && python3 -m pytest tests/test_ai_evals.py -q` → 74 passed (16 supported paraphrases 16/16 routing; 7 missing-identifier; 6 advisory; 6 injection; 5 invalid-arg; 2 secret-extraction)
 
 ### T13 — Wire Compose and write the operator guide
