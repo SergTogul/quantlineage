@@ -16,6 +16,10 @@ Model name, prompts, and API keys are not surfaced in the UI.
 - `frontend/src/components/RiskQuery.test.jsx` — two new tests plus absent-metadata assertions on existing card test
 - `docs/ai/TASKS.md` — T10 marked complete
 
+## Commit
+
+`092c6d3` — Show provider state in RiskQuery UI (T10)
+
 ## Checks
 
 ```bash
