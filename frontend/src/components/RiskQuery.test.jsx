@@ -93,9 +93,26 @@ describe('RiskQuery', () => {
     expect(provenance).not.toHaveTextContent('Value')
 
     expect(card).not.toHaveTextContent('11')
-    expect(screen.getByText(/USD 10Y KR-DV01 is −8 per_bp from the rates showcase/)).toBeInTheDocument()
+    expect(screen.getByTestId('risk-query-answer')).toHaveTextContent(
+      /USD 10Y KR-DV01 is −8 per_bp from the rates showcase/,
+    )
     expect(screen.queryByTestId('risk-query-assistant-state')).not.toBeInTheDocument()
     expect(screen.queryByTestId('risk-query-assistant-fallback')).not.toBeInTheDocument()
+  })
+
+  it('formats answers with bold numbers and paragraph structure', async () => {
+    queryHandler(() => ({
+      answer: 'Worst stress scenario is Dot-com-style equity crash with loss 677,747. Second sentence stays separate.',
+      data: {},
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+
+    const answer = await screen.findByTestId('risk-query-answer')
+    expect(answer.querySelectorAll('.query-answer-p')).toHaveLength(2)
+    expect(answer.querySelector('.query-answer-lead')).toHaveTextContent(/Worst stress scenario/i)
+    expect(answer.querySelector('.query-answer-num')).toHaveTextContent('677,747')
   })
 
   it('hides result card when every identity field is missing on the payload', async () => {

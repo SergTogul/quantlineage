@@ -428,6 +428,49 @@ function isRiskQueryAssistantMeta(value) {
   )
 }
 
+/** Split deterministic answer text into sentences for readable paragraphs. */
+export function splitRiskQueryParagraphs(answer) {
+  const text = String(answer || '').trim()
+  if (!text) return []
+  const parts = text.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [text]
+  return parts.map((part) => part.trim()).filter(Boolean)
+}
+
+function boldRiskQueryNumbers(text) {
+  const parts = String(text).split(/([−-]?\d[\d,]*(?:\.\d+)?%?)/g)
+  return parts.map((part, index) => (
+    /^[−-]?\d/.test(part)
+      ? <strong key={`n-${index}`} className="query-answer-num">{part}</strong>
+      : part
+  ))
+}
+
+function formatRiskQueryInline(paragraph) {
+  const match = String(paragraph).match(/^(.+?)\s+(is|are|from)\s+(.+)$/i)
+  if (!match) return boldRiskQueryNumbers(paragraph)
+  return (
+    <>
+      <strong className="query-answer-lead">{boldRiskQueryNumbers(match[1])}</strong>
+      {` ${match[2]} `}
+      {boldRiskQueryNumbers(match[3])}
+    </>
+  )
+}
+
+function RiskQueryAnswer({ answer }) {
+  const paragraphs = splitRiskQueryParagraphs(answer)
+  if (!paragraphs.length) return null
+  return (
+    <div className="query-answer" data-testid="risk-query-answer">
+      {paragraphs.map((paragraph, index) => (
+        <p key={`p-${index}`} className="query-answer-p">
+          {formatRiskQueryInline(paragraph)}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 function RiskQueryAssistantState({ assistant }) {
   if (!isRiskQueryAssistantMeta(assistant)) return null
   if (assistant.fallback) {
@@ -476,7 +519,7 @@ export function RiskQuery({ portfolio }) {
   const assistant = r?.data?.assistant
 
   return (
-    <div className="card" data-testid="golden-demo-risk-query">
+    <div className="card risk-query-panel" data-testid="golden-demo-risk-query">
       <div className="block-title">
         <h3>Risk Query</h3>
         <BlockHelp id="risk-query" />
@@ -505,10 +548,10 @@ export function RiskQuery({ portfolio }) {
       </div>
       {error && <p className="error">{error}</p>}
       {r && (
-        <>
+        <div className="query-result">
           <RiskQueryAssistantState assistant={assistant} />
-          <p className="query-answer" data-testid="risk-query-answer">{r.answer}</p>
-        </>
+          <RiskQueryAnswer answer={r.answer} />
+        </div>
       )}
       {hasCopiedObject(card) && (
         <QueryFieldList

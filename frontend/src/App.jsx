@@ -223,9 +223,7 @@ export default function App() {
     case 'risk-query':
       body = (
         <SectionFrame id="risk-query">
-          <div className="grid">
-            <RiskQuery portfolio={portfolio} />
-          </div>
+          <RiskQuery portfolio={portfolio} />
         </SectionFrame>
       )
       break
