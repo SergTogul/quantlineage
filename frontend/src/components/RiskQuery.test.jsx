@@ -115,6 +115,21 @@ describe('RiskQuery', () => {
     expect(answer.querySelector('.query-answer-num')).toHaveTextContent('677,747')
   })
 
+  it('keeps decimal percentages intact for top contributors answers', async () => {
+    queryHandler(() => ({
+      answer: 'Top risk contributors: eq-nvda 25.1%, eq-aapl 18.0%, eq-msft 12.5%.',
+      data: {},
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+
+    const answer = await screen.findByTestId('risk-query-answer')
+    expect(answer.querySelectorAll('.query-answer-p')).toHaveLength(1)
+    expect(answer).toHaveTextContent('Top risk contributors: eq-nvda 25.1%, eq-aapl 18.0%, eq-msft 12.5%.')
+    expect(answer.querySelectorAll('.query-answer-num')).toHaveLength(3)
+  })
+
   it('hides result card when every identity field is missing on the payload', async () => {
     queryHandler(() => ({
       answer: 'Worst stress scenario is Dot-com-style equity crash with loss 677,747.',

@@ -432,8 +432,13 @@ function isRiskQueryAssistantMeta(value) {
 export function splitRiskQueryParagraphs(answer) {
   const text = String(answer || '').trim()
   if (!text) return []
-  const parts = text.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [text]
-  return parts.map((part) => part.trim()).filter(Boolean)
+  // Break on ". " only — never on decimal points inside values like 12.1%.
+  const chunks = text.split(/\.\s+/).map((part) => part.trim()).filter(Boolean)
+  if (chunks.length <= 1) return [text]
+  return chunks.map((part, index) => {
+    if (/[.!?]$/.test(part)) return part
+    return index < chunks.length - 1 || /\.\s*$/.test(text) ? `${part}.` : part
+  })
 }
 
 function boldRiskQueryNumbers(text) {
