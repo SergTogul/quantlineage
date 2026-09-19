@@ -14,7 +14,7 @@ When completing a task, add an Evidence line with the commit SHA and exact check
 
 ### T00 — Establish the baseline
 
-- [ ] Capture the current AI/MCP/API/frontend baseline.
+- [x] Capture the current AI/MCP/API/frontend baseline.
 
 Dependencies: none
 
@@ -44,7 +44,7 @@ cd ../frontend
 npm test -- --run src/components/RiskQuery.test.jsx
 ```
 
-Evidence:
+Evidence: `b03c957` — `cd backend && python3 -m pytest tests/test_ai_query_orchestration.py -q` (20 passed); `python3 -m pytest -q -k "mcp or risk_query"` (11 passed); `cd ../frontend && npm test -- --run src/components/RiskQuery.test.jsx` (3 passed).
 
 ### T01 — Add typed AI configuration
 
