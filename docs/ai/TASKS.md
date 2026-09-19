@@ -48,7 +48,7 @@ Evidence: `781bcae` — `cd backend && python3 -m pytest tests/test_ai_query_orc
 
 ### T01 — Add typed AI configuration
 
-- [ ] Add `backend/app/ai/config.py` and configuration unit tests.
+- [x] Add `backend/app/ai/config.py` and configuration unit tests.
 
 Dependencies: T00
 
@@ -70,6 +70,9 @@ python3 -m pytest tests/test_ai_config.py -q
 ```
 
 Evidence:
+
+- Commit `833ed05` — Add typed AI configuration (T01)
+- Checks: `cd backend && python3 -m pytest tests/test_ai_config.py -q` → 14 passed
 
 ### T02 — Add SDK, dotenv, and env templates
 
