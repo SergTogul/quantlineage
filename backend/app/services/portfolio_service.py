@@ -515,7 +515,12 @@ class PortfolioService:
             raise RiskRunNotFound(run_id)
         return provenance
 
-    def query(self, portfolio, question): return self.query_engine.answer(question,portfolio,self)
+    def query(self, portfolio, question):
+        if self.risk_assistant_model is None:
+            return self.query_engine.answer(question, portfolio, self)
+        return self.query_engine.answer_with_model(
+            question, portfolio, self, self.risk_assistant_model
+        )
 
     def dashboard(
         self,

@@ -772,7 +772,33 @@ class RiskQueryEngine:
             question=question,
             tools=tool_contract_schemas(),
         )
-        model_response = model.complete(request)
+        try:
+            model_response = model.complete(request)
+        except Exception as exc:
+            from app.ai.errors import OpenAIConfigurationError, OpenAITransientProviderError
+
+            if not isinstance(exc, OpenAITransientProviderError):
+                if isinstance(exc, OpenAIConfigurationError):
+                    message = str(exc).strip() or "AI assistant configuration is invalid."
+                    return RiskQueryResponse(
+                        intent="unsupported",
+                        answer=message,
+                        data={
+                            "tool_contract": None,
+                            "tool_result": None,
+                            "supported_tools": tool_contract_schemas(),
+                            "assistant": {"fallback": False, "error": exc.code},
+                        },
+                        tool_name=None,
+                        requires_clarification=True,
+                    )
+                raise
+            fallback_response = self.answer(
+                question, portfolio, service, principal=principal
+            )
+            data = dict(fallback_response.data)
+            data["assistant"] = {"fallback": True}
+            return fallback_response.model_copy(update={"data": data})
         model_data = model_response.model_dump(mode="json")
         default_clarification = (
             "Please choose a deterministic risk view: VaR/ES, limits, contributors, "

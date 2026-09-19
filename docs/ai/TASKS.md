@@ -256,7 +256,7 @@ Evidence:
 
 ### T08 — Wire the provider into `PortfolioService.query`
 
-- [ ] Use `answer_with_model` when an OpenAI model is configured.
+- [x] Use `answer_with_model` when an OpenAI model is configured.
 
 Dependencies: T07
 
@@ -278,6 +278,9 @@ python3 -m pytest tests/test_ai_query_orchestration.py tests/test_ai_provider_in
 ```
 
 Evidence:
+
+- Commit `31ca534` — Wire provider into PortfolioService.query (T08)
+- Checks: `cd backend && python3 -m pytest tests/test_ai_query_orchestration.py tests/test_ai_provider_integration.py -q` → 27 passed
 
 ### T09 — Add optional assistant metadata
 
