@@ -49,7 +49,7 @@ python3 -m pytest tests/test_ai_config.py -q
 | SHA | Subject |
 |-----|---------|
 | `833ed05` | Add typed AI configuration (T01) |
-| (docs) | Mark T01 complete in TASKS.md |
+| `ac8b420` | Mark T01 complete in TASKS.md |
 
 ## Out of scope (T02+)
 
