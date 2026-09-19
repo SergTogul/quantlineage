@@ -457,7 +457,7 @@ The second command is operator-run only with a configured key.
 
 Evidence:
 
-- Commit — Add opt-in live OpenAI smoke test (T14)
+- Commit `b95ce7f` — Add opt-in live OpenAI smoke test (T14)
 - Checks: `cd backend && python3 -m pytest tests/test_openai_live.py -q` → 1 skipped; `QUANTLINEAGE_RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q` → 1 skipped (no key in agent VM)
 
 ### T15 — Run the first-release gate
