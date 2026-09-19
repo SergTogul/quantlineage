@@ -516,8 +516,9 @@ export function RiskQuery({ portfolio }) {
         />
       )}
       <div className="muted">
-        Deterministic routing; “Why did VaR change?” needs two completed RiskRun ids
-        and never invents VaR. Query is the control on Overview Command (`#overview/command`).
+        Ask in plain language. With AI enabled the model only picks a tool; numbers stay
+        deterministic. “Why did VaR change?” needs two completed RiskRun ids and never
+        invents VaR.
       </div>
     </div>
   )
