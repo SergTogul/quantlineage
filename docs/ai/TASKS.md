@@ -427,7 +427,7 @@ Inspect rendered config carefully; do not print a real secret into CI or PR evid
 
 Evidence:
 
-- Commit TBD — Wire Compose and write operator guide (T13)
+- Commit `5dd5079` — Wire Compose and write operator guide (T13)
 - Checks: static YAML parse of `docker-compose.yml` and `docker-compose.shared.yml` (backend/worker carry 6 AI env vars; frontend has none); `docker compose config` not run (docker CLI unavailable in agent VM)
 
 ### T14 — Add an opt-in live smoke test
