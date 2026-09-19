@@ -22,5 +22,8 @@ Complete.
 ## Concerns
 - Run `docker compose config` and `docker compose -f docker-compose.shared.yml config` in an environment with Docker before merge to T15 gate.
 
+## Commit
+`77fdf44`
+
 ## Branch
 `feature/openai-risk-assistant`
