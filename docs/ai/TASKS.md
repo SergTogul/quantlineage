@@ -495,7 +495,7 @@ docker compose config
 
 Evidence:
 
-- See commit after T15 gate (lint fix + merge summary).
+- Commit `95542a8` — Complete T15 first-release gate.
 - Checks: backend `pytest -q` → 2000 passed, 10 skipped; `ruff check app tests` clean; frontend `npm test -- --run` → 208 passed; `npm run lint` clean; `npm run build` success; `docker compose config` renders (AI on backend/worker only); shared compose renders with dummy required secrets; full-suite log contains no `api.openai.com`; `docs/ai/GOAL.md` DoD all checked; merge summary at `docs/ai/MERGE_SUMMARY.md`.
 
 ## Deferred tasks — do not select during the first-release loop
