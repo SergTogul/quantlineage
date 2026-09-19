@@ -202,7 +202,7 @@ Evidence:
 
 ### T06 — Handle model and provider failures
 
-- [ ] Complete safe parsing and typed provider errors.
+- [x] Complete safe parsing and typed provider errors.
 
 Dependencies: T05
 
@@ -223,6 +223,9 @@ python3 -m pytest tests/test_openai_model.py -q
 ```
 
 Evidence:
+
+- Commit — Handle model and provider failures (T06)
+- Checks: `cd backend && python3 -m pytest tests/test_openai_model.py -q` → 23 passed; `python3 -m pytest tests/test_ai_query_orchestration.py -q` → 20 passed
 
 ### T07 — Add provider factory and lifecycle wiring
 

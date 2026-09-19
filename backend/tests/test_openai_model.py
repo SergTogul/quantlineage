@@ -1,13 +1,23 @@
-"""Unit tests for the OpenAI risk assistant model adapter (T05)."""
+"""Unit tests for the OpenAI risk assistant model adapter (T05/T06)."""
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
 import pytest
+from openai import (
+    APITimeoutError,
+    AuthenticationError,
+    BadRequestError,
+    InternalServerError,
+    RateLimitError,
+)
 from openai.types.responses import (
     Response,
+    ResponseError,
     ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseOutputRefusal,
@@ -15,19 +25,35 @@ from openai.types.responses import (
 )
 
 from app.ai.config import AISettings
+from app.ai.errors import (
+    OpenAIAuthenticationError,
+    OpenAIConfigurationError,
+    OpenAIIncompleteResponseError,
+    OpenAIMalformedToolArgumentsError,
+    OpenAIMultipleToolCallsError,
+    OpenAIRateLimitError,
+    OpenAIServerError,
+    OpenAITimeoutError,
+    sanitize_provider_message,
+)
 from app.ai.openai_model import OpenAIRiskAssistantModel
 from app.ai.policy import ASSISTANT_POLICY_INSTRUCTION
 from app.ai.tool_schemas import openai_function_tools
 from app.risk.query import RiskAssistantModelRequest, RiskAssistantModelResponse, tool_contract_schemas
+
+SENTINEL_API_KEY = "sk-sentinel-test-key-0123456789abcdef"
 
 
 @dataclass
 class FakeResponses:
     response: Any
     calls: list[dict[str, Any]] = field(default_factory=list)
+    error: BaseException | None = None
 
     def create(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
         return self.response
 
 
@@ -294,7 +320,7 @@ def test_zero_function_calls_with_refusal(openai_settings: AISettings) -> None:
     assert result.proposed_answer is None
 
 
-def test_multiple_function_calls_raise_clear_error(openai_settings: AISettings) -> None:
+def test_multiple_function_calls_raise_typed_error(openai_settings: AISettings) -> None:
     sdk_response = _make_response(
         _function_call(name="get_var_es", call_id="call_1"),
         _function_call(name="get_limits", call_id="call_2"),
@@ -302,7 +328,223 @@ def test_multiple_function_calls_raise_clear_error(openai_settings: AISettings) 
     client = FakeOpenAIClient(responses=FakeResponses(response=sdk_response))
     model = OpenAIRiskAssistantModel(client, openai_settings)
 
-    with pytest.raises(ValueError, match="Expected at most one function call"):
+    with pytest.raises(OpenAIMultipleToolCallsError, match="Expected at most one function call"):
         model.complete(
             RiskAssistantModelRequest(question="Show everything", tools=tool_contract_schemas())
         )
+
+
+def test_zero_function_calls_with_numeric_prose_use_safe_clarification(
+    openai_settings: AISettings,
+) -> None:
+    sdk_response = _make_response(
+        ResponseOutputMessage(
+            id="msg_1",
+            type="message",
+            role="assistant",
+            status="completed",
+            content=[
+                ResponseOutputText(
+                    type="output_text",
+                    text="99% VaR is 123456789.",
+                    annotations=[],
+                )
+            ],
+        )
+    )
+    client = FakeOpenAIClient(responses=FakeResponses(response=sdk_response))
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    result = model.complete(
+        RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+    )
+
+    assert result.requires_clarification is True
+    assert result.proposed_answer is None
+    assert "123456789" not in (result.clarification or "")
+    assert "VaR/ES" in (result.clarification or "")
+
+
+def test_unknown_tool_name_is_returned_as_candidate_only(
+    openai_settings: AISettings,
+) -> None:
+    sdk_response = _make_response(_function_call(name="delete_everything"))
+    client = FakeOpenAIClient(responses=FakeResponses(response=sdk_response))
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    result = model.complete(
+        RiskAssistantModelRequest(question="Delete data", tools=tool_contract_schemas())
+    )
+
+    assert result.tool_name == "delete_everything"
+    assert result.tool_args == {}
+    assert result.proposed_answer is None
+
+
+def test_malformed_function_call_arguments_raise_typed_error(
+    openai_settings: AISettings,
+) -> None:
+    sdk_response = _make_response(
+        _function_call(name="get_var_es", arguments='{"confidence": 0.99')
+    )
+    client = FakeOpenAIClient(responses=FakeResponses(response=sdk_response))
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    with pytest.raises(OpenAIMalformedToolArgumentsError, match="Malformed function call arguments"):
+        model.complete(
+            RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+        )
+
+
+def test_non_object_function_call_arguments_raise_typed_error(
+    openai_settings: AISettings,
+) -> None:
+    sdk_response = _make_response(_function_call(name="get_var_es", arguments='"oops"'))
+    client = FakeOpenAIClient(responses=FakeResponses(response=sdk_response))
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    with pytest.raises(OpenAIMalformedToolArgumentsError, match="must be a JSON object"):
+        model.complete(
+            RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+        )
+
+
+def test_incomplete_response_raises_typed_error(openai_settings: AISettings) -> None:
+    sdk_response = Response(
+        id="resp_incomplete",
+        created_at=0,
+        model="gpt-test-model",
+        object="response",
+        output=[],
+        parallel_tool_calls=False,
+        tool_choice="auto",
+        tools=[],
+        status="incomplete",
+        incomplete_details={"reason": "max_output_tokens"},
+    )
+    client = FakeOpenAIClient(responses=FakeResponses(response=sdk_response))
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    with pytest.raises(OpenAIIncompleteResponseError, match="incomplete"):
+        model.complete(
+            RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+        )
+
+
+def test_failed_response_with_error_raises_typed_error(openai_settings: AISettings) -> None:
+    sdk_response = Response(
+        id="resp_failed",
+        created_at=0,
+        model="gpt-test-model",
+        object="response",
+        output=[],
+        parallel_tool_calls=False,
+        tool_choice="auto",
+        tools=[],
+        status="failed",
+        error=ResponseError(code="server_error", message="Upstream failure."),
+    )
+    client = FakeOpenAIClient(responses=FakeResponses(response=sdk_response))
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    with pytest.raises(OpenAIIncompleteResponseError, match="Upstream failure"):
+        model.complete(
+            RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+        )
+
+
+def _sdk_request() -> httpx.Request:
+    return httpx.Request("POST", "https://api.openai.com/v1/responses")
+
+
+def _sdk_response(status_code: int, text: str) -> httpx.Response:
+    request = _sdk_request()
+    return httpx.Response(status_code, request=request, text=text)
+
+
+@pytest.mark.parametrize(
+    ("sdk_error", "expected_type"),
+    [
+        (APITimeoutError(_sdk_request()), OpenAITimeoutError),
+        (
+            RateLimitError("rate limited", response=_sdk_response(429, "rate limited"), body=None),
+            OpenAIRateLimitError,
+        ),
+        (
+            AuthenticationError(
+                f"Invalid API Key provided: {SENTINEL_API_KEY}",
+                response=_sdk_response(401, "unauthorized"),
+                body=None,
+            ),
+            OpenAIAuthenticationError,
+        ),
+        (
+            InternalServerError(
+                "server exploded",
+                response=_sdk_response(500, "server exploded"),
+                body=None,
+            ),
+            OpenAIServerError,
+        ),
+        (
+            BadRequestError(
+                "invalid model",
+                response=_sdk_response(400, "invalid model"),
+                body=None,
+            ),
+            OpenAIConfigurationError,
+        ),
+    ],
+)
+def test_complete_maps_sdk_errors_to_typed_provider_errors(
+    openai_settings: AISettings,
+    sdk_error: BaseException,
+    expected_type: type[BaseException],
+) -> None:
+    client = FakeOpenAIClient(responses=FakeResponses(response=_make_response(), error=sdk_error))
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    with pytest.raises(expected_type) as exc_info:
+        model.complete(
+            RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+        )
+
+    assert SENTINEL_API_KEY not in str(exc_info.value)
+    assert "Authorization" not in str(exc_info.value)
+
+
+def test_provider_errors_and_logs_redact_api_key(
+    openai_settings: AISettings,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", SENTINEL_API_KEY)
+    sdk_error = AuthenticationError(
+        f"Incorrect API key provided: {SENTINEL_API_KEY}",
+        response=_sdk_response(401, "unauthorized"),
+        body=None,
+    )
+    client = FakeOpenAIClient(responses=FakeResponses(response=_make_response(), error=sdk_error))
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(OpenAIAuthenticationError) as exc_info:
+            model.complete(
+                RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+            )
+
+    assert SENTINEL_API_KEY not in str(exc_info.value)
+    assert all(SENTINEL_API_KEY not in record.getMessage() for record in caplog.records)
+    assert all(SENTINEL_API_KEY not in str(record.__dict__) for record in caplog.records)
+
+
+def test_sanitize_provider_message_redacts_secret_patterns() -> None:
+    message = (
+        "Bearer sk-live-abcdefghijklmnop and Authorization: Bearer secret-token "
+        f"plus literal {SENTINEL_API_KEY}"
+    )
+    sanitized = sanitize_provider_message(message, api_key=SENTINEL_API_KEY)
+    assert SENTINEL_API_KEY not in sanitized
+    assert "sk-live-abcdefghijklmnop" not in sanitized
+    assert "secret-token" not in sanitized
+    assert "[REDACTED]" in sanitized
