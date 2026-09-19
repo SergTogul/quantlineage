@@ -81,18 +81,46 @@ describe('RiskQuery', () => {
     expect(card).toHaveTextContent('−8')
     expect(card).toHaveTextContent('per_bp')
     expect(card).toHaveTextContent('2024-06-15')
-    expect(card).toHaveTextContent('not on this payload')
+    expect(card).not.toHaveTextContent('not on this payload')
+    expect(card).not.toHaveTextContent('Sign')
+    expect(card).not.toHaveTextContent('Run')
 
     const provenance = screen.getByTestId('risk-query-provenance')
     expect(provenance).toHaveTextContent('key_rate_dv01')
     expect(provenance).toHaveTextContent('per_bp')
     expect(provenance).toHaveTextContent('snap-grounded')
-    expect(provenance).toHaveTextContent('not on this payload')
+    expect(provenance).not.toHaveTextContent('not on this payload')
+    expect(provenance).not.toHaveTextContent('Value')
 
     expect(card).not.toHaveTextContent('11')
     expect(screen.getByText(/USD 10Y KR-DV01 is −8 per_bp from the rates showcase/)).toBeInTheDocument()
     expect(screen.queryByTestId('risk-query-assistant-state')).not.toBeInTheDocument()
     expect(screen.queryByTestId('risk-query-assistant-fallback')).not.toBeInTheDocument()
+  })
+
+  it('hides result card when every identity field is missing on the payload', async () => {
+    queryHandler(() => ({
+      answer: 'Worst stress scenario is Dot-com-style equity crash with loss 677,747.',
+      data: {
+        card: {
+          metric: 'not on this payload',
+          value: 'not on this payload',
+          unit: 'not on this payload',
+        },
+        provenance: {
+          metric: 'not on this payload',
+          methodology: 'not on this payload',
+        },
+      },
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+
+    expect(await screen.findByTestId('risk-query-answer')).toHaveTextContent(/Worst stress scenario/)
+    expect(screen.queryByTestId('risk-query-result-card')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('risk-query-provenance')).not.toBeInTheDocument()
+    expect(screen.queryByText('not on this payload')).not.toBeInTheDocument()
   })
 
   it('shows a subtle AI-routed label when assistant metadata is present', async () => {

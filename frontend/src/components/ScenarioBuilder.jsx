@@ -377,24 +377,35 @@ const RISK_QUERY_PROVENANCE_FIELDS = [
 
 function copiedQueryField(source, key) {
   if (!source || !Object.prototype.hasOwnProperty.call(source, key)) {
-    return MISSING_ON_PAYLOAD
+    return null
   }
   const value = source[key]
-  if (value == null || value === '') return MISSING_ON_PAYLOAD
-  if (typeof value === 'object') return MISSING_ON_PAYLOAD
+  if (value == null || value === '' || value === MISSING_ON_PAYLOAD) return null
+  if (typeof value === 'object') return null
   if (typeof value === 'number') return String(value).replace('-', '−')
   return String(value)
 }
 
+function presentQueryFields(source, fields) {
+  return fields
+    .map(([key, label]) => {
+      const value = copiedQueryField(source, key)
+      return value == null ? null : [key, label, value]
+    })
+    .filter(Boolean)
+}
+
 function QueryFieldList({ title, source, fields, testId }) {
+  const rows = presentQueryFields(source, fields)
+  if (!rows.length) return null
   return (
     <section className="risk-query-fields" data-testid={testId}>
       <h4>{title}</h4>
       <dl>
-        {fields.map(([key, label]) => (
+        {rows.map(([key, label, value]) => (
           <div key={key} className="risk-query-field">
             <dt>{label}</dt>
-            <dd>{copiedQueryField(source, key)}</dd>
+            <dd>{value}</dd>
           </div>
         ))}
       </dl>

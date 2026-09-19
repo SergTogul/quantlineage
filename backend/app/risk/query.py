@@ -1073,11 +1073,46 @@ def _format_card_text(card: dict[str, Any]) -> str:
         ("historical_dataset_id", "historical_dataset_id"),
         ("historical_dataset_version", "historical_dataset_version"),
     )
-    parts = []
+    present_parts: list[str] = []
+    missing = False
     for key, label in labels:
-        if key in card and not isinstance(card[key], (dict, list)):
-            parts.append(f"{label} {_format_card_value(card[key])}")
-    return "; ".join(parts)
+        if key not in card or isinstance(card[key], (dict, list)):
+            continue
+        if card[key] == MISSING_ON_PAYLOAD:
+            missing = True
+            continue
+        present_parts.append(f"{label} {_format_card_value(card[key])}")
+    if present_parts:
+        if missing:
+            present_parts.append(MISSING_ON_PAYLOAD)
+        return "; ".join(present_parts)
+    if missing:
+        return MISSING_ON_PAYLOAD
+    return ""
+
+
+def _card_has_present_identity(card: dict[str, Any] | None) -> bool:
+    if not card:
+        return False
+    for key in (
+        "metric",
+        "value",
+        "unit",
+        "sign_convention",
+        "risk_run_id",
+        "as_of",
+        "methodology",
+        "market_snapshot_id",
+        "historical_dataset_id",
+        "historical_dataset_version",
+    ):
+        value = card.get(key)
+        if value is None or value == MISSING_ON_PAYLOAD:
+            continue
+        if isinstance(value, (dict, list)):
+            continue
+        return True
+    return False
 
 
 def _label_payload(payload: dict[str, Any], key: str, label: str) -> str:
@@ -1138,7 +1173,14 @@ def _format_risk_change_answer(payload: dict[str, Any]) -> str:
     return "; ".join(parts) + "."
 
 
-def _join_grounding(text: str, card: dict[str, Any] | None) -> str:
+def _join_grounding(
+    text: str,
+    card: dict[str, Any] | None,
+    *,
+    require_present_identity: bool = False,
+) -> str:
+    if require_present_identity and not _card_has_present_identity(card):
+        return text
     extra = _format_card_text(card or {})
     if not extra:
         return text
@@ -1159,7 +1201,7 @@ def _format_answer(
             f"99% VaR is {_fmt(payload.get('var_99'))}; "
             f"99% Expected Shortfall is {_fmt(payload.get('expected_shortfall_99'))}."
         )
-        return _join_grounding(text, card)
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name == RiskToolName.GET_VAR_ES:
         methods = payload.get("methods") or []
         parts = []
@@ -1182,12 +1224,12 @@ def _format_answer(
             text = "No stress scenarios returned."
         else:
             text = f"Worst stress scenario is {scenario} with loss {_fmt(loss)}."
-        return _join_grounding(text, card)
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name == RiskToolName.GET_LIMITS:
         limits = payload.get("limits") or []
         breaches = [item for item in limits if item.get("breached")]
         text = f"{len(breaches)} limit breaches from {len(limits)} evaluated limits."
-        return _join_grounding(text, card)
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name == RiskToolName.GET_CONTRIBUTORS:
         contributors = payload.get("contributors") or []
         if not contributors:
@@ -1198,7 +1240,7 @@ def _format_answer(
                 for item in contributors
             ]
             text = "Top risk contributors: " + ", ".join(names) + "."
-        return _join_grounding(text, card)
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name in (
         RiskToolName.EXPLAIN_RISK_CHANGE,
         RiskToolName.COMPARE_RISK_RUNS,
