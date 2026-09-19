@@ -30,6 +30,8 @@ npm test -- --run src/components/RiskQuery.test.jsx
 
 Result: 46 backend passed, 5 frontend passed.
 
+Commit: `e41a299`.
+
 ## Concerns
 
 - Frontend scan is static (source text); bundle analysis deferred to T13/T15 gates.

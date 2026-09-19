@@ -360,7 +360,7 @@ npm test -- --run src/components/RiskQuery.test.jsx
 
 Evidence:
 
-- Commit — Add secret and boundary regression tests (T11)
+- Commit `e41a299` — Add secret and boundary regression tests (T11)
 - Checks: `cd backend && python3 -m pytest tests/test_ai_security.py tests/test_wave_c_mcp.py tests/test_ai_query_orchestration.py -q` → 46 passed; `cd ../frontend && npm test -- --run src/components/RiskQuery.test.jsx` → 5 passed
 
 ### T12 — Add the fixed evaluation suite
