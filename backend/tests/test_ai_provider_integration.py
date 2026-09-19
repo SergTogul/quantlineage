@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.ai.config import AISettings
-from app.ai.errors import OpenAIAuthenticationError, OpenAITimeoutError
+from app.ai.errors import (
+    OpenAIAuthenticationError,
+    OpenAIIncompleteResponseError,
+    OpenAITimeoutError,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.query import (
@@ -226,6 +230,26 @@ def test_transient_failure_before_tool_exec_falls_back() -> None:
     fixture.risk_assistant_model = _ScriptedModel(error=OpenAITimeoutError("timed out"))
 
     response = fixture.query(SAMPLE_PORTFOLIO, "show top risk contributors")
+
+    assert len(fixture.risk_assistant_model.requests) == 1
+    assert fixture.calls == ["contributors"]
+    assert response.intent == "contributors"
+    assert response.tool_name == "get_contributors"
+    assert response.data["assistant"] == {
+        "provider": "openai",
+        "model": None,
+        "mode": "fallback",
+        "fallback": True,
+    }
+
+
+def test_incomplete_response_before_tool_exec_falls_back() -> None:
+    fixture = _FixtureService()
+    fixture.risk_assistant_model = _ScriptedModel(
+        error=OpenAIIncompleteResponseError("OpenAI response status was 'incomplete'."),
+    )
+
+    response = fixture.query(SAMPLE_PORTFOLIO, "Top contributors?")
 
     assert len(fixture.risk_assistant_model.requests) == 1
     assert fixture.calls == ["contributors"]

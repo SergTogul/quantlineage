@@ -813,23 +813,27 @@ class RiskQueryEngine:
         try:
             model_response = model.complete(request)
         except Exception as exc:
-            from app.ai.errors import OpenAIConfigurationError, OpenAITransientProviderError
+            from app.ai.errors import (
+                OpenAIConfigurationError,
+                OpenAIModelParseError,
+                OpenAITransientProviderError,
+            )
 
-            if not isinstance(exc, OpenAITransientProviderError):
-                if isinstance(exc, OpenAIConfigurationError):
-                    message = str(exc).strip() or "AI assistant configuration is invalid."
-                    return RiskQueryResponse(
-                        intent="unsupported",
-                        answer=message,
-                        data={
-                            "tool_contract": None,
-                            "tool_result": None,
-                            "supported_tools": tool_contract_schemas(),
-                            "assistant": assistant_meta,
-                        },
-                        tool_name=None,
-                        requires_clarification=True,
-                    )
+            if isinstance(exc, OpenAIConfigurationError):
+                message = str(exc).strip() or "AI assistant configuration is invalid."
+                return RiskQueryResponse(
+                    intent="unsupported",
+                    answer=message,
+                    data={
+                        "tool_contract": None,
+                        "tool_result": None,
+                        "supported_tools": tool_contract_schemas(),
+                        "assistant": assistant_meta,
+                    },
+                    tool_name=None,
+                    requires_clarification=True,
+                )
+            if not isinstance(exc, (OpenAITransientProviderError, OpenAIModelParseError)):
                 raise
             fallback_response = self.answer(
                 question, portfolio, service, principal=principal
