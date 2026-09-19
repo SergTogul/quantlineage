@@ -279,7 +279,7 @@ python3 -m pytest tests/test_ai_query_orchestration.py tests/test_ai_provider_in
 
 Evidence:
 
-- Commit `31ca534` — Wire provider into PortfolioService.query (T08)
+- Commit `ee14e82` — Wire provider into PortfolioService.query (T08)
 - Checks: `cd backend && python3 -m pytest tests/test_ai_query_orchestration.py tests/test_ai_provider_integration.py -q` → 27 passed
 
 ### T09 — Add optional assistant metadata
