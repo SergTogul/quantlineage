@@ -91,6 +91,53 @@ describe('RiskQuery', () => {
 
     expect(card).not.toHaveTextContent('11')
     expect(screen.getByText(/USD 10Y KR-DV01 is −8 per_bp from the rates showcase/)).toBeInTheDocument()
+    expect(screen.queryByTestId('risk-query-assistant-state')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('risk-query-assistant-fallback')).not.toBeInTheDocument()
+  })
+
+  it('shows a subtle AI-routed label when assistant metadata is present', async () => {
+    queryHandler(() => ({
+      answer: 'Top contributors from the portfolio.',
+      data: {
+        assistant: {
+          provider: 'openai',
+          model: 'gpt-test',
+          mode: 'model-routed',
+          fallback: false,
+        },
+      },
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+
+    const state = await screen.findByTestId('risk-query-assistant-state')
+    expect(state).toHaveTextContent('AI-routed')
+    expect(screen.queryByTestId('risk-query-assistant-fallback')).not.toBeInTheDocument()
+    expect(screen.queryByText('gpt-test')).not.toBeInTheDocument()
+  })
+
+  it('shows a deterministic fallback note when assistant metadata reports fallback', async () => {
+    queryHandler(() => ({
+      answer: 'Worst stress scenario from deterministic routing.',
+      data: {
+        assistant: {
+          provider: 'openai',
+          model: 'gpt-test',
+          mode: 'fallback',
+          fallback: true,
+        },
+      },
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Run equity-down stress.' }))
+
+    const note = await screen.findByTestId('risk-query-assistant-fallback')
+    expect(note).toHaveTextContent(/Deterministic fallback/i)
+    expect(note).toHaveTextContent(/built-in router/i)
+    expect(screen.queryByTestId('risk-query-assistant-state')).not.toBeInTheDocument()
+    expect(screen.queryByText('gpt-test')).not.toBeInTheDocument()
   })
 
   it('shows the server clarification for Why did VaR change? without inventing digits', async () => {

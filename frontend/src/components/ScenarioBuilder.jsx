@@ -406,6 +406,40 @@ function hasCopiedObject(value) {
   return value != null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0
 }
 
+function isRiskQueryAssistantMeta(value) {
+  return (
+    value != null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && typeof value.provider === 'string'
+    && typeof value.mode === 'string'
+    && typeof value.fallback === 'boolean'
+  )
+}
+
+function RiskQueryAssistantState({ assistant }) {
+  if (!isRiskQueryAssistantMeta(assistant)) return null
+  if (assistant.fallback) {
+    return (
+      <p
+        className="muted foot"
+        data-testid="risk-query-assistant-fallback"
+        role="note"
+      >
+        Deterministic fallback — AI routing was unavailable; this answer uses the built-in router.
+      </p>
+    )
+  }
+  if (assistant.provider === 'openai') {
+    return (
+      <p className="eyebrow" data-testid="risk-query-assistant-state">
+        AI-routed
+      </p>
+    )
+  }
+  return null
+}
+
 export function RiskQuery({ portfolio }) {
   const [q, setQ] = useState('What is the worst stress scenario?')
   const [r, setR] = useState(null)
@@ -428,6 +462,7 @@ export function RiskQuery({ portfolio }) {
 
   const card = r?.data?.card
   const provenance = r?.data?.provenance
+  const assistant = r?.data?.assistant
 
   return (
     <div className="card" data-testid="golden-demo-risk-query">
@@ -459,7 +494,10 @@ export function RiskQuery({ portfolio }) {
       </div>
       {error && <p className="error">{error}</p>}
       {r && (
-        <p className="query-answer" data-testid="risk-query-answer">{r.answer}</p>
+        <>
+          <RiskQueryAssistantState assistant={assistant} />
+          <p className="query-answer" data-testid="risk-query-answer">{r.answer}</p>
+        </>
       )}
       {hasCopiedObject(card) && (
         <QueryFieldList
