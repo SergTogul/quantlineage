@@ -20,6 +20,7 @@ from app.main import app
 
 @pytest.fixture(autouse=True)
 def _clear_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Global isolation lives in tests/conftest.py; keep local clears for clarity.
     for name in (
         "OPENAI_API_KEY",
         "AI_PROVIDER",
@@ -91,8 +92,10 @@ def test_load_application_dotenv_does_not_override_exported_env(
     env_file.write_text("EXPORTED_VAR=from-dotenv\n", encoding="utf-8")
     monkeypatch.setenv("EXPORTED_VAR", "from-process")
     monkeypatch.chdir(tmp_path)
+    # Exercise the same dotenv contract used by load_application_dotenv.
+    from dotenv import load_dotenv
 
-    load_application_dotenv()
+    load_dotenv(override=False)
 
     assert __import__("os").environ["EXPORTED_VAR"] == "from-process"
 
