@@ -139,19 +139,19 @@ def _mcp_server() -> ThinMcpServer:
 def _clear_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
         "OPENAI_API_KEY",
-        "QUANTLINEAGE_AI_PROVIDER",
-        "QUANTLINEAGE_OPENAI_MODEL",
-        "QUANTLINEAGE_AI_TIMEOUT_SECONDS",
-        "QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS",
-        "QUANTLINEAGE_AI_MAX_TOOL_ROUNDS",
+        "AI_PROVIDER",
+        "OPENAI_MODEL",
+        "AI_TIMEOUT_SECONDS",
+        "AI_MAX_OUTPUT_TOKENS",
+        "AI_MAX_TOOL_ROUNDS",
     ):
         monkeypatch.delenv(name, raising=False)
 
 
 def test_sentinel_absent_from_settings_repr(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", SENTINEL_API_KEY)
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
-    monkeypatch.setenv("QUANTLINEAGE_OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
 
     settings = get_ai_settings()
     rendered = repr(settings)
@@ -162,8 +162,8 @@ def test_sentinel_absent_from_settings_repr(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_sentinel_absent_from_config_error_messages(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", SENTINEL_API_KEY)
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
-    monkeypatch.delenv("QUANTLINEAGE_OPENAI_MODEL", raising=False)
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
     with pytest.raises(ValueError) as exc:
         get_ai_settings()
@@ -175,8 +175,8 @@ def test_sentinel_absent_from_api_risk_query_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", SENTINEL_API_KEY)
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
-    monkeypatch.setenv("QUANTLINEAGE_OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
     openai_ctor = MagicMock(return_value=SimpleNamespace(close=MagicMock()))
     monkeypatch.setattr("openai.OpenAI", openai_ctor)
 

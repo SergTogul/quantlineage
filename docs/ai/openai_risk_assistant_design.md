@@ -141,16 +141,16 @@ Local `.env`:
 
 ```dotenv
 OPENAI_API_KEY=replace-me
-QUANTLINEAGE_AI_PROVIDER=openai
-QUANTLINEAGE_OPENAI_MODEL=gpt-5.6-luna
-QUANTLINEAGE_AI_TIMEOUT_SECONDS=30
-QUANTLINEAGE_AI_MAX_TOOL_ROUNDS=1
+AI_PROVIDER=openai
+OPENAI_MODEL=gpt-5.6-luna
+AI_TIMEOUT_SECONDS=30
+AI_MAX_TOOL_ROUNDS=1
 ```
 
 Rules:
 
 - `OPENAI_API_KEY` is required only when the provider is `openai`.
-- `QUANTLINEAGE_AI_PROVIDER` defaults to `deterministic`.
+- `AI_PROVIDER` defaults to `deterministic`.
 - The model name is configuration, not a constant scattered through code.
 - `.env` and `.env.shared` remain ignored by git.
 - Example env files contain blank placeholders, never live credentials.
@@ -328,7 +328,7 @@ The in-process HTTP assistant should call the shared executor directly, not spaw
 3. Run a small fixed evaluation set for routing, injection, clarification, and grounding.
 4. Enable in a shared demo with rate limits and monitoring.
 5. Only then consider multi-tool narration.
-6. Keep a one-variable rollback: set `QUANTLINEAGE_AI_PROVIDER=deterministic`.
+6. Keep a one-variable rollback: set `AI_PROVIDER=deterministic`.
 
 ## Acceptance criteria
 

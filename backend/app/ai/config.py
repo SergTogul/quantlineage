@@ -50,7 +50,7 @@ def _parse_provider(raw: str | None) -> AIProvider:
     if provider not in _SUPPORTED_PROVIDERS:
         supported = ", ".join(sorted(_SUPPORTED_PROVIDERS))
         raise ValueError(
-            f"Invalid QUANTLINEAGE_AI_PROVIDER: {provider!r}. "
+            f"Invalid AI_PROVIDER: {provider!r}. "
             f"Supported providers: {supported}."
         )
     return provider  # type: ignore[return-value]
@@ -63,13 +63,13 @@ def _parse_timeout(raw: str | None) -> float:
         timeout = float(raw.strip())
     except ValueError as exc:
         raise ValueError(
-            "Invalid QUANTLINEAGE_AI_TIMEOUT_SECONDS: "
+            "Invalid AI_TIMEOUT_SECONDS: "
             f"{raw.strip()!r}. Expected a positive number up to "
             f"{MAX_AI_TIMEOUT_SECONDS:g}."
         ) from exc
     if timeout <= 0 or timeout > MAX_AI_TIMEOUT_SECONDS:
         raise ValueError(
-            "Invalid QUANTLINEAGE_AI_TIMEOUT_SECONDS: "
+            "Invalid AI_TIMEOUT_SECONDS: "
             f"{timeout!r}. Expected a positive number up to "
             f"{MAX_AI_TIMEOUT_SECONDS:g}."
         )
@@ -83,13 +83,13 @@ def _parse_max_output_tokens(raw: str | None) -> int:
         tokens = int(raw.strip())
     except ValueError as exc:
         raise ValueError(
-            "Invalid QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS: "
+            "Invalid AI_MAX_OUTPUT_TOKENS: "
             f"{raw.strip()!r}. Expected a positive integer up to "
             f"{MAX_AI_OUTPUT_TOKENS}."
         ) from exc
     if tokens <= 0 or tokens > MAX_AI_OUTPUT_TOKENS:
         raise ValueError(
-            "Invalid QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS: "
+            "Invalid AI_MAX_OUTPUT_TOKENS: "
             f"{tokens!r}. Expected a positive integer up to "
             f"{MAX_AI_OUTPUT_TOKENS}."
         )
@@ -103,13 +103,13 @@ def _parse_max_tool_rounds(raw: str | None) -> int:
         rounds = int(raw.strip())
     except ValueError as exc:
         raise ValueError(
-            "Invalid QUANTLINEAGE_AI_MAX_TOOL_ROUNDS: "
+            "Invalid AI_MAX_TOOL_ROUNDS: "
             f"{raw.strip()!r}. Milestone 1 requires exactly "
             f"{REQUIRED_MAX_TOOL_ROUNDS}."
         ) from exc
     if rounds != REQUIRED_MAX_TOOL_ROUNDS:
         raise ValueError(
-            "Invalid QUANTLINEAGE_AI_MAX_TOOL_ROUNDS: "
+            "Invalid AI_MAX_TOOL_ROUNDS: "
             f"{rounds!r}. Milestone 1 requires exactly "
             f"{REQUIRED_MAX_TOOL_ROUNDS}."
         )
@@ -134,11 +134,11 @@ def get_ai_settings(
     """Load AI settings from explicit args or environment.
 
     Env vars:
-    - ``QUANTLINEAGE_AI_PROVIDER`` — ``deterministic`` (default) or ``openai``
-    - ``QUANTLINEAGE_OPENAI_MODEL`` — model name (required when provider is openai)
-    - ``QUANTLINEAGE_AI_TIMEOUT_SECONDS`` — request timeout (default 30, max 120)
-    - ``QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS`` — output token cap (default 512, max 4096)
-    - ``QUANTLINEAGE_AI_MAX_TOOL_ROUNDS`` — must be ``1`` in milestone 1
+    - ``AI_PROVIDER`` — ``deterministic`` (default) or ``openai``
+    - ``OPENAI_MODEL`` — model name (required when provider is openai)
+    - ``AI_TIMEOUT_SECONDS`` — request timeout (default 30, max 120)
+    - ``AI_MAX_OUTPUT_TOKENS`` — output token cap (default 512, max 4096)
+    - ``AI_MAX_TOOL_ROUNDS`` — must be ``1`` in milestone 1
 
     ``OPENAI_API_KEY`` is read via :func:`get_openai_api_key` when provider is
     ``openai``; it is never stored on the returned settings object.
@@ -146,12 +146,12 @@ def get_ai_settings(
     resolved_provider = (
         provider
         if provider is not None
-        else _parse_provider(os.environ.get("QUANTLINEAGE_AI_PROVIDER"))
+        else _parse_provider(os.environ.get("AI_PROVIDER"))
     )
     resolved_model = (
         openai_model
         if openai_model is not None
-        else _optional_model(os.environ.get("QUANTLINEAGE_OPENAI_MODEL"))
+        else _optional_model(os.environ.get("OPENAI_MODEL"))
     )
     if timeout_seconds is not None:
         resolved_timeout = timeout_seconds
@@ -162,7 +162,7 @@ def get_ai_settings(
                 f"{MAX_AI_TIMEOUT_SECONDS:g}."
             )
     else:
-        resolved_timeout = _parse_timeout(os.environ.get("QUANTLINEAGE_AI_TIMEOUT_SECONDS"))
+        resolved_timeout = _parse_timeout(os.environ.get("AI_TIMEOUT_SECONDS"))
     if max_output_tokens is not None:
         resolved_output_tokens = max_output_tokens
         if resolved_output_tokens <= 0 or resolved_output_tokens > MAX_AI_OUTPUT_TOKENS:
@@ -173,7 +173,7 @@ def get_ai_settings(
             )
     else:
         resolved_output_tokens = _parse_max_output_tokens(
-            os.environ.get("QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS")
+            os.environ.get("AI_MAX_OUTPUT_TOKENS")
         )
     if max_tool_rounds is not None:
         resolved_rounds = max_tool_rounds
@@ -185,18 +185,18 @@ def get_ai_settings(
             )
     else:
         resolved_rounds = _parse_max_tool_rounds(
-            os.environ.get("QUANTLINEAGE_AI_MAX_TOOL_ROUNDS")
+            os.environ.get("AI_MAX_TOOL_ROUNDS")
         )
 
     if resolved_provider == "openai":
         if get_openai_api_key() is None:
             raise ValueError(
-                "OPENAI_API_KEY is required when QUANTLINEAGE_AI_PROVIDER=openai."
+                "OPENAI_API_KEY is required when AI_PROVIDER=openai."
             )
         if resolved_model is None:
             raise ValueError(
-                "QUANTLINEAGE_OPENAI_MODEL is required when "
-                "QUANTLINEAGE_AI_PROVIDER=openai."
+                "OPENAI_MODEL is required when "
+                "AI_PROVIDER=openai."
             )
 
     return AISettings(

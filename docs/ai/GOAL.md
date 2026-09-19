@@ -10,7 +10,7 @@ A developer can:
 
 1. copy `.env.example` to `.env`;
 2. set `OPENAI_API_KEY`;
-3. set `QUANTLINEAGE_AI_PROVIDER=openai` and a model;
+3. set `AI_PROVIDER=openai` and a model;
 4. start QuantLineage;
 5. ask a supported question in the existing Risk Query UI;
 6. see a response calculated and formatted by existing QuantLineage code.
@@ -46,7 +46,7 @@ The browser never receives or stores the key.
 6. `TOOL_CONTRACTS` stays the canonical tool allowlist.
 7. Invalid or unknown tool calls execute nothing.
 8. Heavy RiskRuns are not automatically replayed or polled inside the assistant request.
-9. The feature can be disabled with `QUANTLINEAGE_AI_PROVIDER=deterministic`.
+9. The feature can be disabled with `AI_PROVIDER=deterministic`.
 10. Multi-tool narration is out of scope until the first-release evaluation gate passes.
 
 ## Success measures

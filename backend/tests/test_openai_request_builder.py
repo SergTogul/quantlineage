@@ -154,10 +154,10 @@ def test_output_budget_and_timeout_default_from_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
-    monkeypatch.setenv("QUANTLINEAGE_OPENAI_MODEL", "gpt-test-model")
-    monkeypatch.setenv("QUANTLINEAGE_AI_TIMEOUT_SECONDS", "55")
-    monkeypatch.setenv("QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS", "384")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test-model")
+    monkeypatch.setenv("AI_TIMEOUT_SECONDS", "55")
+    monkeypatch.setenv("AI_MAX_OUTPUT_TOKENS", "384")
 
     from app.ai.config import get_ai_settings
 

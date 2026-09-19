@@ -50,7 +50,7 @@ def build_risk_assistant_resources(
     api_key = get_openai_api_key()
     if api_key is None:
         raise ValueError(
-            "OPENAI_API_KEY is required when QUANTLINEAGE_AI_PROVIDER=openai."
+            "OPENAI_API_KEY is required when AI_PROVIDER=openai."
         )
 
     from openai import OpenAI

@@ -204,7 +204,7 @@ Update local setup docs:
 
 ```bash
 cp .env.example .env
-# edit OPENAI_API_KEY and QUANTLINEAGE_OPENAI_MODEL
+# edit OPENAI_API_KEY and OPENAI_MODEL
 docker compose up --build
 ```
 
@@ -271,7 +271,7 @@ Additionally:
 Add an opt-in test or script guarded by both:
 
 - `OPENAI_API_KEY`;
-- an explicit `QUANTLINEAGE_RUN_LIVE_AI_TESTS=1`.
+- an explicit `RUN_LIVE_AI_TESTS=1`.
 
 It should ask one cheap routing question and assert an allowed tool selection. It must not run in default CI.
 

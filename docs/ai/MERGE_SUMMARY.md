@@ -4,17 +4,17 @@
 
 ```bash
 cp .env.example .env
-# set OPENAI_API_KEY, QUANTLINEAGE_AI_PROVIDER=openai, QUANTLINEAGE_OPENAI_MODEL
+# set OPENAI_API_KEY, AI_PROVIDER=openai, OPENAI_MODEL
 docker compose up --build
 ```
 
-Default remains `QUANTLINEAGE_AI_PROVIDER=deterministic` (no OpenAI client, no network).
+Default remains `AI_PROVIDER=deterministic` (no OpenAI client, no network).
 
 Operator guide: [docs/openai_risk_assistant.md](../openai_risk_assistant.md).
 
 ## Rollback
 
-Set `QUANTLINEAGE_AI_PROVIDER=deterministic` (or unset it). No code change required.
+Set `AI_PROVIDER=deterministic` (or unset it). No code change required.
 
 ## Test evidence (T15 gate)
 
@@ -36,7 +36,7 @@ Targeted AI suites (earlier tasks): config, tool schemas, request builder, model
 ## Limitations
 
 - Milestone 1: one tool call per turn; multi-tool narration deferred (T20+).
-- Live OpenAI smoke is opt-in only (`QUANTLINEAGE_RUN_LIVE_AI_TESTS=1` + key).
+- Live OpenAI smoke is opt-in only (`RUN_LIVE_AI_TESTS=1` + key).
 - Worker process does not independently construct a separate OpenAI client beyond shared env; interactive query path is lifespan-wired.
 - Agent VM used Python 3.12.3; Docker images target 3.13.
 

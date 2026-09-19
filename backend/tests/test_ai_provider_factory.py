@@ -22,11 +22,11 @@ from app.main import app
 def _clear_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
         "OPENAI_API_KEY",
-        "QUANTLINEAGE_AI_PROVIDER",
-        "QUANTLINEAGE_OPENAI_MODEL",
-        "QUANTLINEAGE_AI_TIMEOUT_SECONDS",
-        "QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS",
-        "QUANTLINEAGE_AI_MAX_TOOL_ROUNDS",
+        "AI_PROVIDER",
+        "OPENAI_MODEL",
+        "AI_TIMEOUT_SECONDS",
+        "AI_MAX_OUTPUT_TOKENS",
+        "AI_MAX_TOOL_ROUNDS",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -66,15 +66,15 @@ def test_openai_mode_constructs_one_reusable_client_and_model(
 def test_openai_config_errors_are_actionable_without_key_leak(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-secret-should-not-appear")
 
-    with pytest.raises(ValueError, match="QUANTLINEAGE_OPENAI_MODEL is required") as exc:
+    with pytest.raises(ValueError, match="OPENAI_MODEL is required") as exc:
         get_ai_settings()
 
     assert "sk-secret-should-not-appear" not in str(exc.value)
 
-    monkeypatch.setenv("QUANTLINEAGE_OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     with pytest.raises(ValueError, match="OPENAI_API_KEY is required") as exc:
@@ -122,9 +122,9 @@ def test_lifespan_sets_ai_state_and_closes_on_shutdown(
     sentinel_client = SimpleNamespace(close=close_mock)
     openai_ctor = MagicMock(return_value=sentinel_client)
     monkeypatch.setattr("openai.OpenAI", openai_ctor)
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key-1234567890")
-    monkeypatch.setenv("QUANTLINEAGE_OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
 
     with TestClient(app) as client:
         assert client.app.state.ai_settings.provider == "openai"

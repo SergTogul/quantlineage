@@ -1,6 +1,6 @@
 """T14 — Opt-in live OpenAI routing smoke test.
 
-Skipped unless both ``OPENAI_API_KEY`` and ``QUANTLINEAGE_RUN_LIVE_AI_TESTS=1`` are set.
+Skipped unless both ``OPENAI_API_KEY`` and ``RUN_LIVE_AI_TESTS=1`` are set.
 Normal CI never sets the run flag, so this file is network-free in default pipelines.
 """
 
@@ -21,7 +21,7 @@ from app.risk.query import (
 
 pytestmark = pytest.mark.live_ai
 
-_LIVE_RUN_FLAG = "QUANTLINEAGE_RUN_LIVE_AI_TESTS"
+_LIVE_RUN_FLAG = "RUN_LIVE_AI_TESTS"
 _SMOKE_QUESTION = "show the portfolio summary"
 _EXPECTED_TOOL = RiskToolName.GET_PORTFOLIO_SUMMARY
 _HEAVY_SIDE_EFFECT_TOOLS = frozenset(
@@ -51,9 +51,9 @@ def live_resources() -> RiskAssistantResources:
     if not _live_ai_enabled():
         pytest.skip(_skip_reason())
 
-    model_name = os.environ.get("QUANTLINEAGE_OPENAI_MODEL", "").strip()
+    model_name = os.environ.get("OPENAI_MODEL", "").strip()
     if not model_name:
-        pytest.skip("QUANTLINEAGE_OPENAI_MODEL is required for live AI smoke tests.")
+        pytest.skip("OPENAI_MODEL is required for live AI smoke tests.")
 
     settings = get_ai_settings(provider="openai", openai_model=model_name)
     resources = build_risk_assistant_resources(settings=settings)

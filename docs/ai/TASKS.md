@@ -441,7 +441,7 @@ Dependencies: T12, T13
 
 Acceptance:
 
-- Skips unless both `OPENAI_API_KEY` and `QUANTLINEAGE_RUN_LIVE_AI_TESTS=1` are set.
+- Skips unless both `OPENAI_API_KEY` and `RUN_LIVE_AI_TESTS=1` are set.
 - Sends one supported question.
 - Asserts an allowlisted tool selection.
 - Does not submit a heavy RiskRun.
@@ -453,7 +453,7 @@ Checks:
 ```bash
 cd backend
 python3 -m pytest tests/test_openai_live.py -q
-QUANTLINEAGE_RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q
+RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q
 ```
 
 The second command is operator-run only with a configured key.
@@ -461,7 +461,7 @@ The second command is operator-run only with a configured key.
 Evidence:
 
 - Commit `b95ce7f` — Add opt-in live OpenAI smoke test (T14)
-- Checks: `cd backend && python3 -m pytest tests/test_openai_live.py -q` → 1 skipped; `QUANTLINEAGE_RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q` → 1 skipped (no key in agent VM)
+- Checks: `cd backend && python3 -m pytest tests/test_openai_live.py -q` → 1 skipped; `RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q` → 1 skipped (no key in agent VM)
 
 ### T15 — Run the first-release gate
 
@@ -479,7 +479,7 @@ Acceptance:
 - Compose config renders.
 - Normal test logs show no external OpenAI call.
 - PR includes setup, rollback, test evidence, limitations, and follow-up list.
-- `QUANTLINEAGE_AI_PROVIDER=deterministic` restores old behavior without code changes.
+- `AI_PROVIDER=deterministic` restores old behavior without code changes.
 
 Checks:
 

@@ -74,7 +74,7 @@ PYTHONPATH=. python ../docs/examples/mcp_stdio_client.py
 ## What this is not
 
 - Not a model host and not a place for API keys. Do not set `OPENAI_API_KEY` or
-  `QUANTLINEAGE_AI_*` in MCP client `env` — those belong on the HTTP backend
+  `AI_*` in MCP client `env` — those belong on the HTTP backend
   only (see [`docs/openai_risk_assistant.md`](openai_risk_assistant.md)).
 - Clients may attach their own LLM elsewhere; QuantLineage MCP still only
   executes allowlisted tools.

@@ -6,7 +6,7 @@ No API key, model selector, or prompt editor exists in the frontend.
 
 ## Default behavior
 
-`QUANTLINEAGE_AI_PROVIDER` defaults to **`deterministic`**. In this mode:
+`AI_PROVIDER` defaults to **`deterministic`**. In this mode:
 
 - No OpenAI client is constructed at startup.
 - No outbound LLM calls are made.
@@ -27,8 +27,8 @@ enable OpenAI.
 
    ```dotenv
    OPENAI_API_KEY=<your-key>
-   QUANTLINEAGE_AI_PROVIDER=openai
-   QUANTLINEAGE_OPENAI_MODEL=<model-id>
+   AI_PROVIDER=openai
+   OPENAI_MODEL=<model-id>
    ```
 
 3. Start the stack (Compose reads `.env` for backend/worker substitution):
@@ -45,9 +45,9 @@ The backend also calls `load_dotenv(override=False)` on startup, so a local
 
 | Variable | Default | Notes |
 |---|---|---|
-| `QUANTLINEAGE_AI_TIMEOUT_SECONDS` | `30` | Max `120` |
-| `QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS` | `512` | Max `4096` |
-| `QUANTLINEAGE_AI_MAX_TOOL_ROUNDS` | `1` | Milestone 1: must stay `1` |
+| `AI_TIMEOUT_SECONDS` | `30` | Max `120` |
+| `AI_MAX_OUTPUT_TOKENS` | `512` | Max `4096` |
+| `AI_MAX_TOOL_ROUNDS` | `1` | Milestone 1: must stay `1` |
 
 ## Shared / production
 
@@ -59,7 +59,7 @@ storage. Only `backend` and `worker` services receive AI environment variables.
 Recommended practice:
 
 - Store `OPENAI_API_KEY` in the deployment platform's secret store.
-- Keep `QUANTLINEAGE_AI_PROVIDER=deterministic` until routing evals pass in
+- Keep `AI_PROVIDER=deterministic` until routing evals pass in
   your environment.
 - Apply per-principal API rate limits before enabling in a shared deployment.
 
@@ -93,7 +93,7 @@ Monitor OpenAI usage in your provider dashboard when enabled.
 Disable OpenAI without code changes:
 
 ```dotenv
-QUANTLINEAGE_AI_PROVIDER=deterministic
+AI_PROVIDER=deterministic
 ```
 
 Restart backend (and worker if running). Remove or leave `OPENAI_API_KEY` unset;
@@ -113,18 +113,18 @@ OpenAI dashboard.
 
 ```dotenv
 OPENAI_API_KEY=<your-key>
-QUANTLINEAGE_OPENAI_MODEL=<model-id>
-QUANTLINEAGE_RUN_LIVE_AI_TESTS=1
+OPENAI_MODEL=<model-id>
+RUN_LIVE_AI_TESTS=1
 ```
 
 **Run:**
 
 ```bash
 cd backend
-QUANTLINEAGE_RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q
+RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q
 ```
 
-Without both `OPENAI_API_KEY` and `QUANTLINEAGE_RUN_LIVE_AI_TESTS=1`, pytest skips
+Without both `OPENAI_API_KEY` and `RUN_LIVE_AI_TESTS=1`, pytest skips
 the test. Normal CI does not set the run flag, so pipelines stay network-free.
 
 ## Boundaries

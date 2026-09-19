@@ -10,7 +10,7 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "live_ai: opt-in live OpenAI smoke test; requires OPENAI_API_KEY and "
-        "QUANTLINEAGE_RUN_LIVE_AI_TESTS=1 (excluded from normal CI).",
+        "RUN_LIVE_AI_TESTS=1 (excluded from normal CI).",
     )
 
 # Unit/API tests must not depend on an optional native QuantLib wheel being

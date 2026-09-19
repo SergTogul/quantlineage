@@ -22,11 +22,11 @@ from app.ai.config import (
 def _clear_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
         "OPENAI_API_KEY",
-        "QUANTLINEAGE_AI_PROVIDER",
-        "QUANTLINEAGE_OPENAI_MODEL",
-        "QUANTLINEAGE_AI_TIMEOUT_SECONDS",
-        "QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS",
-        "QUANTLINEAGE_AI_MAX_TOOL_ROUNDS",
+        "AI_PROVIDER",
+        "OPENAI_MODEL",
+        "AI_TIMEOUT_SECONDS",
+        "AI_MAX_OUTPUT_TOKENS",
+        "AI_MAX_TOOL_ROUNDS",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -41,30 +41,30 @@ def test_defaults_to_deterministic_provider() -> None:
 
 
 def test_supported_providers_are_deterministic_and_openai(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "deterministic")
+    monkeypatch.setenv("AI_PROVIDER", "deterministic")
     assert get_ai_settings().provider == "deterministic"
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setenv("QUANTLINEAGE_OPENAI_MODEL", "gpt-test")
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
     assert get_ai_settings().provider == "openai"
 
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "anthropic")
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
     with pytest.raises(ValueError, match="Supported providers"):
         get_ai_settings()
 
 
 def test_openai_mode_requires_key_and_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
 
     with pytest.raises(ValueError, match="OPENAI_API_KEY is required"):
         get_ai_settings()
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    with pytest.raises(ValueError, match="QUANTLINEAGE_OPENAI_MODEL is required"):
+    with pytest.raises(ValueError, match="OPENAI_MODEL is required"):
         get_ai_settings()
 
-    monkeypatch.setenv("QUANTLINEAGE_OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
     settings = get_ai_settings()
     assert settings.provider == "openai"
     assert settings.openai_model == "gpt-test"
@@ -84,25 +84,25 @@ def test_timeout_is_bounded(
     raw: str,
     message: str,
 ) -> None:
-    monkeypatch.setenv("QUANTLINEAGE_AI_TIMEOUT_SECONDS", raw)
+    monkeypatch.setenv("AI_TIMEOUT_SECONDS", raw)
     with pytest.raises(ValueError, match=message):
         get_ai_settings()
 
 
 def test_timeout_accepts_valid_values(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("QUANTLINEAGE_AI_TIMEOUT_SECONDS", "45.5")
+    monkeypatch.setenv("AI_TIMEOUT_SECONDS", "45.5")
     assert get_ai_settings().timeout_seconds == 45.5
 
-    monkeypatch.setenv("QUANTLINEAGE_AI_TIMEOUT_SECONDS", str(MAX_AI_TIMEOUT_SECONDS))
+    monkeypatch.setenv("AI_TIMEOUT_SECONDS", str(MAX_AI_TIMEOUT_SECONDS))
     assert get_ai_settings().timeout_seconds == MAX_AI_TIMEOUT_SECONDS
 
 
 def test_max_tool_rounds_must_be_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("QUANTLINEAGE_AI_MAX_TOOL_ROUNDS", "2")
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "2")
     with pytest.raises(ValueError, match="Milestone 1 requires exactly 1"):
         get_ai_settings()
 
-    monkeypatch.setenv("QUANTLINEAGE_AI_MAX_TOOL_ROUNDS", "not-int")
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "not-int")
     with pytest.raises(ValueError, match="Milestone 1 requires exactly 1"):
         get_ai_settings()
 
@@ -110,8 +110,8 @@ def test_max_tool_rounds_must_be_one(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_api_key_excluded_from_settings_repr(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "sk-super-secret-key-value"
     monkeypatch.setenv("OPENAI_API_KEY", secret)
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
-    monkeypatch.setenv("QUANTLINEAGE_OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
 
     settings = get_ai_settings()
     rendered = repr(settings)
@@ -124,19 +124,19 @@ def test_api_key_excluded_from_settings_repr(monkeypatch: pytest.MonkeyPatch) ->
 def test_api_key_excluded_from_error_messages(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "sk-leaked-if-present"
     monkeypatch.setenv("OPENAI_API_KEY", secret)
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "openai")
-    monkeypatch.delenv("QUANTLINEAGE_OPENAI_MODEL", raising=False)
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
     with pytest.raises(ValueError) as exc:
         get_ai_settings()
 
     assert secret not in str(exc.value)
-    assert "QUANTLINEAGE_OPENAI_MODEL is required" in str(exc.value)
+    assert "OPENAI_MODEL is required" in str(exc.value)
 
 
 def test_loading_does_not_override_exported_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("QUANTLINEAGE_AI_PROVIDER", "deterministic")
-    monkeypatch.setenv("QUANTLINEAGE_AI_TIMEOUT_SECONDS", "45")
+    monkeypatch.setenv("AI_PROVIDER", "deterministic")
+    monkeypatch.setenv("AI_TIMEOUT_SECONDS", "45")
     before = os.environ.copy()
 
     settings = get_ai_settings()
