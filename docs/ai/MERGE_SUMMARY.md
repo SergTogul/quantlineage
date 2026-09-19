@@ -25,6 +25,7 @@ Set `QUANTLINEAGE_AI_PROVIDER=deterministic` (or unset it). No code change requi
 | Frontend production build | success |
 | Frontend eslint | success (`--max-warnings 0`) |
 | Backend ruff (`app` + `tests`) | clean |
+| Backend mypy (`mypy app`) | No errors under `app/ai/`. Pre-existing 263 `union-attr` findings remain in 3 non-AI files also present without this change set. |
 | `tests/test_openai_live.py` (normal CI) | **skipped** (opt-in) |
 | Full-suite log OpenAI hosts | none (`api.openai.com` absent) |
 | `docker compose config` | renders; AI env on backend/worker only; frontend none |
