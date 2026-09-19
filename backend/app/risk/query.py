@@ -51,6 +51,8 @@ class RiskToolContract(BaseModel):
 class RiskAssistantModelRequest(BaseModel):
     question: str
     tools: list[dict[str, Any]]
+    portfolio_id: str | None = None
+    available_run_ids: list[str] = Field(default_factory=list)
     instruction: str = (
         "Select at most one deterministic QuantLineage tool. Do not calculate or invent "
         "VaR, Greeks, P&L, prices, stress losses, or limit values. Ask for clarification "

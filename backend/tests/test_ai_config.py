@@ -11,6 +11,7 @@ import pytest
 from app.ai.config import (
     AISettings,
     DEFAULT_AI_TIMEOUT_SECONDS,
+    DEFAULT_MAX_OUTPUT_TOKENS,
     MAX_AI_TIMEOUT_SECONDS,
     REQUIRED_MAX_TOOL_ROUNDS,
     get_ai_settings,
@@ -25,6 +26,7 @@ def _clear_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "QUANTLINEAGE_AI_PROVIDER",
         "QUANTLINEAGE_OPENAI_MODEL",
         "QUANTLINEAGE_AI_TIMEOUT_SECONDS",
+        "QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS",
         "QUANTLINEAGE_AI_MAX_TOOL_ROUNDS",
     ):
         monkeypatch.delenv(name, raising=False)
@@ -35,6 +37,7 @@ def test_defaults_to_deterministic_provider() -> None:
     assert settings.provider == "deterministic"
     assert settings.openai_model is None
     assert settings.timeout_seconds == DEFAULT_AI_TIMEOUT_SECONDS
+    assert settings.max_output_tokens == DEFAULT_MAX_OUTPUT_TOKENS
     assert settings.max_tool_rounds == REQUIRED_MAX_TOOL_ROUNDS
 
 
