@@ -44,7 +44,7 @@ cd ../frontend
 npm test -- --run src/components/RiskQuery.test.jsx
 ```
 
-Evidence: `b03c957` — `cd backend && python3 -m pytest tests/test_ai_query_orchestration.py -q` (20 passed); `python3 -m pytest -q -k "mcp or risk_query"` (11 passed); `cd ../frontend && npm test -- --run src/components/RiskQuery.test.jsx` (3 passed).
+Evidence: `781bcae` — `cd backend && python3 -m pytest tests/test_ai_query_orchestration.py -q` (20 passed); `python3 -m pytest -k "mcp or risk_query" -q` (11 passed); `cd ../frontend && npm test -- --run src/components/RiskQuery.test.jsx` (3 passed).
 
 ### T01 — Add typed AI configuration
 
