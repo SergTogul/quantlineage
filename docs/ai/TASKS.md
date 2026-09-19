@@ -332,12 +332,12 @@ npm run build
 
 Evidence:
 
-- Commit `411f073` — Show provider state in RiskQuery UI (T10)
+- Commit `092c6d3` — Show provider state in RiskQuery UI (T10)
 - Checks: `cd frontend && npm test -- --run src/components/RiskQuery.test.jsx` → 5 passed; `npm run build` → success
 
 ### T11 — Add secret and boundary regression tests
 
-- [ ] Add zero-tolerance tests for credential and execution boundaries.
+- [x] Add zero-tolerance tests for credential and execution boundaries.
 
 Dependencies: T08
 
@@ -353,14 +353,15 @@ Checks:
 
 ```bash
 cd backend
-python3 -m pytest tests/test_ai_security.py tests/test_mcp.py tests/test_ai_query_orchestration.py -q
+python3 -m pytest tests/test_ai_security.py tests/test_wave_c_mcp.py tests/test_ai_query_orchestration.py -q
 cd ../frontend
 npm test -- --run src/components/RiskQuery.test.jsx
 ```
 
-Adjust the MCP test filename in T00 if the repository uses a different name.
-
 Evidence:
+
+- Commit — Add secret and boundary regression tests (T11)
+- Checks: `cd backend && python3 -m pytest tests/test_ai_security.py tests/test_wave_c_mcp.py tests/test_ai_query_orchestration.py -q` → 46 passed; `cd ../frontend && npm test -- --run src/components/RiskQuery.test.jsx` → 5 passed
 
 ### T12 — Add the fixed evaluation suite
 
