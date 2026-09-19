@@ -164,7 +164,7 @@ python3 -m pytest tests/test_openai_request_builder.py -q
 
 Evidence:
 
-- Commit — Add assistant policy and request builder (T04)
+- Commit `6ee16b3` — Add assistant policy and request builder (T04)
 - Checks: `cd backend && python3 -m pytest tests/test_openai_request_builder.py -q` → 9 passed
 
 ### T05 — Implement the OpenAI model happy path
