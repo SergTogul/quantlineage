@@ -164,7 +164,10 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
     ),
     RiskToolName.GET_CONTRIBUTORS: RiskToolContract(
         name=RiskToolName.GET_CONTRIBUTORS,
-        description="Rank top position-level risk contributors.",
+        description=(
+            "Rank top position-level risk contributors (component VaR / risk share). "
+            "Not for option Greeks such as delta, gamma, vega, or theta."
+        ),
         service_method="contributors",
         required_inputs=["portfolio"],
         returns=["list[Contributor]"],
@@ -365,6 +368,12 @@ _SECRET_REFUSAL_ANSWER = (
 
 _FAKE_TOOL_REFUSAL_ANSWER = (
     "Unknown tool is not in the QuantLineage allowlist."
+)
+
+_GREEKS_UNSUPPORTED_ANSWER = (
+    "Option Greeks such as delta, gamma, vega, and theta are not available through "
+    "the risk assistant tools. Ask for VaR/ES, limits, contributors, worst stress, "
+    "or portfolio summary instead."
 )
 
 _TOOL_FAILURE_ANSWER = (
@@ -570,6 +579,8 @@ class RiskQueryEngine:
             return _clarification_plan("unsupported", _FAKE_TOOL_REFUSAL_ANSWER)
         if _is_secret_request(q):
             return _clarification_plan("unsupported", _SECRET_REFUSAL_ANSWER)
+        if _is_greeks_question(q):
+            return _clarification_plan("unsupported", _GREEKS_UNSUPPORTED_ANSWER)
         if _is_advisory(q):
             return _clarification_plan(
                 "unsupported",
@@ -797,6 +808,19 @@ class RiskQueryEngine:
             return RiskQueryResponse(
                 intent="unsupported",
                 answer=_SECRET_REFUSAL_ANSWER,
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    "assistant": assistant_meta,
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+        if _is_greeks_question(" ".join(question.strip().split()).lower()):
+            return RiskQueryResponse(
+                intent="unsupported",
+                answer=_GREEKS_UNSUPPORTED_ANSWER,
                 data={
                     "tool_contract": None,
                     "tool_result": None,
@@ -1595,6 +1619,16 @@ def _is_fake_tool_request(question: str) -> bool:
 
 def _is_secret_request(question: str) -> bool:
     return any(marker in question for marker in _SECRET_REQUEST_MARKERS)
+
+
+def _is_greeks_question(question: str) -> bool:
+    """True when the user asks for option Greeks not covered by allowlisted tools."""
+    if _mentions(question, "greeks", "greek"):
+        return True
+    if not re.search(r"\b(delta|gamma|vega|theta|rho)\b", question, re.I):
+        return False
+    # Keep explain-risk-change paths that mention a greek metric name.
+    return not _is_risk_change_question(question)
 
 
 def _tool_args_oversized(args: dict[str, Any] | None) -> bool:

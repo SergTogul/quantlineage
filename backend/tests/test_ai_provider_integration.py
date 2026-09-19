@@ -159,7 +159,27 @@ def test_default_deterministic_query_path_unchanged() -> None:
     assert "assistant" not in routed.data
 
 
-def test_model_selected_valid_tool_executes_once() -> None:
+def test_model_options_delta_question_does_not_run_contributors() -> None:
+    fixture = _FixtureService()
+    fixture.risk_assistant_model = _ScriptedModel(
+        RiskAssistantModelResponse(
+            tool_name=RiskToolName.GET_CONTRIBUTORS,
+            intent="contributors",
+            rationale="Misrouted biggest options delta to contributors.",
+        )
+    )
+
+    response = fixture.query(SAMPLE_PORTFOLIO, "Biggest options delta?")
+
+    assert fixture.calls == []
+    assert response.tool_name is None
+    assert response.requires_clarification
+    assert response.intent == "unsupported"
+    assert "delta" in response.answer.lower() or "greek" in response.answer.lower()
+    assert "Top risk contributors" not in response.answer
+    assert response.data["assistant"]["mode"] == "model-routed"
+    assert response.data["assistant"]["fallback"] is False
+
     fixture = _FixtureService()
     fixture.risk_assistant_model = _ScriptedModel(
         RiskAssistantModelResponse(

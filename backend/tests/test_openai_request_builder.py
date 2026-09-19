@@ -31,7 +31,7 @@ def openai_settings() -> AISettings:
 def test_policy_is_versioned_and_covers_required_rules() -> None:
     policy = ASSISTANT_POLICY_INSTRUCTION
 
-    assert ASSISTANT_POLICY_VERSION == "1.0.0"
+    assert ASSISTANT_POLICY_VERSION == "1.0.1"
     assert f"v{ASSISTANT_POLICY_VERSION}" in policy
     assert "Select at most one function" in policy
     assert "Never calculate" in policy
