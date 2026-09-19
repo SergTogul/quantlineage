@@ -427,12 +427,12 @@ Inspect rendered config carefully; do not print a real secret into CI or PR evid
 
 Evidence:
 
-- Commit `5dd5079` — Wire Compose and write operator guide (T13)
+- Commit `77fdf44` — Wire Compose and write operator guide (T13)
 - Checks: static YAML parse of `docker-compose.yml` and `docker-compose.shared.yml` (backend/worker carry 6 AI env vars; frontend has none); `docker compose config` not run (docker CLI unavailable in agent VM)
 
 ### T14 — Add an opt-in live smoke test
 
-- [ ] Add one cheap live routing smoke test or script.
+- [x] Add one cheap live routing smoke test or script.
 
 Dependencies: T12, T13
 
@@ -456,6 +456,9 @@ QUANTLINEAGE_RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q
 The second command is operator-run only with a configured key.
 
 Evidence:
+
+- Commit — Add opt-in live OpenAI smoke test (T14)
+- Checks: `cd backend && python3 -m pytest tests/test_openai_live.py -q` → 1 skipped; `QUANTLINEAGE_RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q` → 1 skipped (no key in agent VM)
 
 ### T15 — Run the first-release gate
 

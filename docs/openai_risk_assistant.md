@@ -99,6 +99,34 @@ QUANTLINEAGE_AI_PROVIDER=deterministic
 Restart backend (and worker if running). Remove or leave `OPENAI_API_KEY` unset;
 deterministic mode ignores it. Behavior returns to the pre-OpenAI routing path.
 
+## Live smoke test (opt-in)
+
+`backend/tests/test_openai_live.py` sends **one** cheap routing question to OpenAI
+and asserts an allowlisted, read-only tool selection. It does **not** execute tools
+or submit a RiskRun.
+
+**Cost:** roughly one Responses API call with bounded output tokens (default cap
+512). Expect a few cents or less on current small models; monitor usage in your
+OpenAI dashboard.
+
+**Requirements:** both env vars must be set:
+
+```dotenv
+OPENAI_API_KEY=<your-key>
+QUANTLINEAGE_OPENAI_MODEL=<model-id>
+QUANTLINEAGE_RUN_LIVE_AI_TESTS=1
+```
+
+**Run:**
+
+```bash
+cd backend
+QUANTLINEAGE_RUN_LIVE_AI_TESTS=1 python3 -m pytest tests/test_openai_live.py -q
+```
+
+Without both `OPENAI_API_KEY` and `QUANTLINEAGE_RUN_LIVE_AI_TESTS=1`, pytest skips
+the test. Normal CI does not set the run flag, so pipelines stay network-free.
+
 ## Boundaries
 
 - **Frontend:** displays optional assistant metadata only; no secrets.
