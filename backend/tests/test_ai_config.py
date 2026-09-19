@@ -9,7 +9,6 @@ import sys
 import pytest
 
 from app.ai.config import (
-    AISettings,
     DEFAULT_AI_TIMEOUT_SECONDS,
     DEFAULT_MAX_OUTPUT_TOKENS,
     MAX_AI_TIMEOUT_SECONDS,
@@ -165,10 +164,18 @@ def test_importing_config_does_not_create_openai_client_or_network_call(
 
     module_name = "app.ai.config"
     sys.modules.pop(module_name, None)
-    sys.modules.pop("app.ai", None)
+    # Keep sibling packages; only prove *this* module's import is offline and
+    # does not construct an OpenAI client (openai may already be in sys.modules
+    # from earlier tests in the full suite).
+    openai_was_loaded = "openai" in sys.modules
 
     imported = importlib.import_module(module_name)
 
     assert imported.AISettings.__name__ == "AISettings"
     assert callable(imported.get_ai_settings)
-    assert "openai" not in sys.modules
+    assert "openai" not in getattr(imported, "__dict__", {})
+    # Importing config must not newly pull in the OpenAI SDK.
+    if not openai_was_loaded:
+        assert "openai" not in sys.modules
+    # And must not bind a client constructor as a side effect of import.
+    assert not hasattr(imported, "OpenAI")

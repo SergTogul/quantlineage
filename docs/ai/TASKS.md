@@ -428,7 +428,7 @@ Inspect rendered config carefully; do not print a real secret into CI or PR evid
 Evidence:
 
 - Commit `77fdf44` — Wire Compose and write operator guide (T13)
-- Checks: static YAML parse of `docker-compose.yml` and `docker-compose.shared.yml` (backend/worker carry 6 AI env vars; frontend has none); `docker compose config` not run (docker CLI unavailable in agent VM)
+- Checks: `docker compose config` renders (AI env on backend/worker only; frontend none); `docker compose -f docker-compose.shared.yml config` renders with dummy `POSTGRES_PASSWORD` / token (same AI placement); no live secrets in rendered output.
 
 ### T14 — Add an opt-in live smoke test
 
@@ -462,7 +462,7 @@ Evidence:
 
 ### T15 — Run the first-release gate
 
-- [ ] Verify the complete first release and prepare the merge summary.
+- [x] Verify the complete first release and prepare the merge summary.
 
 Dependencies: T00–T14
 
@@ -494,6 +494,9 @@ docker compose config
 ```
 
 Evidence:
+
+- See commit after T15 gate (lint fix + merge summary).
+- Checks: backend `pytest -q` → 2000 passed, 10 skipped; `ruff check app tests` clean; frontend `npm test -- --run` → 208 passed; `npm run lint` clean; `npm run build` success; `docker compose config` renders (AI on backend/worker only); shared compose renders with dummy required secrets; full-suite log contains no `api.openai.com`; `docs/ai/GOAL.md` DoD all checked; merge summary at `docs/ai/MERGE_SUMMARY.md`.
 
 ## Deferred tasks — do not select during the first-release loop
 

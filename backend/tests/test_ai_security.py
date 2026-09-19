@@ -272,11 +272,10 @@ def test_sentinel_absent_from_provider_errors_and_logs(
     )
     model = OpenAIRiskAssistantModel(client, settings)
 
-    with caplog.at_level(logging.WARNING):
-        with pytest.raises(OpenAIAuthenticationError) as exc_info:
-            model.complete(
-                RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
-            )
+    with caplog.at_level(logging.WARNING), pytest.raises(OpenAIAuthenticationError) as exc_info:
+        model.complete(
+            RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+        )
 
     _assert_sentinel_absent(str(exc_info.value))
     for record in caplog.records:

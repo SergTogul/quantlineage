@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.ai.factory import build_risk_assistant_resources, load_application_dotenv
 from app.api.attribution import router as attribution_router
 from app.api.auth import SharedTokenMiddleware, require_shared_auth_configured
 from app.api.data import router as data_router
@@ -19,7 +20,6 @@ from app.api.risk import router as risk_router
 from app.api.risk_runs import router as risk_runs_router
 from app.api.stress import router as stress_router
 from app.api.workload import WorkloadBodyLimitMiddleware, enforce_workload_limits
-from app.ai.factory import build_risk_assistant_resources, load_application_dotenv
 from app.persistence.wiring import build_persistence_wiring
 from app.services.risk_factories import build_portfolio_service
 from app.services.risk_run_worker import RiskRunWorker

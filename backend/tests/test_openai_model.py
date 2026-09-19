@@ -39,7 +39,11 @@ from app.ai.errors import (
 from app.ai.openai_model import OpenAIRiskAssistantModel
 from app.ai.policy import ASSISTANT_POLICY_INSTRUCTION
 from app.ai.tool_schemas import openai_function_tools
-from app.risk.query import RiskAssistantModelRequest, RiskAssistantModelResponse, tool_contract_schemas
+from app.risk.query import (
+    RiskAssistantModelRequest,
+    RiskAssistantModelResponse,
+    tool_contract_schemas,
+)
 
 SENTINEL_API_KEY = "sk-sentinel-test-key-0123456789abcdef"
 
@@ -527,11 +531,10 @@ def test_provider_errors_and_logs_redact_api_key(
     client = FakeOpenAIClient(responses=FakeResponses(response=_make_response(), error=sdk_error))
     model = OpenAIRiskAssistantModel(client, openai_settings)
 
-    with caplog.at_level(logging.WARNING):
-        with pytest.raises(OpenAIAuthenticationError) as exc_info:
-            model.complete(
-                RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
-            )
+    with caplog.at_level(logging.WARNING), pytest.raises(OpenAIAuthenticationError) as exc_info:
+        model.complete(
+            RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+        )
 
     assert SENTINEL_API_KEY not in str(exc_info.value)
     assert all(SENTINEL_API_KEY not in record.getMessage() for record in caplog.records)

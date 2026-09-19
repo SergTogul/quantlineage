@@ -19,22 +19,22 @@ The browser never receives or stores the key.
 
 ## Definition of done
 
-- [ ] Deterministic routing remains the default.
-- [ ] Local `.env` loading works and does not override exported env vars.
-- [ ] The OpenAI Python SDK uses the Responses API.
-- [ ] OpenAI function tools are derived from existing `TOOL_CONTRACTS` in strict mode.
-- [ ] The provider implements the existing one-tool `RiskAssistantModel` seam.
-- [ ] Every returned tool name and argument set is validated again in the application.
-- [ ] Tool execution continues through `PortfolioService`.
-- [ ] Numerical answers use existing deterministic formatters.
-- [ ] Transient provider failures fall back safely before tool execution.
-- [ ] No fallback replays a potentially side-effecting tool.
-- [ ] Existing HTTP request/response behavior remains compatible.
-- [ ] The UI shows provider/fallback status and has no key input.
-- [ ] Normal tests are network-free.
-- [ ] The routing/safety evaluation gate in the implementation plan passes.
-- [ ] Setup, rollback, and operating behavior are documented.
-- [ ] An opt-in live smoke test is available but excluded from normal CI.
+- [x] Deterministic routing remains the default.
+- [x] Local `.env` loading works and does not override exported env vars.
+- [x] The OpenAI Python SDK uses the Responses API.
+- [x] OpenAI function tools are derived from existing `TOOL_CONTRACTS` in strict mode.
+- [x] The provider implements the existing one-tool `RiskAssistantModel` seam.
+- [x] Every returned tool name and argument set is validated again in the application.
+- [x] Tool execution continues through `PortfolioService`.
+- [x] Numerical answers use existing deterministic formatters.
+- [x] Transient provider failures fall back safely before tool execution.
+- [x] No fallback replays a potentially side-effecting tool.
+- [x] Existing HTTP request/response behavior remains compatible.
+- [x] The UI shows provider/fallback status and has no key input.
+- [x] Normal tests are network-free.
+- [x] The routing/safety evaluation gate in the implementation plan passes.
+- [x] Setup, rollback, and operating behavior are documented.
+- [x] An opt-in live smoke test is available but excluded from normal CI.
 
 ## Non-negotiable constraints
 

@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from app.ai.config import AISettings, DEFAULT_MAX_OUTPUT_TOKENS
+from app.ai.config import DEFAULT_MAX_OUTPUT_TOKENS, AISettings
 from app.ai.policy import ASSISTANT_POLICY_INSTRUCTION, ASSISTANT_POLICY_VERSION
 from app.ai.request_builder import (
     OpenAIResponsesRequest,
@@ -118,14 +118,8 @@ def test_tools_come_from_openai_function_schemas_not_request_tools(
 def test_portfolio_positions_and_tool_results_are_not_sent(
     openai_settings: AISettings,
 ) -> None:
-    positions = [
-        {
-            "id": "pos-secret-123",
-            "instrument_id": "AAPL",
-            "quantity": 1_000_000,
-            "market_value": 175_000_000.55,
-        }
-    ]
+    # Request builder has no positions/results fields; guard that sensitive
+    # position-like tokens never appear in the serialized Responses payload.
     request = RiskAssistantModelRequest(
         question="Summarize the portfolio",
         tools=tool_contract_schemas(),
