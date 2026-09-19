@@ -108,7 +108,7 @@ Evidence:
 
 ### T03 — Build strict OpenAI tool schemas
 
-- [ ] Add a pure adapter from `TOOL_CONTRACTS` to strict function tools.
+- [x] Add a pure adapter from `TOOL_CONTRACTS` to strict function tools.
 
 Dependencies: T01
 
@@ -136,6 +136,9 @@ python3 -m pytest tests/test_openai_tool_schemas.py tests/test_ai_query_orchestr
 ```
 
 Evidence:
+
+- Commit — Build strict OpenAI tool schemas (T03)
+- Checks: `cd backend && python3 -m pytest tests/test_openai_tool_schemas.py tests/test_ai_query_orchestration.py -q` → 31 passed
 
 ### T04 — Add the assistant policy and request builder
 
