@@ -332,7 +332,7 @@ npm run build
 
 Evidence:
 
-- Commit `8a54826` — Show provider state in RiskQuery UI (T10)
+- Commit `411f073` — Show provider state in RiskQuery UI (T10)
 - Checks: `cd frontend && npm test -- --run src/components/RiskQuery.test.jsx` → 5 passed; `npm run build` → success
 
 ### T11 — Add secret and boundary regression tests
