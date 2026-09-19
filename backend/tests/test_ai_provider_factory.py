@@ -12,7 +12,6 @@ from app.ai.config import AISettings, get_ai_settings
 from app.ai.factory import (
     RiskAssistantResources,
     build_risk_assistant_resources,
-    load_application_dotenv,
 )
 from app.ai.openai_model import OpenAIRiskAssistantModel
 from app.main import app

@@ -20,7 +20,6 @@ from app.main import app
 from app.risk.query import (
     RiskAssistantModelRequest,
     RiskAssistantModelResponse,
-    RiskToolName,
 )
 
 
