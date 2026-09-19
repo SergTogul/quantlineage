@@ -17,6 +17,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from app.ai.config import AISettings
 from app.api.schemas import (
     RiskRunRequestBody,
     dump_risk_run_request,
@@ -45,6 +46,7 @@ from app.risk.historical_data import (
     create_historical_dataset,
     file_csv_dataset_id,
 )
+from app.risk.query import RiskAssistantModel
 from app.services.portfolio_service import PortfolioService
 
 DEFAULT_HISTORICAL_DATASET_VERSION = "v1"
@@ -174,6 +176,8 @@ def build_portfolio_service(
     seed: int | None = None,
     observations: int | None = None,
     market_data: Any | None = None,
+    risk_assistant_model: RiskAssistantModel | None = None,
+    ai_settings: AISettings | None = None,
 ) -> PortfolioService:
     """Construct the process-wide pricing + historical risk stack.
 
@@ -186,9 +190,21 @@ def build_portfolio_service(
         seed=seed,
         observations=observations,
     )
+    pricing = create_pricing_engine()
     if market_data is None:
-        return PortfolioService(create_pricing_engine(), engine)
-    return PortfolioService(create_pricing_engine(), engine, market_data=market_data)
+        return PortfolioService(
+            pricing,
+            engine,
+            risk_assistant_model=risk_assistant_model,
+            ai_settings=ai_settings,
+        )
+    return PortfolioService(
+        pricing,
+        engine,
+        market_data=market_data,
+        risk_assistant_model=risk_assistant_model,
+        ai_settings=ai_settings,
+    )
 
 
 def dataset_identity(dataset: object) -> tuple[str, str]:

@@ -5,6 +5,14 @@ from pathlib import Path
 
 import pytest
 
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "live_ai: opt-in live OpenAI smoke test; requires OPENAI_API_KEY and "
+        "RUN_LIVE_AI_TESTS=1 (excluded from normal CI).",
+    )
+
 # Unit/API tests must not depend on an optional native QuantLib wheel being
 # present in the execution environment. QuantLib has its own adapter tests.
 # The R0.1.6 hard-gate job sets QUANTLINEAGE_REQUIRE_QUANTLIB=1 so QL skips fail.
@@ -33,6 +41,33 @@ def pytest_sessionfinish(session, exitstatus):
             ql_skips.append(node)
     if ql_skips:
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+@pytest.fixture(autouse=True)
+def _isolate_ai_env_from_workspace_dotenv(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> None:
+    """Keep normal tests free of a developer workspace ``.env`` AI config.
+
+    ``load_application_dotenv`` uses ``override=False``, so clearing env vars
+    alone is not enough: lifespan would reload ``AI_PROVIDER`` from ``.env``.
+    Opt-in ``live_ai`` tests keep the real environment.
+    """
+    if request.node.get_closest_marker("live_ai"):
+        return
+    for name in (
+        "OPENAI_API_KEY",
+        "AI_PROVIDER",
+        "OPENAI_MODEL",
+        "AI_TIMEOUT_SECONDS",
+        "AI_MAX_OUTPUT_TOKENS",
+        "AI_MAX_TOOL_ROUNDS",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr("app.ai.factory.load_application_dotenv", lambda: None)
+    import app.main as main_mod
+
+    monkeypatch.setattr(main_mod, "load_application_dotenv", lambda: None)
 
 
 @pytest.fixture(autouse=True)

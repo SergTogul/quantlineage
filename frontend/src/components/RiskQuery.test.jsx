@@ -81,16 +81,123 @@ describe('RiskQuery', () => {
     expect(card).toHaveTextContent('−8')
     expect(card).toHaveTextContent('per_bp')
     expect(card).toHaveTextContent('2024-06-15')
-    expect(card).toHaveTextContent('not on this payload')
+    expect(card).not.toHaveTextContent('not on this payload')
+    expect(card).not.toHaveTextContent('Sign')
+    expect(card).not.toHaveTextContent('Run')
 
     const provenance = screen.getByTestId('risk-query-provenance')
     expect(provenance).toHaveTextContent('key_rate_dv01')
     expect(provenance).toHaveTextContent('per_bp')
     expect(provenance).toHaveTextContent('snap-grounded')
-    expect(provenance).toHaveTextContent('not on this payload')
+    expect(provenance).not.toHaveTextContent('not on this payload')
+    expect(provenance).not.toHaveTextContent('Value')
 
     expect(card).not.toHaveTextContent('11')
-    expect(screen.getByText(/USD 10Y KR-DV01 is −8 per_bp from the rates showcase/)).toBeInTheDocument()
+    expect(screen.getByTestId('risk-query-answer')).toHaveTextContent(
+      /USD 10Y KR-DV01 is −8 per_bp from the rates showcase/,
+    )
+    expect(screen.queryByTestId('risk-query-assistant-state')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('risk-query-assistant-fallback')).not.toBeInTheDocument()
+  })
+
+  it('formats answers with bold numbers and paragraph structure', async () => {
+    queryHandler(() => ({
+      answer: 'Worst stress scenario is Dot-com-style equity crash with loss 677,747. Second sentence stays separate.',
+      data: {},
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+
+    const answer = await screen.findByTestId('risk-query-answer')
+    expect(answer.querySelectorAll('.query-answer-p')).toHaveLength(2)
+    expect(answer.querySelector('.query-answer-lead')).toHaveTextContent(/Worst stress scenario/i)
+    expect(answer.querySelector('.query-answer-num')).toHaveTextContent('677,747')
+  })
+
+  it('keeps decimal percentages intact for top contributors answers', async () => {
+    queryHandler(() => ({
+      answer: 'Top risk contributors: eq-nvda 25.1%, eq-aapl 18.0%, eq-msft 12.5%.',
+      data: {},
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+
+    const answer = await screen.findByTestId('risk-query-answer')
+    expect(answer.querySelectorAll('.query-answer-p')).toHaveLength(1)
+    expect(answer).toHaveTextContent('Top risk contributors: eq-nvda 25.1%, eq-aapl 18.0%, eq-msft 12.5%.')
+    expect(answer.querySelectorAll('.query-answer-num')).toHaveLength(3)
+  })
+
+  it('hides result card when every identity field is missing on the payload', async () => {
+    queryHandler(() => ({
+      answer: 'Worst stress scenario is Dot-com-style equity crash with loss 677,747.',
+      data: {
+        card: {
+          metric: 'not on this payload',
+          value: 'not on this payload',
+          unit: 'not on this payload',
+        },
+        provenance: {
+          metric: 'not on this payload',
+          methodology: 'not on this payload',
+        },
+      },
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+
+    expect(await screen.findByTestId('risk-query-answer')).toHaveTextContent(/Worst stress scenario/)
+    expect(screen.queryByTestId('risk-query-result-card')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('risk-query-provenance')).not.toBeInTheDocument()
+    expect(screen.queryByText('not on this payload')).not.toBeInTheDocument()
+  })
+
+  it('shows a subtle AI-routed label when assistant metadata is present', async () => {
+    queryHandler(() => ({
+      answer: 'Top contributors from the portfolio.',
+      data: {
+        assistant: {
+          provider: 'openai',
+          model: 'gpt-test',
+          mode: 'model-routed',
+          fallback: false,
+        },
+      },
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+
+    const state = await screen.findByTestId('risk-query-assistant-state')
+    expect(state).toHaveTextContent('AI-routed')
+    expect(screen.queryByTestId('risk-query-assistant-fallback')).not.toBeInTheDocument()
+    expect(screen.queryByText('gpt-test')).not.toBeInTheDocument()
+  })
+
+  it('shows a deterministic fallback note when assistant metadata reports fallback', async () => {
+    queryHandler(() => ({
+      answer: 'Worst stress scenario from deterministic routing.',
+      data: {
+        assistant: {
+          provider: 'openai',
+          model: 'gpt-test',
+          mode: 'fallback',
+          fallback: true,
+        },
+      },
+    }))
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Run equity-down stress.' }))
+
+    const note = await screen.findByTestId('risk-query-assistant-fallback')
+    expect(note).toHaveTextContent(/Deterministic fallback/i)
+    expect(note).toHaveTextContent(/built-in router/i)
+    expect(screen.queryByTestId('risk-query-assistant-state')).not.toBeInTheDocument()
+    expect(screen.queryByText('gpt-test')).not.toBeInTheDocument()
   })
 
   it('shows the server clarification for Why did VaR change? without inventing digits', async () => {

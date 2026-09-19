@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from app.api.schemas import RiskQueryResponse
+from app.api.schemas import RiskQueryAssistantMetadata, RiskQueryResponse
 from app.domain.models import Portfolio
 from app.risk.tool_contracts import (
     C1_ARG_MODELS,
@@ -51,6 +52,8 @@ class RiskToolContract(BaseModel):
 class RiskAssistantModelRequest(BaseModel):
     question: str
     tools: list[dict[str, Any]]
+    portfolio_id: str | None = None
+    available_run_ids: list[str] = Field(default_factory=list)
     instruction: str = (
         "Select at most one deterministic QuantLineage tool. Do not calculate or invent "
         "VaR, Greeks, P&L, prices, stress losses, or limit values. Ask for clarification "
@@ -74,6 +77,32 @@ class RiskAssistantModel(Protocol):
 
     def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
         """Return one tool request, a clarification, or a refusal."""
+
+
+AssistantMode = Literal["model-routed", "deterministic", "fallback"]
+
+
+@dataclass(frozen=True, slots=True)
+class AssistantMetadataContext:
+    """Configured provider label for optional query response metadata."""
+
+    provider: Literal["deterministic", "openai"]
+    model: str | None = None
+
+
+def build_assistant_metadata(
+    context: AssistantMetadataContext,
+    *,
+    mode: AssistantMode,
+    fallback: bool,
+) -> dict[str, Any]:
+    """Return a safe ``data.assistant`` payload (no secrets or model internals)."""
+    return RiskQueryAssistantMetadata(
+        provider=context.provider,
+        model=context.model,
+        mode=mode,
+        fallback=fallback,
+    ).model_dump(mode="json")
 
 
 class RiskQueryPlan(BaseModel):
@@ -753,7 +782,17 @@ class RiskQueryEngine:
         model: RiskAssistantModel,
         *,
         principal: str | None = None,
+        assistant_context: AssistantMetadataContext | None = None,
     ) -> RiskQueryResponse:
+        context = assistant_context or AssistantMetadataContext(
+            provider="openai",
+            model=None,
+        )
+        assistant_meta = build_assistant_metadata(
+            context,
+            mode="model-routed",
+            fallback=False,
+        )
         if _is_secret_request(" ".join(question.strip().split()).lower()):
             return RiskQueryResponse(
                 intent="unsupported",
@@ -762,6 +801,7 @@ class RiskQueryEngine:
                     "tool_contract": None,
                     "tool_result": None,
                     "supported_tools": tool_contract_schemas(),
+                    "assistant": assistant_meta,
                 },
                 tool_name=None,
                 requires_clarification=True,
@@ -770,8 +810,37 @@ class RiskQueryEngine:
             question=question,
             tools=tool_contract_schemas(),
         )
-        model_response = model.complete(request)
-        model_data = model_response.model_dump(mode="json")
+        try:
+            model_response = model.complete(request)
+        except Exception as exc:
+            from app.ai.errors import OpenAIConfigurationError, OpenAITransientProviderError
+
+            if not isinstance(exc, OpenAITransientProviderError):
+                if isinstance(exc, OpenAIConfigurationError):
+                    message = str(exc).strip() or "AI assistant configuration is invalid."
+                    return RiskQueryResponse(
+                        intent="unsupported",
+                        answer=message,
+                        data={
+                            "tool_contract": None,
+                            "tool_result": None,
+                            "supported_tools": tool_contract_schemas(),
+                            "assistant": assistant_meta,
+                        },
+                        tool_name=None,
+                        requires_clarification=True,
+                    )
+                raise
+            fallback_response = self.answer(
+                question, portfolio, service, principal=principal
+            )
+            data = dict(fallback_response.data)
+            data["assistant"] = build_assistant_metadata(
+                context,
+                mode="fallback",
+                fallback=True,
+            )
+            return fallback_response.model_copy(update={"data": data})
         default_clarification = (
             "Please choose a deterministic risk view: VaR/ES, limits, contributors, "
             "worst stress, or portfolio summary."
@@ -793,7 +862,7 @@ class RiskQueryEngine:
                     "tool_contract": None,
                     "tool_result": None,
                     "supported_tools": tool_contract_schemas(),
-                    "model": model_data,
+                    "assistant": assistant_meta,
                 },
                 tool_name=None,
                 requires_clarification=True,
@@ -810,7 +879,7 @@ class RiskQueryEngine:
                     "tool_contract": None,
                     "tool_result": None,
                     "supported_tools": tool_contract_schemas(),
-                    "model": model_data,
+                    "assistant": assistant_meta,
                 },
                 tool_name=None,
                 requires_clarification=True,
@@ -823,7 +892,7 @@ class RiskQueryEngine:
             service=service,
             args=checked.args,
             principal=principal,
-            extra_data={"model": model_data},
+            extra_data={"assistant": assistant_meta},
         )
 
     def _grounded_tool_response(
@@ -1004,11 +1073,46 @@ def _format_card_text(card: dict[str, Any]) -> str:
         ("historical_dataset_id", "historical_dataset_id"),
         ("historical_dataset_version", "historical_dataset_version"),
     )
-    parts = []
+    present_parts: list[str] = []
+    missing = False
     for key, label in labels:
-        if key in card and not isinstance(card[key], (dict, list)):
-            parts.append(f"{label} {_format_card_value(card[key])}")
-    return "; ".join(parts)
+        if key not in card or isinstance(card[key], (dict, list)):
+            continue
+        if card[key] == MISSING_ON_PAYLOAD:
+            missing = True
+            continue
+        present_parts.append(f"{label} {_format_card_value(card[key])}")
+    if present_parts:
+        if missing:
+            present_parts.append(MISSING_ON_PAYLOAD)
+        return "; ".join(present_parts)
+    if missing:
+        return MISSING_ON_PAYLOAD
+    return ""
+
+
+def _card_has_present_identity(card: dict[str, Any] | None) -> bool:
+    if not card:
+        return False
+    for key in (
+        "metric",
+        "value",
+        "unit",
+        "sign_convention",
+        "risk_run_id",
+        "as_of",
+        "methodology",
+        "market_snapshot_id",
+        "historical_dataset_id",
+        "historical_dataset_version",
+    ):
+        value = card.get(key)
+        if value is None or value == MISSING_ON_PAYLOAD:
+            continue
+        if isinstance(value, (dict, list)):
+            continue
+        return True
+    return False
 
 
 def _label_payload(payload: dict[str, Any], key: str, label: str) -> str:
@@ -1069,7 +1173,14 @@ def _format_risk_change_answer(payload: dict[str, Any]) -> str:
     return "; ".join(parts) + "."
 
 
-def _join_grounding(text: str, card: dict[str, Any] | None) -> str:
+def _join_grounding(
+    text: str,
+    card: dict[str, Any] | None,
+    *,
+    require_present_identity: bool = False,
+) -> str:
+    if require_present_identity and not _card_has_present_identity(card):
+        return text
     extra = _format_card_text(card or {})
     if not extra:
         return text
@@ -1090,7 +1201,7 @@ def _format_answer(
             f"99% VaR is {_fmt(payload.get('var_99'))}; "
             f"99% Expected Shortfall is {_fmt(payload.get('expected_shortfall_99'))}."
         )
-        return _join_grounding(text, card)
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name == RiskToolName.GET_VAR_ES:
         methods = payload.get("methods") or []
         parts = []
@@ -1113,12 +1224,12 @@ def _format_answer(
             text = "No stress scenarios returned."
         else:
             text = f"Worst stress scenario is {scenario} with loss {_fmt(loss)}."
-        return _join_grounding(text, card)
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name == RiskToolName.GET_LIMITS:
         limits = payload.get("limits") or []
         breaches = [item for item in limits if item.get("breached")]
         text = f"{len(breaches)} limit breaches from {len(limits)} evaluated limits."
-        return _join_grounding(text, card)
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name == RiskToolName.GET_CONTRIBUTORS:
         contributors = payload.get("contributors") or []
         if not contributors:
@@ -1129,7 +1240,7 @@ def _format_answer(
                 for item in contributors
             ]
             text = "Top risk contributors: " + ", ".join(names) + "."
-        return _join_grounding(text, card)
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name in (
         RiskToolName.EXPLAIN_RISK_CHANGE,
         RiskToolName.COMPARE_RISK_RUNS,

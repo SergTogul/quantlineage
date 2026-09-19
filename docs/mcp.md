@@ -3,7 +3,12 @@
 Thin, **allowlist-only** MCP over existing deterministic tools. The server
 registers `TOOL_CONTRACTS` from `app.risk.query` and dispatches through
 `validate_tool_call` + `execute_allowlisted_tool`. It does not compute VaR, ES,
-DV01, stress, or other risk numbers. **No live LLM.**
+DV01, stress, or other risk numbers.
+
+**No embedded LLM.** `backend/app/mcp.py` does not import the OpenAI SDK, does
+not read `OPENAI_API_KEY`, and does not host a model. External MCP clients (for
+example Cursor or Claude Desktop) may attach their own LLM; QuantLineage still
+only executes allowlisted tools server-side.
 
 The FastAPI app (`app.main`) does **not** import MCP (AD-C8). Core HTTP risk
 APIs run with MCP unused.
@@ -68,7 +73,10 @@ PYTHONPATH=. python ../docs/examples/mcp_stdio_client.py
 
 ## What this is not
 
-- Not a model host. Clients may attach an LLM; QuantLineage still only executes
-  allowlisted tools.
+- Not a model host and not a place for API keys. Do not set `OPENAI_API_KEY` or
+  `AI_*` in MCP client `env` — those belong on the HTTP backend
+  only (see [`docs/openai_risk_assistant.md`](openai_risk_assistant.md)).
+- Clients may attach their own LLM elsewhere; QuantLineage MCP still only
+  executes allowlisted tools.
 - Not a rewrite of MCP internals (`backend/app/mcp.py` stays the thin facade).
 - Not a path to invent risk figures when a tool refuses or fails.

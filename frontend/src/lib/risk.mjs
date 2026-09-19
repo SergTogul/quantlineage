@@ -683,6 +683,12 @@ export function overviewCollage({ summary, threats, limits, hierarchy, stress, f
       teaser: 'Custom equity / rates / FX / vol shocks',
     },
     {
+      id: 'risk-query',
+      label: 'Risk Query',
+      hint: 'Ask the book in plain language',
+      teaser: 'Natural-language risk questions',
+    },
+    {
       id: 'pnl-explain',
       label: 'P&L Explain',
       hint: 'Attribution',

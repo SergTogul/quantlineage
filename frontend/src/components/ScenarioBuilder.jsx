@@ -377,24 +377,35 @@ const RISK_QUERY_PROVENANCE_FIELDS = [
 
 function copiedQueryField(source, key) {
   if (!source || !Object.prototype.hasOwnProperty.call(source, key)) {
-    return MISSING_ON_PAYLOAD
+    return null
   }
   const value = source[key]
-  if (value == null || value === '') return MISSING_ON_PAYLOAD
-  if (typeof value === 'object') return MISSING_ON_PAYLOAD
+  if (value == null || value === '' || value === MISSING_ON_PAYLOAD) return null
+  if (typeof value === 'object') return null
   if (typeof value === 'number') return String(value).replace('-', '−')
   return String(value)
 }
 
+function presentQueryFields(source, fields) {
+  return fields
+    .map(([key, label]) => {
+      const value = copiedQueryField(source, key)
+      return value == null ? null : [key, label, value]
+    })
+    .filter(Boolean)
+}
+
 function QueryFieldList({ title, source, fields, testId }) {
+  const rows = presentQueryFields(source, fields)
+  if (!rows.length) return null
   return (
     <section className="risk-query-fields" data-testid={testId}>
       <h4>{title}</h4>
       <dl>
-        {fields.map(([key, label]) => (
+        {rows.map(([key, label, value]) => (
           <div key={key} className="risk-query-field">
             <dt>{label}</dt>
-            <dd>{copiedQueryField(source, key)}</dd>
+            <dd>{value}</dd>
           </div>
         ))}
       </dl>
@@ -404,6 +415,88 @@ function QueryFieldList({ title, source, fields, testId }) {
 
 function hasCopiedObject(value) {
   return value != null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0
+}
+
+function isRiskQueryAssistantMeta(value) {
+  return (
+    value != null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && typeof value.provider === 'string'
+    && typeof value.mode === 'string'
+    && typeof value.fallback === 'boolean'
+  )
+}
+
+/** Split deterministic answer text into sentences for readable paragraphs. */
+export function splitRiskQueryParagraphs(answer) {
+  const text = String(answer || '').trim()
+  if (!text) return []
+  // Break on ". " only — never on decimal points inside values like 12.1%.
+  const chunks = text.split(/\.\s+/).map((part) => part.trim()).filter(Boolean)
+  if (chunks.length <= 1) return [text]
+  return chunks.map((part, index) => {
+    if (/[.!?]$/.test(part)) return part
+    return index < chunks.length - 1 || /\.\s*$/.test(text) ? `${part}.` : part
+  })
+}
+
+function boldRiskQueryNumbers(text) {
+  const parts = String(text).split(/([−-]?\d[\d,]*(?:\.\d+)?%?)/g)
+  return parts.map((part, index) => (
+    /^[−-]?\d/.test(part)
+      ? <strong key={`n-${index}`} className="query-answer-num">{part}</strong>
+      : part
+  ))
+}
+
+function formatRiskQueryInline(paragraph) {
+  const match = String(paragraph).match(/^(.+?)\s+(is|are|from)\s+(.+)$/i)
+  if (!match) return boldRiskQueryNumbers(paragraph)
+  return (
+    <>
+      <strong className="query-answer-lead">{boldRiskQueryNumbers(match[1])}</strong>
+      {` ${match[2]} `}
+      {boldRiskQueryNumbers(match[3])}
+    </>
+  )
+}
+
+function RiskQueryAnswer({ answer }) {
+  const paragraphs = splitRiskQueryParagraphs(answer)
+  if (!paragraphs.length) return null
+  return (
+    <div className="query-answer" data-testid="risk-query-answer">
+      {paragraphs.map((paragraph, index) => (
+        <p key={`p-${index}`} className="query-answer-p">
+          {formatRiskQueryInline(paragraph)}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+function RiskQueryAssistantState({ assistant }) {
+  if (!isRiskQueryAssistantMeta(assistant)) return null
+  if (assistant.fallback) {
+    return (
+      <p
+        className="muted foot"
+        data-testid="risk-query-assistant-fallback"
+        role="note"
+      >
+        Deterministic fallback — AI routing was unavailable; this answer uses the built-in router.
+      </p>
+    )
+  }
+  if (assistant.provider === 'openai') {
+    return (
+      <p className="eyebrow" data-testid="risk-query-assistant-state">
+        AI-routed
+      </p>
+    )
+  }
+  return null
 }
 
 export function RiskQuery({ portfolio }) {
@@ -428,9 +521,10 @@ export function RiskQuery({ portfolio }) {
 
   const card = r?.data?.card
   const provenance = r?.data?.provenance
+  const assistant = r?.data?.assistant
 
   return (
-    <div className="card" data-testid="golden-demo-risk-query">
+    <div className="card risk-query-panel" data-testid="golden-demo-risk-query">
       <div className="block-title">
         <h3>Risk Query</h3>
         <BlockHelp id="risk-query" />
@@ -459,7 +553,10 @@ export function RiskQuery({ portfolio }) {
       </div>
       {error && <p className="error">{error}</p>}
       {r && (
-        <p className="query-answer" data-testid="risk-query-answer">{r.answer}</p>
+        <div className="query-result">
+          <RiskQueryAssistantState assistant={assistant} />
+          <RiskQueryAnswer answer={r.answer} />
+        </div>
       )}
       {hasCopiedObject(card) && (
         <QueryFieldList
@@ -478,8 +575,9 @@ export function RiskQuery({ portfolio }) {
         />
       )}
       <div className="muted">
-        Deterministic routing; “Why did VaR change?” needs two completed RiskRun ids
-        and never invents VaR. Query is the control on Overview Command (`#overview/command`).
+        Ask in plain language. With AI enabled the model only picks a tool; numbers stay
+        deterministic. “Why did VaR change?” needs two completed RiskRun ids and never
+        invents VaR.
       </div>
     </div>
   )

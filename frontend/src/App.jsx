@@ -216,8 +216,14 @@ export default function App() {
           <div className="grid">
             <ScenarioBuilder portfolio={portfolio} />
             <HedgeCompare portfolio={portfolio} />
-            <RiskQuery portfolio={portfolio} />
           </div>
+        </SectionFrame>
+      )
+      break
+    case 'risk-query':
+      body = (
+        <SectionFrame id="risk-query">
+          <RiskQuery portfolio={portfolio} />
         </SectionFrame>
       )
       break

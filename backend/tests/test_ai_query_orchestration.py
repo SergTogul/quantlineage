@@ -243,7 +243,10 @@ def test_m11_model_tool_loop_executes_selected_deterministic_tool() -> None:
     assert response.intent == "limits"
     assert response.tool_name == "get_limits"
     assert response.data["tool_result"]["limits"][0]["value"] == 777.0
-    assert response.data["model"]["rationale"] == "The user asked about breach status."
+    assistant = response.data["assistant"]
+    assert assistant["provider"] == "openai"
+    assert assistant["mode"] == "model-routed"
+    assert assistant["fallback"] is False
     assert "1 limit breaches" in response.answer
 
 

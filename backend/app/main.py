@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.ai.factory import build_risk_assistant_resources, load_application_dotenv
 from app.api.attribution import router as attribution_router
 from app.api.auth import SharedTokenMiddleware, require_shared_auth_configured
 from app.api.data import router as data_router
@@ -57,6 +58,10 @@ async def lifespan(app: FastAPI):
     one instance (R0.9.3).
     """
     require_shared_auth_configured()
+    load_application_dotenv()
+    ai_resources = build_risk_assistant_resources()
+    app.state.ai_settings = ai_resources.settings
+    app.state.risk_assistant_model = ai_resources.model
     wiring = build_persistence_wiring()
     app.state.persistence_enabled = wiring.enabled
     app.state.session_factory = wiring.session_factory
@@ -66,7 +71,10 @@ async def lifespan(app: FastAPI):
     app.state.scenario_definition_repo = wiring.scenario_definition_repo
     app.state.limit_definition_repo = wiring.limit_definition_repo
 
-    service = build_portfolio_service()
+    service = build_portfolio_service(
+        risk_assistant_model=ai_resources.model,
+        ai_settings=ai_resources.settings,
+    )
     app.state.portfolio_service = service
     if wiring.enabled and wiring.session_factory is not None:
         worker = RiskRunWorker(service, session_factory=wiring.session_factory)
@@ -79,6 +87,7 @@ async def lifespan(app: FastAPI):
     service.risk_run_compare = worker.compare_runs
     yield
     worker.shutdown(wait=False)
+    ai_resources.close()
 
 
 app = FastAPI(
