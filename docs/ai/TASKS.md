@@ -76,7 +76,7 @@ Evidence:
 
 ### T02 — Add SDK, dotenv, and env templates
 
-- [ ] Add compatible OpenAI SDK and dotenv dependencies plus safe example env entries.
+- [x] Add compatible OpenAI SDK and dotenv dependencies plus safe example env entries.
 
 Dependencies: T01
 
@@ -105,6 +105,9 @@ python3 -m pytest tests/test_ai_config.py -q
 ```
 
 Evidence:
+
+- Commit `567464f` — Add SDK, dotenv, and env templates (T02)
+- Checks: `git check-ignore .env .env.shared` OK; `pip install -r requirements.txt` OK; `pytest tests/test_ai_config.py -q` → 14 passed
 
 ### T03 — Build strict OpenAI tool schemas
 
