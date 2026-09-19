@@ -318,6 +318,3 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
 @keyframes risk-query-spin{
   to{transform:rotate(360deg)}
 }
-
-.overview-hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}
-.overview-hero-actions .overview-hero-action{margin:0}

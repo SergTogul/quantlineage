@@ -711,7 +711,7 @@ test('overviewKpis and overviewCollage use API teasers', () => {
   assert.match(cards[0].teaser, /desks/)
   assert.equal(cards[2].id, 'var-es')
   assert.equal(cards[3].id, 'historical-analytics')
-  assert.equal(cards.find((c) => c.id === 'risk-query')?.label, 'AI Query')
+  assert.equal(cards.find((c) => c.id === 'risk-query')?.label, 'Risk Query')
   assert.match(cards.find((c) => c.id === 'limits').teaser, /1 breach/)
 })
 

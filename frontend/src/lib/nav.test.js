@@ -15,7 +15,7 @@ test('NAV_SECTIONS covers terminal target areas in order', () => {
   assert.equal(DEFAULT_SECTION_ID, 'overview')
   assert.equal(navSectionById('historical-analytics').label, 'Historical')
   assert.equal(navSectionById('historical-analytics').hint, 'Wealth, drawdown, SPY')
-  assert.equal(navSectionById('risk-query').label, 'AI Query')
+  assert.equal(navSectionById('risk-query').label, 'Risk Query')
   assert.equal(navSectionById('risk-query').hint, 'Ask the book in plain language')
   assert.equal(navSectionById('market-data').label, 'Market Data')
   assert.equal(navSectionById('market-data').hint, 'Search & history')

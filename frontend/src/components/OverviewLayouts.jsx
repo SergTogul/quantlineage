@@ -109,22 +109,13 @@ export function StatusBlotterLayout({
   return (
     <div data-testid="overview-layout-status">
       <BookStatus status={status} onNavigate={onNavigate} />
-      <div className="overview-hero-actions">
-        <a
-          className="overview-hero-action"
-          href={hashForPanel('var-es', 'risk-change')}
-          data-testid="overview-risk-change-hero"
-        >
-          Why did my risk change?
-        </a>
-        <a
-          className="overview-hero-action"
-          href="#risk-query"
-          data-testid="overview-ai-query-hero"
-        >
-          AI Query
-        </a>
-      </div>
+      <a
+        className="overview-hero-action"
+        href={hashForPanel('var-es', 'risk-change')}
+        data-testid="overview-risk-change-hero"
+      >
+        Why did my risk change?
+      </a>
       <section className="exception-list" aria-label="Exceptions">
         <h3>Where</h3>
         {exceptions.length ? (
