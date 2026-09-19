@@ -169,7 +169,7 @@ Evidence:
 
 ### T05 — Implement the OpenAI model happy path
 
-- [ ] Implement `OpenAIRiskAssistantModel.complete` for one tool call.
+- [x] Implement `OpenAIRiskAssistantModel.complete` for one tool call.
 
 Dependencies: T04
 
@@ -196,6 +196,9 @@ python3 -m pytest tests/test_openai_model.py tests/test_ai_query_orchestration.p
 ```
 
 Evidence:
+
+- Commit — Implement OpenAI model happy path (T05)
+- Checks: `cd backend && python3 -m pytest tests/test_openai_model.py tests/test_ai_query_orchestration.py -q` → 30 passed
 
 ### T06 — Handle model and provider failures
 
