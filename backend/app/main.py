@@ -19,6 +19,7 @@ from app.api.risk import router as risk_router
 from app.api.risk_runs import router as risk_runs_router
 from app.api.stress import router as stress_router
 from app.api.workload import WorkloadBodyLimitMiddleware, enforce_workload_limits
+from app.ai.factory import build_risk_assistant_resources, load_application_dotenv
 from app.persistence.wiring import build_persistence_wiring
 from app.services.risk_factories import build_portfolio_service
 from app.services.risk_run_worker import RiskRunWorker
@@ -57,6 +58,10 @@ async def lifespan(app: FastAPI):
     one instance (R0.9.3).
     """
     require_shared_auth_configured()
+    load_application_dotenv()
+    ai_resources = build_risk_assistant_resources()
+    app.state.ai_settings = ai_resources.settings
+    app.state.risk_assistant_model = ai_resources.model
     wiring = build_persistence_wiring()
     app.state.persistence_enabled = wiring.enabled
     app.state.session_factory = wiring.session_factory
@@ -66,7 +71,7 @@ async def lifespan(app: FastAPI):
     app.state.scenario_definition_repo = wiring.scenario_definition_repo
     app.state.limit_definition_repo = wiring.limit_definition_repo
 
-    service = build_portfolio_service()
+    service = build_portfolio_service(risk_assistant_model=ai_resources.model)
     app.state.portfolio_service = service
     if wiring.enabled and wiring.session_factory is not None:
         worker = RiskRunWorker(service, session_factory=wiring.session_factory)
@@ -79,6 +84,7 @@ async def lifespan(app: FastAPI):
     service.risk_run_compare = worker.compare_runs
     yield
     worker.shutdown(wait=False)
+    ai_resources.close()
 
 
 app = FastAPI(

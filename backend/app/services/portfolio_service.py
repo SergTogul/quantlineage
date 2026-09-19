@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from app.domain.models import (
     Contributor,
@@ -37,6 +40,9 @@ from app.risk.historical_analytics import (
 from app.risk.limit_drilldown import LimitDrilldownEngine
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
 from app.risk.query import RiskQueryEngine
+
+if TYPE_CHECKING:
+    from app.risk.query import RiskAssistantModel
 from app.risk.risk_attribution import RiskChangeAttributionEngine
 from app.risk.scenario_attribution import ScenarioLike
 from app.risk.stress import (
@@ -128,6 +134,7 @@ class PortfolioService:
         risk: RiskEngine,
         *,
         market_data: MarketDataProvider | None = None,
+        risk_assistant_model: RiskAssistantModel | None = None,
     ):
         self.pricing = pricing
         self.risk = risk
@@ -172,6 +179,7 @@ class PortfolioService:
             market_data=self.market_data,
         )
         self.query_engine = RiskQueryEngine()
+        self.risk_assistant_model = risk_assistant_model
         self.risk_run_compare = None
         self.risk_run_worker = None
 

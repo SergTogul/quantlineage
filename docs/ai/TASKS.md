@@ -229,7 +229,7 @@ Evidence:
 
 ### T07 — Add provider factory and lifecycle wiring
 
-- [ ] Construct the configured provider once at the existing application lifecycle seam.
+- [x] Construct the configured provider once at the existing application lifecycle seam.
 
 Dependencies: T06
 
@@ -250,6 +250,9 @@ python3 -m pytest tests/test_ai_provider_factory.py tests/test_api.py -q
 ```
 
 Evidence:
+
+- Commit TBD — Add provider factory and lifecycle wiring (T07)
+- Checks: `cd backend && python3 -m pytest tests/test_ai_provider_factory.py tests/test_api.py -q` → 12 passed
 
 ### T08 — Wire the provider into `PortfolioService.query`
 
