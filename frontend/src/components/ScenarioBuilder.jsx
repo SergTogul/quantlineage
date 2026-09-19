@@ -549,10 +549,18 @@ export function RiskQuery({ portfolio }) {
           aria-label="Risk question"
           disabled={busy}
         />
-        <button type="button" disabled={busy} onClick={() => submit(q)}>Ask</button>
+        <button type="button" disabled={busy} onClick={() => submit(q)}>
+          {busy ? 'Asking…' : 'Ask'}
+        </button>
       </div>
+      {busy && (
+        <div className="risk-query-waiting" data-testid="risk-query-waiting" role="status" aria-live="polite">
+          <span className="risk-query-spinner" aria-hidden="true" />
+          <span>Waiting for risk answer…</span>
+        </div>
+      )}
       {error && <p className="error">{error}</p>}
-      {r && (
+      {!busy && r && (
         <div className="query-result">
           <RiskQueryAssistantState assistant={assistant} />
           <RiskQueryAnswer answer={r.answer} />

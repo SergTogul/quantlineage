@@ -155,6 +155,36 @@ describe('RiskQuery', () => {
     expect(screen.queryByText('not on this payload')).not.toBeInTheDocument()
   })
 
+  it('shows a waiting spinner while the risk query is in flight', async () => {
+    let resolveRequest
+    const pending = new Promise((resolve) => {
+      resolveRequest = resolve
+    })
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/query`, async () => {
+        await pending
+        return HttpResponse.json({
+          answer: 'Top risk contributors: eq-nvda 25.1%.',
+          data: {},
+        })
+      }),
+    )
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+
+    expect(await screen.findByTestId('risk-query-waiting')).toHaveTextContent(/Waiting for risk answer/i)
+    expect(screen.getByRole('button', { name: 'Asking…' })).toBeDisabled()
+    expect(screen.queryByTestId('risk-query-answer')).not.toBeInTheDocument()
+
+    resolveRequest()
+
+    expect(await screen.findByTestId('risk-query-answer')).toHaveTextContent(/Top risk contributors/)
+    expect(screen.queryByTestId('risk-query-waiting')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeEnabled()
+  })
+
   it('shows a subtle AI-routed label when assistant metadata is present', async () => {
     queryHandler(() => ({
       answer: 'Top contributors from the portfolio.',

@@ -50,14 +50,24 @@ SENTINEL_API_KEY = "sk-sentinel-test-key-0123456789abcdef"
 
 @dataclass
 class FakeResponses:
-    response: Any
+    response: Any = None
+    responses: list[Any] | None = None
     calls: list[dict[str, Any]] = field(default_factory=list)
     error: BaseException | None = None
+    _index: int = 0
 
     def create(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
         if self.error is not None:
             raise self.error
+        if self.responses is not None:
+            if self._index >= len(self.responses):
+                raise AssertionError("FakeResponses queue exhausted")
+            item = self.responses[self._index]
+            self._index += 1
+            if isinstance(item, BaseException):
+                raise item
+            return item
         return self.response
 
 
@@ -413,8 +423,10 @@ def test_non_object_function_call_arguments_raise_typed_error(
         )
 
 
-def test_incomplete_response_raises_typed_error(openai_settings: AISettings) -> None:
-    sdk_response = Response(
+def test_incomplete_response_retries_once_then_raises(
+    openai_settings: AISettings,
+) -> None:
+    incomplete = Response(
         id="resp_incomplete",
         created_at=0,
         model="gpt-test-model",
@@ -426,17 +438,53 @@ def test_incomplete_response_raises_typed_error(openai_settings: AISettings) -> 
         status="incomplete",
         incomplete_details={"reason": "max_output_tokens"},
     )
-    client = FakeOpenAIClient(responses=FakeResponses(response=sdk_response))
+    client = FakeOpenAIClient(
+        responses=FakeResponses(responses=[incomplete, incomplete])
+    )
     model = OpenAIRiskAssistantModel(client, openai_settings)
 
     with pytest.raises(OpenAIIncompleteResponseError, match="incomplete"):
         model.complete(
             RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
         )
+    assert len(client.responses.calls) == 2
+
+
+def test_incomplete_response_retries_once_then_succeeds(
+    openai_settings: AISettings,
+) -> None:
+    incomplete = Response(
+        id="resp_incomplete",
+        created_at=0,
+        model="gpt-test-model",
+        object="response",
+        output=[],
+        parallel_tool_calls=False,
+        tool_choice="auto",
+        tools=[],
+        status="incomplete",
+        incomplete_details={"reason": "max_output_tokens"},
+    )
+    success = _make_response(
+        _function_call(name="get_contributors", arguments="{}")
+    )
+    client = FakeOpenAIClient(
+        responses=FakeResponses(responses=[incomplete, success])
+    )
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    result = model.complete(
+        RiskAssistantModelRequest(
+            question="Top contributors?", tools=tool_contract_schemas()
+        )
+    )
+
+    assert result.tool_name == "get_contributors"
+    assert len(client.responses.calls) == 2
 
 
 def test_failed_response_with_error_raises_typed_error(openai_settings: AISettings) -> None:
-    sdk_response = Response(
+    failed = Response(
         id="resp_failed",
         created_at=0,
         model="gpt-test-model",
@@ -448,13 +496,14 @@ def test_failed_response_with_error_raises_typed_error(openai_settings: AISettin
         status="failed",
         error=ResponseError(code="server_error", message="Upstream failure."),
     )
-    client = FakeOpenAIClient(responses=FakeResponses(response=sdk_response))
+    client = FakeOpenAIClient(responses=FakeResponses(responses=[failed, failed]))
     model = OpenAIRiskAssistantModel(client, openai_settings)
 
     with pytest.raises(OpenAIIncompleteResponseError, match="Upstream failure"):
         model.complete(
             RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
         )
+    assert len(client.responses.calls) == 2
 
 
 def _sdk_request() -> httpx.Request:
