@@ -7,7 +7,7 @@ export const NAV_SECTIONS = Object.freeze([
   Object.freeze({ id: 'historical-analytics', label: 'Historical', hint: 'Wealth, drawdown, SPY' }),
   Object.freeze({ id: 'stress', label: 'Stress', hint: 'Scenarios & reverse stress' }),
   Object.freeze({ id: 'scenario-builder', label: 'Scenario Builder', hint: 'Shocks & hedge compare' }),
-  Object.freeze({ id: 'risk-query', label: 'Risk Query', hint: 'Ask the book in plain language' }),
+  Object.freeze({ id: 'risk-query', label: 'AI Query', hint: 'Ask the book in plain language' }),
   Object.freeze({ id: 'pnl-explain', label: 'P&L Explain', hint: 'Attribution' }),
   Object.freeze({ id: 'limits', label: 'Limits', hint: 'Utilization & status' }),
   Object.freeze({ id: 'risk-runs', label: 'Risk Runs', hint: 'Async run status' }),

@@ -684,7 +684,7 @@ export function overviewCollage({ summary, threats, limits, hierarchy, stress, f
     },
     {
       id: 'risk-query',
-      label: 'Risk Query',
+      label: 'AI Query',
       hint: 'Ask the book in plain language',
       teaser: 'Natural-language risk questions',
     },
