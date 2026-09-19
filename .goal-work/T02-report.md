@@ -44,7 +44,7 @@ python3 -m pytest tests/test_ai_config.py -q
 
 | SHA | Subject |
 |-----|---------|
-| `5b002f2` | Add SDK, dotenv, and env templates (T02) |
+| `567464f` | Add SDK, dotenv, and env templates (T02) |
 
 ## Out of scope (T03+)
 
