@@ -1,3 +1,4 @@
+# Local AI settings: cp .env.example .env (optional; default provider is deterministic).
 services:
   postgres:
     image: postgres:16-alpine
@@ -24,6 +25,13 @@ services:
       QUANTLINEAGE_DATABASE_URL: postgresql+psycopg://quantlineage:quantlineage@postgres:5432/quantlineage
       # Defer execution to the ``worker`` service (shared Postgres QUEUED rows).
       QUANTLINEAGE_EXTERNAL_WORKER: "1"
+      # OpenAI risk assistant — backend only; values from project-root ``.env``.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      QUANTLINEAGE_AI_PROVIDER: ${QUANTLINEAGE_AI_PROVIDER:-deterministic}
+      QUANTLINEAGE_OPENAI_MODEL: ${QUANTLINEAGE_OPENAI_MODEL:-}
+      QUANTLINEAGE_AI_TIMEOUT_SECONDS: ${QUANTLINEAGE_AI_TIMEOUT_SECONDS:-30}
+      QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS: ${QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS:-512}
+      QUANTLINEAGE_AI_MAX_TOOL_ROUNDS: ${QUANTLINEAGE_AI_MAX_TOOL_ROUNDS:-1}
     # Local demo: bind to loopback (unauthenticated API; not internet-ready).
     # Shared/non-loopback: set QUANTLINEAGE_SHARED_DEPLOYMENT=1 and QUANTLINEAGE_API_TOKEN (R0.11.5).
     ports: ["127.0.0.1:8000:8000"]
@@ -42,6 +50,13 @@ services:
       QUANTLINEAGE_DATABASE_URL: postgresql+psycopg://quantlineage:quantlineage@postgres:5432/quantlineage
       QUANTLINEAGE_WORKER_POLL_INTERVAL: "2"
       QUANTLINEAGE_WORKER_POLL_BATCH: "10"
+      # Same backend image; keep AI env aligned with ``backend`` (query runs in API).
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      QUANTLINEAGE_AI_PROVIDER: ${QUANTLINEAGE_AI_PROVIDER:-deterministic}
+      QUANTLINEAGE_OPENAI_MODEL: ${QUANTLINEAGE_OPENAI_MODEL:-}
+      QUANTLINEAGE_AI_TIMEOUT_SECONDS: ${QUANTLINEAGE_AI_TIMEOUT_SECONDS:-30}
+      QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS: ${QUANTLINEAGE_AI_MAX_OUTPUT_TOKENS:-512}
+      QUANTLINEAGE_AI_MAX_TOOL_ROUNDS: ${QUANTLINEAGE_AI_MAX_TOOL_ROUNDS:-1}
     depends_on:
       postgres:
         condition: service_healthy

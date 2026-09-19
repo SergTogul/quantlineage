@@ -396,7 +396,7 @@ Evidence:
 
 ### T13 — Wire Compose and write the operator guide
 
-- [ ] Pass backend-only env variables and document setup, fallback, and rollback.
+- [x] Pass backend-only env variables and document setup, fallback, and rollback.
 
 Dependencies: T09, T11
 
@@ -426,6 +426,9 @@ docker compose -f docker-compose.shared.yml config
 Inspect rendered config carefully; do not print a real secret into CI or PR evidence.
 
 Evidence:
+
+- Commit TBD — Wire Compose and write operator guide (T13)
+- Checks: static YAML parse of `docker-compose.yml` and `docker-compose.shared.yml` (backend/worker carry 6 AI env vars; frontend has none); `docker compose config` not run (docker CLI unavailable in agent VM)
 
 ### T14 — Add an opt-in live smoke test
 

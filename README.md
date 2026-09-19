@@ -100,7 +100,7 @@ Typed tools over the same risk services. The model routes; it does not invent Va
 }
 ```
 
-See [`docs/mcp.md`](docs/mcp.md) and [`docs/wave_c_ai_mcp_demo.md`](docs/wave_c_ai_mcp_demo.md).
+See [`docs/mcp.md`](docs/mcp.md), [`docs/openai_risk_assistant.md`](docs/openai_risk_assistant.md) (optional server-side OpenAI routing), and [`docs/wave_c_ai_mcp_demo.md`](docs/wave_c_ai_mcp_demo.md).
 
 ## Run Locally
 
