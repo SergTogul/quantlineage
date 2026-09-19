@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from app.api.schemas import RiskQueryResponse
+from app.api.schemas import RiskQueryAssistantMetadata, RiskQueryResponse
 from app.domain.models import Portfolio
 from app.risk.tool_contracts import (
     C1_ARG_MODELS,
@@ -76,6 +77,32 @@ class RiskAssistantModel(Protocol):
 
     def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
         """Return one tool request, a clarification, or a refusal."""
+
+
+AssistantMode = Literal["model-routed", "deterministic", "fallback"]
+
+
+@dataclass(frozen=True, slots=True)
+class AssistantMetadataContext:
+    """Configured provider label for optional query response metadata."""
+
+    provider: Literal["deterministic", "openai"]
+    model: str | None = None
+
+
+def build_assistant_metadata(
+    context: AssistantMetadataContext,
+    *,
+    mode: AssistantMode,
+    fallback: bool,
+) -> dict[str, Any]:
+    """Return a safe ``data.assistant`` payload (no secrets or model internals)."""
+    return RiskQueryAssistantMetadata(
+        provider=context.provider,
+        model=context.model,
+        mode=mode,
+        fallback=fallback,
+    ).model_dump(mode="json")
 
 
 class RiskQueryPlan(BaseModel):
@@ -755,7 +782,17 @@ class RiskQueryEngine:
         model: RiskAssistantModel,
         *,
         principal: str | None = None,
+        assistant_context: AssistantMetadataContext | None = None,
     ) -> RiskQueryResponse:
+        context = assistant_context or AssistantMetadataContext(
+            provider="openai",
+            model=None,
+        )
+        assistant_meta = build_assistant_metadata(
+            context,
+            mode="model-routed",
+            fallback=False,
+        )
         if _is_secret_request(" ".join(question.strip().split()).lower()):
             return RiskQueryResponse(
                 intent="unsupported",
@@ -764,6 +801,7 @@ class RiskQueryEngine:
                     "tool_contract": None,
                     "tool_result": None,
                     "supported_tools": tool_contract_schemas(),
+                    "assistant": assistant_meta,
                 },
                 tool_name=None,
                 requires_clarification=True,
@@ -787,7 +825,7 @@ class RiskQueryEngine:
                             "tool_contract": None,
                             "tool_result": None,
                             "supported_tools": tool_contract_schemas(),
-                            "assistant": {"fallback": False, "error": exc.code},
+                            "assistant": assistant_meta,
                         },
                         tool_name=None,
                         requires_clarification=True,
@@ -797,9 +835,12 @@ class RiskQueryEngine:
                 question, portfolio, service, principal=principal
             )
             data = dict(fallback_response.data)
-            data["assistant"] = {"fallback": True}
+            data["assistant"] = build_assistant_metadata(
+                context,
+                mode="fallback",
+                fallback=True,
+            )
             return fallback_response.model_copy(update={"data": data})
-        model_data = model_response.model_dump(mode="json")
         default_clarification = (
             "Please choose a deterministic risk view: VaR/ES, limits, contributors, "
             "worst stress, or portfolio summary."
@@ -821,7 +862,7 @@ class RiskQueryEngine:
                     "tool_contract": None,
                     "tool_result": None,
                     "supported_tools": tool_contract_schemas(),
-                    "model": model_data,
+                    "assistant": assistant_meta,
                 },
                 tool_name=None,
                 requires_clarification=True,
@@ -838,7 +879,7 @@ class RiskQueryEngine:
                     "tool_contract": None,
                     "tool_result": None,
                     "supported_tools": tool_contract_schemas(),
-                    "model": model_data,
+                    "assistant": assistant_meta,
                 },
                 tool_name=None,
                 requires_clarification=True,
@@ -851,7 +892,7 @@ class RiskQueryEngine:
             service=service,
             args=checked.args,
             principal=principal,
-            extra_data={"model": model_data},
+            extra_data={"assistant": assistant_meta},
         )
 
     def _grounded_tool_response(

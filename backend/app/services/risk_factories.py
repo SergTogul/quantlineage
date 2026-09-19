@@ -17,6 +17,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from app.ai.config import AISettings
 from app.api.schemas import (
     RiskRunRequestBody,
     dump_risk_run_request,
@@ -176,6 +177,7 @@ def build_portfolio_service(
     observations: int | None = None,
     market_data: Any | None = None,
     risk_assistant_model: RiskAssistantModel | None = None,
+    ai_settings: AISettings | None = None,
 ) -> PortfolioService:
     """Construct the process-wide pricing + historical risk stack.
 
@@ -194,12 +196,14 @@ def build_portfolio_service(
             pricing,
             engine,
             risk_assistant_model=risk_assistant_model,
+            ai_settings=ai_settings,
         )
     return PortfolioService(
         pricing,
         engine,
         market_data=market_data,
         risk_assistant_model=risk_assistant_model,
+        ai_settings=ai_settings,
     )
 
 

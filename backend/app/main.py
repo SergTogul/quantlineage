@@ -71,7 +71,10 @@ async def lifespan(app: FastAPI):
     app.state.scenario_definition_repo = wiring.scenario_definition_repo
     app.state.limit_definition_repo = wiring.limit_definition_repo
 
-    service = build_portfolio_service(risk_assistant_model=ai_resources.model)
+    service = build_portfolio_service(
+        risk_assistant_model=ai_resources.model,
+        ai_settings=ai_resources.settings,
+    )
     app.state.portfolio_service = service
     if wiring.enabled and wiring.session_factory is not None:
         worker = RiskRunWorker(service, session_factory=wiring.session_factory)

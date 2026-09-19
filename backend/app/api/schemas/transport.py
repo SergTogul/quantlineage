@@ -91,12 +91,31 @@ class RiskQueryRequest(FiniteInputMixin):
     question: str
 
 
+class RiskQueryAssistantMetadata(BaseModel):
+    """Optional provider state for risk-query responses (no secrets or prompts)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["deterministic", "openai"]
+    model: str | None = None
+    mode: Literal["model-routed", "deterministic", "fallback"]
+    fallback: bool
+
+
 class RiskQueryResponse(BaseModel):
     intent: str
     answer: str
-    data: dict
+    data: dict[str, Any]
     tool_name: str | None = None
     requires_clarification: bool = False
+
+    @field_validator("data")
+    @classmethod
+    def _validate_assistant_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        assistant = value.get("assistant")
+        if assistant is not None:
+            RiskQueryAssistantMetadata.model_validate(assistant)
+        return value
 
 
 class RiskRunRequestBody(BaseModel):

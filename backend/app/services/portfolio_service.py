@@ -39,9 +39,10 @@ from app.risk.historical_analytics import (
 )
 from app.risk.limit_drilldown import LimitDrilldownEngine
 from app.risk.limits import DEFAULT_LIMITS, LimitEngine
-from app.risk.query import RiskQueryEngine
+from app.risk.query import AssistantMetadataContext, RiskQueryEngine
 
 if TYPE_CHECKING:
+    from app.ai.config import AISettings
     from app.risk.query import RiskAssistantModel
 from app.risk.risk_attribution import RiskChangeAttributionEngine
 from app.risk.scenario_attribution import ScenarioLike
@@ -135,6 +136,7 @@ class PortfolioService:
         *,
         market_data: MarketDataProvider | None = None,
         risk_assistant_model: RiskAssistantModel | None = None,
+        ai_settings: AISettings | None = None,
     ):
         self.pricing = pricing
         self.risk = risk
@@ -180,6 +182,7 @@ class PortfolioService:
         )
         self.query_engine = RiskQueryEngine()
         self.risk_assistant_model = risk_assistant_model
+        self.ai_settings = ai_settings
         self.risk_run_compare = None
         self.risk_run_worker = None
 
@@ -515,11 +518,25 @@ class PortfolioService:
             raise RiskRunNotFound(run_id)
         return provenance
 
+    def _assistant_metadata_context(self) -> AssistantMetadataContext | None:
+        if self.risk_assistant_model is None:
+            return None
+        if self.ai_settings is not None:
+            return AssistantMetadataContext(
+                provider=self.ai_settings.provider,
+                model=self.ai_settings.openai_model,
+            )
+        return AssistantMetadataContext(provider="openai", model=None)
+
     def query(self, portfolio, question):
         if self.risk_assistant_model is None:
             return self.query_engine.answer(question, portfolio, self)
         return self.query_engine.answer_with_model(
-            question, portfolio, self, self.risk_assistant_model
+            question,
+            portfolio,
+            self,
+            self.risk_assistant_model,
+            assistant_context=self._assistant_metadata_context(),
         )
 
     def dashboard(

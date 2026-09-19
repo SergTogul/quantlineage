@@ -284,7 +284,7 @@ Evidence:
 
 ### T09 — Add optional assistant metadata
 
-- [ ] Add backward-compatible provider/mode/fallback metadata to query responses.
+- [x] Add backward-compatible provider/mode/fallback metadata to query responses.
 
 Dependencies: T08
 
@@ -304,6 +304,9 @@ python3 -m pytest tests/test_api_typed_models.py tests/test_api_openapi_examples
 ```
 
 Evidence:
+
+- Commit — Add optional assistant metadata (T09)
+- Checks: `cd backend && python3 -m pytest tests/test_api_typed_models.py tests/test_api_openapi_examples.py tests/test_ai_provider_integration.py -q` → 65 passed
 
 ### T10 — Show provider state in the existing UI
 

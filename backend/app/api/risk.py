@@ -17,7 +17,7 @@ from app.api.openapi_examples import (
     RESP_WHAT_IF,
     WHAT_IF_BODY_EXAMPLES,
 )
-from app.api.schemas import RiskQueryRequest
+from app.api.schemas import RiskQueryRequest, RiskQueryResponse
 from app.domain.models import (
     ESContributionReport,
     Portfolio,
@@ -161,11 +161,11 @@ def risk_hierarchy(
     return service.hierarchy(portfolio)
 
 
-@router.post("/query")
+@router.post("/query", response_model=RiskQueryResponse)
 def risk_query(
     request: RiskQueryRequest,
     service: PortfolioService = Depends(get_portfolio_service),
-):
+) -> RiskQueryResponse:
     reject_inline_heavy(route="POST /risk/query")
     return service.query(request.portfolio, request.question)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.ai.config import AISettings
 from app.ai.errors import OpenAIAuthenticationError, OpenAITimeoutError
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
@@ -119,11 +120,22 @@ class _ScriptedModel:
         return self.response
 
 
-def _portfolio_service(model=None) -> PortfolioService:
+def _openai_settings(model: str = "gpt-test-model") -> AISettings:
+    return AISettings(
+        provider="openai",
+        openai_model=model,
+        timeout_seconds=30.0,
+        max_output_tokens=512,
+        max_tool_rounds=1,
+    )
+
+
+def _portfolio_service(model=None, *, ai_settings: AISettings | None = None) -> PortfolioService:
     return PortfolioService(
         BuiltinPricingEngine(),
         HistoricalRiskEngine(seed=1, observations=20),
         risk_assistant_model=model,
+        ai_settings=ai_settings,
     )
 
 
@@ -140,6 +152,7 @@ def test_default_deterministic_query_path_unchanged() -> None:
     assert routed.intent == direct.intent == "contributors"
     assert routed.tool_name == direct.tool_name == "get_contributors"
     assert routed.requires_clarification == direct.requires_clarification
+    assert "assistant" not in routed.data
 
 
 def test_model_selected_valid_tool_executes_once() -> None:
@@ -160,6 +173,14 @@ def test_model_selected_valid_tool_executes_once() -> None:
     assert response.tool_name == "get_limits"
     assert response.data["tool_result"]["limits"][0]["value"] == 777.0
     assert "1 limit breaches" in response.answer
+    assistant = response.data["assistant"]
+    assert assistant == {
+        "provider": "openai",
+        "model": None,
+        "mode": "model-routed",
+        "fallback": False,
+    }
+    assert "rationale" not in response.data
 
 
 def test_unknown_tool_executes_zero_times() -> None:
@@ -210,7 +231,12 @@ def test_transient_failure_before_tool_exec_falls_back() -> None:
     assert fixture.calls == ["contributors"]
     assert response.intent == "contributors"
     assert response.tool_name == "get_contributors"
-    assert response.data["assistant"]["fallback"] is True
+    assert response.data["assistant"] == {
+        "provider": "openai",
+        "model": None,
+        "mode": "fallback",
+        "fallback": True,
+    }
 
 
 def test_configuration_error_does_not_fallback() -> None:
@@ -223,8 +249,13 @@ def test_configuration_error_does_not_fallback() -> None:
 
     assert fixture.calls == []
     assert response.requires_clarification
-    assert response.data["assistant"]["fallback"] is False
-    assert response.data["assistant"]["error"] == "authentication"
+    assert response.data["assistant"] == {
+        "provider": "openai",
+        "model": None,
+        "mode": "model-routed",
+        "fallback": False,
+    }
+    assert "error" not in response.data["assistant"]
     assert "authentication failed" in response.answer.lower()
 
 
@@ -236,7 +267,8 @@ def test_formatter_remains_authoritative_through_portfolio_service_query() -> No
                 intent="var",
                 proposed_answer="99% VaR is 999999999.",
             )
-        )
+        ),
+        ai_settings=_openai_settings("gpt-4.1-mini"),
     )
 
     response = service.query(SAMPLE_PORTFOLIO, "What is 99% VaR?")
@@ -244,3 +276,34 @@ def test_formatter_remains_authoritative_through_portfolio_service_query() -> No
     assert response.tool_name == "get_var_es"
     assert "999999999" not in response.answer
     assert response.data["tool_result"]["methods"][0]["var"] is not None
+    assert response.data["assistant"] == {
+        "provider": "openai",
+        "model": "gpt-4.1-mini",
+        "mode": "model-routed",
+        "fallback": False,
+    }
+
+
+def test_assistant_metadata_excludes_model_internal_fields() -> None:
+    fixture = _FixtureService()
+    fixture.risk_assistant_model = _ScriptedModel(
+        RiskAssistantModelResponse(
+            tool_name=RiskToolName.GET_LIMITS,
+            intent="limits",
+            rationale="chain-of-thought must not leak",
+            tool_args={"unexpected": "value"},
+            proposed_answer="invented numbers",
+        )
+    )
+
+    response = fixture.query(SAMPLE_PORTFOLIO, "Which limits are breached?")
+
+    assert set(response.data["assistant"]) == {
+        "provider",
+        "model",
+        "mode",
+        "fallback",
+    }
+    assert "rationale" not in response.data
+    assert "tool_args" not in response.data
+    assert "proposed_answer" not in response.data
