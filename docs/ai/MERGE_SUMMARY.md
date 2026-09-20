@@ -33,7 +33,8 @@ required). Python 3.12.3.
 | Frontend production build | success (`vite build`) |
 | Frontend eslint | success (`--max-warnings 0`) |
 | Backend ruff (`app` + `tests`) | clean |
-| Backend mypy | `mypy app/ai --follow-imports=silent` **Success**. `mypy app` still reports pre-existing **263** findings in 3 non-AI files (`pricing/snapshot_overlay.py`, `services/portfolio_service.py`, `persistence/result_payloads.py`) — same T15 policy. CI `lint-static-analysis` was SUCCESS on `7c68832`. |
+| Backend mypy | `mypy app/ai --follow-imports=silent` **Success**. `mypy app` still reports pre-existing **263** findings in 3 non-AI files (`pricing/snapshot_overlay.py`, `services/portfolio_service.py`, `persistence/result_payloads.py`) — same T15 policy. CI `lint-static-analysis` SUCCESS on HEAD `97cb4ed`. |
+| GitHub CI on `97cb4ed` | All SUCCESS (push 35531122080, pull_request 35531125281): backend-pytest, quantlib hard gate, frontend-test-build, lint, e2e, postgres smoke, PR-FAST, PR-FULL. `MERGEABLE` / `CLEAN`. |
 | Playwright `tests/risk-query.spec.ts` | **1 passed** (`QUANTLINEAGE_E2E_UVICORN="python3 -m uvicorn" PLAYWRIGHT_USE_CHROMIUM=1`) |
 | `tests/test_openai_live.py` (normal CI) | **skipped** (opt-in). Body now requires tool → `function_call_output` → `proposed_answer`. Not executed here (no `RUN_LIVE_AI_TESTS=1`). |
 | Full-suite log OpenAI hosts | none (suite finished in ~33s; CI workflow has no OpenAI env) |

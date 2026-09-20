@@ -670,7 +670,7 @@ Evidence:
   git diff --check
   ```
   → pytest **2158 passed**, 10 skipped; ruff clean; mypy `app/ai` silent Success; vitest **215 passed**; eslint 0; vite build 0; Playwright **1 passed**; both compose configs render with AI env on backend/worker only; `git diff --check` 0.
-- CI: `gh pr checks 6` was all SUCCESS on `7c68832` (C11). C12 HEAD CI not yet observed at evidence time.
+- CI: `gh pr checks 6` all SUCCESS on HEAD `97cb4ed` (push run 35531122080 and pull_request run 35531125281): backend-pytest, backend-quantlib-hard-gate, frontend-test-build, lint-static-analysis, e2e-playwright, postgres-persistence-smoke, PR-FAST, PR-FULL. Mergeable/CLEAN vs `cursor/openai-risk-assistant`. Normal CI does not set `RUN_LIVE_AI_TESTS`.
 
 ---
 
