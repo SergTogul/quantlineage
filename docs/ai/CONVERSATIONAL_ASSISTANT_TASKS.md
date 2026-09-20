@@ -208,12 +208,22 @@ python3 -m pytest   tests/test_ai_provider_integration.py   tests/test_ai_bounde
 
 Evidence:
 
-- Removed `_is_greeks_question` short-circuits from `answer_with_model` and `answer_with_bounded_assistant` (`backend/app/risk/query.py`). Deterministic `route()` still maps Greek questions.
-- Secret extraction remains pre-OpenAI and is labeled `preflight-refused`. Config/auth errors after `complete()`/`run()` use `fallback` without executing tools. Successful model results stamp `model-routed` only after the provider call.
-- Schema modes now include `model-narrated` and `preflight-refused` (`transport.py`, `AssistantMode`).
-- Tests: delta/gamma/vega questions assert `complete()` ran; bounded HTTP greeks assert `complete_count==1`; secret preflight asserts zero model calls and `preflight-refused`.
+- Product fix HEAD: `b250a42` (`fix: send OpenAI-path Greek questions to the model (C02)`). Removed `_is_greeks_question` short-circuits from `answer_with_model` and `answer_with_bounded_assistant` (`backend/app/risk/query.py`). Deterministic `route()` still maps Greek questions. Secret extraction remains pre-OpenAI and is labeled `preflight-refused`. Config/auth errors after `complete()`/`run()` use `fallback` without executing tools. Successful model results stamp `model-routed` only after the provider call. Schema modes include `model-narrated` and `preflight-refused` (`transport.py`, `AssistantMode`).
+- This run (no extra product-code change): closed remaining C02 coverage/evidence gaps.
+  - Theta/rho are not security preflight; one-shot and bounded tests fail if those questions skip OpenAI.
+  - Bounded secret preflight asserts `complete_count==0` and `preflight-refused`.
+  - Deterministic router still clarifies theta/rho with no `assistant` metadata.
+  - Tests: `21d8ddd` (`test: prove OpenAI-path theta/rho questions are not preflight shortcuts (C02)`).
 - Security-grounding reviewer: keep `_is_secret_request`; theta/rho are not security preflight; SIDE_EFFECTING expansion is C03 scope.
-- Checks: `python3 -m pytest tests/test_ai_provider_integration.py tests/test_ai_bounded_http.py tests/test_position_greeks_tool.py tests/test_ai_query_orchestration.py -q` → **40 passed**. Related suites `test_ai_evals.py test_ai_security.py test_api_typed_models.py test_api_openapi_examples.py test_risk_query_api_incomplete.py` → **150 passed**.
+- Checks (2026-09-20, Python 3.12.3), fresh after the test commit and again after a temporary bypass restore:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_provider_integration.py tests/test_ai_bounded_http.py tests/test_position_greeks_tool.py tests/test_ai_query_orchestration.py -q
+  ```
+  → **45 passed**, 1 warning, exit code **0** (1.43s).
+  Related suites `tests/test_ai_evals.py tests/test_ai_security.py tests/test_api_typed_models.py tests/test_api_openapi_examples.py tests/test_risk_query_api_incomplete.py` → **150 passed**, exit code **0**.
+  Bypass proof: restoring the old `_is_greeks_question` OpenAI-path short-circuit fails 7 tests (delta/gamma/vega, theta/rho, bounded greeks/theta); deterministic theta/rho still passes.
+- Final C02 HEAD: recorded in this evidence commit on `cursor/risk-query-incomplete-fallback-bebd`.
 
 Next eligible after this commit: **C03**, **C04**, and **C06**.
 
