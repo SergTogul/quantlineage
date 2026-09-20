@@ -223,7 +223,7 @@ Evidence:
   → **45 passed**, 1 warning, exit code **0** (1.43s).
   Related suites `tests/test_ai_evals.py tests/test_ai_security.py tests/test_api_typed_models.py tests/test_api_openapi_examples.py tests/test_risk_query_api_incomplete.py` → **150 passed**, exit code **0**.
   Bypass proof: restoring the old `_is_greeks_question` OpenAI-path short-circuit fails 7 tests (delta/gamma/vega, theta/rho, bounded greeks/theta); deterministic theta/rho still passes.
-- Final C02 HEAD: recorded in this evidence commit on `cursor/risk-query-incomplete-fallback-bebd`.
+- C02 SHAs on `cursor/risk-query-incomplete-fallback-bebd`: product `b250a42`, tests `21d8ddd`, evidence `f23c533`.
 
 Next eligible after this commit: **C03**, **C04**, and **C06**.
 
