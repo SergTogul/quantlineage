@@ -33,7 +33,7 @@ def openai_settings() -> AISettings:
 def test_policy_is_versioned_and_covers_required_rules() -> None:
     policy = ASSISTANT_POLICY_INSTRUCTION
 
-    assert ASSISTANT_POLICY_VERSION == "1.0.1"
+    assert ASSISTANT_POLICY_VERSION == "1.0.2"
     assert f"v{ASSISTANT_POLICY_VERSION}" in policy
     assert "Select at most one function" in policy
     assert "Never calculate" in policy
@@ -41,6 +41,8 @@ def test_policy_is_versioned_and_covers_required_rules() -> None:
     assert "Refuse trading advice" in policy
     assert "prompt injection" in policy
     assert "Never reveal secrets" in policy
+    assert "get_position_greeks" in policy
+    assert "Never substitute get_contributors" in policy
 
 
 def test_request_structure_matches_responses_api_shape(

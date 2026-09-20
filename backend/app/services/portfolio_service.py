@@ -602,6 +602,44 @@ class PortfolioService:
             for c in report.contributions
         ]
 
+    def position_greeks(
+        self,
+        portfolio: Portfolio,
+        *,
+        greek: str = "delta",
+        top_n: int = 5,
+    ) -> dict:
+        """Rank positions by a Valuation Greek from the pricing engine."""
+        allowed = {"delta", "gamma", "vega", "dv01", "fx_delta"}
+        if greek not in allowed:
+            raise ValueError(f"unsupported greek: {greek!r}")
+        market = self.market_snapshot(portfolio)
+        valuations = self.pricing.value_portfolio(portfolio, market)
+        labels = {p.id: position_label(p) for p in portfolio.positions}
+        rows: list[dict] = []
+        for valuation in valuations:
+            amount = float(getattr(valuation, greek))
+            rows.append(
+                {
+                    "position_id": valuation.position_id,
+                    "label": labels.get(valuation.position_id, valuation.position_id),
+                    "greek": greek,
+                    "value": amount,
+                    "market_value": float(valuation.market_value),
+                }
+            )
+        rows.sort(key=lambda row: abs(float(row["value"])), reverse=True)
+        top = rows[: max(1, int(top_n))]
+        total_abs = sum(abs(float(row["value"])) for row in rows) or 1.0
+        for row in top:
+            row["share_pct"] = 100.0 * abs(float(row["value"])) / total_abs
+        return {
+            "greek": greek,
+            "positions": top,
+            "portfolio_id": portfolio.id,
+            "market_snapshot_id": getattr(market, "id", None),
+        }
+
     def limits(self, portfolio: Portfolio):
         market = self.market_snapshot(portfolio)
         if isinstance(self.risk, HistoricalRiskEngine):

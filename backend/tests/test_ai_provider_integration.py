@@ -109,6 +109,24 @@ class _FixtureService:
             )
         ]
 
+    def position_greeks(self, portfolio, *, greek: str = "delta", top_n: int = 5) -> dict:
+        self.calls.append("position_greeks")
+        return {
+            "greek": greek,
+            "portfolio_id": portfolio.id,
+            "market_snapshot_id": "fixture-snap",
+            "positions": [
+                {
+                    "position_id": "opt-1",
+                    "label": "NVDA call",
+                    "greek": greek,
+                    "value": 1234.5,
+                    "market_value": 5000.0,
+                    "share_pct": 80.0,
+                }
+            ][:top_n],
+        }
+
 
 class _ScriptedModel:
     def __init__(self, response: RiskAssistantModelResponse | None = None, *, error=None) -> None:
@@ -171,14 +189,15 @@ def test_model_options_delta_question_does_not_run_contributors() -> None:
 
     response = fixture.query(SAMPLE_PORTFOLIO, "Biggest options delta?")
 
-    assert fixture.calls == []
-    assert response.tool_name is None
-    assert response.requires_clarification
-    assert response.intent == "unsupported"
-    assert "delta" in response.answer.lower() or "greek" in response.answer.lower()
+    # Short-circuits to get_position_greeks; never runs contributors.
+    assert "contributors" not in fixture.calls
+    assert response.tool_name == "get_position_greeks"
+    assert response.requires_clarification is False
+    assert response.intent == "position_greeks"
     assert "Top risk contributors" not in response.answer
     assert response.data["assistant"]["mode"] == "model-routed"
     assert response.data["assistant"]["fallback"] is False
+    assert len(fixture.risk_assistant_model.requests) == 0
 
     fixture = _FixtureService()
     fixture.risk_assistant_model = _ScriptedModel(

@@ -36,6 +36,7 @@ class RiskToolName(str, Enum):
     GET_KEY_RATE_DV01 = "get_key_rate_dv01"
     GET_TOP_RISK_CONTRIBUTORS = "get_top_risk_contributors"
     GET_RUN_PROVENANCE = "get_run_provenance"
+    GET_POSITION_GREEKS = "get_position_greeks"
 
 
 class RiskToolContract(BaseModel):
@@ -350,6 +351,18 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
             "methodology",
         ],
     ),
+    RiskToolName.GET_POSITION_GREEKS: RiskToolContract(
+        name=RiskToolName.GET_POSITION_GREEKS,
+        description=(
+            "Rank positions by a valuation Greek from PricingEngine "
+            "(delta, gamma, vega, dv01, or fx_delta). Not component VaR contributors."
+        ),
+        service_method="position_greeks",
+        required_inputs=["portfolio"],
+        returns=["PositionGreeksReport"],
+        numeric_source="deterministic PortfolioService.position_greeks from Valuation",
+        provenance_fields=["portfolio_id", "market_snapshot_id", "greek"],
+    ),
 }
 
 TOOL_ARG_MODELS: dict[RiskToolName, type[BaseModel]] = {
@@ -373,9 +386,8 @@ _FAKE_TOOL_REFUSAL_ANSWER = (
 )
 
 _GREEKS_UNSUPPORTED_ANSWER = (
-    "Option Greeks such as delta, gamma, vega, and theta are not available through "
-    "the risk assistant tools. Ask for VaR/ES, limits, contributors, worst stress, "
-    "or portfolio summary instead."
+    "Theta and rho are not available on valuation payloads. "
+    "Ask for delta, gamma, vega, dv01, or fx_delta position Greeks instead."
 )
 
 _TOOL_FAILURE_ANSWER = (
@@ -447,6 +459,7 @@ _NUMERIC_TOOLS = frozenset(
         RiskToolName.GET_KEY_RATE_DV01,
         RiskToolName.GET_TOP_RISK_CONTRIBUTORS,
         RiskToolName.GET_RUN_PROVENANCE,
+        RiskToolName.GET_POSITION_GREEKS,
     }
 )
 
@@ -582,7 +595,14 @@ class RiskQueryEngine:
         if _is_secret_request(q):
             return _clarification_plan("unsupported", _SECRET_REFUSAL_ANSWER)
         if _is_greeks_question(q):
-            return _clarification_plan("unsupported", _GREEKS_UNSUPPORTED_ANSWER)
+            greek = _infer_position_greek(q)
+            if greek is None:
+                return _clarification_plan("unsupported", _GREEKS_UNSUPPORTED_ANSWER)
+            return RiskQueryPlan(
+                intent="position_greeks",
+                tool_name=RiskToolName.GET_POSITION_GREEKS,
+                tool_args={"greek": greek},
+            )
         if _is_advisory(q):
             return _clarification_plan(
                 "unsupported",
@@ -820,17 +840,28 @@ class RiskQueryEngine:
                 requires_clarification=True,
             )
         if _is_greeks_question(" ".join(question.strip().split()).lower()):
-            return RiskQueryResponse(
-                intent="unsupported",
-                answer=_GREEKS_UNSUPPORTED_ANSWER,
-                data={
-                    "tool_contract": None,
-                    "tool_result": None,
-                    "supported_tools": tool_contract_schemas(),
-                    "assistant": assistant_meta,
-                },
-                tool_name=None,
-                requires_clarification=True,
+            greek = _infer_position_greek(" ".join(question.strip().split()).lower())
+            if greek is None:
+                return RiskQueryResponse(
+                    intent="unsupported",
+                    answer=_GREEKS_UNSUPPORTED_ANSWER,
+                    data={
+                        "tool_contract": None,
+                        "tool_result": None,
+                        "supported_tools": tool_contract_schemas(),
+                        "assistant": assistant_meta,
+                    },
+                    tool_name=None,
+                    requires_clarification=True,
+                )
+            return self._grounded_tool_response(
+                intent="position_greeks",
+                tool_name=RiskToolName.GET_POSITION_GREEKS,
+                portfolio=portfolio,
+                service=service,
+                args={"greek": greek},
+                principal=principal,
+                extra_data={"assistant": assistant_meta},
             )
         request = RiskAssistantModelRequest(
             question=question,
@@ -1493,6 +1524,18 @@ def _format_answer(
             ]
             text = "Top risk contributors: " + ", ".join(names) + "."
         return _join_grounding(text, card, require_present_identity=True)
+    if tool_name == RiskToolName.GET_POSITION_GREEKS:
+        greek = payload.get("greek") or "delta"
+        positions = payload.get("positions") or []
+        if not positions:
+            text = f"No position {greek} values returned."
+        else:
+            names = [
+                f"{item.get('label', item.get('position_id'))} {_fmt(item.get('value'))}"
+                for item in positions
+            ]
+            text = f"Top position {greek}: " + ", ".join(names) + "."
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name in (
         RiskToolName.EXPLAIN_RISK_CHANGE,
         RiskToolName.COMPARE_RISK_RUNS,
@@ -1512,6 +1555,8 @@ def _intent_for_tool(tool_name: RiskToolName) -> str:
         return "limits"
     if tool_name == RiskToolName.GET_CONTRIBUTORS:
         return "contributors"
+    if tool_name == RiskToolName.GET_POSITION_GREEKS:
+        return "position_greeks"
     if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
         return "explain_risk_change"
     if tool_name == RiskToolName.SEARCH_INSTRUMENTS:
@@ -1846,13 +1891,28 @@ def _is_secret_request(question: str) -> bool:
 
 
 def _is_greeks_question(question: str) -> bool:
-    """True when the user asks for option Greeks not covered by allowlisted tools."""
+    """True when the user asks for position Greeks (delta/gamma/vega/…)."""
     if _mentions(question, "greeks", "greek"):
         return True
     if not re.search(r"\b(delta|gamma|vega|theta|rho)\b", question, re.I):
         return False
     # Keep explain-risk-change paths that mention a greek metric name.
     return not _is_risk_change_question(question)
+
+
+def _infer_position_greek(question: str) -> str | None:
+    """Map NL Greek asks onto Valuation fields. Theta/rho are not on Valuation."""
+    if re.search(r"\btheta\b", question, re.I) or re.search(r"\brho\b", question, re.I):
+        return None
+    if re.search(r"\bgamma\b", question, re.I):
+        return "gamma"
+    if re.search(r"\bvega\b", question, re.I):
+        return "vega"
+    if re.search(r"\bdv01\b", question, re.I):
+        return "dv01"
+    if re.search(r"\bfx[_\s-]?delta\b", question, re.I):
+        return "fx_delta"
+    return "delta"
 
 
 def _tool_args_oversized(args: dict[str, Any] | None) -> bool:
