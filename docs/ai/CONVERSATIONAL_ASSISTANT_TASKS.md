@@ -570,7 +570,7 @@ Evidence:
 
 ## C11 — Align configuration, documentation, and PR scope
 
-- [ ] Remove configuration ambiguity and unrelated changes.
+- [x] Remove configuration ambiguity and unrelated changes.
 
 Dependencies: C03, C08, C09
 
@@ -600,6 +600,15 @@ git diff --check
 ```
 
 Evidence:
+
+- Product HEAD: `522173d` (`docs: align canonical AI env names and conversational operator guide (C11)`). Canonical names are `AI_*` / `OPENAI_*` in code, `.env.example`, `.env.shared.example`, Compose (backend + worker), operator guide, and design snippet. `AI_ASSISTANT_LOOP=conversational` vs `router` documented. Conversation retention is in-memory, 24h TTL, max 8 turns, fail-closed ownership. `.cursor/DEFERRED_NOT_DONE.md` removed. Operator guide cites OpenAI function calling and conversation state. Historical T00–T24 queue in `docs/ai/TASKS.md` points at this file for conversational defaults.
+- Unrelated Vite/E2E: `e2e` `#risk-query` / Risk Query nav is required because chat is its own section (C09). `frontend/.env.development` (`VITE_API_BASE_URL=same-origin`) was already on PR #6 (`dd291ac`); no OpenAI secret; cannot split to another PR on this branch.
+- Checks (2026-09-20), fresh:
+  ```
+  rg -n "AI_PROVIDER|OPENAI_MODEL|MAX_TOOL_ROUNDS|QUANTLINEAGE_AI" .
+  git diff --check
+  ```
+  → `QUANTLINEAGE_AI` appears only as “do not introduce aliases” in the operator guide plus this check command. `git diff --check` exit **0**.
 
 ## C12 — Run the merge gate
 
