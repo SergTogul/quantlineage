@@ -62,6 +62,8 @@ def _isolate_ai_env_from_workspace_dotenv(
         "AI_TIMEOUT_SECONDS",
         "AI_MAX_OUTPUT_TOKENS",
         "AI_MAX_TOOL_ROUNDS",
+        "AI_MAX_TOOL_CALLS",
+        "AI_ASSISTANT_LOOP",
     ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr("app.ai.factory.load_application_dotenv", lambda: None)

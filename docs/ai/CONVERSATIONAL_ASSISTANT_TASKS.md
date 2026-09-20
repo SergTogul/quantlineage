@@ -229,7 +229,7 @@ Next eligible after this commit: **C03**, **C04**, and **C06**.
 
 ## C03 — Make tool-output continuation the normal OpenAI experience
 
-- [ ] Guarantee one tool call can be followed by a final model answer.
+- [x] Guarantee one tool call can be followed by a final model answer.
 
 Dependencies: C02
 
@@ -259,6 +259,19 @@ python3 -m pytest   tests/test_ai_bounded_assistant.py   tests/test_ai_bounded_h
 ```
 
 Evidence:
+
+- Product: conversational OpenAI defaults are `AI_ASSISTANT_LOOP=conversational`, `AI_MAX_TOOL_ROUNDS` (model turns) **2**, `AI_MAX_TOOL_CALLS` (executed tools) **1**. `AISettings.max_model_turns` aliases the model-turn budget. Explicit `AI_ASSISTANT_LOOP=router` is one-shot (`model-routed` only; never `model-narrated`).
+- `BoundedRiskAssistant` always appends `function_call_output` and continues after an executed tool. A tool on the last permitted tool or model turn sets `reserve_narration` (`tool_choice=none`). Final text is parsed only on `continue_after_tools` (`allow_final_text=True`); `complete()` still treats text as clarification.
+- HTTP: OpenAI + conversational uses the bounded loop even for one tool. Grounded narration stamps `model-narrated`. Provider error after execution still returns truncated fallback without replay.
+- `SIDE_EFFECTING_TOOLS` includes `run_portfolio_risk`, `run_stress`, and `get_top_risk_contributors` (RiskRun submit).
+- Checks (2026-09-20, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_bounded_assistant.py tests/test_ai_bounded_http.py tests/test_openai_model.py tests/test_openai_request_builder.py tests/test_ai_config.py -q
+  ```
+  → **88 passed**, exit code **0** (2.75s).
+
+Next eligible after this commit: **C04**, **C05**, and **C06**.
 
 ## C04 — Sanitize tool failures before model continuation
 

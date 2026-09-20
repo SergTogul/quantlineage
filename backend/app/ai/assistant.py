@@ -38,6 +38,7 @@ SIDE_EFFECTING_TOOLS: frozenset[str] = frozenset(
     {
         RiskToolName.RUN_PORTFOLIO_RISK.value,
         RiskToolName.RUN_STRESS.value,
+        RiskToolName.GET_TOP_RISK_CONTRIBUTORS.value,
     }
 )
 
@@ -81,7 +82,8 @@ class RiskAssistantRequest(BaseModel):
     tools: list[dict[str, Any]] = Field(default_factory=list)
     portfolio_id: str | None = None
     available_run_ids: list[str] = Field(default_factory=list)
-    max_rounds: int = Field(default=1, ge=1, le=4)
+    max_rounds: int = Field(default=2, ge=1, le=4)
+    max_tool_calls: int = Field(default=4, ge=1, le=4)
 
 
 class RiskAssistantResult(BaseModel):
@@ -119,6 +121,7 @@ class RiskAssistantLoopModel(Protocol):
         previous_response_id: str,
         tool_outputs: Sequence[FunctionCallOutput],
         request: RiskAssistantModelRequest,
+        reserve_narration: bool = False,
     ) -> RiskAssistantModelResponse:
         """Continue after appending ``function_call_output`` items."""
 
@@ -162,7 +165,8 @@ class BoundedRiskAssistant:
         self._allow_side_effecting = allow_side_effecting
 
     def run(self, request: RiskAssistantRequest) -> RiskAssistantResult:
-        max_rounds = min(max(request.max_rounds, 1), 4)
+        max_model_turns = min(max(request.max_rounds, 1), 4)
+        max_tool_calls = min(max(request.max_tool_calls, 1), 4)
         model_request = RiskAssistantModelRequest(
             question=request.question,
             tools=request.tools,
@@ -174,18 +178,27 @@ class BoundedRiskAssistant:
         pending_outputs: list[FunctionCallOutput] | None = None
         previous_response_id: str | None = None
         last_response: RiskAssistantModelResponse | None = None
-
-        for round_index in range(1, max_rounds + 1):
+        tools_executed = 0
+        reserve_narration = False
+        # One extra slot beyond the model-turn budget for a reserved narration continue.
+        for round_index in range(1, max_model_turns + 2):
             if round_index == 1:
                 response = self._model.complete(model_request)
             else:
                 assert previous_response_id is not None
                 assert pending_outputs is not None
-                response = self._model.continue_after_tools(
-                    previous_response_id=previous_response_id,
-                    tool_outputs=pending_outputs,
-                    request=model_request,
-                )
+                continue_kwargs: dict[str, Any] = {
+                    "previous_response_id": previous_response_id,
+                    "tool_outputs": pending_outputs,
+                    "request": model_request,
+                }
+                try:
+                    response = self._model.continue_after_tools(
+                        **continue_kwargs,
+                        reserve_narration=reserve_narration,
+                    )
+                except TypeError:
+                    response = self._model.continue_after_tools(**continue_kwargs)
             last_response = response
 
             if response.refusal:
@@ -233,6 +246,14 @@ class BoundedRiskAssistant:
                     stopped_reason="refusal",
                 )
 
+            if reserve_narration or tools_executed >= max_tool_calls:
+                return RiskAssistantResult(
+                    intent=response.intent,
+                    tool_turns=tool_turns,
+                    rounds_used=round_index,
+                    stopped_reason="round_limit",
+                )
+
             checked = validate_tool_call(tool_name_str, response.tool_args)
             if not checked.allowed or checked.tool_name is None:
                 return RiskAssistantResult(
@@ -254,28 +275,20 @@ class BoundedRiskAssistant:
             )
             tool_turns.append(turn)
             pending_outputs = [output_item]
-            previous_response_id = response.provider_response_id or f"resp_round_{round_index}"
-
-            if round_index >= max_rounds:
-                if response.proposed_answer:
-                    return self._finalize_narration(
-                        response=response,
-                        tool_turns=tool_turns,
-                        rounds_used=round_index,
-                        stopped_reason="round_limit",
-                    )
-                return RiskAssistantResult(
-                    intent=response.intent,
-                    tool_turns=tool_turns,
-                    rounds_used=round_index,
-                    stopped_reason="round_limit",
-                )
+            previous_response_id = (
+                response.provider_response_id or f"resp_round_{round_index}"
+            )
+            tools_executed += 1
+            reserve_narration = (
+                tools_executed >= max_tool_calls or round_index >= max_model_turns
+            )
+            # Always continue so the executed result is sent as function_call_output.
 
         assert last_response is not None
         return RiskAssistantResult(
             intent=last_response.intent,
             tool_turns=tool_turns,
-            rounds_used=max_rounds,
+            rounds_used=max_model_turns + 1,
             stopped_reason="round_limit",
         )
 

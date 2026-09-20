@@ -179,6 +179,74 @@ def test_continue_after_tools_sends_function_call_output(
     assert call["max_tool_calls"] == 1
 
 
+def test_complete_does_not_parse_final_text_before_tool_output(
+    openai_settings: AISettings,
+) -> None:
+    sdk_response = _make_response(
+        ResponseOutputMessage(
+            id="msg_1",
+            type="message",
+            role="assistant",
+            status="completed",
+            content=[
+                ResponseOutputText(
+                    type="output_text",
+                    text="The historical VaR is ready.",
+                    annotations=[],
+                )
+            ],
+        )
+    )
+    model = OpenAIRiskAssistantModel(
+        FakeOpenAIClient(FakeResponses(response=sdk_response)),
+        openai_settings,
+    )
+
+    result = model.complete(
+        RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+    )
+
+    assert result.proposed_answer is None
+    assert result.requires_clarification is True
+
+
+def test_reserved_narration_continue_parses_final_text_after_tool_output(
+    openai_settings: AISettings,
+) -> None:
+    from app.ai.assistant import FunctionCallOutput
+
+    sdk_response = _make_response(
+        ResponseOutputMessage(
+            id="msg_2",
+            type="message",
+            role="assistant",
+            status="completed",
+            content=[
+                ResponseOutputText(
+                    type="output_text",
+                    text="QuantLineage calculated the ranking.",
+                    annotations=[],
+                )
+            ],
+        )
+    )
+    fake = FakeResponses(response=sdk_response)
+    model = OpenAIRiskAssistantModel(FakeOpenAIClient(fake), openai_settings)
+
+    result = model.continue_after_tools(
+        previous_response_id="resp_1",
+        tool_outputs=[FunctionCallOutput(call_id="call_1", output='{"ok": true}')],
+        request=RiskAssistantModelRequest(
+            question="Show VaR", tools=tool_contract_schemas()
+        ),
+        reserve_narration=True,
+    )
+
+    assert result.proposed_answer == "QuantLineage calculated the ranking."
+    assert fake.calls[0]["tool_choice"] == "none"
+    assert fake.calls[0]["input"][0]["type"] == "function_call_output"
+
+
 def test_complete_parses_one_function_call(openai_settings: AISettings) -> None:
     sdk_response = _make_response(
         _function_call(name="get_var_es", arguments='{"confidence": 0.99}')

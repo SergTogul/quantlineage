@@ -64,18 +64,20 @@ class OpenAIRiskAssistantModel:
         previous_response_id: str,
         tool_outputs: Sequence[Any],
         request: RiskAssistantModelRequest,
+        reserve_narration: bool = False,
     ) -> RiskAssistantModelResponse:
         """Append ``function_call_output`` items and continue the Responses turn.
 
         ``request`` is retained for protocol symmetry with scripted loop models;
         continue payloads use ``previous_response_id`` rather than re-sending the
-        user question.
+        user question. Final text is parsed only on this continuation path.
         """
         del request  # routing context lives on previous_response_id
         openai_request = build_openai_continue_request(
             previous_response_id=previous_response_id,
             tool_outputs=tool_outputs,
             settings=self._settings,
+            reserve_narration=reserve_narration,
         )
         return self._create_parsed(
             openai_request.create_params,

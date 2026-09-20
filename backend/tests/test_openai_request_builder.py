@@ -238,3 +238,20 @@ def test_initial_request_keeps_one_tool_call_per_round_when_max_rounds_is_four(
         settings,
     )
     assert payload.create_params["max_tool_calls"] == 1
+
+
+def test_reserved_narration_continue_disables_further_tool_calls(
+    openai_settings: AISettings,
+) -> None:
+    payload = build_openai_continue_request(
+        previous_response_id="resp_last_tool",
+        tool_outputs=[
+            FunctionCallOutput(call_id="call_1", output='{"ok": true}'),
+        ],
+        settings=openai_settings,
+        reserve_narration=True,
+    )
+
+    assert payload.create_params["input"][0]["type"] == "function_call_output"
+    assert payload.create_params["tool_choice"] == "none"
+    assert "max_tool_calls" not in payload.create_params

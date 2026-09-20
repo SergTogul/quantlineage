@@ -28,6 +28,8 @@ def _clear_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "AI_TIMEOUT_SECONDS",
         "AI_MAX_OUTPUT_TOKENS",
         "AI_MAX_TOOL_ROUNDS",
+        "AI_MAX_TOOL_CALLS",
+        "AI_ASSISTANT_LOOP",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -39,6 +41,9 @@ def test_defaults_to_deterministic_provider() -> None:
     assert settings.timeout_seconds == DEFAULT_AI_TIMEOUT_SECONDS
     assert settings.max_output_tokens == DEFAULT_MAX_OUTPUT_TOKENS
     assert settings.max_tool_rounds == DEFAULT_MAX_TOOL_ROUNDS
+    assert settings.max_tool_calls == 1
+    assert settings.assistant_loop == "conversational"
+    assert settings.max_model_turns == settings.max_tool_rounds
 
 
 def test_supported_providers_are_deterministic_and_openai(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -98,8 +103,52 @@ def test_timeout_accepts_valid_values(monkeypatch: pytest.MonkeyPatch) -> None:
     assert get_ai_settings().timeout_seconds == MAX_AI_TIMEOUT_SECONDS
 
 
-def test_max_tool_rounds_defaults_to_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    assert get_ai_settings().max_tool_rounds == 1
+def test_conversational_openai_defaults_allow_one_tool_plus_narration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """C03: OpenAI chat defaults to select + reserved narration, not one-shot."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+
+    settings = get_ai_settings()
+
+    assert settings.assistant_loop == "conversational"
+    assert settings.max_tool_rounds == 2
+    assert settings.max_model_turns == 2
+    assert settings.max_tool_calls == 1
+    assert settings.max_tool_rounds != settings.max_tool_calls
+
+
+def test_explicit_router_loop_is_one_shot_and_named(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "router")
+
+    settings = get_ai_settings()
+
+    assert settings.assistant_loop == "router"
+    assert settings.max_model_turns == 1
+    assert settings.max_tool_rounds == 1
+    assert settings.max_tool_calls == 1
+
+
+def test_assistant_loop_rejects_unknown_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "chat")
+    with pytest.raises(ValueError, match="AI_ASSISTANT_LOOP"):
+        get_ai_settings()
+
+
+def test_max_tool_calls_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "3")
+    assert get_ai_settings().max_tool_calls == 3
+
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "5")
+    with pytest.raises(ValueError, match="AI_MAX_TOOL_CALLS"):
+        get_ai_settings()
 
 
 @pytest.mark.parametrize("rounds", [1, 2, 3, 4])

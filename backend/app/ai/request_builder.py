@@ -50,11 +50,13 @@ def build_openai_continue_request(
     previous_response_id: str,
     tool_outputs: Sequence[Any],
     settings: AISettings,
+    reserve_narration: bool = False,
 ) -> OpenAIResponsesRequest:
     """Continue a Responses turn with ``function_call_output`` items.
 
-    ``settings.max_tool_rounds`` is owned by :class:`BoundedRiskAssistant`; each
-    continue request still allows at most one tool call.
+    ``settings.max_tool_rounds`` / ``max_tool_calls`` are owned by
+    :class:`BoundedRiskAssistant`. Each continue still allows at most one tool
+    call unless ``reserve_narration`` forces a final text turn.
     """
     if settings.openai_model is None:
         raise ValueError("openai_model is required to build an OpenAI Responses request.")
@@ -77,16 +79,19 @@ def build_openai_continue_request(
     if not input_items:
         raise ValueError("At least one function_call_output is required to continue.")
 
+    create_params: dict[str, Any] = {
+        "model": settings.openai_model,
+        "previous_response_id": previous_response_id.strip(),
+        "input": input_items,
+        "tools": openai_function_tools(),
+        "max_output_tokens": settings.max_output_tokens,
+        "tool_choice": "none" if reserve_narration else "auto",
+    }
+    if not reserve_narration:
+        create_params["max_tool_calls"] = _MAX_TOOL_CALLS_PER_ROUND
+
     return OpenAIResponsesRequest(
-        create_params={
-            "model": settings.openai_model,
-            "previous_response_id": previous_response_id.strip(),
-            "input": input_items,
-            "tools": openai_function_tools(),
-            "max_output_tokens": settings.max_output_tokens,
-            "max_tool_calls": _MAX_TOOL_CALLS_PER_ROUND,
-            "tool_choice": "auto",
-        },
+        create_params=create_params,
         timeout_seconds=settings.timeout_seconds,
     )
 

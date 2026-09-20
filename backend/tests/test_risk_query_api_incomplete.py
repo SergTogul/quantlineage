@@ -120,6 +120,7 @@ def openai_env(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key-for-api-incomplete")
     monkeypatch.setenv("OPENAI_MODEL", "gpt-test-model")
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "router")
     monkeypatch.setattr(
         "openai.OpenAI",
         MagicMock(return_value=SimpleNamespace(close=MagicMock())),

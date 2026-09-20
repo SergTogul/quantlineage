@@ -27,6 +27,8 @@ def _clear_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "AI_TIMEOUT_SECONDS",
         "AI_MAX_OUTPUT_TOKENS",
         "AI_MAX_TOOL_ROUNDS",
+        "AI_MAX_TOOL_CALLS",
+        "AI_ASSISTANT_LOOP",
     ):
         monkeypatch.delenv(name, raising=False)
 

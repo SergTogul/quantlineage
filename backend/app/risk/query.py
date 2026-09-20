@@ -962,6 +962,7 @@ class RiskQueryEngine:
         model,
         *,
         max_rounds: int,
+        max_tool_calls: int = 1,
         principal: str | None = None,
         assistant_context: AssistantMetadataContext | None = None,
     ) -> RiskQueryResponse:
@@ -1006,6 +1007,7 @@ class RiskQueryEngine:
             tools=tool_contract_schemas(),
             portfolio_id=getattr(portfolio, "id", None),
             max_rounds=max_rounds,
+            max_tool_calls=max_tool_calls,
         )
         try:
             result = assistant.run(request)
@@ -1038,9 +1040,12 @@ class RiskQueryEngine:
             )
             return fallback_response.model_copy(update={"data": data})
 
+        assistant_mode: AssistantMode = (
+            "model-narrated" if result.narration_grounded else "model-routed"
+        )
         assistant_meta = build_assistant_metadata(
             context,
-            mode="model-routed",
+            mode=assistant_mode,
             fallback=False,
         )
         investigation = {

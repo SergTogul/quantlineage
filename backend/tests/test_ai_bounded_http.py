@@ -1,9 +1,10 @@
-"""HTTP wiring for BoundedRiskAssistant when AI_MAX_TOOL_ROUNDS > 1."""
+"""HTTP wiring for conversational BoundedRiskAssistant and explicit router mode."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from app.ai.assistant import SIDE_EFFECTING_TOOLS
 from app.ai.config import AISettings
 from app.ai.errors import OpenAITimeoutError
 from app.pricing.builtin import BuiltinPricingEngine
@@ -39,26 +40,43 @@ class _ScriptedLoopModel:
         return self._responses.pop(0)
 
 
-def _settings(*, rounds: int) -> AISettings:
+def _settings(
+    *,
+    rounds: int,
+    tool_calls: int | None = None,
+    assistant_loop: str = "conversational",
+) -> AISettings:
     return AISettings(
         provider="openai",
         openai_model="gpt-test-model",
         timeout_seconds=30.0,
         max_output_tokens=512,
         max_tool_rounds=rounds,
+        max_tool_calls=tool_calls if tool_calls is not None else max(rounds - 1, 1),
+        assistant_loop=assistant_loop,  # type: ignore[arg-type]
     )
 
 
-def _service(model, *, rounds: int) -> PortfolioService:
+def _service(
+    model,
+    *,
+    rounds: int,
+    tool_calls: int | None = None,
+    assistant_loop: str = "conversational",
+) -> PortfolioService:
     return PortfolioService(
         BuiltinPricingEngine(),
         HistoricalRiskEngine(seed=1, observations=20),
         risk_assistant_model=model,
-        ai_settings=_settings(rounds=rounds),
+        ai_settings=_settings(
+            rounds=rounds,
+            tool_calls=tool_calls,
+            assistant_loop=assistant_loop,
+        ),
     )
 
 
-def test_default_one_round_stays_on_one_shot_complete() -> None:
+def test_explicit_router_loop_stays_one_shot_and_is_not_model_narrated() -> None:
     model = _ScriptedLoopModel(
         [
             RiskAssistantModelResponse(
@@ -67,7 +85,7 @@ def test_default_one_round_stays_on_one_shot_complete() -> None:
             )
         ]
     )
-    service = _service(model, rounds=1)
+    service = _service(model, rounds=1, assistant_loop="router")
 
     response = service.query(SAMPLE_PORTFOLIO, "show top risk contributors")
 
@@ -75,6 +93,37 @@ def test_default_one_round_stays_on_one_shot_complete() -> None:
     assert model.continue_count == 0
     assert response.tool_name == "get_contributors"
     assert response.data.get("investigation") is None
+    assert response.data["assistant"]["mode"] == "model-routed"
+    assert response.data["assistant"]["mode"] != "model-narrated"
+
+
+def test_default_conversational_http_continues_after_one_tool() -> None:
+    model = _ScriptedLoopModel(
+        [
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.GET_VAR_ES,
+                intent="var_es",
+                tool_call_id="call_var",
+                provider_response_id="resp_1",
+            ),
+            RiskAssistantModelResponse(
+                proposed_answer="Historical VaR was calculated by QuantLineage tools.",
+                intent="final",
+                provider_response_id="resp_2",
+            ),
+        ]
+    )
+    service = _service(model, rounds=2, tool_calls=1)
+
+    response = service.query(SAMPLE_PORTFOLIO, "What is 99% VaR?")
+
+    assert model.complete_count == 1
+    assert model.continue_count == 1
+    assert response.tool_name == "get_var_es"
+    assert response.data["investigation"]["tool_names"] == ["get_var_es"]
+    assert response.data["investigation"]["narration_grounded"] is True
+    assert response.data["assistant"]["mode"] == "model-narrated"
+    assert response.data["assistant"]["fallback"] is False
 
 
 def test_multi_round_http_executes_tools_and_continues() -> None:
@@ -113,7 +162,7 @@ def test_multi_round_http_executes_tools_and_continues() -> None:
     assert response.data["investigation"]["rounds_used"] == 3
     assert response.data["investigation"]["narration_grounded"] is True
     assert "assistant" in response.data
-    assert response.data["assistant"]["mode"] == "model-routed"
+    assert response.data["assistant"]["mode"] == "model-narrated"
     assert response.data["assistant"]["fallback"] is False
 
 
@@ -199,7 +248,7 @@ def test_bounded_greeks_question_calls_the_model() -> None:
     assert model.complete_count == 1
     assert model.continue_count == 1
     assert response.tool_name == "get_position_greeks"
-    assert response.data["assistant"]["mode"] == "model-routed"
+    assert response.data["assistant"]["mode"] == "model-narrated"
 
 
 def test_bounded_theta_question_calls_the_model() -> None:
@@ -245,3 +294,27 @@ def test_bounded_secret_preflight_is_not_labeled_model_routed() -> None:
     assert response.data["assistant"]["mode"] == "preflight-refused"
     assert response.data["assistant"]["fallback"] is False
     assert "api key" in response.answer.lower() or "secrets" in response.answer.lower()
+
+
+def test_conversational_loop_refuses_top_risk_contributors_submit() -> None:
+    model = _ScriptedLoopModel(
+        [
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.GET_TOP_RISK_CONTRIBUTORS,
+                tool_args={"top_n": 5},
+                intent="contributors",
+                tool_call_id="call_top",
+                provider_response_id="resp_1",
+            )
+        ]
+    )
+    service = _service(model, rounds=2, tool_calls=1)
+
+    response = service.query(SAMPLE_PORTFOLIO, "Submit a contributors risk run")
+
+    assert model.complete_count == 1
+    assert model.continue_count == 0
+    assert response.tool_name is None
+    assert response.requires_clarification is True
+    assert response.data["assistant"]["mode"] == "model-routed"
+    assert "get_top_risk_contributors" in SIDE_EFFECTING_TOOLS

@@ -534,7 +534,8 @@ class PortfolioService:
         settings = self.ai_settings
         if (
             settings is not None
-            and settings.max_tool_rounds > 1
+            and settings.provider == "openai"
+            and settings.assistant_loop != "router"
             and hasattr(self.risk_assistant_model, "continue_after_tools")
         ):
             return self.query_engine.answer_with_bounded_assistant(
@@ -542,7 +543,8 @@ class PortfolioService:
                 portfolio,
                 self,
                 self.risk_assistant_model,
-                max_rounds=settings.max_tool_rounds,
+                max_rounds=settings.max_model_turns,
+                max_tool_calls=settings.max_tool_calls,
                 assistant_context=self._assistant_metadata_context(),
             )
         return self.query_engine.answer_with_model(

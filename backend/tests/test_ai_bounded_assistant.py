@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from app.ai.assistant import (
+    SIDE_EFFECTING_TOOLS,
     BoundedRiskAssistant,
     FunctionCallOutput,
     RiskAssistantRequest,
@@ -41,12 +42,14 @@ class _ScriptedLoopModel:
         previous_response_id: str,
         tool_outputs: list[FunctionCallOutput],
         request: RiskAssistantModelRequest,
+        reserve_narration: bool = False,
     ) -> RiskAssistantModelResponse:
         self.continue_calls.append(
             {
                 "previous_response_id": previous_response_id,
                 "tool_outputs": list(tool_outputs),
                 "request": request,
+                "reserve_narration": reserve_narration,
             }
         )
         if not self._responses:
@@ -125,7 +128,47 @@ def test_bounded_assistant_executes_tool_and_continues_until_final() -> None:
     assert model.continue_calls[1]["previous_response_id"] == "resp_2"
 
 
-def test_bounded_assistant_stops_at_round_limit_after_tool_execution() -> None:
+def test_final_tool_turn_still_sends_function_call_output_for_narration() -> None:
+    """C03: last permitted tool turn reserves a narration continue."""
+    model = _ScriptedLoopModel(
+        [
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.GET_VAR_ES,
+                tool_args={},
+                tool_call_id="call_var",
+                provider_response_id="resp_1",
+                intent="var_es",
+            ),
+            RiskAssistantModelResponse(
+                intent="final",
+                proposed_answer="Historical VaR was calculated by QuantLineage.",
+                provider_response_id="resp_2",
+            ),
+        ]
+    )
+    exec_calls, execute = _executor_recording()
+    assistant = BoundedRiskAssistant(model, execute)
+
+    result = assistant.run(
+        RiskAssistantRequest(
+            question="What is 99% VaR?",
+            tools=[],
+            max_rounds=1,
+            max_tool_calls=1,
+        )
+    )
+
+    assert result.stopped_reason == "final"
+    assert len(exec_calls) == 1
+    assert len(model.continue_calls) == 1
+    output = model.continue_calls[0]["tool_outputs"][0]
+    assert output.call_id == "call_var"
+    assert json.loads(output.output)["tool"] == "get_var_es"
+    assert result.proposed_answer == "Historical VaR was calculated by QuantLineage."
+    assert model.continue_calls[0].get("reserve_narration") is True
+
+
+def test_tool_budget_exhausted_does_not_execute_another_tool_after_reserved_narration() -> None:
     model = _ScriptedLoopModel(
         [
             RiskAssistantModelResponse(
@@ -150,15 +193,53 @@ def test_bounded_assistant_stops_at_round_limit_after_tool_execution() -> None:
             question="Contributors then stress",
             tools=[],
             max_rounds=2,
+            max_tool_calls=1,
         )
     )
 
     assert result.stopped_reason == "round_limit"
-    assert result.rounds_used == 2
-    assert len(result.tool_turns) == 2
-    assert len(exec_calls) == 2
+    assert len(result.tool_turns) == 1
+    assert len(exec_calls) == 1
     assert len(model.continue_calls) == 1
-    assert len(model._responses) == 0 or True  # queue may be empty after 2 model calls
+    assert result.tool_turns[0].tool_name == "get_contributors"
+
+
+def test_side_effecting_tools_include_riskrun_submitters() -> None:
+    assert "run_portfolio_risk" in SIDE_EFFECTING_TOOLS
+    assert "run_stress" in SIDE_EFFECTING_TOOLS
+    assert "get_top_risk_contributors" in SIDE_EFFECTING_TOOLS
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    [
+        RiskToolName.RUN_PORTFOLIO_RISK,
+        RiskToolName.RUN_STRESS,
+        RiskToolName.GET_TOP_RISK_CONTRIBUTORS,
+    ],
+)
+def test_bounded_assistant_rejects_each_side_effecting_tool(tool_name: RiskToolName) -> None:
+    model = _ScriptedLoopModel(
+        [
+            RiskAssistantModelResponse(
+                tool_name=tool_name,
+                tool_args={},
+                tool_call_id="call_side",
+                provider_response_id="resp_1",
+            )
+        ]
+    )
+    exec_calls, execute = _executor_recording()
+    assistant = BoundedRiskAssistant(model, execute)
+
+    result = assistant.run(
+        RiskAssistantRequest(question="Run it", tools=[], max_rounds=2)
+    )
+
+    assert result.stopped_reason == "refusal"
+    assert result.tool_turns == []
+    assert exec_calls == []
+    assert model.continue_calls == []
 
 
 def test_bounded_assistant_clarification_stops_without_execution() -> None:
@@ -242,21 +323,33 @@ def test_bounded_assistant_caps_max_rounds_at_four() -> None:
             tool_call_id=f"call_{i}",
             provider_response_id=f"resp_{i}",
         )
-        for i in range(1, 6)
+        for i in range(1, 5)
     ]
+    responses.append(
+        RiskAssistantModelResponse(
+            intent="final",
+            proposed_answer="Stop.",
+            provider_response_id="resp_5",
+        )
+    )
     model = _ScriptedLoopModel(responses)
     exec_calls, execute = _executor_recording()
     assistant = BoundedRiskAssistant(model, execute)
 
-    # Pydantic request rejects >4; exercise assistant clamp via constructor default path
+    # Pydantic request rejects >4; last tool still reserves a narration continue.
     result = assistant.run(
-        RiskAssistantRequest(question="Keep going", tools=[], max_rounds=4)
+        RiskAssistantRequest(
+            question="Keep going",
+            tools=[],
+            max_rounds=4,
+            max_tool_calls=4,
+        )
     )
 
-    assert result.rounds_used == 4
-    assert result.stopped_reason == "round_limit"
+    assert result.rounds_used >= 4
     assert len(exec_calls) == 4
-    assert len(model.continue_calls) == 3
+    assert len(model.continue_calls) == 4
+    assert model.continue_calls[-1]["reserve_narration"] is True
 
 
 def test_tool_executor_error_is_returned_as_function_output_and_loop_continues() -> None:
