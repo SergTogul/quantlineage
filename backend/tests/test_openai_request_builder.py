@@ -6,9 +6,9 @@ import json
 
 import pytest
 
+from app.ai.assistant import FunctionCallOutput
 from app.ai.config import DEFAULT_MAX_OUTPUT_TOKENS, AISettings
 from app.ai.policy import ASSISTANT_POLICY_INSTRUCTION, ASSISTANT_POLICY_VERSION
-from app.ai.assistant import FunctionCallOutput
 from app.ai.request_builder import (
     OpenAIResponsesRequest,
     build_openai_continue_request,
