@@ -350,7 +350,7 @@ Evidence:
 
 ## C06 — Correct and type the position-Greeks tool
 
-- [ ] Make Greek ranking quantitatively meaningful and auditable.
+- [x] Make Greek ranking quantitatively meaningful and auditable.
 
 Dependencies: C01
 

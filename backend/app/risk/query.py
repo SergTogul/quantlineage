@@ -389,13 +389,21 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
         name=RiskToolName.GET_POSITION_GREEKS,
         description=(
             "Rank positions by a valuation Greek from PricingEngine "
-            "(delta, gamma, vega, dv01, or fx_delta). Not component VaR contributors."
+            "(delta, gamma, vega, dv01, or fx_delta). Use options_only or "
+            "instrument_types to restrict families. Not component VaR contributors."
         ),
         service_method="position_greeks",
         required_inputs=["portfolio"],
         returns=["PositionGreeksReport"],
         numeric_source="deterministic PortfolioService.position_greeks from Valuation",
-        provenance_fields=["portfolio_id", "market_snapshot_id", "greek"],
+        provenance_fields=[
+            "portfolio_id",
+            "market_snapshot_id",
+            "greek",
+            "unit",
+            "convention",
+            "pricing_engine",
+        ],
     ),
 }
 
@@ -635,7 +643,7 @@ class RiskQueryEngine:
             return RiskQueryPlan(
                 intent="position_greeks",
                 tool_name=RiskToolName.GET_POSITION_GREEKS,
-                tool_args={"greek": greek},
+                tool_args=_position_greeks_tool_args(q, greek),
             )
         if _is_advisory(q):
             return _clarification_plan(
@@ -1895,6 +1903,13 @@ def _infer_position_greek(question: str) -> str | None:
     if re.search(r"\bfx[_\s-]?delta\b", question, re.I):
         return "fx_delta"
     return "delta"
+
+
+def _position_greeks_tool_args(question: str, greek: str) -> dict[str, Any]:
+    args: dict[str, Any] = {"greek": greek}
+    if re.search(r"\boptions?\b", question, re.I):
+        args["options_only"] = True
+    return args
 
 
 def _tool_args_oversized(args: dict[str, Any] | None) -> bool:

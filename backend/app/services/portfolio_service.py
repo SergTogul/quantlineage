@@ -114,6 +114,36 @@ _LABEL_HANDLERS = MappingProxyType(
     }
 )
 
+_GREEK_REPORT_META = MappingProxyType(
+    {
+        "delta": {
+            "unit": "currency",
+            "convention": "cash_delta",
+            "scale": "S * dV/dS",
+        },
+        "gamma": {
+            "unit": "currency",
+            "convention": "dollar_gamma",
+            "scale": "S^2 * d2V/dS2",
+        },
+        "vega": {
+            "unit": "currency",
+            "convention": "pnl_per_vol_point",
+            "scale": "P&L per 0.01 vol",
+        },
+        "dv01": {
+            "unit": "currency",
+            "convention": "pnl_per_bp",
+            "scale": "P&L for +1bp",
+        },
+        "fx_delta": {
+            "unit": "currency",
+            "convention": "cash_fx_delta",
+            "scale": "S * dV/dS_fx",
+        },
+    }
+)
+
 
 def position_label(position: Position) -> str:
     """Human-readable trade label that distinguishes instrument type."""
@@ -610,36 +640,79 @@ class PortfolioService:
         *,
         greek: str = "delta",
         top_n: int = 5,
+        options_only: bool = False,
+        instrument_types: list[str] | None = None,
+        ranking_basis: str = "abs_value",
     ) -> dict:
-        """Rank positions by a Valuation Greek from the pricing engine."""
+        """Rank positions by a Valuation Greek from the pricing engine.
+
+        Conventions match ``app.risk.sensitivities`` / Builtin+QuantLib adapters:
+        cash delta ``S·∂V/∂S``; dollar gamma ``S²·∂²V/∂S²``; vega as P&L per
+        1 vol point (``0.01``); DV01 as P&L for +1bp; cash FX delta.
+        """
         allowed = {"delta", "gamma", "vega", "dv01", "fx_delta"}
         if greek not in allowed:
             raise ValueError(f"unsupported greek: {greek!r}")
+        if ranking_basis != "abs_value":
+            raise ValueError(f"unsupported ranking_basis: {ranking_basis!r}")
+        meta = _GREEK_REPORT_META[greek]
+        option_families = {
+            "european_option",
+            "fx_option",
+            "cap_floor",
+            "swaption",
+        }
+        allowed_types: set[str] | None = None
+        if instrument_types:
+            allowed_types = set(instrument_types)
+        if options_only:
+            allowed_types = (
+                option_families
+                if allowed_types is None
+                else allowed_types & option_families
+            )
+
         market = self.market_snapshot(portfolio)
         valuations = self.pricing.value_portfolio(portfolio, market)
         labels = {p.id: position_label(p) for p in portfolio.positions}
+        types = {p.id: getattr(p, "type", "unknown") for p in portfolio.positions}
         rows: list[dict] = []
         for valuation in valuations:
+            instrument_type = types.get(valuation.position_id, "unknown")
+            if allowed_types is not None and instrument_type not in allowed_types:
+                continue
             amount = float(getattr(valuation, greek))
             rows.append(
                 {
                     "position_id": valuation.position_id,
                     "label": labels.get(valuation.position_id, valuation.position_id),
+                    "instrument_type": instrument_type,
                     "greek": greek,
                     "value": amount,
+                    "unit": meta["unit"],
+                    "convention": meta["convention"],
                     "market_value": float(valuation.market_value),
                 }
             )
         rows.sort(key=lambda row: abs(float(row["value"])), reverse=True)
-        top = rows[: max(1, int(top_n))]
+        top = rows[: max(1, int(top_n))] if rows else []
         total_abs = sum(abs(float(row["value"])) for row in rows) or 1.0
         for row in top:
             row["share_pct"] = 100.0 * abs(float(row["value"])) / total_abs
+        engine_name = type(self.pricing).__name__
         return {
             "greek": greek,
+            "unit": meta["unit"],
+            "convention": meta["convention"],
+            "scale": meta["scale"],
+            "ranking_basis": ranking_basis,
+            "options_only": bool(options_only),
+            "instrument_types": sorted(allowed_types) if allowed_types is not None else None,
             "positions": top,
             "portfolio_id": portfolio.id,
             "market_snapshot_id": getattr(market, "id", None),
+            "pricing_engine": engine_name,
+            "pricing_model": engine_name,
         }
 
     def limits(self, portfolio: Portfolio):

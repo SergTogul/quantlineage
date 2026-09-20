@@ -133,6 +133,7 @@ class GetRunProvenanceArgs(BaseModel):
 
 
 PositionGreekName = Literal["delta", "gamma", "vega", "dv01", "fx_delta"]
+GreekRankingBasis = Literal["abs_value"]
 
 
 class GetPositionGreeksArgs(BaseModel):
@@ -142,6 +143,8 @@ class GetPositionGreeksArgs(BaseModel):
 
     greek: PositionGreekName = "delta"
     top_n: int = Field(default=5, ge=1, le=50)
+    options_only: bool = False
+    ranking_basis: GreekRankingBasis = "abs_value"
 
 
 C1_ARG_MODELS: dict[str, type[BaseModel]] = {
@@ -314,6 +317,8 @@ def execute_allowlisted_tool(
                 portfolio,
                 greek=args.get("greek", "delta"),
                 top_n=args.get("top_n", 5),
+                options_only=args.get("options_only", False),
+                ranking_basis=args.get("ranking_basis", "abs_value"),
             )
         )
     if tool_name == "get_portfolio_summary":
