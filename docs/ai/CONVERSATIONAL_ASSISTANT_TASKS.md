@@ -474,7 +474,7 @@ Evidence:
 
 ## C09 — Convert the Risk Query UI into a chat transcript
 
-- [ ] Add multi-turn conversational UX without exposing implementation internals.
+- [x] Add multi-turn conversational UX without exposing implementation internals.
 
 Dependencies: C07, C08
 
@@ -505,6 +505,18 @@ npx playwright test tests/risk-query.spec.ts
 ```
 
 Evidence:
+
+- Product HEAD: `31e6169`. Risk Query keeps a transcript of user/assistant turns, retains `conversation_id` on follow-ups, and renders compact expandable tool activity (label, status, provenance link, structured result). Mode badges use `assistant.mode` (`AI-narrated` / `AI-routed`). Clarification is an assistant turn. Loading, cancel, retry, fallback, and partial/truncated states are distinct. New conversation clears local state. No schemas, CoT, model names, or credentials in the UI. Deterministic worst-stress E2E still passes.
+- Checks (2026-09-20), fresh:
+  ```
+  cd /workspace/frontend
+  npm test -- --run src/components/RiskQuery.test.jsx
+  npm run lint
+  npm run build
+  cd /workspace/e2e
+  QUANTLINEAGE_E2E_UVICORN="python3 -m uvicorn" PLAYWRIGHT_USE_CHROMIUM=1 npx playwright test tests/risk-query.spec.ts
+  ```
+  → vitest **12 passed** (1 file); eslint exit **0**; vite build exit **0**; Playwright **1 passed**.
 
 ## C10 — Add conversational and adversarial evaluations
 
