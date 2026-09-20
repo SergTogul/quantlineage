@@ -999,17 +999,28 @@ class RiskQueryEngine:
                 requires_clarification=True,
             )
         if _is_greeks_question(" ".join(question.strip().split()).lower()):
-            return RiskQueryResponse(
-                intent="unsupported",
-                answer=_GREEKS_UNSUPPORTED_ANSWER,
-                data={
-                    "tool_contract": None,
-                    "tool_result": None,
-                    "supported_tools": tool_contract_schemas(),
-                    "assistant": assistant_meta,
-                },
-                tool_name=None,
-                requires_clarification=True,
+            greek = _infer_position_greek(" ".join(question.strip().split()).lower())
+            if greek is None:
+                return RiskQueryResponse(
+                    intent="unsupported",
+                    answer=_GREEKS_UNSUPPORTED_ANSWER,
+                    data={
+                        "tool_contract": None,
+                        "tool_result": None,
+                        "supported_tools": tool_contract_schemas(),
+                        "assistant": assistant_meta,
+                    },
+                    tool_name=None,
+                    requires_clarification=True,
+                )
+            return self._grounded_tool_response(
+                intent="position_greeks",
+                tool_name=RiskToolName.GET_POSITION_GREEKS,
+                portfolio=portfolio,
+                service=service,
+                args={"greek": greek},
+                principal=principal,
+                extra_data={"assistant": assistant_meta},
             )
 
         executed: list[str] = []
