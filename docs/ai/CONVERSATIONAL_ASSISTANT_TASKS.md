@@ -520,7 +520,7 @@ Evidence:
 
 ## C10 — Add conversational and adversarial evaluations
 
-- [ ] Prove the assistant is useful, grounded, and safe over multiple turns.
+- [x] Prove the assistant is useful, grounded, and safe over multiple turns.
 
 Dependencies: C04–C09
 
@@ -559,6 +559,14 @@ python3 -m pytest tests/test_ai_conversational_evals.py tests/test_ai_security.p
 ```
 
 Evidence:
+
+- Product HEAD: `770eb4b` (`tests/test_ai_conversational_evals.py`). Network-free suite counts: **10** single-tool narrated, **8** multi-tool investigations, **8** follow-ups (100% intent/tool-selection), **6** option/Greek filter, **8** numeric-grounding attacks, **6** timeout/fallback (no replay), **6** prompt-injection/secret, **4** cross-principal. Thresholds documented in the module: follow-up/tool-selection/grounding = 1.0. Secrets/raw exceptions stay off client payloads.
+- Checks (2026-09-20, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_conversational_evals.py tests/test_ai_security.py -q
+  ```
+  → **79 passed**, 1 warning, exit code **0** (1.79s).
 
 ## C11 — Align configuration, documentation, and PR scope
 
