@@ -540,7 +540,7 @@ Evidence:
 
 Evidence:
 
-- Commit pending — `backend/tests/test_ai_multi_tool_evals.py` table-driven bounded sequences for compare/provenance/contributors/limits/stress plus grounding and side-effect refusals.
+- Commit `ddb816b` — `backend/tests/test_ai_multi_tool_evals.py` table-driven bounded sequences for compare/provenance/contributors/limits/stress plus grounding and side-effect refusals.
 - Checks: `cd backend && python3 -m pytest tests/test_ai_multi_tool_evals.py -q` → 12 passed.
 
 ### T24 — Evaluate new direct QuantLib tools
