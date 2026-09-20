@@ -531,6 +531,20 @@ class PortfolioService:
     def query(self, portfolio, question):
         if self.risk_assistant_model is None:
             return self.query_engine.answer(question, portfolio, self)
+        settings = self.ai_settings
+        if (
+            settings is not None
+            and settings.max_tool_rounds > 1
+            and hasattr(self.risk_assistant_model, "continue_after_tools")
+        ):
+            return self.query_engine.answer_with_bounded_assistant(
+                question,
+                portfolio,
+                self,
+                self.risk_assistant_model,
+                max_rounds=settings.max_tool_rounds,
+                assistant_context=self._assistant_metadata_context(),
+            )
         return self.query_engine.answer_with_model(
             question,
             portfolio,

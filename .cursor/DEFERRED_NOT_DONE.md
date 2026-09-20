@@ -12,5 +12,4 @@ T20–T24 were historically labeled “deferred” and were **not** complete unt
 
 Optional follow-ups (not blocking the PR#4 task queue):
 
-- Wire `BoundedRiskAssistant` into HTTP `answer_with_model` when `AI_MAX_TOOL_ROUNDS > 1`
 - Implement `get_position_greeks` per the T24 decision (separate change)

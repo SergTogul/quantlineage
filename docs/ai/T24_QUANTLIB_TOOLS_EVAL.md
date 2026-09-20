@@ -77,4 +77,3 @@ Do not add assistant-facing curve dump tools unless a later investigation use ca
 ## Follow-up (out of T24 / optional)
 
 1. Spec + implement `get_position_greeks` (preferred name) behind `TOOL_CONTRACTS`.
-2. Optionally wire `BoundedRiskAssistant` into `answer_with_model` when `AI_MAX_TOOL_ROUNDS > 1` (library already exists from T21–T22).

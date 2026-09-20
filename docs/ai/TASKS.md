@@ -506,8 +506,8 @@ Evidence:
 **CRITICAL (historical):** “Deferred” did **not** mean complete while unchecked.
 T20–T24 are now checked with evidence below. The first-release gate (T00–T15)
 remains the production default; multi-tool investigation lives behind
-`AI_MAX_TOOL_ROUNDS` / `BoundedRiskAssistant` until optionally wired into the
-HTTP path.
+`AI_MAX_TOOL_ROUNDS` / `BoundedRiskAssistant`. The HTTP query path uses the
+bounded loop when `AI_MAX_TOOL_ROUNDS` is `2`–`4` (default remains `1`).
 
 ### T20 — Introduce the multi-tool assistant interface
 
