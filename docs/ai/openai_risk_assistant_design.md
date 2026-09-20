@@ -1,8 +1,15 @@
 # OpenAI Risk Assistant — Design
 
-Status: Proposed  
+Status: Proposed (milestone 1 shipped; conversational contract in ADR 009)  
 Target repository: QuantLineage  
-Last updated: 2026-09-18
+Last updated: 2026-09-20
+
+The first-release one-shot router described below remains the **implemented**
+OpenAI path as of C00. The corrective conversational contract — model-led
+`function_call_output` continuation, truthful assistant modes, provider-neutral
+conversation ids, typed grounding manifests, and filtered position Greeks — is
+frozen in [`docs/adr/009-grounded-conversational-risk-assistant.md`](../adr/009-grounded-conversational-risk-assistant.md)
+and implemented by tasks C02–C12. ADR 006 still forbids model arithmetic.
 
 ## Decision summary
 

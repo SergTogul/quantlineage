@@ -153,5 +153,6 @@ The release gate must prove:
 - [OpenAI function calling](https://developers.openai.com/api/docs/guides/function-calling)
 - [OpenAI conversation state](https://developers.openai.com/api/docs/guides/conversation-state)
 - `docs/adr/006-llm-orchestrates-not-calculates.md`
+- `docs/adr/009-grounded-conversational-risk-assistant.md` (C01 conversational contract)
 - `docs/ai/openai_risk_assistant_design.md`
 - `docs/ai/CONVERSATIONAL_ASSISTANT_TASKS.md`
