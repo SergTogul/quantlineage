@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   askRisk, compareHedge, evaluateCustomScenario, reverseStress, reverseStressMulti,
 } from '../api'
@@ -399,7 +399,7 @@ function QueryFieldList({ title, source, fields, testId }) {
   const rows = presentQueryFields(source, fields)
   if (!rows.length) return null
   return (
-    <section className="risk-query-fields" data-testid={testId}>
+    <section className="risk-query-fields" data-testid={testId} id={testId}>
       <h4>{title}</h4>
       <dl>
         {rows.map(([key, label, value]) => (
@@ -462,11 +462,11 @@ function formatRiskQueryInline(paragraph) {
   )
 }
 
-function RiskQueryAnswer({ answer }) {
+function RiskQueryAnswer({ answer, testId = 'risk-query-answer' }) {
   const paragraphs = splitRiskQueryParagraphs(answer)
   if (!paragraphs.length) return null
   return (
-    <div className="query-answer" data-testid="risk-query-answer">
+    <div className="query-answer" data-testid={testId}>
       {paragraphs.map((paragraph, index) => (
         <p key={`p-${index}`} className="query-answer-p">
           {formatRiskQueryInline(paragraph)}
@@ -478,7 +478,7 @@ function RiskQueryAnswer({ answer }) {
 
 function RiskQueryAssistantState({ assistant }) {
   if (!isRiskQueryAssistantMeta(assistant)) return null
-  if (assistant.fallback) {
+  if (assistant.fallback || assistant.mode === 'fallback') {
     return (
       <p
         className="muted foot"
@@ -489,14 +489,54 @@ function RiskQueryAssistantState({ assistant }) {
       </p>
     )
   }
-  if (assistant.provider === 'openai') {
-    return (
-      <p className="eyebrow" data-testid="risk-query-assistant-state">
-        AI-routed
-      </p>
-    )
-  }
-  return null
+  const label = (
+    assistant.mode === 'model-narrated'
+      ? 'AI-narrated'
+      : assistant.mode === 'model-routed'
+        ? 'AI-routed'
+        : assistant.mode === 'preflight-refused'
+          ? 'Request refused'
+          : null
+  )
+  if (!label) return null
+  return (
+    <p className="eyebrow" data-testid="risk-query-assistant-state">
+      {label}
+    </p>
+  )
+}
+
+function RiskQueryToolActivity({ turns }) {
+  if (!Array.isArray(turns) || turns.length === 0) return null
+  return (
+    <div className="risk-query-tools" data-testid="risk-query-tool-activity">
+      {turns.map((turn, index) => {
+        const name = String(turn?.tool_name || 'tool')
+        const status = String(turn?.status || 'unknown')
+        const payload = turn?.result ?? turn?.error ?? null
+        return (
+          <details key={`${name}-${index}`} className="risk-query-tool">
+            <summary>
+              <span>{name}</span>
+              <span className="muted"> {status}</span>
+              {hasCopiedObject(turn?.provenance) ? (
+                <a className="risk-query-tool-provenance" href="#risk-query-provenance">
+                  Provenance
+                </a>
+              ) : null}
+            </summary>
+            {payload != null && (
+              <pre className="risk-query-tool-result">{JSON.stringify(payload, null, 2)}</pre>
+            )}
+          </details>
+        )
+      })}
+    </div>
+  )
+}
+
+function isAbortError(error) {
+  return error?.name === 'AbortError' || error?.code === 20
 }
 
 export function RiskQuery({ portfolio }) {
@@ -504,17 +544,62 @@ export function RiskQuery({ portfolio }) {
   const [r, setR] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [cancelled, setCancelled] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [conversationId, setConversationId] = useState(null)
+  const [lastQuestion, setLastQuestion] = useState('')
+  const abortRef = useRef(null)
+
+  function resetConversation() {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setMessages([])
+    setConversationId(null)
+    setR(null)
+    setError('')
+    setCancelled(false)
+    setLastQuestion('')
+    setBusy(false)
+  }
 
   async function submit(question) {
-    setQ(question)
+    const text = String(question || '').trim()
+    if (!text || busy) return
+    setQ(text)
+    setLastQuestion(text)
     setBusy(true)
     setError('')
+    setCancelled(false)
+    setMessages((current) => [...current, { role: 'user', text }])
+    const controller = new AbortController()
+    abortRef.current = controller
     try {
-      setR(await askRisk(portfolio, question))
+      const response = await askRisk(portfolio, text, {
+        conversationId,
+        signal: controller.signal,
+      })
+      const nextId = response?.data?.conversation_id || conversationId
+      if (nextId) setConversationId(nextId)
+      setR(response)
+      setMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          answer: response?.answer || '',
+          data: response?.data || {},
+          requiresClarification: Boolean(response?.requires_clarification),
+        },
+      ])
     } catch (e) {
-      setR(null)
-      setError(e.message || 'Query failed')
+      if (isAbortError(e)) {
+        setCancelled(true)
+        setMessages((current) => current.slice(0, -1))
+      } else {
+        setR(null)
+        setError(e.message || 'Query failed')
+      }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null
       setBusy(false)
     }
   }
@@ -522,6 +607,9 @@ export function RiskQuery({ portfolio }) {
   const card = r?.data?.card
   const provenance = r?.data?.provenance
   const assistant = r?.data?.assistant
+  const truncated = Boolean(r?.data?.investigation?.truncated)
+  const lastAssistantIndex = [...messages].reverse().findIndex((m) => m.role === 'assistant')
+  const lastAssistantAbs = lastAssistantIndex === -1 ? -1 : messages.length - 1 - lastAssistantIndex
 
   return (
     <div className="card risk-query-panel" data-testid="golden-demo-risk-query">
@@ -546,11 +634,35 @@ export function RiskQuery({ portfolio }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              submit(q)
+            }
+          }}
           aria-label="Risk question"
           disabled={busy}
         />
         <button type="button" disabled={busy} onClick={() => submit(q)}>
           {busy ? 'Asking…' : 'Ask'}
+        </button>
+        {busy && (
+          <button type="button" onClick={() => abortRef.current?.abort()}>
+            Cancel
+          </button>
+        )}
+        {!busy && error && lastQuestion && (
+          <button type="button" onClick={() => submit(lastQuestion)}>
+            Retry
+          </button>
+        )}
+        {!busy && truncated && (
+          <button type="button" onClick={() => submit(lastQuestion)}>
+            Retry
+          </button>
+        )}
+        <button type="button" onClick={resetConversation} disabled={busy}>
+          New conversation
         </button>
       </div>
       {busy && (
@@ -559,8 +671,42 @@ export function RiskQuery({ portfolio }) {
           <span>Waiting for risk answer…</span>
         </div>
       )}
-      {error && <p className="error">{error}</p>}
-      {!busy && r && (
+      {cancelled && (
+        <p className="muted" data-testid="risk-query-cancelled" role="status">
+          Request cancelled.
+        </p>
+      )}
+      {error && <p className="error" data-testid="risk-query-error">{error}</p>}
+      {truncated && (
+        <p className="muted" data-testid="risk-query-partial" role="status">
+          Partial result — the investigation stopped before a final answer.
+        </p>
+      )}
+      {messages.length > 0 && (
+        <ol className="risk-query-transcript" data-testid="risk-query-transcript" aria-label="Conversation">
+          {messages.map((message, index) => (
+            <li
+              key={`${message.role}-${index}`}
+              className={`risk-query-turn risk-query-turn-${message.role}`}
+            >
+              <span className="eyebrow">{message.role === 'user' ? 'You' : 'Assistant'}</span>
+              {message.role === 'user' ? (
+                <p>{message.text}</p>
+              ) : (
+                <>
+                  <RiskQueryAssistantState assistant={message.data?.assistant} />
+                  <RiskQueryAnswer
+                    answer={message.answer}
+                    testId={index === lastAssistantAbs ? 'risk-query-answer' : undefined}
+                  />
+                  <RiskQueryToolActivity turns={message.data?.investigation?.turns} />
+                </>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+      {!busy && r && messages.length === 0 && (
         <div className="query-result">
           <RiskQueryAssistantState assistant={assistant} />
           <RiskQueryAnswer answer={r.answer} />

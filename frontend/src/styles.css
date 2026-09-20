@@ -318,3 +318,30 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
 @keyframes risk-query-spin{
   to{transform:rotate(360deg)}
 }
+.risk-query-transcript{
+  list-style:none;
+  margin:14px 0 0;
+  padding:0;
+  display:grid;
+  gap:12px;
+}
+.risk-query-turn{
+  margin:0;
+  padding:10px 12px;
+  background:var(--well);
+  border:1px solid var(--well-line);
+  border-radius:7px;
+}
+.risk-query-turn p{margin:6px 0 0}
+.risk-query-tools{margin-top:8px}
+.risk-query-tool{margin-top:6px}
+.risk-query-tool summary{cursor:pointer;font-size:13px;font-weight:600}
+.risk-query-tool-provenance{margin-left:10px;font-weight:600}
+.risk-query-tool-result{
+  margin:8px 0 0;
+  padding:8px;
+  overflow:auto;
+  max-height:180px;
+  font-size:12px;
+  background:var(--inset);
+}

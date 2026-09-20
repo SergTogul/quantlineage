@@ -247,5 +247,133 @@ describe('RiskQuery', () => {
     expect(answer).toHaveTextContent(/Provide two completed RiskRun identifiers/i)
     expect(answer.textContent).not.toMatch(/\d/)
     expect(screen.queryByTestId('risk-query-result-card')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('risk-query-error')).not.toBeInTheDocument()
+    expect(screen.getByTestId('risk-query-transcript')).toHaveTextContent(/Why did VaR change\?/)
+  })
+
+  it('renders a transcript, keeps conversation_id, and compact tool activity', async () => {
+    const seen = []
+    queryHandler((body) => {
+      seen.push(body)
+      if (!body.conversation_id) {
+        return {
+          answer: 'Options delta ranking was calculated by QuantLineage.',
+          data: {
+            conversation_id: 'conv_ui_1',
+            assistant: { provider: 'openai', model: 'gpt-test', mode: 'model-narrated', fallback: false },
+            investigation: {
+              rounds_used: 2,
+              stopped_reason: 'final',
+              tool_names: ['get_position_greeks'],
+              turns: [
+                {
+                  tool_name: 'get_position_greeks',
+                  tool_args: { greek: 'delta', options_only: true },
+                  status: 'success',
+                  result: { greek: 'delta', positions: [{ position_id: 'opt-1', value: 12 }] },
+                  grounding_manifest: [],
+                  provenance: { portfolio_id: 'demo' },
+                },
+              ],
+            },
+          },
+        }
+      }
+      return {
+        answer: 'Options gamma ranking was calculated by QuantLineage.',
+        data: {
+          conversation_id: body.conversation_id,
+          assistant: { provider: 'openai', model: 'gpt-test', mode: 'model-narrated', fallback: false },
+          investigation: {
+            rounds_used: 2,
+            stopped_reason: 'final',
+            tool_names: ['get_position_greeks'],
+            turns: [
+              {
+                tool_name: 'get_position_greeks',
+                tool_args: { greek: 'gamma', options_only: true },
+                status: 'success',
+                result: { greek: 'gamma', positions: [{ position_id: 'opt-1', value: 0.4 }] },
+                grounding_manifest: [],
+                provenance: { portfolio_id: 'demo' },
+              },
+            ],
+          },
+        },
+      }
+    })
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+    expect(await screen.findByTestId('risk-query-transcript')).toHaveTextContent('Top contributors?')
+    expect(screen.getByTestId('risk-query-assistant-state')).toHaveTextContent('AI-narrated')
+    expect(screen.getByTestId('risk-query-tool-activity')).toHaveTextContent('get_position_greeks')
+    expect(screen.getByTestId('risk-query-tool-activity')).toHaveTextContent(/success/i)
+    expect(screen.queryByText(/supported_tools/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/chain.of.thought/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/sk-secret/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('gpt-test')).not.toBeInTheDocument()
+
+    await user.clear(screen.getByRole('textbox', { name: 'Risk question' }))
+    await user.type(screen.getByRole('textbox', { name: 'Risk question' }), 'What about gamma?')
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(seen).toHaveLength(2))
+    expect(seen[1].conversation_id).toBe('conv_ui_1')
+    expect(seen[1].question).toBe('What about gamma?')
+    const transcript = screen.getByTestId('risk-query-transcript')
+    expect(transcript).toHaveTextContent('Top contributors?')
+    expect(transcript).toHaveTextContent('What about gamma?')
+    expect(transcript).toHaveTextContent(/gamma ranking/i)
+  })
+
+  it('New conversation clears local state so the next ask has no conversation_id', async () => {
+    const seen = []
+    queryHandler((body) => {
+      seen.push(body)
+      return {
+        answer: 'Historical VaR is 32,798.',
+        data: { conversation_id: body.conversation_id || 'conv_keep' },
+      }
+    })
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+    await screen.findByTestId('risk-query-transcript')
+    await user.click(screen.getByRole('button', { name: 'New conversation' }))
+    expect(screen.queryByTestId('risk-query-transcript')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show USD 10Y KR-DV01.' }))
+    await waitFor(() => expect(seen).toHaveLength(2))
+    expect(seen[1].conversation_id).toBeUndefined()
+  })
+
+  it('exposes cancel, retry, and partial-result states distinctly', async () => {
+    let resolveRequest
+    const pending = new Promise((resolve) => {
+      resolveRequest = resolve
+    })
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/query`, async () => {
+        await pending
+        return HttpResponse.json({
+          answer: 'The investigation stopped after a provider error.',
+          requires_clarification: true,
+          data: {
+            conversation_id: 'conv_partial',
+            assistant: { provider: 'openai', mode: 'fallback', fallback: true },
+            investigation: { truncated: true, turns: [{ tool_name: 'get_var_es', status: 'success', tool_args: {}, result: {} }] },
+          },
+        })
+      }),
+    )
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Top contributors?' }))
+    expect(await screen.findByRole('button', { name: 'Cancel' })).toBeEnabled()
+    resolveRequest()
+    expect(await screen.findByTestId('risk-query-partial')).toHaveTextContent(/partial/i)
+    expect(screen.getByTestId('risk-query-assistant-fallback')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled()
   })
 })
