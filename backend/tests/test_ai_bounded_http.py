@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from app.ai.assistant import SIDE_EFFECTING_TOOLS
@@ -122,6 +123,12 @@ def test_default_conversational_http_continues_after_one_tool() -> None:
     assert response.tool_name == "get_var_es"
     assert response.data["investigation"]["tool_names"] == ["get_var_es"]
     assert response.data["investigation"]["narration_grounded"] is True
+    turns = response.data["investigation"]["turns"]
+    assert [turn["tool_name"] for turn in turns] == ["get_var_es"]
+    assert turns[0]["status"] == "success"
+    assert turns[0]["result"] is not None
+    assert turns[0]["grounding_manifest"]
+    assert response.data["tool_result"] == turns[0]["result"]
     assert response.data["assistant"]["mode"] == "model-narrated"
     assert response.data["assistant"]["fallback"] is False
 
@@ -164,6 +171,24 @@ def test_multi_round_http_executes_tools_and_continues() -> None:
     assert "assistant" in response.data
     assert response.data["assistant"]["mode"] == "model-narrated"
     assert response.data["assistant"]["fallback"] is False
+    turns = response.data["investigation"]["turns"]
+    assert [turn["tool_name"] for turn in turns] == ["get_var_es", "get_limits"]
+    assert turns[0]["status"] == "success"
+    assert turns[1]["status"] == "success"
+    assert turns[0]["result"] is not None
+    assert turns[1]["result"] is not None
+    assert turns[0]["result"] != turns[1]["result"]
+    assert response.data["tool_result"] == turns[1]["result"]
+    assert turns[0]["grounding_manifest"]
+    assert turns[1]["grounding_manifest"]
+    assert turns[0]["provenance"]
+    blob = json.dumps(response.model_dump(mode="json"))
+    assert "resp_1" not in blob
+    assert "resp_2" not in blob
+    assert "resp_3" not in blob
+    assert "provider_response_id" not in blob
+    assert "OPENAI_API_KEY" not in blob
+    assert "traceback" not in blob.lower()
 
 
 def test_ungrounded_http_narration_falls_back_to_deterministic_formatter() -> None:
@@ -219,6 +244,11 @@ def test_provider_error_after_a_tool_does_not_replay() -> None:
     assert model.continue_count == 1
     assert response.requires_clarification is True
     assert response.data["investigation"]["truncated"] is True
+    turns = response.data["investigation"]["turns"]
+    assert [turn["tool_name"] for turn in turns] == ["get_var_es"]
+    assert turns[0]["status"] == "success"
+    assert turns[0]["result"] is not None
+    assert "resp_1" not in json.dumps(response.model_dump(mode="json"))
     assert response.data["assistant"]["mode"] == "fallback"
     assert response.data["assistant"]["fallback"] is True
     assert "not replayed" in response.answer.lower()

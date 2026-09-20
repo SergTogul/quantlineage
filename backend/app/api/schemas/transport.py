@@ -108,6 +108,59 @@ class RiskQueryAssistantMetadata(BaseModel):
     fallback: bool
 
 
+class GroundingClaimWire(BaseModel):
+    """Client-safe quantitative claim from a successful tool result."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    metric: str
+    value: float
+    unit: str
+    sign_convention: str | None = None
+    entity_id: str | None = None
+    source_tool: str | None = None
+    field_path: str
+    snapshot_or_run_id: str | None = None
+    allow_percent_from_fraction: bool = False
+
+
+class InvestigationTurnError(BaseModel):
+    """Typed safe tool error (no raw exception text)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    retryable: bool
+    message: str
+
+
+class InvestigationTurn(BaseModel):
+    """One executed tool turn returned to the client."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tool_name: str
+    tool_args: dict[str, Any] = Field(default_factory=dict)
+    status: Literal["success", "error"]
+    result: dict[str, Any] | None = None
+    error: InvestigationTurnError | None = None
+    grounding_manifest: list[GroundingClaimWire] = Field(default_factory=list)
+    provenance: dict[str, Any] = Field(default_factory=dict)
+
+
+class RiskQueryInvestigation(BaseModel):
+    """Ordered investigation for a conversational risk-query turn."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rounds_used: int = Field(ge=0)
+    stopped_reason: str
+    tool_names: list[str] = Field(default_factory=list)
+    narration_grounded: bool | None = None
+    truncated: bool | None = None
+    turns: list[InvestigationTurn] = Field(default_factory=list)
+
+
 class RiskQueryResponse(BaseModel):
     intent: str
     answer: str
@@ -121,6 +174,9 @@ class RiskQueryResponse(BaseModel):
         assistant = value.get("assistant")
         if assistant is not None:
             RiskQueryAssistantMetadata.model_validate(assistant)
+        investigation = value.get("investigation")
+        if investigation is not None:
+            RiskQueryInvestigation.model_validate(investigation)
         return value
 
 

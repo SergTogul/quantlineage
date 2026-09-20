@@ -996,6 +996,7 @@ class RiskQueryEngine:
             )
 
         executed: list[str] = []
+        executed_turns: list[dict[str, Any]] = []
 
         def _execute(tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
             name = RiskToolName(tool_name)
@@ -1007,6 +1008,14 @@ class RiskQueryEngine:
                 principal=principal,
             )
             executed.append(tool_name)
+            executed_turns.append(
+                _investigation_turn_payload(
+                    tool_name=tool_name,
+                    tool_args=dict(tool_args or {}),
+                    result=payload,
+                    error=None,
+                )
+            )
             return payload
 
         assistant = BoundedRiskAssistant(model, _execute)
@@ -1036,6 +1045,7 @@ class RiskQueryEngine:
                         mode="fallback",
                         fallback=True,
                     ),
+                    executed_turns=executed_turns,
                 )
             fallback_response = self.answer(
                 question, portfolio, service, principal=principal
@@ -1056,12 +1066,7 @@ class RiskQueryEngine:
             mode=assistant_mode,
             fallback=False,
         )
-        investigation = {
-            "rounds_used": result.rounds_used,
-            "stopped_reason": result.stopped_reason,
-            "tool_names": [turn.tool_name for turn in result.tool_turns],
-            "narration_grounded": result.narration_grounded,
-        }
+        investigation = _investigation_from_result(result)
         extra = {"assistant": assistant_meta, "investigation": investigation}
 
         if result.requires_clarification and not any(
@@ -1143,8 +1148,21 @@ class RiskQueryEngine:
         *,
         executed_tools: list[str],
         assistant_meta: dict[str, Any],
+        executed_turns: list[dict[str, Any]] | None = None,
     ) -> RiskQueryResponse:
         """Stop after tools already ran; never replay a fallback router."""
+        from app.api.schemas.transport import RiskQueryInvestigation
+
+        investigation = RiskQueryInvestigation.model_validate(
+            {
+                "rounds_used": len(executed_tools),
+                "stopped_reason": "round_limit",
+                "tool_names": list(executed_tools),
+                "narration_grounded": None,
+                "truncated": True,
+                "turns": executed_turns or [],
+            }
+        ).model_dump(mode="json")
         return RiskQueryResponse(
             intent="unsupported",
             answer=(
@@ -1156,13 +1174,7 @@ class RiskQueryEngine:
                 "tool_result": None,
                 "supported_tools": tool_contract_schemas(),
                 "assistant": assistant_meta,
-                "investigation": {
-                    "rounds_used": len(executed_tools),
-                    "stopped_reason": "round_limit",
-                    "tool_names": list(executed_tools),
-                    "narration_grounded": None,
-                    "truncated": True,
-                },
+                "investigation": investigation,
             },
             tool_name=executed_tools[-1] if executed_tools else None,
             requires_clarification=True,
@@ -1212,6 +1224,74 @@ class RiskQueryEngine:
             data=data,
             tool_name=tool_name.value,
         )
+
+
+def _investigation_turn_payload(
+    *,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    result: dict[str, Any] | None,
+    error: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Client-safe executed turn (no provider ids, prompts, or raw exceptions)."""
+    from app.ai.narration import build_grounding_manifest
+
+    manifest: list[dict[str, Any]] = []
+    provenance: dict[str, Any] = {}
+    if result is not None:
+        manifest = [
+            claim.model_dump(mode="json")
+            for claim in build_grounding_manifest(tool_name, result)
+        ]
+        try:
+            name = RiskToolName(str(tool_name))
+        except ValueError:
+            name = None
+        if name is not None:
+            provenance = _grounded_provenance(_grounded_card(name, result))
+    return {
+        "tool_name": tool_name,
+        "tool_args": dict(tool_args or {}),
+        "status": "error" if error else "success",
+        "result": result,
+        "error": error,
+        "grounding_manifest": manifest,
+        "provenance": provenance,
+    }
+
+
+def _investigation_from_result(result: Any) -> dict[str, Any]:
+    """Build a client-safe investigation payload (no provider ids or CoT)."""
+    from app.api.schemas.transport import RiskQueryInvestigation
+
+    turns: list[dict[str, Any]] = []
+    for turn in result.tool_turns:
+        result_payload = turn.tool_output if isinstance(turn.tool_output, dict) else None
+        error = None
+        if turn.safe_error:
+            error = dict(turn.safe_error)
+        elif turn.tool_error:
+            error = {
+                "code": "unknown_error",
+                "retryable": False,
+                "message": turn.tool_error,
+            }
+        turns.append(
+            _investigation_turn_payload(
+                tool_name=turn.tool_name,
+                tool_args=dict(turn.tool_args or {}),
+                result=result_payload,
+                error=error,
+            )
+        )
+    payload = {
+        "rounds_used": result.rounds_used,
+        "stopped_reason": result.stopped_reason,
+        "tool_names": [turn.tool_name for turn in result.tool_turns],
+        "narration_grounded": result.narration_grounded,
+        "turns": turns,
+    }
+    return RiskQueryInvestigation.model_validate(payload).model_dump(mode="json")
 
 
 def _execute_tool(

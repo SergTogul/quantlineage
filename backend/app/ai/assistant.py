@@ -72,6 +72,7 @@ class RiskAssistantToolTurn(BaseModel):
     rationale: str | None = None
     tool_output: dict[str, Any] | None = None
     tool_error: str | None = None
+    safe_error: dict[str, Any] | None = None
 
 
 class RiskAssistantRequest(BaseModel):
@@ -362,6 +363,7 @@ class BoundedRiskAssistant:
                 tool_call_id=tool_call_id,
                 rationale=rationale,
                 tool_error=error_payload["error"]["message"],
+                safe_error=dict(error_payload["error"]),
             )
             output = FunctionCallOutput(
                 call_id=tool_call_id,

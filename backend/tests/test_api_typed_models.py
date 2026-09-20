@@ -257,3 +257,59 @@ def test_m73_live_responses_validate_against_domain_models() -> None:
         assert v1_var.status_code == 200
         VaRReport.model_validate(v1_var.json())
         assert v1_var.json() == var_payload.json()
+
+
+def test_investigation_turn_schema_forbids_provider_ids_and_requires_turns() -> None:
+    from pydantic import ValidationError
+
+    from app.api.schemas.transport import (
+        InvestigationTurn,
+        RiskQueryInvestigation,
+        RiskQueryResponse,
+    )
+
+    turn = InvestigationTurn.model_validate(
+        {
+            "tool_name": "get_var_es",
+            "tool_args": {},
+            "status": "success",
+            "result": {"methods": []},
+            "error": None,
+            "grounding_manifest": [],
+            "provenance": {"portfolio_id": "global-macro"},
+        }
+    )
+    assert turn.tool_name == "get_var_es"
+    for forbidden in (
+        {"provider_response_id": "resp_secret"},
+        {"previous_response_id": "resp_secret"},
+        {"prompt": "system prompt"},
+        {"chain_of_thought": "hidden"},
+    ):
+        with pytest.raises(ValidationError):
+            InvestigationTurn.model_validate(
+                {
+                    "tool_name": "get_var_es",
+                    "tool_args": {},
+                    "status": "success",
+                    **forbidden,
+                }
+            )
+
+    investigation = RiskQueryInvestigation.model_validate(
+        {
+            "rounds_used": 2,
+            "stopped_reason": "final",
+            "tool_names": ["get_var_es", "get_limits"],
+            "narration_grounded": True,
+            "turns": [turn.model_dump(mode="json")],
+        }
+    )
+    RiskQueryResponse.model_validate(
+        {
+            "intent": "final",
+            "answer": "ok",
+            "data": {"investigation": investigation.model_dump(mode="json")},
+            "tool_name": "get_limits",
+        }
+    )
