@@ -7,9 +7,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.ai.config import AISettings
-from app.ai.policy import ASSISTANT_POLICY_INSTRUCTION
+from app.ai.policy import ASSISTANT_MULTI_TOOL_POLICY_INSTRUCTION, ASSISTANT_POLICY_INSTRUCTION
 from app.ai.tool_schemas import openai_function_tools
 from app.risk.query import RiskAssistantModelRequest
+
+_MAX_FUNCTION_OUTPUT_CHARS = 4000
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +42,62 @@ def build_openai_responses_request(
         },
         timeout_seconds=settings.timeout_seconds,
     )
+
+
+def build_openai_followup_request(
+    *,
+    settings: AISettings,
+    previous_response_id: str,
+    outputs: list[Any],
+) -> OpenAIResponsesRequest:
+    """Build a Responses API follow-up with ``function_call_output`` items."""
+    if settings.openai_model is None:
+        raise ValueError("openai_model is required to build an OpenAI Responses request.")
+    if not previous_response_id.strip():
+        raise ValueError("previous_response_id is required for a tool-output follow-up.")
+
+    return OpenAIResponsesRequest(
+        create_params={
+            "model": settings.openai_model,
+            "instructions": ASSISTANT_MULTI_TOOL_POLICY_INSTRUCTION
+            if settings.multi_tool
+            else ASSISTANT_POLICY_INSTRUCTION,
+            "previous_response_id": previous_response_id,
+            "input": [_function_call_output_item(item) for item in outputs],
+            "tools": openai_function_tools(),
+            "max_output_tokens": settings.max_output_tokens,
+            "max_tool_calls": settings.max_tool_rounds,
+            "tool_choice": "auto",
+        },
+        timeout_seconds=settings.timeout_seconds,
+    )
+
+
+def apply_multi_tool_instructions(payload: OpenAIResponsesRequest) -> OpenAIResponsesRequest:
+    """Copy a first-round request onto the multi-tool investigation policy."""
+    params = dict(payload.create_params)
+    params["instructions"] = ASSISTANT_MULTI_TOOL_POLICY_INSTRUCTION
+    return OpenAIResponsesRequest(
+        create_params=params,
+        timeout_seconds=payload.timeout_seconds,
+    )
+
+
+def _function_call_output_item(output: Any) -> dict[str, Any]:
+    payload = {
+        "name": getattr(output, "name", None),
+        "allowed": getattr(output, "allowed", True),
+        "result": getattr(output, "output", {}),
+        "error": getattr(output, "error", None),
+    }
+    serialized = json.dumps(payload, default=str)
+    if len(serialized) > _MAX_FUNCTION_OUTPUT_CHARS:
+        serialized = serialized[:_MAX_FUNCTION_OUTPUT_CHARS]
+    return {
+        "type": "function_call_output",
+        "call_id": getattr(output, "call_id", ""),
+        "output": serialized,
+    }
 
 
 def _format_user_input(request: RiskAssistantModelRequest) -> str:

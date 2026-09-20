@@ -53,6 +53,7 @@ class RiskAssistantRequest(BaseModel):
     portfolio_id: str | None = None
     available_run_ids: list[str] = Field(default_factory=list)
     prior_outputs: list[RiskAssistantToolOutput] = Field(default_factory=list)
+    previous_response_id: str | None = None
     round_index: int = 0
     max_rounds: int = 1
     instruction: str = (
@@ -75,6 +76,7 @@ class RiskAssistantTurn(BaseModel):
     intent: str | None = None
     rationale: str | None = None
     proposed_answer: str | None = None
+    response_id: str | None = None
 
 
 class RiskAssistant(Protocol):

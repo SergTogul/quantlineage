@@ -19,6 +19,10 @@ MAX_AI_TIMEOUT_SECONDS = 120.0
 DEFAULT_MAX_OUTPUT_TOKENS = 512
 MAX_AI_OUTPUT_TOKENS = 4096
 REQUIRED_MAX_TOOL_ROUNDS = 1
+DEFAULT_MAX_TOOL_ROUNDS = REQUIRED_MAX_TOOL_ROUNDS
+MAX_AI_TOOL_ROUNDS = 4
+DEFAULT_MULTI_TOOL = False
+DEFAULT_ALLOW_QUEUED_RUNS = False
 
 _SUPPORTED_PROVIDERS: frozenset[str] = frozenset({"deterministic", "openai"})
 
@@ -32,6 +36,8 @@ class AISettings:
     timeout_seconds: float
     max_output_tokens: int
     max_tool_rounds: int
+    multi_tool: bool = False
+    allow_queued_runs: bool = False
 
 
 def get_openai_api_key() -> str | None:
@@ -98,22 +104,35 @@ def _parse_max_output_tokens(raw: str | None) -> int:
 
 def _parse_max_tool_rounds(raw: str | None) -> int:
     if raw is None or not raw.strip():
-        return REQUIRED_MAX_TOOL_ROUNDS
+        return DEFAULT_MAX_TOOL_ROUNDS
     try:
         rounds = int(raw.strip())
     except ValueError as exc:
         raise ValueError(
             "Invalid AI_MAX_TOOL_ROUNDS: "
-            f"{raw.strip()!r}. Milestone 1 requires exactly "
-            f"{REQUIRED_MAX_TOOL_ROUNDS}."
+            f"{raw.strip()!r}. Expected an integer from "
+            f"{DEFAULT_MAX_TOOL_ROUNDS} to {MAX_AI_TOOL_ROUNDS}."
         ) from exc
-    if rounds != REQUIRED_MAX_TOOL_ROUNDS:
+    if rounds < DEFAULT_MAX_TOOL_ROUNDS or rounds > MAX_AI_TOOL_ROUNDS:
         raise ValueError(
             "Invalid AI_MAX_TOOL_ROUNDS: "
-            f"{rounds!r}. Milestone 1 requires exactly "
-            f"{REQUIRED_MAX_TOOL_ROUNDS}."
+            f"{rounds!r}. Expected an integer from "
+            f"{DEFAULT_MAX_TOOL_ROUNDS} to {MAX_AI_TOOL_ROUNDS}."
         )
     return rounds
+
+
+def _parse_bool_flag(raw: str | None, *, default: bool, name: str) -> bool:
+    if raw is None or not raw.strip():
+        return default
+    value = raw.strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(
+        f"Invalid {name}: {raw.strip()!r}. Expected a boolean flag."
+    )
 
 
 def _optional_model(raw: str | None) -> str | None:
@@ -130,6 +149,8 @@ def get_ai_settings(
     timeout_seconds: float | None = None,
     max_output_tokens: int | None = None,
     max_tool_rounds: int | None = None,
+    multi_tool: bool | None = None,
+    allow_queued_runs: bool | None = None,
 ) -> AISettings:
     """Load AI settings from explicit args or environment.
 
@@ -138,7 +159,9 @@ def get_ai_settings(
     - ``OPENAI_MODEL`` — model name (required when provider is openai)
     - ``AI_TIMEOUT_SECONDS`` — request timeout (default 30, max 120)
     - ``AI_MAX_OUTPUT_TOKENS`` — output token cap (default 512, max 4096)
-    - ``AI_MAX_TOOL_ROUNDS`` — must be ``1`` in milestone 1
+    - ``AI_MAX_TOOL_ROUNDS`` — bounded Responses rounds (default 1, max 4)
+    - ``AI_MULTI_TOOL`` — opt-in bounded tool loop (default false)
+    - ``AI_ALLOW_QUEUED_RUNS`` — allow RiskRun submission tools in the loop
 
     ``OPENAI_API_KEY`` is read via :func:`get_openai_api_key` when provider is
     ``openai``; it is never stored on the returned settings object.
@@ -177,15 +200,34 @@ def get_ai_settings(
         )
     if max_tool_rounds is not None:
         resolved_rounds = max_tool_rounds
-        if resolved_rounds != REQUIRED_MAX_TOOL_ROUNDS:
+        if (
+            resolved_rounds < DEFAULT_MAX_TOOL_ROUNDS
+            or resolved_rounds > MAX_AI_TOOL_ROUNDS
+        ):
             raise ValueError(
                 "Invalid max_tool_rounds: "
-                f"{resolved_rounds!r}. Milestone 1 requires exactly "
-                f"{REQUIRED_MAX_TOOL_ROUNDS}."
+                f"{resolved_rounds!r}. Expected an integer from "
+                f"{DEFAULT_MAX_TOOL_ROUNDS} to {MAX_AI_TOOL_ROUNDS}."
             )
     else:
         resolved_rounds = _parse_max_tool_rounds(
             os.environ.get("AI_MAX_TOOL_ROUNDS")
+        )
+    if multi_tool is not None:
+        resolved_multi_tool = multi_tool
+    else:
+        resolved_multi_tool = _parse_bool_flag(
+            os.environ.get("AI_MULTI_TOOL"),
+            default=DEFAULT_MULTI_TOOL,
+            name="AI_MULTI_TOOL",
+        )
+    if allow_queued_runs is not None:
+        resolved_allow_queued_runs = allow_queued_runs
+    else:
+        resolved_allow_queued_runs = _parse_bool_flag(
+            os.environ.get("AI_ALLOW_QUEUED_RUNS"),
+            default=DEFAULT_ALLOW_QUEUED_RUNS,
+            name="AI_ALLOW_QUEUED_RUNS",
         )
 
     if resolved_provider == "openai":
@@ -205,4 +247,6 @@ def get_ai_settings(
         timeout_seconds=resolved_timeout,
         max_output_tokens=resolved_output_tokens,
         max_tool_rounds=resolved_rounds,
+        multi_tool=resolved_multi_tool,
+        allow_queued_runs=resolved_allow_queued_runs,
     )
