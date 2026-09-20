@@ -1,15 +1,20 @@
-"""T14 — Opt-in live OpenAI routing smoke test.
+"""T14 / C12 — Opt-in live OpenAI conversational smoke test.
 
 Skipped unless both ``OPENAI_API_KEY`` and ``RUN_LIVE_AI_TESTS=1`` are set.
 Normal CI never sets the run flag, so this file is network-free in default pipelines.
+
+When enabled, the smoke proves tool selection → ``function_call_output`` →
+final narration (not one-shot routing).
 """
 
 from __future__ import annotations
 
+import json
 import os
 
 import pytest
 
+from app.ai.assistant import FunctionCallOutput
 from app.ai.config import get_ai_settings, get_openai_api_key
 from app.ai.factory import RiskAssistantResources, build_risk_assistant_resources
 from app.risk.query import (
@@ -28,8 +33,15 @@ _HEAVY_SIDE_EFFECT_TOOLS = frozenset(
     {
         RiskToolName.RUN_PORTFOLIO_RISK,
         RiskToolName.RUN_STRESS,
+        RiskToolName.GET_TOP_RISK_CONTRIBUTORS,
     }
 )
+_CANNED_TOOL_OUTPUT = {
+    "tool": "get_portfolio_summary",
+    "portfolio_id": "rates-macro",
+    "position_count": 3,
+    "status": "ok",
+}
 
 
 def _live_ai_enabled() -> bool:
@@ -55,31 +67,61 @@ def live_resources() -> RiskAssistantResources:
     if not model_name:
         pytest.skip("OPENAI_MODEL is required for live AI smoke tests.")
 
-    settings = get_ai_settings(provider="openai", openai_model=model_name)
+    settings = get_ai_settings(
+        provider="openai",
+        openai_model=model_name,
+        assistant_loop="conversational",
+    )
     resources = build_risk_assistant_resources(settings=settings)
     assert resources.model is not None
     yield resources
     resources.close()
 
 
-def test_live_openai_routes_supported_question_to_allowlisted_tool(
+def test_live_openai_tool_then_function_output_then_narration(
     live_resources: RiskAssistantResources,
 ) -> None:
-    """One cheap routing call; tool selection only — no RiskRun submission."""
+    """Cheap conversational smoke: select → function_call_output → final text.
+
+    Does not submit a RiskRun. Tool JSON is a canned allowlisted payload so the
+    live model only narrates; QuantLineage remains the source of numbers.
+    """
     model = live_resources.model
     assert model is not None
-
-    response = model.complete(
-        RiskAssistantModelRequest(
-            question=_SMOKE_QUESTION,
-            tools=tool_contract_schemas(),
-            portfolio_id="rates-macro",
-        )
+    continue_after_tools = getattr(model, "continue_after_tools", None)
+    assert callable(continue_after_tools), (
+        "Live smoke requires continue_after_tools for reserved narration."
     )
 
-    assert response.tool_name is not None, (
+    request = RiskAssistantModelRequest(
+        question=_SMOKE_QUESTION,
+        tools=tool_contract_schemas(),
+        portfolio_id="rates-macro",
+    )
+    selected = model.complete(request)
+
+    assert selected.tool_name is not None, (
         "Expected one allowlisted tool; got clarification/refusal instead."
     )
-    assert response.tool_name in {name.value for name in TOOL_CONTRACTS}
-    assert response.tool_name not in {name.value for name in _HEAVY_SIDE_EFFECT_TOOLS}
-    assert response.tool_name == _EXPECTED_TOOL.value
+    assert selected.tool_name in {name.value for name in TOOL_CONTRACTS}
+    assert selected.tool_name not in {name.value for name in _HEAVY_SIDE_EFFECT_TOOLS}
+    assert selected.tool_name == _EXPECTED_TOOL.value
+    assert selected.tool_call_id
+    assert selected.provider_response_id
+    assert selected.proposed_answer is None
+
+    continued = continue_after_tools(
+        previous_response_id=selected.provider_response_id,
+        tool_outputs=[
+            FunctionCallOutput(
+                call_id=selected.tool_call_id,
+                output=json.dumps(_CANNED_TOOL_OUTPUT),
+            )
+        ],
+        request=request,
+        reserve_narration=True,
+    )
+
+    assert continued.tool_name is None
+    assert continued.proposed_answer
+    assert continued.proposed_answer.strip()
