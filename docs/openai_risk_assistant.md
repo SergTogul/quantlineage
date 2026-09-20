@@ -47,7 +47,7 @@ The backend also calls `load_dotenv(override=False)` on startup, so a local
 |---|---|---|
 | `AI_TIMEOUT_SECONDS` | `30` | Max `120` |
 | `AI_MAX_OUTPUT_TOKENS` | `512` | Max `4096` |
-| `AI_MAX_TOOL_ROUNDS` | `1` | Bounded tool-loop rounds (`1`–`4`). Default `1` keeps milestone-1 one-shot routing. |
+| `AI_MAX_TOOL_ROUNDS` | `1` | Bounded tool-loop rounds (`1`–`4`). Default `1` keeps one-shot HTTP routing. Set `2`–`4` to run the read-only Responses investigation loop on `POST /api/v1/risk/query`. |
 
 ## Shared / production
 

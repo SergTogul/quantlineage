@@ -925,6 +925,228 @@ class RiskQueryEngine:
             extra_data={"assistant": assistant_meta},
         )
 
+    def answer_with_bounded_assistant(
+        self,
+        question: str,
+        portfolio: Portfolio,
+        service,
+        model,
+        *,
+        max_rounds: int,
+        principal: str | None = None,
+        assistant_context: AssistantMetadataContext | None = None,
+    ) -> RiskQueryResponse:
+        """Run the T21 bounded tool loop, then format a grounded HTTP response."""
+        from app.ai.assistant import BoundedRiskAssistant, RiskAssistantRequest
+        from app.ai.errors import (
+            OpenAIConfigurationError,
+            OpenAIModelParseError,
+            OpenAITransientProviderError,
+        )
+        from app.ai.narration import format_tool_turns_deterministically
+
+        context = assistant_context or AssistantMetadataContext(
+            provider="openai",
+            model=None,
+        )
+        assistant_meta = build_assistant_metadata(
+            context,
+            mode="model-routed",
+            fallback=False,
+        )
+        if _is_secret_request(" ".join(question.strip().split()).lower()):
+            return RiskQueryResponse(
+                intent="unsupported",
+                answer=_SECRET_REFUSAL_ANSWER,
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    "assistant": assistant_meta,
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+        if _is_greeks_question(" ".join(question.strip().split()).lower()):
+            return RiskQueryResponse(
+                intent="unsupported",
+                answer=_GREEKS_UNSUPPORTED_ANSWER,
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    "assistant": assistant_meta,
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+
+        executed: list[str] = []
+
+        def _execute(tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
+            name = RiskToolName(tool_name)
+            payload = _execute_tool(
+                name,
+                portfolio,
+                service,
+                args=tool_args,
+                principal=principal,
+            )
+            executed.append(tool_name)
+            return payload
+
+        assistant = BoundedRiskAssistant(model, _execute)
+        request = RiskAssistantRequest(
+            question=question,
+            tools=tool_contract_schemas(),
+            portfolio_id=getattr(portfolio, "id", None),
+            max_rounds=max_rounds,
+        )
+        try:
+            result = assistant.run(request)
+        except OpenAIConfigurationError as exc:
+            message = str(exc).strip() or "AI assistant configuration is invalid."
+            return RiskQueryResponse(
+                intent="unsupported",
+                answer=message,
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    "assistant": assistant_meta,
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+        except (OpenAITransientProviderError, OpenAIModelParseError):
+            if executed:
+                return self._partial_bounded_response(
+                    executed_tools=executed,
+                    assistant_meta=assistant_meta,
+                )
+            fallback_response = self.answer(
+                question, portfolio, service, principal=principal
+            )
+            data = dict(fallback_response.data)
+            data["assistant"] = build_assistant_metadata(
+                context,
+                mode="fallback",
+                fallback=True,
+            )
+            return fallback_response.model_copy(update={"data": data})
+
+        investigation = {
+            "rounds_used": result.rounds_used,
+            "stopped_reason": result.stopped_reason,
+            "tool_names": [turn.tool_name for turn in result.tool_turns],
+            "narration_grounded": result.narration_grounded,
+        }
+        extra = {"assistant": assistant_meta, "investigation": investigation}
+
+        if result.requires_clarification and not any(
+            turn.tool_output for turn in result.tool_turns
+        ):
+            default_clarification = (
+                "Please choose a deterministic risk view: VaR/ES, limits, contributors, "
+                "worst stress, or portfolio summary."
+            )
+            return RiskQueryResponse(
+                intent=result.intent
+                or ("unsupported" if result.refusal else "ambiguous"),
+                answer=_safe_ungrounded_text(
+                    result.refusal,
+                    result.clarification,
+                    fallback=default_clarification,
+                ),
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    **extra,
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+
+        last_success = next(
+            (
+                turn
+                for turn in reversed(result.tool_turns)
+                if isinstance(turn.tool_output, dict)
+            ),
+            None,
+        )
+        answer = result.proposed_answer or format_tool_turns_deterministically(
+            result.tool_turns
+        )
+        if last_success is None:
+            return RiskQueryResponse(
+                intent=result.intent or "unsupported",
+                answer=_safe_ungrounded_text(
+                    answer,
+                    result.refusal,
+                    result.clarification,
+                    fallback=SAFE_UNGROUNDED_ANSWER,
+                ),
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    **extra,
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+
+        tool_name = RiskToolName(last_success.tool_name)
+        payload = last_success.tool_output or {}
+        card = _grounded_card(tool_name, payload)
+        provenance = _grounded_provenance(card)
+        if not answer:
+            answer = _format_answer(tool_name, payload, card=card)
+        return RiskQueryResponse(
+            intent=result.intent or _intent_for_tool(tool_name),
+            answer=answer,
+            data={
+                "tool_contract": TOOL_CONTRACTS[tool_name].model_dump(mode="json"),
+                "tool_result": payload,
+                "card": card,
+                "provenance": provenance,
+                **extra,
+            },
+            tool_name=tool_name.value,
+        )
+
+    def _partial_bounded_response(
+        self,
+        *,
+        executed_tools: list[str],
+        assistant_meta: dict[str, Any],
+    ) -> RiskQueryResponse:
+        """Stop after tools already ran; never replay a fallback router."""
+        return RiskQueryResponse(
+            intent="unsupported",
+            answer=(
+                "The investigation stopped after a provider error. "
+                "Already-executed tools were not replayed."
+            ),
+            data={
+                "tool_contract": None,
+                "tool_result": None,
+                "supported_tools": tool_contract_schemas(),
+                "assistant": assistant_meta,
+                "investigation": {
+                    "rounds_used": len(executed_tools),
+                    "stopped_reason": "round_limit",
+                    "tool_names": list(executed_tools),
+                    "narration_grounded": None,
+                    "truncated": True,
+                },
+            },
+            tool_name=executed_tools[-1] if executed_tools else None,
+            requires_clarification=True,
+        )
+
     def _grounded_tool_response(
         self,
         *,
