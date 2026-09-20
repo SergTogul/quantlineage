@@ -551,7 +551,7 @@ Evidence:
 
 Evidence:
 
-- Commit pending — Design decision at `docs/ai/T24_QUANTLIB_TOOLS_EVAL.md`: approve future `calculate_greeks`/`get_position_greeks` candidate via `PortfolioService` (not implemented); defer `price_instrument`; reject curve dump tools; no raw QuantLib exposure.
+- Commit `1bb9369` — Design decision at `docs/ai/T24_QUANTLIB_TOOLS_EVAL.md`: approve future `calculate_greeks`/`get_position_greeks` candidate via `PortfolioService` (not implemented); defer `price_instrument`; reject curve dump tools; no raw QuantLib exposure.
 - Checks: documentation-only; `cd backend && python3 -m pytest tests/test_ai_multi_tool_evals.py tests/test_ai_narration_grounding.py tests/test_ai_bounded_assistant.py -q` still green (regression).
 
 T24 is a design task, not permission to expose raw QuantLib APIs. Any new tool must enter `TOOL_CONTRACTS`, use typed schemas, call existing pricing abstractions, include provenance, and pass the same security gate.
