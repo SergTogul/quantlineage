@@ -538,7 +538,7 @@ python3 -m pytest tests/test_ai_assistant_protocol.py tests/test_ai_query_orches
 
 Evidence:
 
-- Commit pending — Introduce multi-tool RiskAssistant protocol (T20)
+- Commit `2ef76cd` — Add multi-tool RiskAssistant protocol without replacing the one-tool adapter.
 - Checks: `cd backend && python3 -m pytest tests/test_ai_assistant_protocol.py tests/test_ai_query_orchestration.py tests/test_openai_model.py tests/test_ai_provider_factory.py -q` → 62 passed; plus `tests/test_ai_security.py` → 79 passed combined; `ruff check` on touched files clean.
 
 ### T21 — Implement the bounded Responses tool loop

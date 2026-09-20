@@ -38,6 +38,12 @@ ruff check app/ai/assistant.py app/ai/factory.py app/ai/__init__.py app/main.py 
 # All checks passed
 ```
 
+## Commits
+
+| SHA | Subject |
+|-----|---------|
+| `2ef76cd` | Add multi-tool RiskAssistant protocol without replacing the one-tool adapter. |
+
 ## Out of scope (T21+)
 
 - Responses `function_call_output` loop
