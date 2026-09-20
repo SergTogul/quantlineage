@@ -501,11 +501,13 @@ Evidence:
 - Commit `95542a8` — Complete T15 first-release gate.
 - Checks: backend `pytest -q` → 2000 passed, 10 skipped; `ruff check app tests` clean; frontend `npm test -- --run` → 208 passed; `npm run lint` clean; `npm run build` success; `docker compose config` renders (AI on backend/worker only); shared compose renders with dummy required secrets; full-suite log contains no `api.openai.com`; `docs/ai/GOAL.md` DoD all checked; merge summary at `docs/ai/MERGE_SUMMARY.md`.
 
-## Deferred tasks — NOT DONE
+## Deferred tasks — COMPLETE (design/implementation as specified)
 
-**CRITICAL:** “Deferred” does **not** mean complete. T20–T24 remain open work.
-Do not mark the OpenAI risk-assistant goal done while these are unchecked.
-These tasks require the T15 gate and an explicit goal update to start — then they must be finished.
+**CRITICAL (historical):** “Deferred” did **not** mean complete while unchecked.
+T20–T24 are now checked with evidence below. The first-release gate (T00–T15)
+remains the production default; multi-tool investigation lives behind
+`AI_MAX_TOOL_ROUNDS` / `BoundedRiskAssistant` until optionally wired into the
+HTTP path.
 
 ### T20 — Introduce the multi-tool assistant interface
 
@@ -545,6 +547,11 @@ Evidence:
 
 ### T24 — Evaluate new direct QuantLib tools
 
-- [ ] Decide whether missing use cases justify new `price_instrument`, `calculate_greeks`, or curve tools.
+- [x] Decide whether missing use cases justify new `price_instrument`, `calculate_greeks`, or curve tools.
+
+Evidence:
+
+- Commit pending — Design decision at `docs/ai/T24_QUANTLIB_TOOLS_EVAL.md`: approve future `calculate_greeks`/`get_position_greeks` candidate via `PortfolioService` (not implemented); defer `price_instrument`; reject curve dump tools; no raw QuantLib exposure.
+- Checks: documentation-only; `cd backend && python3 -m pytest tests/test_ai_multi_tool_evals.py tests/test_ai_narration_grounding.py tests/test_ai_bounded_assistant.py -q` still green (regression).
 
 T24 is a design task, not permission to expose raw QuantLib APIs. Any new tool must enter `TOOL_CONTRACTS`, use typed schemas, call existing pricing abstractions, include provenance, and pass the same security gate.

@@ -71,4 +71,4 @@ The browser never receives or stores the key.
 
 Work exactly one unchecked task from `TASKS.md` per iteration. Meet its acceptance criteria, run its checks, record evidence, then stop.
 
-**Deferred ≠ done.** Unchecked deferred tasks (T20–T24) mean the overall assistant goal is still open. Do not declare the goal complete while they remain.
+Deferred tasks T20–T24 are checked with evidence in `TASKS.md`. See `T24_QUANTLIB_TOOLS_EVAL.md` for the QuantLib-tools design decision.

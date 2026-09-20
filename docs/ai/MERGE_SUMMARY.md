@@ -35,13 +35,14 @@ Targeted AI suites (earlier tasks): config, tool schemas, request builder, model
 
 ## Limitations
 
-- Milestone 1: one tool call per turn; multi-tool narration deferred (T20+).
+- Milestone 1 HTTP path remains one tool call per turn via `answer_with_model`; `BoundedRiskAssistant` (T21–T22) is available for bounded multi-tool loops and may be wired when `AI_MAX_TOOL_ROUNDS > 1`.
 - Live OpenAI smoke is opt-in only (`RUN_LIVE_AI_TESTS=1` + key).
 - Worker process does not independently construct a separate OpenAI client beyond shared env; interactive query path is lifespan-wired.
 - Agent VM used Python 3.12.3; Docker images target 3.13.
 
 ## Follow-ups
 
-- T20–T24 multi-tool investigation loop after evaluation gates pass in production-like conditions.
+- Optional: wire `BoundedRiskAssistant` into `answer_with_model` when `AI_MAX_TOOL_ROUNDS > 1`.
+- Optional follow-up tool: `get_position_greeks` per `docs/ai/T24_QUANTLIB_TOOLS_EVAL.md` (not implemented in T24).
 - Confirm live smoke against the chosen production model before enabling by default in shared deployments.
 - Optional: wire worker-only AI path if workers ever need model routing (currently unused).
