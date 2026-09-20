@@ -8,11 +8,11 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from app.ai.assistant import OneToolRiskAssistant
 from app.ai.config import AISettings, get_ai_settings
 from app.ai.factory import (
     RiskAssistantResources,
     build_risk_assistant_resources,
-    load_application_dotenv,
 )
 from app.ai.openai_model import OpenAIRiskAssistantModel
 from app.main import app
@@ -44,6 +44,7 @@ def test_deterministic_mode_does_not_construct_openai_client(
 
     assert resources.settings.provider == "deterministic"
     assert resources.model is None
+    assert resources.assistant is None
     assert resources._openai_client is None
     openai_ctor.assert_not_called()
 
@@ -61,6 +62,8 @@ def test_openai_mode_constructs_one_reusable_client_and_model(
 
     openai_ctor.assert_called_once_with(api_key="sk-test-key-1234567890")
     assert isinstance(resources.model, OpenAIRiskAssistantModel)
+    assert isinstance(resources.assistant, OneToolRiskAssistant)
+    assert resources.assistant.model is resources.model
     assert resources._openai_client is sentinel_client
 
 
@@ -132,6 +135,8 @@ def test_lifespan_sets_ai_state_and_closes_on_shutdown(
     with TestClient(app) as client:
         assert client.app.state.ai_settings.provider == "openai"
         assert isinstance(client.app.state.risk_assistant_model, OpenAIRiskAssistantModel)
+        assert isinstance(client.app.state.risk_assistant, OneToolRiskAssistant)
+        assert client.app.state.risk_assistant.model is client.app.state.risk_assistant_model
         assert client.app.state.portfolio_service.risk_assistant_model is (
             client.app.state.risk_assistant_model
         )
@@ -149,6 +154,7 @@ def test_lifespan_default_is_deterministic_without_openai_client(
     with TestClient(app) as client:
         assert client.app.state.ai_settings.provider == "deterministic"
         assert client.app.state.risk_assistant_model is None
+        assert client.app.state.risk_assistant is None
         assert client.app.state.portfolio_service.risk_assistant_model is None
         openai_ctor.assert_not_called()
 

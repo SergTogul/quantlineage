@@ -501,13 +501,45 @@ Evidence:
 - Commit `95542a8` — Complete T15 first-release gate.
 - Checks: backend `pytest -q` → 2000 passed, 10 skipped; `ruff check app tests` clean; frontend `npm test -- --run` → 208 passed; `npm run lint` clean; `npm run build` success; `docker compose config` renders (AI on backend/worker only); shared compose renders with dummy required secrets; full-suite log contains no `api.openai.com`; `docs/ai/GOAL.md` DoD all checked; merge summary at `docs/ai/MERGE_SUMMARY.md`.
 
-## Deferred tasks — do not select during the first-release loop
+## Deferred tasks — NOT DONE
 
-These tasks require the T15 gate and an explicit update to the goal.
+T15 first-release (one-tool router) is complete. **Deferred ≠ done.** T20–T24 remain OPEN and are the current queue. The goal in `GOAL.md` has been updated for milestone 2.
 
 ### T20 — Introduce the multi-tool assistant interface
 
-- [ ] Add a higher-level `RiskAssistant` protocol without breaking the milestone 1 adapter.
+- [x] Add a higher-level `RiskAssistant` protocol without breaking the milestone 1 adapter.
+
+Dependencies: T15
+
+Files:
+
+- `backend/app/ai/assistant.py`
+- `backend/app/ai/factory.py`
+- `backend/app/main.py`
+- `backend/tests/test_ai_assistant_protocol.py`
+
+Acceptance:
+
+- `RiskAssistant.complete_turn` proposes tool calls, a clarification, or a refusal and never executes a tool.
+- Request types can carry prior tool outputs and a round index for the later Responses loop.
+- `OneToolRiskAssistant` adapts `RiskAssistantModel` to at most one tool call.
+- Follow-up rounds fail closed on the one-tool adapter (no fake continuation, inner model not called).
+- `OpenAIRiskAssistantModel.complete` remains the milestone 1 seam and still works.
+- Factory/lifespan expose the wrapper without replacing `risk_assistant_model`.
+- Deterministic mode still constructs no OpenAI client and no assistant.
+- Existing `answer_with_model` behavior is unchanged.
+
+Checks:
+
+```bash
+cd backend
+python3 -m pytest tests/test_ai_assistant_protocol.py tests/test_ai_query_orchestration.py tests/test_openai_model.py tests/test_ai_provider_factory.py -q
+```
+
+Evidence:
+
+- Commit pending — Introduce multi-tool RiskAssistant protocol (T20)
+- Checks: `cd backend && python3 -m pytest tests/test_ai_assistant_protocol.py tests/test_ai_query_orchestration.py tests/test_openai_model.py tests/test_ai_provider_factory.py -q` → 62 passed; plus `tests/test_ai_security.py` → 79 passed combined; `ruff check` on touched files clean.
 
 ### T21 — Implement the bounded Responses tool loop
 

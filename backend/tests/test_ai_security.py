@@ -379,6 +379,7 @@ def test_deterministic_mode_is_network_free(monkeypatch: pytest.MonkeyPatch) -> 
 
     resources = build_risk_assistant_resources(settings=get_ai_settings(provider="deterministic"))
     assert resources.model is None
+    assert resources.assistant is None
     openai_ctor.assert_not_called()
 
     service = PortfolioService(

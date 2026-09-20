@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI):
     ai_resources = build_risk_assistant_resources()
     app.state.ai_settings = ai_resources.settings
     app.state.risk_assistant_model = ai_resources.model
+    app.state.risk_assistant = ai_resources.assistant
     wiring = build_persistence_wiring()
     app.state.persistence_enabled = wiring.enabled
     app.state.session_factory = wiring.session_factory

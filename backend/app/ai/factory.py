@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.ai.assistant import OneToolRiskAssistant, RiskAssistant
 from app.ai.config import AISettings, get_ai_settings, get_openai_api_key
 from app.ai.openai_model import OpenAIRiskAssistantModel
 from app.risk.query import RiskAssistantModel
@@ -23,6 +24,7 @@ class RiskAssistantResources:
 
     settings: AISettings
     model: RiskAssistantModel | None
+    assistant: RiskAssistant | None = None
     _openai_client: Any | None = field(default=None, repr=False)
 
     def close(self) -> None:
@@ -45,7 +47,7 @@ def build_risk_assistant_resources(
     """
     resolved = settings or get_ai_settings()
     if resolved.provider == "deterministic":
-        return RiskAssistantResources(settings=resolved, model=None)
+        return RiskAssistantResources(settings=resolved, model=None, assistant=None)
 
     api_key = get_openai_api_key()
     if api_key is None:
@@ -60,5 +62,6 @@ def build_risk_assistant_resources(
     return RiskAssistantResources(
         settings=resolved,
         model=model,
+        assistant=OneToolRiskAssistant(model),
         _openai_client=client,
     )
