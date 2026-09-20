@@ -340,7 +340,7 @@ python3 -m pytest   tests/test_ai_narration_grounding.py   tests/test_ai_multi_t
 
 Evidence:
 
-- Typed `GroundingClaim` manifests bind metric, value, unit, entity, field path, and optional percent-from-fraction. Years, ids, counts, and dates are not financial claims. Global numeric-token collection no longer approves invented VaR/Greeks. Attacks covered: year/id → VaR, delta → VaR. Rounding/`32,798` tolerated; `32000` is not. Fraction-to-percent only for ratio/percent fields. Rejection still uses the deterministic formatter.
+- Product HEAD: `72e6d43`. Typed `GroundingClaim` manifests bind metric, value, unit, entity, field path, and optional percent-from-fraction. Years, ids, counts, and dates are not financial claims. Global numeric-token collection no longer approves invented VaR/Greeks. Attacks covered: year/id → VaR, delta → VaR. Rounding/`32,798` tolerated; `32000` is not. Fraction-to-percent only for ratio/percent fields. Rejection still uses the deterministic formatter.
 - Checks (2026-09-20, Python 3.12.3), fresh:
   ```
   cd /workspace/backend
@@ -384,9 +384,18 @@ Use the repository’s actual QuantLib adapter test filename if different.
 
 Evidence:
 
+- `get_position_greeks` args: `greek`, `top_n`, `options_only`, `ranking_basis=abs_value`. OpenAI strict schemas cannot carry arrays, so family filtering is the boolean `options_only` flag (option families: european_option, fx_option, cap_floor, swaption). Deterministic router sets `options_only` when the question mentions options.
+- Report rows include `instrument_type`, `unit`, `convention`; report metadata includes `scale`, `pricing_engine`, portfolio and snapshot ids. Equities cannot win an options-only ranking on SAMPLE_PORTFOLIO. No QuantLib objects in the payload.
+- Checks (2026-09-20, Python 3.12.3), fresh. Repo has `tests/test_quantlib_pricing.py` (no `test_quantlib_adapter.py`):
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_position_greeks_tool.py tests/test_quantlib_pricing.py tests/test_ai_query_orchestration.py -q
+  ```
+  → **69 passed**, 1 warning, exit code **0** (1.42s).
+
 ## C07 — Preserve the complete investigation result
 
-- [ ] Return every executed tool turn, not only the last result.
+- [x] Return every executed tool turn, not only the last result.
 
 Dependencies: C03, C04, C05
 
@@ -415,6 +424,14 @@ python3 -m pytest   tests/test_ai_bounded_http.py   tests/test_api_typed_models.
 ```
 
 Evidence:
+
+- Product HEAD: `d2b87e2`. Typed `RiskQueryInvestigation` / `InvestigationTurn` on the HTTP response: ordered turns with tool name, validated args, success/error, structured result or typed safe error, grounding manifest, and provenance. `data.tool_result` remains the last successful result alias. Extra fields (`provider_response_id`, `previous_response_id`, prompts, CoT) are forbidden. Partial provider-error fallback includes executed turns and does not replay tools.
+- Checks (2026-09-20, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_bounded_http.py tests/test_api_typed_models.py tests/test_api_openapi_examples.py -q
+  ```
+  → **66 passed**, 1 warning, exit code **0** (2.24s).
 
 ## C08 — Add provider-neutral conversation state
 
