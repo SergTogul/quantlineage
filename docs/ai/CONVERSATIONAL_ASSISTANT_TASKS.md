@@ -137,7 +137,7 @@ Next eligible task: **C01** (not started).
 
 ## C01 — Freeze the conversational architecture contract
 
-- [ ] Add an ADR or update the AI design with the final model-led request flow.
+- [x] Add an ADR or update the AI design with the final model-led request flow.
 
 Dependencies: C00
 
@@ -170,6 +170,16 @@ rg -n "model-narrated|function_call_output|conversation|grounding manifest" docs
 ```
 
 Evidence:
+
+- Contract: `docs/adr/009-grounded-conversational-risk-assistant.md` (Accepted operating contract; implementation C02–C12). Indexed in `docs/adr/README.md`. Pointer in `docs/ai/openai_risk_assistant_design.md` and `docs/ai/CONVERSATIONAL_ASSISTANT_GOAL.md`.
+- Subagents (read-only drafts; root wrote the ADR):
+  - architecture-auditor: zero/one/many function-call sequences; `function_call_output` + reserved narration turn; MCP external; truthful modes; distinct model-turn vs tool-call budgets; provider-neutral `conversation_id`.
+  - security-grounding: `preflight-refused` vs model modes; typed safe errors; grounding-manifest schema; no fallback replay; server-only key; untrusted portfolio/tool data.
+  - quant-tools: ADR 006 binding; `get_position_greeks` filter/units/engine-identity target; `TOOL_CONTRACTS` canonical; no raw QuantLib; RiskRun submit disabled in the loop (including `get_top_risk_contributors`).
+- Checks (2026-09-20): `rg -n "model-narrated|function_call_output|conversation|grounding manifest" docs` matches ADR 009 (including `model-narrated`, `function_call_output`, `conversation_id`, `grounding manifest`) plus index/design pointers. No backend/frontend product files changed.
+- No application behavior changes.
+
+Next eligible tasks after C01: **C02**, **C04**, and **C06** (this loop stops; first by queue order is C02).
 
 ## C02 — Remove model-path deterministic shortcuts
 
