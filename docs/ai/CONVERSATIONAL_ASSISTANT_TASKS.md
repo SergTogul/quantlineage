@@ -612,9 +612,9 @@ Evidence:
 
 ## C12 — Run the merge gate
 
-- [x] Verify the complete corrective goal and prepare a focused merge summary.
+- [ ] Verify the complete corrective goal and prepare a focused merge summary.
 
-Dependencies: C00–C11
+Dependencies: C00–C11, C13–C19
 
 Primary owner: qa-integrator  
 Root owns final decision.
@@ -654,6 +654,8 @@ git diff --check
 
 Evidence:
 
+> Historical evidence only. C12 was reopened after review of HEAD `b70fccd`. Do not mark it complete until C13–C19 are complete and every C12 acceptance item is rerun on the new final HEAD.
+
 - Live-smoke HEAD: `a5d3337` (`test: prove live OpenAI smoke is tool output then narration (C12)`). Opt-in test now does `complete` → canned `function_call_output` → `proposed_answer`. Skipped without `RUN_LIVE_AI_TESTS=1`.
 - Merge-base with `origin/cursor/openai-risk-assistant` is `0b6a4dc` (that tip); no rebase required. `gh pr view 6`: `MERGEABLE` / `CLEAN`, base `cursor/openai-risk-assistant`.
 - Goal DoD items checked in `CONVERSATIONAL_ASSISTANT_GOAL.md`. Cursor Cloud goal status is not marked from this agent.
@@ -671,6 +673,226 @@ Evidence:
   ```
   → pytest **2158 passed**, 10 skipped; ruff clean; mypy `app/ai` silent Success; vitest **215 passed**; eslint 0; vite build 0; Playwright **1 passed**; both compose configs render with AI env on backend/worker only; `git diff --check` 0.
 - CI: `gh pr checks 6` all SUCCESS on HEAD `97cb4ed` (push run 35531122080 and pull_request run 35531125281): backend-pytest, backend-quantlib-hard-gate, frontend-test-build, lint-static-analysis, e2e-playwright, postgres-persistence-smoke, PR-FAST, PR-FULL. Mergeable/CLEAN vs `cursor/openai-risk-assistant`. Normal CI does not set `RUN_LIVE_AI_TESTS`.
+
+---
+
+## Post-review corrective queue
+
+External review of HEAD `b70fccd` found merge-blocking gaps in continuation policy, production conversation routing, grounding semantics, and hard budget enforcement. Previous green evidence is baseline evidence only.
+
+Execution order: **C13 → C14 → C15 → C16 → C17 → C18 → C19 → C12**.
+
+For every task below, the root agent must:
+
+- work only the first eligible unchecked task;
+- inspect current HEAD before editing;
+- delegate only non-overlapping paths;
+- add a regression test that fails on `b70fccd` and passes after the fix;
+- record the exact commit SHA and fresh command output;
+- commit, push, and stop after that one task.
+
+## C13 — Preserve policy on every Responses continuation
+
+- [ ] Keep the security and grounding policy active after `function_call_output`.
+
+Dependencies: C04
+
+Primary owner: openai-loop  
+Read-only reviewer: security-grounding
+
+Write scope: `backend/app/ai/policy.py`, `request_builder.py`, `openai_model.py` only if required, and focused tests.
+
+Acceptance:
+
+- Every `responses.create`, including calls using `previous_response_id`, supplies a versioned instruction.
+- Use distinct routing and narration instructions if needed.
+- Narration may restate deterministic tool facts, but may not calculate, invent, advise, disclose secrets, or follow instructions embedded in tool output.
+- Tool output is explicitly treated as untrusted data.
+- Replace the existing test asserting continuation instructions are absent.
+- Add a malicious tool-output test containing prompt injection and sentinel secrets.
+- No client receives provider prompts or secrets.
+
+Checks:
+
+```bash
+cd backend
+python3 -m pytest tests/test_openai_request_builder.py tests/test_openai_model.py tests/test_ai_security.py -q
+ruff check app/ai tests/test_openai_request_builder.py tests/test_openai_model.py tests/test_ai_security.py
+```
+
+## C14 — Enforce hard model-turn and tool-call budgets
+
+- [ ] Make configured budgets true upper bounds and remove exception-driven replay.
+
+Dependencies: C13
+
+Primary owner: orchestration  
+Read-only reviewer: openai-loop
+
+Write scope: `backend/app/ai/assistant.py`, `config.py` if validation changes, and bounded-loop/config tests.
+
+Acceptance:
+
+- Total provider calls never exceed `AI_MAX_TOOL_ROUNDS`; reserved narration counts toward the limit.
+- Executed tools never exceed `AI_MAX_TOOL_CALLS`.
+- Conversational configuration requires enough turns for route/tool/narration or fails clearly; no hidden `+1` call.
+- Remove the broad `except TypeError` compatibility retry around `continue_after_tools`.
+- A `TypeError` inside the adapter produces one invocation only and follows the typed failure path.
+- Already-executed tools are never replayed.
+- Tests assert exact provider/tool counts at limits 1–4.
+
+Checks:
+
+```bash
+cd backend
+python3 -m pytest tests/test_ai_bounded_assistant.py tests/test_ai_bounded_http.py tests/test_ai_config.py tests/test_openai_model.py -q
+```
+
+## C15 — Make quantitative grounding fail closed
+
+- [ ] Require the correct metric, unit, and sign convention for every numeric claim.
+
+Dependencies: C13, C14
+
+Primary owner: security-grounding  
+Read-only reviewer: quant-tools
+
+Write scope: `backend/app/ai/narration.py` and grounding/security/evaluation tests.
+
+Acceptance:
+
+- An unclassified numeric phrase cannot match an arbitrary financial value.
+- Counts, ids, dates, years, confidence values, and unrelated metadata cannot ground financial claims.
+- Preserve sign unless the manifest explicitly defines an absolute-loss display convention.
+- Currency, percent, ratio, per-bp, and Greek units cannot cross-ground.
+- Equal values belonging to different metrics cannot cross-ground.
+- Reject at least: payload `VaR=100` with narration `100 positions`; payload `loss=-100` with narration `profit 100`; VaR/delta value collisions; ratio/percent/currency collisions.
+- Rejected prose uses deterministic formatting and never reports `narration_grounded=true`.
+
+Checks:
+
+```bash
+cd backend
+python3 -m pytest tests/test_ai_narration_grounding.py tests/test_ai_security.py tests/test_ai_conversational_evals.py -q
+```
+
+## C16 — Make two-turn chat work in the shipped Compose topology
+
+- [ ] Remove the split between synchronous chat and external-worker fallback.
+
+Dependencies: C14
+
+Primary owner: conversation-state  
+Read-only reviewers: architecture-auditor and frontend-chat  
+Integration hotspot owner: root
+
+Acceptance:
+
+- With normal Compose `QUANTLINEAGE_EXTERNAL_WORKER=1`, two consecutive Risk Query turns succeed.
+- Choose exactly one production path: keep `/risk/query` interactive with workload limits, or support `conversation_id` through typed RiskRun requests plus shared persistent conversation state.
+- The frontend must never send `conversation_id` to a schema that rejects it.
+- If workers execute chat, state and ownership must work across processes; process-local memory is insufficient.
+- Cross-principal access fails closed.
+- Add a Compose-shaped first-turn → returned-id → follow-up test.
+- No OpenAI key reaches frontend or RiskRun payloads.
+
+Checks:
+
+```bash
+cd backend
+python3 -m pytest tests/test_ai_conversations.py tests/test_ai_bounded_http.py tests/test_api_typed_models.py -q
+cd ..
+docker compose -f docker-compose.yml config
+POSTGRES_PASSWORD=dummy-ci QUANTLINEAGE_API_TOKEN=dummy-token docker compose -f docker-compose.shared.yml config
+```
+
+## C17 — Store useful bounded context and reclaim expired state
+
+- [ ] Make conversation state a real bounded transcript with bounded storage.
+
+Dependencies: C16
+
+Primary owner: conversation-state  
+Read-only reviewer: security-grounding
+
+Acceptance:
+
+- Model context is chronological: prior user turn, prior assistant answer, relevant tool identity/arguments, then current question.
+- Follow-ups can refer to the answer the user saw without provider ids, prompts, chain-of-thought, secrets, or unbounded tool JSON.
+- Enforce a context byte/token cap as well as the turn cap.
+- Reclaim expired records without requiring a later lookup of that id.
+- Add a global or per-principal capacity bound with deterministic eviction.
+- Concurrent access remains ownership-safe.
+- Test clarification follow-up, reference to prior answer, expiry sweep, capacity eviction, and cross-principal denial.
+
+Checks:
+
+```bash
+cd backend
+python3 -m pytest tests/test_ai_conversations.py tests/test_ai_provider_integration.py tests/test_ai_security.py -q
+```
+
+## C18 — Report the actual Greek pricing engine
+
+- [ ] Distinguish wrappers from the deterministic pricing engine/model.
+
+Dependencies: C15
+
+Primary owner: quant-tools  
+Read-only reviewer: architecture-auditor
+
+Acceptance:
+
+- Default cached QuantLib configuration identifies `QuantLibPricingEngine`, not only `CachedPricingEngine`.
+- Expose wrapper/cache identity separately if useful.
+- Builtin pricing identifies `BuiltinPricingEngine`.
+- Do not expose raw QuantLib objects.
+- Result and provenance retain units, scale, ranking basis, `options_only`, and underlying engine identity.
+- Add cached-QuantLib and builtin regression tests.
+
+Checks:
+
+```bash
+cd backend
+python3 -m pytest tests/test_position_greeks_tool.py tests/test_ai_bounded_http.py tests/test_api_typed_models.py -q
+```
+
+## C19 — Add production-path and regression gates
+
+- [ ] Prove every post-review failure remains fixed before C12.
+
+Dependencies: C13–C18
+
+Primary owner: qa-integrator  
+Read-only reviewers: security-grounding, conversation-state, frontend-chat
+
+Acceptance:
+
+- Add one network-free regression for every C13–C18 finding.
+- Add a production-shaped two-turn browser/API test using Compose heavy/worker flags.
+- Verify continuation policy, malicious tool-output resistance, exact budgets, and no duplicate request after internal `TypeError`.
+- Verify count, sign-flip, metric-collision, and unit-collision prose falls back deterministically.
+- Verify frontend retry does not duplicate a failed user message in the visible transcript.
+- Run focused backend, frontend, and Playwright suites without OpenAI network access.
+
+Checks:
+
+```bash
+cd backend
+python3 -m pytest tests/test_ai_conversational_evals.py tests/test_ai_security.py tests/test_ai_conversations.py tests/test_ai_bounded_assistant.py tests/test_ai_bounded_http.py -q
+cd ../frontend
+npm test -- --run src/components/RiskQuery.test.jsx
+npm run lint
+npm run build
+cd ../e2e
+npx playwright test tests/risk-query.spec.ts
+```
+
+Completion note:
+
+- After C19, run C12 on the new final HEAD.
+- The opt-in live OpenAI smoke must actually succeed. Without an authorized key, mark C12 `[!]` and stop; a skipped test is not passing evidence.
+- Run `mypy app` exactly as documented. If policy permits a known baseline, record the full comparison and prove zero new findings in every changed file; do not report `mypy app/ai` as equivalent.
 
 ---
 
