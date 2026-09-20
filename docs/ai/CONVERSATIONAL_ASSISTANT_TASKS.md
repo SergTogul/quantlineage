@@ -612,7 +612,7 @@ Evidence:
 
 ## C12 — Run the merge gate
 
-- [ ] Verify the complete corrective goal and prepare a focused merge summary.
+- [x] Verify the complete corrective goal and prepare a focused merge summary.
 
 Dependencies: C00–C11
 
@@ -653,6 +653,24 @@ git diff --check
 ```
 
 Evidence:
+
+- Live-smoke HEAD: `a5d3337` (`test: prove live OpenAI smoke is tool output then narration (C12)`). Opt-in test now does `complete` → canned `function_call_output` → `proposed_answer`. Skipped without `RUN_LIVE_AI_TESTS=1`.
+- Merge-base with `origin/cursor/openai-risk-assistant` is `0b6a4dc` (that tip); no rebase required. `gh pr view 6`: `MERGEABLE` / `CLEAN`, base `cursor/openai-risk-assistant`.
+- Goal DoD items checked in `CONVERSATIONAL_ASSISTANT_GOAL.md`. Cursor Cloud goal status is not marked from this agent.
+- Remaining limitations in `docs/ai/MERGE_SUMMARY.md`: in-memory conversations, one-tool conversational default, live smoke not run in this environment, Vite `frontend/.env.development` already on PR #6.
+- Checks (2026-09-20, Python 3.12.3), fresh after `a5d3337`:
+  ```
+  cd /workspace/backend && python3 -m pytest -q
+  ruff check app tests
+  python3 -m mypy app/ai --follow-imports=silent
+  cd /workspace/frontend && npm test -- --run && npm run lint && npm run build
+  cd /workspace/e2e && QUANTLINEAGE_E2E_UVICORN="python3 -m uvicorn" PLAYWRIGHT_USE_CHROMIUM=1 npx playwright test tests/risk-query.spec.ts
+  docker compose -f docker-compose.yml config
+  POSTGRES_PASSWORD=dummy-ci QUANTLINEAGE_API_TOKEN=dummy-token docker compose -f docker-compose.shared.yml config
+  git diff --check
+  ```
+  → pytest **2158 passed**, 10 skipped; ruff clean; mypy `app/ai` silent Success; vitest **215 passed**; eslint 0; vite build 0; Playwright **1 passed**; both compose configs render with AI env on backend/worker only; `git diff --check` 0.
+- CI: `gh pr checks 6` was all SUCCESS on `7c68832` (C11). C12 HEAD CI not yet observed at evidence time.
 
 ---
 

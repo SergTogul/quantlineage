@@ -52,26 +52,29 @@ The model:
 
 ## Definition of done
 
-- [ ] OpenAI-enabled supported questions enter the model-led tool loop; no product-specific keyword shortcut bypasses OpenAI.
-- [ ] Security preflight may reject secret extraction or clearly prohibited actions before OpenAI, with metadata stating the true mode.
-- [ ] OpenAI mode supports at least one function call followed by a final model answer by default.
-- [ ] The backend executes only allowlisted, schema-valid tools.
-- [ ] Tool results are returned to OpenAI as `function_call_output`.
-- [ ] The final answer is generated after tool execution and is grounded in typed result fields.
-- [ ] Deterministic mode remains available and makes no OpenAI call.
-- [ ] MCP remains LLM-independent and shares the canonical contracts/executor.
-- [ ] Every executed tool turn and structured result is available in the HTTP response.
-- [ ] Follow-up questions work through an explicit conversation identifier or documented bounded-history mechanism.
-- [ ] Conversation ownership is checked against the authenticated principal.
-- [ ] Tool errors sent to OpenAI are sanitized; internal exception details remain server-side.
-- [ ] Numeric grounding is field-aware, unit-aware, and metric-aware—not global token matching.
-- [ ] `get_position_greeks` supports instrument-family filtering and returns units/conventions.
-- [ ] “Options delta” cannot return a cash equity merely because its absolute delta is larger.
-- [ ] Assistant metadata distinguishes model-narrated, model-routed, deterministic, preflight-refused, and fallback modes truthfully.
-- [ ] The React UI renders a message transcript, tool activity, clarification, errors, and follow-up turns.
-- [ ] Network-free unit/integration/evaluation tests cover all behavior.
-- [ ] A full backend, frontend, lint, type, build, and E2E gate passes after the PR is rebased.
-- [ ] The PR contains no temporary Cursor tracking files or unrelated environment/UI fixes.
+Verified in C12 (`docs/ai/CONVERSATIONAL_ASSISTANT_TASKS.md`). Cursor Cloud goal
+status is owned by the parent run, not this checklist.
+
+- [x] OpenAI-enabled supported questions enter the model-led tool loop; no product-specific keyword shortcut bypasses OpenAI.
+- [x] Security preflight may reject secret extraction or clearly prohibited actions before OpenAI, with metadata stating the true mode.
+- [x] OpenAI mode supports at least one function call followed by a final model answer by default.
+- [x] The backend executes only allowlisted, schema-valid tools.
+- [x] Tool results are returned to OpenAI as `function_call_output`.
+- [x] The final answer is generated after tool execution and is grounded in typed result fields.
+- [x] Deterministic mode remains available and makes no OpenAI call.
+- [x] MCP remains LLM-independent and shares the canonical contracts/executor.
+- [x] Every executed tool turn and structured result is available in the HTTP response.
+- [x] Follow-up questions work through an explicit conversation identifier or documented bounded-history mechanism.
+- [x] Conversation ownership is checked against the authenticated principal.
+- [x] Tool errors sent to OpenAI are sanitized; internal exception details remain server-side.
+- [x] Numeric grounding is field-aware, unit-aware, and metric-aware—not global token matching.
+- [x] `get_position_greeks` supports instrument-family filtering and returns units/conventions.
+- [x] “Options delta” cannot return a cash equity merely because its absolute delta is larger.
+- [x] Assistant metadata distinguishes model-narrated, model-routed, deterministic, preflight-refused, and fallback modes truthfully.
+- [x] The React UI renders a message transcript, tool activity, clarification, errors, and follow-up turns.
+- [x] Network-free unit/integration/evaluation tests cover all behavior.
+- [x] A full backend, frontend, lint, type, build, and E2E gate passes after the PR is rebased.
+- [x] The PR contains no temporary Cursor tracking files or unrelated environment/UI fixes.
 
 ## Product rules
 
