@@ -178,7 +178,6 @@ class BoundedRiskAssistant:
         pending_outputs: list[FunctionCallOutput] | None = None
         previous_response_id: str | None = None
         last_response: RiskAssistantModelResponse | None = None
-        tools_executed = 0
         reserve_narration = False
         # One extra slot beyond the model-turn budget for a reserved narration continue.
         for round_index in range(1, max_model_turns + 2):
@@ -246,7 +245,7 @@ class BoundedRiskAssistant:
                     stopped_reason="refusal",
                 )
 
-            if reserve_narration or tools_executed >= max_tool_calls:
+            if reserve_narration or len(tool_turns) >= max_tool_calls:
                 return RiskAssistantResult(
                     intent=response.intent,
                     tool_turns=tool_turns,
@@ -278,9 +277,8 @@ class BoundedRiskAssistant:
             previous_response_id = (
                 response.provider_response_id or f"resp_round_{round_index}"
             )
-            tools_executed += 1
             reserve_narration = (
-                tools_executed >= max_tool_calls or round_index >= max_model_turns
+                len(tool_turns) >= max_tool_calls or round_index >= max_model_turns
             )
             # Always continue so the executed result is sent as function_call_output.
 

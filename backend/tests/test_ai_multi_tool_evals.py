@@ -48,10 +48,14 @@ class _ScriptedLoopModel:
     def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
         del request
         self.complete_count += 1
+        if not self._responses:
+            raise AssertionError("ScriptedLoopModel complete queue exhausted")
         return self._responses.pop(0)
 
     def continue_after_tools(self, **_kwargs: Any) -> RiskAssistantModelResponse:
         self.continue_count += 1
+        if not self._responses:
+            raise AssertionError("ScriptedLoopModel continue queue exhausted")
         return self._responses.pop(0)
 
 
@@ -273,6 +277,9 @@ INVESTIGATION_CASES: tuple[InvestigationCase, ...] = (
         model_turns=(
             _tool(RiskToolName.GET_LIMITS, call_id="c1", response_id="r1"),
             _tool(RiskToolName.GET_LIMITS, call_id="c2", response_id="r2"),
+            # C03 reserved-narration continue: still a tool, so the loop stops
+            # without executing a third call.
+            _tool(RiskToolName.GET_LIMITS, call_id="c3", response_id="r3"),
         ),
         expected_tools=("get_limits", "get_limits"),
         expected_stopped="round_limit",
@@ -337,5 +344,8 @@ def test_investigation_eval_covers_required_categories() -> None:
 def test_investigation_sequences_stay_within_four_rounds() -> None:
     for case in INVESTIGATION_CASES:
         assert case.max_rounds <= 4
-        tool_turns = sum(1 for turn in case.model_turns if turn.tool_name)
-        assert tool_turns <= case.max_rounds
+        executed = len(case.expected_tools)
+        assert executed <= case.max_rounds
+        assert executed <= 4
+        # C03: last executed tool may reserve one extra model continue.
+        assert len(case.model_turns) <= case.max_rounds + 1
