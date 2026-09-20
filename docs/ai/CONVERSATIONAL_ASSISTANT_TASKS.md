@@ -312,7 +312,7 @@ Evidence:
 
 ## C05 — Replace token grounding with typed claim grounding
 
-- [ ] Implement field-aware, unit-aware quantitative narration validation.
+- [x] Implement field-aware, unit-aware quantitative narration validation.
 
 Dependencies: C01, C03
 
@@ -339,6 +339,14 @@ python3 -m pytest   tests/test_ai_narration_grounding.py   tests/test_ai_multi_t
 ```
 
 Evidence:
+
+- Typed `GroundingClaim` manifests bind metric, value, unit, entity, field path, and optional percent-from-fraction. Years, ids, counts, and dates are not financial claims. Global numeric-token collection no longer approves invented VaR/Greeks. Attacks covered: year/id → VaR, delta → VaR. Rounding/`32,798` tolerated; `32000` is not. Fraction-to-percent only for ratio/percent fields. Rejection still uses the deterministic formatter.
+- Checks (2026-09-20, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_narration_grounding.py tests/test_ai_multi_tool_evals.py tests/test_ai_security.py -q
+  ```
+  → **45 passed**, 1 warning, exit code **0** (1.48s).
 
 ## C06 — Correct and type the position-Greeks tool
 

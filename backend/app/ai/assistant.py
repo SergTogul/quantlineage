@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.ai.narration import (
     format_tool_turns_deterministically,
     ground_narration,
+    build_grounding_manifest,
 )
 from app.risk.query import (
     RiskAssistantModel,
@@ -298,12 +299,11 @@ class BoundedRiskAssistant:
         rounds_used: int,
         stopped_reason: StoppedReason = "final",
     ) -> RiskAssistantResult:
-        payloads = [
-            turn.tool_output
-            for turn in tool_turns
-            if isinstance(turn.tool_output, dict)
-        ]
-        grounding = ground_narration(response.proposed_answer or "", payloads)
+        manifests = []
+        for turn in tool_turns:
+            if isinstance(turn.tool_output, dict):
+                manifests.extend(build_grounding_manifest(turn.tool_name, turn.tool_output))
+        grounding = ground_narration(response.proposed_answer or "", manifests)
         if grounding.accepted:
             return RiskAssistantResult(
                 intent=response.intent or "final",

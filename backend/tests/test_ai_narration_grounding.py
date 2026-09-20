@@ -11,7 +11,6 @@ from app.ai.assistant import (
 )
 from app.ai.narration import (
     NarrationGroundingResult,
-    collect_allowed_numeric_tokens,
     format_tool_turns_deterministically,
     ground_narration,
 )
@@ -65,11 +64,17 @@ def test_ground_narration_accepts_non_numeric_prose() -> None:
 
 
 def test_collect_allowed_tokens_includes_fmt_and_percent_forms() -> None:
-    allowed = collect_allowed_numeric_tokens(
-        [{"var_99": 1234.0, "confidence": 0.99}]
+    from app.ai.narration import GroundingClaim, build_grounding_manifest
+
+    claims = build_grounding_manifest(
+        "get_var_es",
+        {"var_99": 1234.0, "confidence": 0.99},
     )
-    assert "1234" in allowed or "1,234" in allowed
-    assert "99" in allowed or "99%" in allowed
+    assert any(c.metric == "var" and abs(c.value - 1234.0) < 1e-9 for c in claims)
+    confidence = next(c for c in claims if c.metric == "confidence")
+    assert confidence.unit == "ratio"
+    assert confidence.allow_percent_from_fraction is True
+    assert all(isinstance(c, GroundingClaim) for c in claims)
 
 
 def test_bounded_assistant_accepts_grounded_final_narration() -> None:
@@ -148,6 +153,64 @@ def test_bounded_assistant_falls_back_when_narration_has_hallucinated_numbers() 
     assert "444" in result.proposed_answer
     # Deterministic formatter path
     assert "VaR" in result.proposed_answer
+
+
+def test_year_or_id_cannot_ground_invented_var() -> None:
+    payloads = [
+        {
+            "as_of_year": 2024,
+            "run_id": "32798",
+            "portfolio_id": "p-2024",
+            "methods": [{"method": "historical", "var": 100.0, "confidence": 0.99}],
+        }
+    ]
+    year_attack = ground_narration("99% VaR is 2024.", payloads)
+    assert year_attack.accepted is False
+    assert any("2024" in token for token in year_attack.rejected_tokens)
+
+    id_attack = ground_narration("VaR is 32798.", payloads)
+    assert id_attack.accepted is False
+    assert any("32798" in token for token in id_attack.rejected_tokens)
+
+
+def test_delta_value_cannot_ground_a_var_claim() -> None:
+    payloads = [
+        {
+            "greek": "delta",
+            "positions": [{"position_id": "opt-1", "greek": "delta", "value": 444.0}],
+        }
+    ]
+    result = ground_narration("Historical 99% VaR is 444.", payloads)
+    assert result.accepted is False
+    assert any("444" in token for token in result.rejected_tokens)
+
+
+def test_rounding_and_thousands_formatting_are_tolerated() -> None:
+    payloads = [{"methods": [{"var": 32798.4, "confidence": 0.99}]}]
+    assert ground_narration("VaR is 32,798.", payloads).accepted is True
+    assert ground_narration("VaR is 32798.", payloads).accepted is True
+    assert ground_narration("VaR is 32,798.4.", payloads).accepted is True
+    assert ground_narration("VaR is 32000.", payloads).accepted is False
+
+
+def test_fraction_to_percent_only_for_percentage_or_ratio_fields() -> None:
+    percent_ok = ground_narration(
+        "Contribution share is 42%.",
+        [{"contribution_pct": 42.0, "count": 42}],
+    )
+    assert percent_ok.accepted is True
+
+    ratio_ok = ground_narration(
+        "Historical 99% VaR is 444.",
+        [{"methods": [{"var": 444.0, "confidence": 0.99}]}],
+    )
+    assert ratio_ok.accepted is True
+
+    not_percent = ground_narration(
+        "VaR is 50%.",
+        [{"methods": [{"var": 0.5, "confidence": 0.99}]}],
+    )
+    assert not_percent.accepted is False
 
 
 def test_format_tool_turns_deterministically_uses_last_successful_payload() -> None:
