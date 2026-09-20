@@ -23,6 +23,22 @@ def test_deterministic_router_maps_biggest_options_delta_to_greeks_tool() -> Non
     assert plan.tool_args.get("greek") == "delta"
 
 
+def test_deterministic_router_clarifies_unsupported_theta_and_rho() -> None:
+    for question in ("What is my theta?", "Show rho"):
+        plan = RiskQueryEngine().route(question)
+        assert plan.needs_clarification is True, question
+        assert plan.tool_name is None, question
+        clarification = (plan.clarification or "").lower()
+        assert "theta" in clarification or "rho" in clarification, question
+
+        service = build_portfolio_service()
+        response = RiskQueryEngine().answer(question, SAMPLE_PORTFOLIO, service)
+        assert response.requires_clarification is True, question
+        assert response.tool_name is None, question
+        assert "assistant" not in response.data, question
+        assert "valuation payloads" in response.answer.lower(), question
+
+
 def test_answer_biggest_options_delta_returns_grounded_positions() -> None:
     service = build_portfolio_service()
     assert isinstance(service, PortfolioService)

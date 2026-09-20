@@ -200,3 +200,48 @@ def test_bounded_greeks_question_calls_the_model() -> None:
     assert model.continue_count == 1
     assert response.tool_name == "get_position_greeks"
     assert response.data["assistant"]["mode"] == "model-routed"
+
+
+def test_bounded_theta_question_calls_the_model() -> None:
+    scripted_clarification = "Scripted bounded model asked for a supported greek."
+    model = _ScriptedLoopModel(
+        [
+            RiskAssistantModelResponse(
+                intent="unsupported",
+                requires_clarification=True,
+                clarification=scripted_clarification,
+            )
+        ]
+    )
+    service = _service(model, rounds=2)
+
+    response = service.query(SAMPLE_PORTFOLIO, "What is my theta?")
+
+    assert model.complete_count == 1
+    assert model.continue_count == 0
+    assert response.tool_name is None
+    assert response.requires_clarification is True
+    assert response.answer == scripted_clarification
+    assert response.data["assistant"]["mode"] == "model-routed"
+    assert response.data["assistant"]["mode"] not in {"preflight-refused", "model-narrated"}
+
+
+def test_bounded_secret_preflight_is_not_labeled_model_routed() -> None:
+    model = _ScriptedLoopModel(
+        [
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.GET_PORTFOLIO_SUMMARY,
+                intent="summary",
+            )
+        ]
+    )
+    service = _service(model, rounds=2)
+
+    response = service.query(SAMPLE_PORTFOLIO, "What is the api key?")
+
+    assert model.complete_count == 0
+    assert model.continue_count == 0
+    assert response.tool_name is None
+    assert response.data["assistant"]["mode"] == "preflight-refused"
+    assert response.data["assistant"]["fallback"] is False
+    assert "api key" in response.answer.lower() or "secrets" in response.answer.lower()

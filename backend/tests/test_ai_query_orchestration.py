@@ -219,6 +219,28 @@ def test_m11_query_endpoint_exposes_tool_contract_metadata() -> None:
     assert body["data"]["tool_result"]["contributors"]
 
 
+def test_openai_path_theta_question_calls_complete() -> None:
+    engine = RiskQueryEngine()
+    service = _FixtureService()
+    model = _ScriptedModel(
+        RiskAssistantModelResponse(
+            intent="unsupported",
+            requires_clarification=True,
+            clarification="Ask for delta, gamma, or vega.",
+        )
+    )
+
+    response = engine.answer_with_model(
+        "What is my theta?", SAMPLE_PORTFOLIO, service, model
+    )
+
+    assert len(model.requests) == 1
+    assert service.calls == []
+    assert response.data["assistant"]["mode"] == "model-routed"
+    assert response.data["assistant"]["mode"] != "preflight-refused"
+    assert "Ask for delta" in response.answer
+
+
 def test_m11_model_tool_loop_executes_selected_deterministic_tool() -> None:
     engine = RiskQueryEngine()
     service = _FixtureService()

@@ -218,6 +218,32 @@ def test_model_greeks_questions_are_not_bypassed() -> None:
         assert fixture.calls == ["position_greeks"], question
         assert response.tool_name == "get_position_greeks", question
         assert response.data["assistant"]["mode"] == "model-routed", question
+        assert "get_position_greeks" in {
+            tool["name"] for tool in fixture.risk_assistant_model.requests[0].tools
+        }, question
+
+
+def test_model_theta_and_rho_questions_are_not_preflight_shortcuts() -> None:
+    """Theta/rho are unsupported Greeks, not security preflight — the model must run."""
+    scripted_clarification = "Scripted model asked for a supported greek."
+    for question in ("What is my theta?", "What is our rho?"):
+        fixture = _FixtureService()
+        fixture.risk_assistant_model = _ScriptedModel(
+            RiskAssistantModelResponse(
+                intent="unsupported",
+                requires_clarification=True,
+                clarification=scripted_clarification,
+            )
+        )
+        response = fixture.query(SAMPLE_PORTFOLIO, question)
+        assert len(fixture.risk_assistant_model.requests) == 1, question
+        assert fixture.calls == [], question
+        assistant = response.data["assistant"]
+        assert assistant["mode"] == "model-routed", question
+        assert assistant["mode"] not in {"preflight-refused", "model-narrated"}, question
+        assert assistant["fallback"] is False, question
+        assert response.answer == scripted_clarification, question
+        assert "valuation payloads" not in response.answer.lower(), question
 
 
 def test_secret_preflight_is_not_labeled_model_routed() -> None:
