@@ -522,7 +522,7 @@ Evidence:
 
 Evidence:
 
-- Commit pending — `BoundedRiskAssistant` in `backend/app/ai/assistant.py` executes validated read-only tools, appends `FunctionCallOutput`, and continues via `OpenAIRiskAssistantModel.continue_after_tools` / `build_openai_continue_request` for at most four rounds; side-effecting tools refused by default; `AI_MAX_TOOL_ROUNDS` accepts `1`–`4` (default `1`); per-round `max_tool_calls` stays `1`.
+- Commit `d698e83` — `BoundedRiskAssistant` in `backend/app/ai/assistant.py` executes validated read-only tools, appends `FunctionCallOutput`, and continues via `OpenAIRiskAssistantModel.continue_after_tools` / `build_openai_continue_request` for at most four rounds; side-effecting tools refused by default; `AI_MAX_TOOL_ROUNDS` accepts `1`–`4` (default `1`); per-round `max_tool_calls` stays `1`.
 - Checks: `cd backend && python3 -m pytest tests/test_ai_bounded_assistant.py tests/test_ai_config.py tests/test_openai_request_builder.py tests/test_openai_model.py tests/test_ai_assistant_protocol.py tests/test_ai_provider_factory.py tests/test_ai_provider_integration.py -q` → 89 passed.
 
 ### T22 — Add numeric narration grounding
