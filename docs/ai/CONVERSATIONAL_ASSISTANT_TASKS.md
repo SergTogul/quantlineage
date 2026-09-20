@@ -260,7 +260,7 @@ python3 -m pytest   tests/test_ai_bounded_assistant.py   tests/test_ai_bounded_h
 
 Evidence:
 
-- Product: conversational OpenAI defaults are `AI_ASSISTANT_LOOP=conversational`, `AI_MAX_TOOL_ROUNDS` (model turns) **2**, `AI_MAX_TOOL_CALLS` (executed tools) **1**. `AISettings.max_model_turns` aliases the model-turn budget. Explicit `AI_ASSISTANT_LOOP=router` is one-shot (`model-routed` only; never `model-narrated`).
+- Product HEAD: `0ccac58` (`feat: default OpenAI chat to tool output then reserved narration (C03)`). Conversational OpenAI defaults are `AI_ASSISTANT_LOOP=conversational`, `AI_MAX_TOOL_ROUNDS` (model turns) **2**, `AI_MAX_TOOL_CALLS` (executed tools) **1**. `AISettings.max_model_turns` aliases the model-turn budget. Explicit `AI_ASSISTANT_LOOP=router` is one-shot (`model-routed` only; never `model-narrated`).
 - `BoundedRiskAssistant` always appends `function_call_output` and continues after an executed tool. A tool on the last permitted tool or model turn sets `reserve_narration` (`tool_choice=none`). Final text is parsed only on `continue_after_tools` (`allow_final_text=True`); `complete()` still treats text as clarification.
 - HTTP: OpenAI + conversational uses the bounded loop even for one tool. Grounded narration stamps `model-narrated`. Provider error after execution still returns truncated fallback without replay.
 - `SIDE_EFFECTING_TOOLS` includes `run_portfolio_risk`, `run_stress`, and `get_top_risk_contributors` (RiskRun submit).
