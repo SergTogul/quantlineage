@@ -509,11 +509,21 @@ These tasks require the T15 gate and an explicit goal update to start — then t
 
 ### T20 — Introduce the multi-tool assistant interface
 
-- [ ] Add a higher-level `RiskAssistant` protocol without breaking the milestone 1 adapter.
+- [x] Add a higher-level `RiskAssistant` protocol without breaking the milestone 1 adapter.
+
+Evidence:
+
+- Commit `d9b2a32` — `backend/app/ai/assistant.py` adds `RiskAssistant` protocol, request/result types, and `OneShotRiskAssistant` / `adapt_model_as_assistant` wrapping `RiskAssistantModel.complete`.
+- Checks: `cd backend && python3 -m pytest tests/test_ai_assistant_protocol.py tests/test_ai_provider_integration.py tests/test_ai_query_orchestration.py -q` → 33 passed.
 
 ### T21 — Implement the bounded Responses tool loop
 
-- [ ] Execute function calls, append `function_call_output`, and continue for at most four rounds.
+- [x] Execute function calls, append `function_call_output`, and continue for at most four rounds.
+
+Evidence:
+
+- Commit pending — `BoundedRiskAssistant` in `backend/app/ai/assistant.py` executes validated read-only tools, appends `FunctionCallOutput`, and continues via `OpenAIRiskAssistantModel.continue_after_tools` / `build_openai_continue_request` for at most four rounds; side-effecting tools refused by default; `AI_MAX_TOOL_ROUNDS` accepts `1`–`4` (default `1`); per-round `max_tool_calls` stays `1`.
+- Checks: `cd backend && python3 -m pytest tests/test_ai_bounded_assistant.py tests/test_ai_config.py tests/test_openai_request_builder.py tests/test_openai_model.py tests/test_ai_assistant_protocol.py tests/test_ai_provider_factory.py tests/test_ai_provider_integration.py -q` → 89 passed.
 
 ### T22 — Add numeric narration grounding
 

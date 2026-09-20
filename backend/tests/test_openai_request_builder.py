@@ -8,8 +8,10 @@ import pytest
 
 from app.ai.config import DEFAULT_MAX_OUTPUT_TOKENS, AISettings
 from app.ai.policy import ASSISTANT_POLICY_INSTRUCTION, ASSISTANT_POLICY_VERSION
+from app.ai.assistant import FunctionCallOutput
 from app.ai.request_builder import (
     OpenAIResponsesRequest,
+    build_openai_continue_request,
     build_openai_responses_request,
     request_payload_text,
 )
@@ -185,3 +187,52 @@ def test_openai_model_is_required_to_build_request() -> None:
 
     with pytest.raises(ValueError, match="openai_model is required"):
         build_openai_responses_request(request, settings)
+
+
+def test_continue_request_appends_function_call_outputs(
+    openai_settings: AISettings,
+) -> None:
+    """T21: previous_response_id + function_call_output items; one tool call per round."""
+    multi_round = AISettings(
+        provider="openai",
+        openai_model="gpt-test-model",
+        timeout_seconds=42.0,
+        max_output_tokens=256,
+        max_tool_rounds=4,
+    )
+    payload = build_openai_continue_request(
+        previous_response_id="resp_abc",
+        tool_outputs=[
+            FunctionCallOutput(call_id="call_1", output='{"var": 1.2}'),
+        ],
+        settings=multi_round,
+    )
+
+    assert payload.create_params["previous_response_id"] == "resp_abc"
+    assert payload.create_params["max_tool_calls"] == 1
+    assert payload.create_params["input"] == [
+        {
+            "type": "function_call_output",
+            "call_id": "call_1",
+            "output": '{"var": 1.2}',
+        }
+    ]
+    assert "instructions" not in payload.create_params
+    assert payload.create_params["tools"] == openai_function_tools()
+
+
+def test_initial_request_keeps_one_tool_call_per_round_when_max_rounds_is_four(
+    openai_settings: AISettings,
+) -> None:
+    settings = AISettings(
+        provider="openai",
+        openai_model="gpt-test-model",
+        timeout_seconds=30.0,
+        max_output_tokens=256,
+        max_tool_rounds=4,
+    )
+    payload = build_openai_responses_request(
+        RiskAssistantModelRequest(question="Show VaR", tools=[]),
+        settings,
+    )
+    assert payload.create_params["max_tool_calls"] == 1

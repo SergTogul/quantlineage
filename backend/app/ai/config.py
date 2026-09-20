@@ -18,7 +18,10 @@ DEFAULT_AI_TIMEOUT_SECONDS = 30.0
 MAX_AI_TIMEOUT_SECONDS = 120.0
 DEFAULT_MAX_OUTPUT_TOKENS = 512
 MAX_AI_OUTPUT_TOKENS = 4096
-REQUIRED_MAX_TOOL_ROUNDS = 1
+DEFAULT_MAX_TOOL_ROUNDS = 1
+MAX_TOOL_ROUNDS = 4
+# Backward-compatible alias (milestone 1 default).
+REQUIRED_MAX_TOOL_ROUNDS = DEFAULT_MAX_TOOL_ROUNDS
 
 _SUPPORTED_PROVIDERS: frozenset[str] = frozenset({"deterministic", "openai"})
 
@@ -98,20 +101,20 @@ def _parse_max_output_tokens(raw: str | None) -> int:
 
 def _parse_max_tool_rounds(raw: str | None) -> int:
     if raw is None or not raw.strip():
-        return REQUIRED_MAX_TOOL_ROUNDS
+        return DEFAULT_MAX_TOOL_ROUNDS
     try:
         rounds = int(raw.strip())
     except ValueError as exc:
         raise ValueError(
             "Invalid AI_MAX_TOOL_ROUNDS: "
-            f"{raw.strip()!r}. Milestone 1 requires exactly "
-            f"{REQUIRED_MAX_TOOL_ROUNDS}."
+            f"{raw.strip()!r}. Expected an integer between 1 and "
+            f"{MAX_TOOL_ROUNDS}."
         ) from exc
-    if rounds != REQUIRED_MAX_TOOL_ROUNDS:
+    if rounds < 1 or rounds > MAX_TOOL_ROUNDS:
         raise ValueError(
             "Invalid AI_MAX_TOOL_ROUNDS: "
-            f"{rounds!r}. Milestone 1 requires exactly "
-            f"{REQUIRED_MAX_TOOL_ROUNDS}."
+            f"{rounds!r}. Expected an integer between 1 and "
+            f"{MAX_TOOL_ROUNDS}."
         )
     return rounds
 
@@ -138,7 +141,7 @@ def get_ai_settings(
     - ``OPENAI_MODEL`` — model name (required when provider is openai)
     - ``AI_TIMEOUT_SECONDS`` — request timeout (default 30, max 120)
     - ``AI_MAX_OUTPUT_TOKENS`` — output token cap (default 512, max 4096)
-    - ``AI_MAX_TOOL_ROUNDS`` — must be ``1`` in milestone 1
+    - ``AI_MAX_TOOL_ROUNDS`` — ``1`` (default) through ``4`` (bounded loop)
 
     ``OPENAI_API_KEY`` is read via :func:`get_openai_api_key` when provider is
     ``openai``; it is never stored on the returned settings object.
@@ -177,11 +180,11 @@ def get_ai_settings(
         )
     if max_tool_rounds is not None:
         resolved_rounds = max_tool_rounds
-        if resolved_rounds != REQUIRED_MAX_TOOL_ROUNDS:
+        if resolved_rounds < 1 or resolved_rounds > MAX_TOOL_ROUNDS:
             raise ValueError(
                 "Invalid max_tool_rounds: "
-                f"{resolved_rounds!r}. Milestone 1 requires exactly "
-                f"{REQUIRED_MAX_TOOL_ROUNDS}."
+                f"{resolved_rounds!r}. Expected an integer between 1 and "
+                f"{MAX_TOOL_ROUNDS}."
             )
     else:
         resolved_rounds = _parse_max_tool_rounds(

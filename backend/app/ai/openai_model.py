@@ -1,10 +1,10 @@
-"""OpenAI Responses API adapter for one QuantLineage tool-selection turn."""
+"""OpenAI Responses API adapter for QuantLineage tool-selection turns."""
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Protocol
+from typing import Any, Protocol, Sequence
 
 from app.ai.config import AISettings, get_openai_api_key
 from app.ai.errors import (
@@ -16,7 +16,10 @@ from app.ai.errors import (
     redact_request_kwargs,
     sanitize_provider_message,
 )
-from app.ai.request_builder import build_openai_responses_request
+from app.ai.request_builder import (
+    build_openai_continue_request,
+    build_openai_responses_request,
+)
 from app.risk.query import RiskAssistantModelRequest, RiskAssistantModelResponse
 
 logger = logging.getLogger(__name__)
@@ -37,7 +40,7 @@ class OpenAIResponsesClient(Protocol):
 
 
 class OpenAIRiskAssistantModel:
-    """OpenAI-backed model adapter for one strict tool-selection turn."""
+    """OpenAI-backed model adapter for tool-selection and continue turns."""
 
     def __init__(
         self,
@@ -53,14 +56,45 @@ class OpenAIRiskAssistantModel:
         Incomplete Responses API outputs are retried once before raising.
         """
         openai_request = build_openai_responses_request(request, self._settings)
-        create_kwargs = {
-            **openai_request.create_params,
-            "timeout": openai_request.timeout_seconds,
-        }
+        return self._create_parsed(openai_request.create_params, openai_request.timeout_seconds)
+
+    def continue_after_tools(
+        self,
+        *,
+        previous_response_id: str,
+        tool_outputs: Sequence[Any],
+        request: RiskAssistantModelRequest,
+    ) -> RiskAssistantModelResponse:
+        """Append ``function_call_output`` items and continue the Responses turn.
+
+        ``request`` is retained for protocol symmetry with scripted loop models;
+        continue payloads use ``previous_response_id`` rather than re-sending the
+        user question.
+        """
+        del request  # routing context lives on previous_response_id
+        openai_request = build_openai_continue_request(
+            previous_response_id=previous_response_id,
+            tool_outputs=tool_outputs,
+            settings=self._settings,
+        )
+        return self._create_parsed(
+            openai_request.create_params,
+            openai_request.timeout_seconds,
+            allow_final_text=True,
+        )
+
+    def _create_parsed(
+        self,
+        create_kwargs: dict[str, Any],
+        timeout_seconds: float,
+        *,
+        allow_final_text: bool = False,
+    ) -> RiskAssistantModelResponse:
+        call_kwargs = {**create_kwargs, "timeout": timeout_seconds}
         last_incomplete: OpenAIIncompleteResponseError | None = None
         for attempt in range(2):
             try:
-                sdk_response = self._client.responses.create(**create_kwargs)
+                sdk_response = self._client.responses.create(**call_kwargs)
             except Exception as exc:
                 mapped = map_openai_sdk_error(exc, api_key=get_openai_api_key())
                 logger.warning(
@@ -70,14 +104,17 @@ class OpenAIRiskAssistantModel:
                     extra={
                         "error_code": mapped.code,
                         "request": redact_request_kwargs(
-                            create_kwargs,
+                            call_kwargs,
                             api_key=get_openai_api_key(),
                         ),
                     },
                 )
                 raise mapped from exc
             try:
-                return _parse_sdk_response(sdk_response)
+                return _parse_sdk_response(
+                    sdk_response,
+                    allow_final_text=allow_final_text,
+                )
             except OpenAIIncompleteResponseError as exc:
                 last_incomplete = exc
                 if attempt == 0:
@@ -92,8 +129,13 @@ class OpenAIRiskAssistantModel:
         raise last_incomplete
 
 
-def _parse_sdk_response(response: Any) -> RiskAssistantModelResponse:
+def _parse_sdk_response(
+    response: Any,
+    *,
+    allow_final_text: bool = False,
+) -> RiskAssistantModelResponse:
     _raise_for_incomplete_response(response)
+    response_id = getattr(response, "id", None)
 
     output = getattr(response, "output", None) or []
     function_calls = [
@@ -103,7 +145,14 @@ def _parse_sdk_response(response: Any) -> RiskAssistantModelResponse:
     rationale = _optional_rationale(assistant_text)
 
     if not function_calls:
-        return _parse_text_only_response(output, assistant_text)
+        parsed = _parse_text_only_response(
+            output,
+            assistant_text,
+            allow_final_text=allow_final_text,
+        )
+        return parsed.model_copy(
+            update={"provider_response_id": response_id or parsed.provider_response_id}
+        )
 
     if len(function_calls) > 1:
         raise OpenAIMultipleToolCallsError(
@@ -127,11 +176,14 @@ def _parse_sdk_response(response: Any) -> RiskAssistantModelResponse:
             f"Function call arguments must be a JSON object for {name!r}."
         )
 
+    call_id = getattr(call, "call_id", None) or getattr(call, "id", None)
     return RiskAssistantModelResponse(
         tool_name=name,
         tool_args=tool_args,
         rationale=rationale,
         proposed_answer=None,
+        tool_call_id=str(call_id) if call_id else None,
+        provider_response_id=str(response_id) if response_id else None,
     )
 
 
@@ -152,6 +204,8 @@ def _raise_for_incomplete_response(response: Any) -> None:
 def _parse_text_only_response(
     output: list[Any],
     assistant_text: str | None,
+    *,
+    allow_final_text: bool = False,
 ) -> RiskAssistantModelResponse:
     refusal_text = _extract_refusal_text(output)
     if refusal_text:
@@ -163,6 +217,11 @@ def _parse_text_only_response(
 
     text = (assistant_text or "").strip()
     if text and not _contains_numeric_prose(text):
+        if allow_final_text:
+            return RiskAssistantModelResponse(
+                intent="final",
+                proposed_answer=text,
+            )
         return RiskAssistantModelResponse(
             intent="ambiguous",
             requires_clarification=True,

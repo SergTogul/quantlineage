@@ -114,6 +114,71 @@ def _function_call(
     )
 
 
+def test_complete_captures_call_id_and_response_id(openai_settings: AISettings) -> None:
+    sdk_response = _make_response(
+        _function_call(
+            name="get_var_es",
+            arguments='{"confidence": 0.99}',
+            call_id="call_xyz",
+        )
+    )
+    sdk_response = sdk_response.model_copy(update={"id": "resp_xyz"})
+    client = FakeOpenAIClient(FakeResponses(response=sdk_response))
+    model = OpenAIRiskAssistantModel(client, openai_settings)
+
+    result = model.complete(
+        RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
+    )
+
+    assert result.tool_call_id == "call_xyz"
+    assert result.provider_response_id == "resp_xyz"
+
+
+def test_continue_after_tools_sends_function_call_output(
+    openai_settings: AISettings,
+) -> None:
+    from app.ai.assistant import FunctionCallOutput
+
+    sdk_response = _make_response(
+        ResponseOutputMessage(
+            id="msg_1",
+            type="message",
+            role="assistant",
+            status="completed",
+            content=[
+                ResponseOutputText(
+                    type="output_text",
+                    text="Done.",
+                    annotations=[],
+                )
+            ],
+        )
+    )
+    sdk_response = sdk_response.model_copy(update={"id": "resp_2"})
+    fake = FakeResponses(response=sdk_response)
+    model = OpenAIRiskAssistantModel(FakeOpenAIClient(fake), openai_settings)
+
+    result = model.continue_after_tools(
+        previous_response_id="resp_1",
+        tool_outputs=[
+            FunctionCallOutput(call_id="call_1", output='{"ok": true}'),
+        ],
+        request=RiskAssistantModelRequest(
+            question="Show VaR", tools=tool_contract_schemas()
+        ),
+    )
+
+    assert result.proposed_answer == "Done."
+    assert result.requires_clarification is False
+    assert result.provider_response_id == "resp_2"
+    assert len(fake.calls) == 1
+    call = fake.calls[0]
+    assert call["previous_response_id"] == "resp_1"
+    assert call["input"][0]["type"] == "function_call_output"
+    assert call["input"][0]["call_id"] == "call_1"
+    assert call["max_tool_calls"] == 1
+
+
 def test_complete_parses_one_function_call(openai_settings: AISettings) -> None:
     sdk_response = _make_response(
         _function_call(name="get_var_es", arguments='{"confidence": 0.99}')

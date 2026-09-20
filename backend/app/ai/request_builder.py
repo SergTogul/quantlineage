@@ -1,15 +1,18 @@
-"""Build minimal OpenAI Responses API requests for one routing turn."""
+"""Build minimal OpenAI Responses API requests for routing and tool-loop turns."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 from app.ai.config import AISettings
 from app.ai.policy import ASSISTANT_POLICY_INSTRUCTION
 from app.ai.tool_schemas import openai_function_tools
 from app.risk.query import RiskAssistantModelRequest
+
+# One function call per Responses create(); the assistant owns the round budget.
+_MAX_TOOL_CALLS_PER_ROUND = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +38,53 @@ def build_openai_responses_request(
             "input": _format_user_input(request),
             "tools": openai_function_tools(),
             "max_output_tokens": settings.max_output_tokens,
-            "max_tool_calls": settings.max_tool_rounds,
+            "max_tool_calls": _MAX_TOOL_CALLS_PER_ROUND,
+            "tool_choice": "auto",
+        },
+        timeout_seconds=settings.timeout_seconds,
+    )
+
+
+def build_openai_continue_request(
+    *,
+    previous_response_id: str,
+    tool_outputs: Sequence[Any],
+    settings: AISettings,
+) -> OpenAIResponsesRequest:
+    """Continue a Responses turn with ``function_call_output`` items.
+
+    ``settings.max_tool_rounds`` is owned by :class:`BoundedRiskAssistant`; each
+    continue request still allows at most one tool call.
+    """
+    if settings.openai_model is None:
+        raise ValueError("openai_model is required to build an OpenAI Responses request.")
+    if not previous_response_id.strip():
+        raise ValueError("previous_response_id is required to continue a Responses turn.")
+
+    input_items: list[dict[str, str]] = []
+    for item in tool_outputs:
+        call_id = getattr(item, "call_id", None)
+        output = getattr(item, "output", None)
+        if not call_id or output is None:
+            raise ValueError("Each tool output must provide call_id and output.")
+        input_items.append(
+            {
+                "type": "function_call_output",
+                "call_id": str(call_id),
+                "output": str(output),
+            }
+        )
+    if not input_items:
+        raise ValueError("At least one function_call_output is required to continue.")
+
+    return OpenAIResponsesRequest(
+        create_params={
+            "model": settings.openai_model,
+            "previous_response_id": previous_response_id.strip(),
+            "input": input_items,
+            "tools": openai_function_tools(),
+            "max_output_tokens": settings.max_output_tokens,
+            "max_tool_calls": _MAX_TOOL_CALLS_PER_ROUND,
             "tool_choice": "auto",
         },
         timeout_seconds=settings.timeout_seconds,

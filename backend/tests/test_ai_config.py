@@ -11,8 +11,9 @@ import pytest
 from app.ai.config import (
     DEFAULT_AI_TIMEOUT_SECONDS,
     DEFAULT_MAX_OUTPUT_TOKENS,
+    DEFAULT_MAX_TOOL_ROUNDS,
     MAX_AI_TIMEOUT_SECONDS,
-    REQUIRED_MAX_TOOL_ROUNDS,
+    MAX_TOOL_ROUNDS,
     get_ai_settings,
     get_openai_api_key,
 )
@@ -37,7 +38,7 @@ def test_defaults_to_deterministic_provider() -> None:
     assert settings.openai_model is None
     assert settings.timeout_seconds == DEFAULT_AI_TIMEOUT_SECONDS
     assert settings.max_output_tokens == DEFAULT_MAX_OUTPUT_TOKENS
-    assert settings.max_tool_rounds == REQUIRED_MAX_TOOL_ROUNDS
+    assert settings.max_tool_rounds == DEFAULT_MAX_TOOL_ROUNDS
 
 
 def test_supported_providers_are_deterministic_and_openai(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -97,14 +98,36 @@ def test_timeout_accepts_valid_values(monkeypatch: pytest.MonkeyPatch) -> None:
     assert get_ai_settings().timeout_seconds == MAX_AI_TIMEOUT_SECONDS
 
 
-def test_max_tool_rounds_must_be_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "2")
-    with pytest.raises(ValueError, match="Milestone 1 requires exactly 1"):
+def test_max_tool_rounds_defaults_to_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert get_ai_settings().max_tool_rounds == 1
+
+
+@pytest.mark.parametrize("rounds", [1, 2, 3, 4])
+def test_max_tool_rounds_allows_one_through_four(
+    monkeypatch: pytest.MonkeyPatch,
+    rounds: int,
+) -> None:
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", str(rounds))
+    assert get_ai_settings().max_tool_rounds == rounds
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["0", "5", "-1", "not-int"],
+)
+def test_max_tool_rounds_rejects_out_of_range(
+    monkeypatch: pytest.MonkeyPatch,
+    raw: str,
+) -> None:
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", raw)
+    with pytest.raises(ValueError, match=f"1 and {MAX_TOOL_ROUNDS}"):
         get_ai_settings()
 
-    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "not-int")
-    with pytest.raises(ValueError, match="Milestone 1 requires exactly 1"):
-        get_ai_settings()
+
+def test_max_tool_rounds_explicit_arg_bounded() -> None:
+    assert get_ai_settings(max_tool_rounds=3).max_tool_rounds == 3
+    with pytest.raises(ValueError, match=f"1 and {MAX_TOOL_ROUNDS}"):
+        get_ai_settings(max_tool_rounds=5)
 
 
 def test_api_key_excluded_from_settings_repr(monkeypatch: pytest.MonkeyPatch) -> None:

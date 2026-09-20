@@ -70,6 +70,8 @@ class RiskAssistantModelResponse(BaseModel):
     refusal: str | None = None
     rationale: str | None = None
     proposed_answer: str | None = None
+    tool_call_id: str | None = None
+    provider_response_id: str | None = None
 
 
 class RiskAssistantModel(Protocol):
