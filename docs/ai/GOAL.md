@@ -70,3 +70,5 @@ The browser never receives or stores the key.
 ## Loop instruction
 
 Work exactly one unchecked task from `TASKS.md` per iteration. Meet its acceptance criteria, run its checks, record evidence, then stop.
+
+**Deferred ≠ done.** Unchecked deferred tasks (T20–T24) mean the overall assistant goal is still open. Do not declare the goal complete while they remain.
