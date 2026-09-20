@@ -435,7 +435,7 @@ Evidence:
 
 ## C08 — Add provider-neutral conversation state
 
-- [ ] Support follow-up questions with an application-owned conversation id.
+- [x] Support follow-up questions with an application-owned conversation id.
 
 Dependencies: C03, C07
 
@@ -463,6 +463,14 @@ python3 -m pytest   tests/test_ai_conversations.py   tests/test_ai_provider_inte
 ```
 
 Evidence:
+
+- Product HEAD: `47a2fb8`. Optional `RiskQueryRequest.conversation_id`; first turn creates `conv_*` and returns it on `data.conversation_id`. Follow-ups load bounded prior question/tool-args into the model request. Cross-principal access raises `ConversationAccessDenied`; unknown/expired ids raise `ConversationNotFound`. In-memory repo (`SURVIVES_RESTARTS=False`, TTL 24h, max 8 turns) is used for local/demo and the current shared process; provider `previous_response_id` is stored privately and never appears on the client contract. “What about gamma?” after options-delta selects `get_position_greeks` with `options_only=true`.
+- Checks (2026-09-20, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_conversations.py tests/test_ai_provider_integration.py tests/test_api_typed_models.py -q
+  ```
+  → **48 passed**, 1 warning, exit code **0** (2.02s).
 
 ## C09 — Convert the Risk Query UI into a chat transcript
 
