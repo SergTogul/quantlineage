@@ -183,7 +183,7 @@ Next eligible tasks after C01: **C02**, **C04**, and **C06** (this loop stops; f
 
 ## C02 — Remove model-path deterministic shortcuts
 
-- [ ] Ensure supported OpenAI-mode questions enter the model-led flow.
+- [x] Ensure supported OpenAI-mode questions enter the model-led flow.
 
 Dependencies: C01
 
@@ -207,6 +207,15 @@ python3 -m pytest   tests/test_ai_provider_integration.py   tests/test_ai_bounde
 ```
 
 Evidence:
+
+- Removed `_is_greeks_question` short-circuits from `answer_with_model` and `answer_with_bounded_assistant` (`backend/app/risk/query.py`). Deterministic `route()` still maps Greek questions.
+- Secret extraction remains pre-OpenAI and is labeled `preflight-refused`. Config/auth errors after `complete()`/`run()` use `fallback` without executing tools. Successful model results stamp `model-routed` only after the provider call.
+- Schema modes now include `model-narrated` and `preflight-refused` (`transport.py`, `AssistantMode`).
+- Tests: delta/gamma/vega questions assert `complete()` ran; bounded HTTP greeks assert `complete_count==1`; secret preflight asserts zero model calls and `preflight-refused`.
+- Security-grounding reviewer: keep `_is_secret_request`; theta/rho are not security preflight; SIDE_EFFECTING expansion is C03 scope.
+- Checks: `python3 -m pytest tests/test_ai_provider_integration.py tests/test_ai_bounded_http.py tests/test_position_greeks_tool.py tests/test_ai_query_orchestration.py -q` → **40 passed**. Related suites `test_ai_evals.py test_ai_security.py test_api_typed_models.py test_api_openapi_examples.py test_risk_query_api_incomplete.py` → **150 passed**.
+
+Next eligible after this commit: **C03**, **C04**, and **C06**.
 
 ## C03 — Make tool-output continuation the normal OpenAI experience
 

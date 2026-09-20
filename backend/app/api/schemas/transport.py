@@ -98,7 +98,13 @@ class RiskQueryAssistantMetadata(BaseModel):
 
     provider: Literal["deterministic", "openai"]
     model: str | None = None
-    mode: Literal["model-routed", "deterministic", "fallback"]
+    mode: Literal[
+        "model-narrated",
+        "model-routed",
+        "deterministic",
+        "preflight-refused",
+        "fallback",
+    ]
     fallback: bool
 
 

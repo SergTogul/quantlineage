@@ -82,7 +82,13 @@ class RiskAssistantModel(Protocol):
         """Return one tool request, a clarification, or a refusal."""
 
 
-AssistantMode = Literal["model-routed", "deterministic", "fallback"]
+AssistantMode = Literal[
+    "model-narrated",
+    "model-routed",
+    "deterministic",
+    "preflight-refused",
+    "fallback",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +112,34 @@ def build_assistant_metadata(
         mode=mode,
         fallback=fallback,
     ).model_dump(mode="json")
+
+
+def _normalized_question(question: str) -> str:
+    return " ".join(question.strip().split()).lower()
+
+
+def _ungrounded_assistant_response(
+    *,
+    context: AssistantMetadataContext,
+    mode: AssistantMode,
+    fallback: bool,
+    answer: str,
+) -> RiskQueryResponse:
+    """Clarification/refusal with truthful assistant metadata and no tool result."""
+    return RiskQueryResponse(
+        intent="unsupported",
+        answer=answer,
+        data={
+            "tool_contract": None,
+            "tool_result": None,
+            "supported_tools": tool_contract_schemas(),
+            "assistant": build_assistant_metadata(
+                context, mode=mode, fallback=fallback
+            ),
+        },
+        tool_name=None,
+        requires_clarification=True,
+    )
 
 
 class RiskQueryPlan(BaseModel):
@@ -821,47 +855,12 @@ class RiskQueryEngine:
             provider="openai",
             model=None,
         )
-        assistant_meta = build_assistant_metadata(
-            context,
-            mode="model-routed",
-            fallback=False,
-        )
-        if _is_secret_request(" ".join(question.strip().split()).lower()):
-            return RiskQueryResponse(
-                intent="unsupported",
+        if _is_secret_request(_normalized_question(question)):
+            return _ungrounded_assistant_response(
+                context=context,
+                mode="preflight-refused",
+                fallback=False,
                 answer=_SECRET_REFUSAL_ANSWER,
-                data={
-                    "tool_contract": None,
-                    "tool_result": None,
-                    "supported_tools": tool_contract_schemas(),
-                    "assistant": assistant_meta,
-                },
-                tool_name=None,
-                requires_clarification=True,
-            )
-        if _is_greeks_question(" ".join(question.strip().split()).lower()):
-            greek = _infer_position_greek(" ".join(question.strip().split()).lower())
-            if greek is None:
-                return RiskQueryResponse(
-                    intent="unsupported",
-                    answer=_GREEKS_UNSUPPORTED_ANSWER,
-                    data={
-                        "tool_contract": None,
-                        "tool_result": None,
-                        "supported_tools": tool_contract_schemas(),
-                        "assistant": assistant_meta,
-                    },
-                    tool_name=None,
-                    requires_clarification=True,
-                )
-            return self._grounded_tool_response(
-                intent="position_greeks",
-                tool_name=RiskToolName.GET_POSITION_GREEKS,
-                portfolio=portfolio,
-                service=service,
-                args={"greek": greek},
-                principal=principal,
-                extra_data={"assistant": assistant_meta},
             )
         request = RiskAssistantModelRequest(
             question=question,
@@ -878,17 +877,11 @@ class RiskQueryEngine:
 
             if isinstance(exc, OpenAIConfigurationError):
                 message = str(exc).strip() or "AI assistant configuration is invalid."
-                return RiskQueryResponse(
-                    intent="unsupported",
+                return _ungrounded_assistant_response(
+                    context=context,
+                    mode="fallback",
+                    fallback=True,
                     answer=message,
-                    data={
-                        "tool_contract": None,
-                        "tool_result": None,
-                        "supported_tools": tool_contract_schemas(),
-                        "assistant": assistant_meta,
-                    },
-                    tool_name=None,
-                    requires_clarification=True,
                 )
             if not isinstance(exc, (OpenAITransientProviderError, OpenAIModelParseError)):
                 raise
@@ -902,6 +895,11 @@ class RiskQueryEngine:
                 fallback=True,
             )
             return fallback_response.model_copy(update={"data": data})
+        assistant_meta = build_assistant_metadata(
+            context,
+            mode="model-routed",
+            fallback=False,
+        )
         default_clarification = (
             "Please choose a deterministic risk view: VaR/ES, limits, contributors, "
             "worst stress, or portfolio summary."
@@ -980,47 +978,12 @@ class RiskQueryEngine:
             provider="openai",
             model=None,
         )
-        assistant_meta = build_assistant_metadata(
-            context,
-            mode="model-routed",
-            fallback=False,
-        )
-        if _is_secret_request(" ".join(question.strip().split()).lower()):
-            return RiskQueryResponse(
-                intent="unsupported",
+        if _is_secret_request(_normalized_question(question)):
+            return _ungrounded_assistant_response(
+                context=context,
+                mode="preflight-refused",
+                fallback=False,
                 answer=_SECRET_REFUSAL_ANSWER,
-                data={
-                    "tool_contract": None,
-                    "tool_result": None,
-                    "supported_tools": tool_contract_schemas(),
-                    "assistant": assistant_meta,
-                },
-                tool_name=None,
-                requires_clarification=True,
-            )
-        if _is_greeks_question(" ".join(question.strip().split()).lower()):
-            greek = _infer_position_greek(" ".join(question.strip().split()).lower())
-            if greek is None:
-                return RiskQueryResponse(
-                    intent="unsupported",
-                    answer=_GREEKS_UNSUPPORTED_ANSWER,
-                    data={
-                        "tool_contract": None,
-                        "tool_result": None,
-                        "supported_tools": tool_contract_schemas(),
-                        "assistant": assistant_meta,
-                    },
-                    tool_name=None,
-                    requires_clarification=True,
-                )
-            return self._grounded_tool_response(
-                intent="position_greeks",
-                tool_name=RiskToolName.GET_POSITION_GREEKS,
-                portfolio=portfolio,
-                service=service,
-                args={"greek": greek},
-                principal=principal,
-                extra_data={"assistant": assistant_meta},
             )
 
         executed: list[str] = []
@@ -1048,23 +1011,21 @@ class RiskQueryEngine:
             result = assistant.run(request)
         except OpenAIConfigurationError as exc:
             message = str(exc).strip() or "AI assistant configuration is invalid."
-            return RiskQueryResponse(
-                intent="unsupported",
+            return _ungrounded_assistant_response(
+                context=context,
+                mode="fallback",
+                fallback=True,
                 answer=message,
-                data={
-                    "tool_contract": None,
-                    "tool_result": None,
-                    "supported_tools": tool_contract_schemas(),
-                    "assistant": assistant_meta,
-                },
-                tool_name=None,
-                requires_clarification=True,
             )
         except (OpenAITransientProviderError, OpenAIModelParseError):
             if executed:
                 return self._partial_bounded_response(
                     executed_tools=executed,
-                    assistant_meta=assistant_meta,
+                    assistant_meta=build_assistant_metadata(
+                        context,
+                        mode="fallback",
+                        fallback=True,
+                    ),
                 )
             fallback_response = self.answer(
                 question, portfolio, service, principal=principal
@@ -1077,6 +1038,11 @@ class RiskQueryEngine:
             )
             return fallback_response.model_copy(update={"data": data})
 
+        assistant_meta = build_assistant_metadata(
+            context,
+            mode="model-routed",
+            fallback=False,
+        )
         investigation = {
             "rounds_used": result.rounds_used,
             "stopped_reason": result.stopped_reason,

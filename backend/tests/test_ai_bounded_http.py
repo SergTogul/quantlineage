@@ -170,5 +170,33 @@ def test_provider_error_after_a_tool_does_not_replay() -> None:
     assert model.continue_count == 1
     assert response.requires_clarification is True
     assert response.data["investigation"]["truncated"] is True
-    assert response.data["assistant"]["fallback"] is False
+    assert response.data["assistant"]["mode"] == "fallback"
+    assert response.data["assistant"]["fallback"] is True
     assert "not replayed" in response.answer.lower()
+
+
+def test_bounded_greeks_question_calls_the_model() -> None:
+    model = _ScriptedLoopModel(
+        [
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.GET_POSITION_GREEKS,
+                tool_args={"greek": "delta"},
+                intent="position_greeks",
+                tool_call_id="call_greeks",
+                provider_response_id="resp_1",
+            ),
+            RiskAssistantModelResponse(
+                proposed_answer="Position delta ranking was calculated by QuantLineage.",
+                intent="final",
+                provider_response_id="resp_2",
+            ),
+        ]
+    )
+    service = _service(model, rounds=2)
+
+    response = service.query(SAMPLE_PORTFOLIO, "Which options have the largest delta?")
+
+    assert model.complete_count == 1
+    assert model.continue_count == 1
+    assert response.tool_name == "get_position_greeks"
+    assert response.data["assistant"]["mode"] == "model-routed"
