@@ -13,6 +13,10 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.ai.narration import (
+    format_tool_turns_deterministically,
+    ground_narration,
+)
 from app.risk.query import (
     RiskAssistantModel,
     RiskAssistantModelRequest,
@@ -93,6 +97,7 @@ class RiskAssistantResult(BaseModel):
     tool_turns: list[RiskAssistantToolTurn] = Field(default_factory=list)
     rounds_used: int = Field(default=0, ge=0)
     stopped_reason: StoppedReason = "one_shot"
+    narration_grounded: bool | None = None
 
 
 class RiskAssistant(Protocol):
@@ -204,12 +209,10 @@ class BoundedRiskAssistant:
                     stopped_reason="clarification",
                 )
             if response.tool_name is None and response.proposed_answer:
-                return RiskAssistantResult(
-                    intent=response.intent or "final",
-                    proposed_answer=response.proposed_answer,
+                return self._finalize_narration(
+                    response=response,
                     tool_turns=tool_turns,
                     rounds_used=round_index,
-                    stopped_reason="final",
                 )
 
             tool_name = response.tool_name
@@ -254,12 +257,18 @@ class BoundedRiskAssistant:
             previous_response_id = response.provider_response_id or f"resp_round_{round_index}"
 
             if round_index >= max_rounds:
+                if response.proposed_answer:
+                    return self._finalize_narration(
+                        response=response,
+                        tool_turns=tool_turns,
+                        rounds_used=round_index,
+                        stopped_reason="round_limit",
+                    )
                 return RiskAssistantResult(
                     intent=response.intent,
                     tool_turns=tool_turns,
                     rounds_used=round_index,
                     stopped_reason="round_limit",
-                    proposed_answer=response.proposed_answer,
                 )
 
         assert last_response is not None
@@ -268,6 +277,40 @@ class BoundedRiskAssistant:
             tool_turns=tool_turns,
             rounds_used=max_rounds,
             stopped_reason="round_limit",
+        )
+
+    def _finalize_narration(
+        self,
+        *,
+        response: RiskAssistantModelResponse,
+        tool_turns: list[RiskAssistantToolTurn],
+        rounds_used: int,
+        stopped_reason: StoppedReason = "final",
+    ) -> RiskAssistantResult:
+        payloads = [
+            turn.tool_output
+            for turn in tool_turns
+            if isinstance(turn.tool_output, dict)
+        ]
+        grounding = ground_narration(response.proposed_answer or "", payloads)
+        if grounding.accepted:
+            return RiskAssistantResult(
+                intent=response.intent or "final",
+                proposed_answer=grounding.narration,
+                tool_turns=tool_turns,
+                rounds_used=rounds_used,
+                stopped_reason=stopped_reason,
+                narration_grounded=True,
+            )
+
+        fallback = format_tool_turns_deterministically(tool_turns)
+        return RiskAssistantResult(
+            intent=response.intent or "final",
+            proposed_answer=fallback,
+            tool_turns=tool_turns,
+            rounds_used=rounds_used,
+            stopped_reason=stopped_reason,
+            narration_grounded=False,
         )
 
     def _execute_turn(

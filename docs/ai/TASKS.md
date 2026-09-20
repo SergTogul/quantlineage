@@ -527,7 +527,12 @@ Evidence:
 
 ### T22 — Add numeric narration grounding
 
-- [ ] Reject narration with unsupported numeric claims and fall back to deterministic formatting.
+- [x] Reject narration with unsupported numeric claims and fall back to deterministic formatting.
+
+Evidence:
+
+- Commit pending — `backend/app/ai/narration.py` extracts numeric tokens, allows only values present/derived from tool payloads, and `BoundedRiskAssistant` replaces ungrounded `proposed_answer` with `_format_answer` output (`narration_grounded=False`).
+- Checks: `cd backend && python3 -m pytest tests/test_ai_narration_grounding.py tests/test_ai_bounded_assistant.py -q` → 15 passed.
 
 ### T23 — Add multi-tool investigation evals
 
