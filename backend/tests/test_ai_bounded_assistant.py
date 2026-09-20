@@ -371,7 +371,9 @@ def test_tool_executor_error_is_returned_as_function_output_and_loop_continues()
     )
 
     def execute(_name: str, _args: dict[str, Any]) -> dict[str, Any]:
-        raise ValueError("RiskRun not found")
+        from app.services.risk_run_service import RiskRunNotFound
+
+        raise RiskRunNotFound("missing")
 
     assistant = BoundedRiskAssistant(model, execute)
     result = assistant.run(
@@ -381,10 +383,12 @@ def test_tool_executor_error_is_returned_as_function_output_and_loop_continues()
     assert result.stopped_reason == "clarification"
     assert len(result.tool_turns) == 1
     assert result.tool_turns[0].tool_error is not None
-    assert "not found" in result.tool_turns[0].tool_error.lower()
-    assert len(model.continue_calls) == 1
     payload = json.loads(model.continue_calls[0]["tool_outputs"][0].output)
-    assert payload.get("error")
+    error = payload["error"]
+    assert error["code"] == "risk_run_not_found"
+    assert error["retryable"] is False
+    assert "missing" not in json.dumps(payload)
+    assert "not found" in error["message"].lower()
 
 
 def test_function_call_output_model_requires_call_id_and_output_string() -> None:

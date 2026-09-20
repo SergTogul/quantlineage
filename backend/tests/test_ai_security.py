@@ -393,3 +393,132 @@ def test_deterministic_mode_is_network_free(monkeypatch: pytest.MonkeyPatch) -> 
     assert response.tool_name == "get_contributors"
     assert response.data.get("assistant") is None
     openai_ctor.assert_not_called()
+
+
+SENTINEL_TOOL_SECRET = "sk-sentinel-tool-failure-key-abcdef"
+INTERNAL_TOOL_PATH = "/var/lib/quantlineage/secret-runs.db"
+INTERNAL_SQL = "SELECT api_key FROM users WHERE token='super-secret'"
+
+
+class _LoopModel:
+    def __init__(self) -> None:
+        self.continue_outputs: list[str] = []
+
+    def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
+        del request
+        return RiskAssistantModelResponse(
+            tool_name=RiskToolName.GET_RISK_RUN,
+            tool_args={"run_id": "run-x"},
+            tool_call_id="call_err",
+            provider_response_id="resp_1",
+        )
+
+    def continue_after_tools(self, **kwargs: Any) -> RiskAssistantModelResponse:
+        outputs = kwargs["tool_outputs"]
+        self.continue_outputs.append(outputs[0].output)
+        return RiskAssistantModelResponse(
+            intent="ambiguous",
+            requires_clarification=True,
+            clarification="Tool failed.",
+            provider_response_id="resp_2",
+        )
+
+
+def _run_failing_tool(exc: BaseException) -> tuple[str, str]:
+    from app.ai.assistant import BoundedRiskAssistant, RiskAssistantRequest
+
+    model = _LoopModel()
+
+    def execute(_name: str, _args: dict[str, Any]) -> dict[str, Any]:
+        raise exc
+
+    BoundedRiskAssistant(model, execute).run(
+        RiskAssistantRequest(question="Get the run", tools=[], max_rounds=2)
+    )
+    assert model.continue_outputs
+    return model.continue_outputs[0], json.dumps(json.loads(model.continue_outputs[0]))
+
+
+def test_database_tool_error_is_typed_and_omits_sql_and_paths(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class FakeDatabaseError(Exception):
+        __module__ = "psycopg2"
+
+    with caplog.at_level(logging.WARNING):
+        raw, serialized = _run_failing_tool(
+            FakeDatabaseError(
+                f"could not connect to {INTERNAL_TOOL_PATH}: {INTERNAL_SQL} "
+                f"key={SENTINEL_TOOL_SECRET}"
+            )
+        )
+    payload = json.loads(raw)["error"]
+    assert payload["code"] == "database_error"
+    assert payload["retryable"] is True
+    assert set(payload) == {"code", "retryable", "message"}
+    assert SENTINEL_TOOL_SECRET not in serialized
+    assert INTERNAL_TOOL_PATH not in serialized
+    assert INTERNAL_SQL not in serialized
+    assert "SELECT" not in serialized
+
+
+def test_provider_tool_error_is_typed_and_retryable() -> None:
+    from app.ai.errors import OpenAITimeoutError
+
+    raw, serialized = _run_failing_tool(
+        OpenAITimeoutError(f"timeout contacting {INTERNAL_TOOL_PATH} {SENTINEL_TOOL_SECRET}")
+    )
+    payload = json.loads(raw)["error"]
+    assert payload["code"] == "provider_error"
+    assert payload["retryable"] is True
+    assert SENTINEL_TOOL_SECRET not in serialized
+    assert INTERNAL_TOOL_PATH not in serialized
+
+
+def test_validation_tool_error_is_typed_and_not_retryable() -> None:
+    from pydantic import BaseModel, ValidationError
+
+    class _Required(BaseModel):
+        run_id: str
+
+    try:
+        _Required()
+    except ValidationError as exc:
+        raw, serialized = _run_failing_tool(exc)
+    payload = json.loads(raw)["error"]
+    assert payload["code"] == "validation_error"
+    assert payload["retryable"] is False
+    assert "validation" in payload["message"].lower() or "invalid" in payload["message"].lower()
+    assert "traceback" not in serialized.lower()
+    assert "run_id" not in serialized
+
+
+def test_missing_risk_run_tool_error_does_not_leak_run_id() -> None:
+    from app.services.risk_run_service import RiskRunNotFound
+
+    raw, serialized = _run_failing_tool(RiskRunNotFound("run-secret-id-999"))
+    payload = json.loads(raw)["error"]
+    assert payload["code"] == "risk_run_not_found"
+    assert payload["retryable"] is False
+    assert "run-secret-id-999" not in serialized
+
+
+def test_unknown_tool_error_omits_secret_path_and_keeps_detail_in_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR):
+        raw, serialized = _run_failing_tool(
+            RuntimeError(
+                f"boom at {INTERNAL_TOOL_PATH} sql={INTERNAL_SQL} {SENTINEL_TOOL_SECRET}"
+            )
+        )
+    payload = json.loads(raw)["error"]
+    assert payload["code"] == "unknown_error"
+    assert payload["retryable"] is False
+    assert SENTINEL_TOOL_SECRET not in serialized
+    assert INTERNAL_TOOL_PATH not in serialized
+    assert INTERNAL_SQL not in serialized
+    log_blob = " ".join(record.getMessage() for record in caplog.records)
+    assert SENTINEL_TOOL_SECRET not in log_blob
+    assert INTERNAL_TOOL_PATH not in log_blob or "[REDACTED]" in log_blob
+    assert any("tool" in record.getMessage().lower() for record in caplog.records)

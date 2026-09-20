@@ -353,14 +353,17 @@ class BoundedRiskAssistant:
             )
             return turn, output
         except Exception as exc:
-            message = str(exc).strip() or exc.__class__.__name__
-            error_payload = {"error": message}
+            from app.ai.config import get_openai_api_key
+            from app.ai.errors import log_tool_exception, safe_tool_error_payload
+
+            log_tool_exception(exc, api_key=get_openai_api_key())
+            error_payload = safe_tool_error_payload(exc, api_key=get_openai_api_key())
             turn = RiskAssistantToolTurn(
                 tool_name=tool_name,
                 tool_args=tool_args,
                 tool_call_id=tool_call_id,
                 rationale=rationale,
-                tool_error=message,
+                tool_error=error_payload["error"]["message"],
             )
             output = FunctionCallOutput(
                 call_id=tool_call_id,

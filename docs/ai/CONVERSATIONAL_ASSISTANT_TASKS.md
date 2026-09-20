@@ -275,7 +275,7 @@ Next eligible after this commit: **C04**, **C05**, and **C06**.
 
 ## C04 — Sanitize tool failures before model continuation
 
-- [ ] Prevent internal exception text from entering model or client payloads.
+- [x] Prevent internal exception text from entering model or client payloads.
 
 Dependencies: C01
 
@@ -301,6 +301,14 @@ python3 -m pytest tests/test_ai_security.py tests/test_ai_bounded_assistant.py -
 ```
 
 Evidence:
+
+- Tool failures sent to OpenAI as `{error: {code, retryable, message}}` via `safe_tool_error_payload`. Codes: `database_error`, `provider_error`, `validation_error`, `risk_run_not_found`, `unknown_error`. Raw `str(exc)` is logged with redacted secrets/paths/SQL (`log_tool_exception`).
+- Checks (2026-09-20, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_security.py tests/test_ai_bounded_assistant.py -q
+  ```
+  → **35 passed**, 1 warning, exit code **0** (1.37s).
 
 ## C05 — Replace token grounding with typed claim grounding
 

@@ -147,3 +147,77 @@ def redact_request_kwargs(kwargs: dict[str, Any], *, api_key: str | None = None)
         if isinstance(input_text, str):
             redacted["input"] = sanitize_provider_message(input_text, api_key=api_key)
     return redacted
+
+
+_PATH_RE = re.compile(r"(?:[A-Za-z]:[\\/]|/)(?:[^\s'\"`,;]+)")
+_SQL_RE = re.compile(
+    r"\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|INTO|VALUES)\b[^;\n]*",
+    re.IGNORECASE,
+)
+_DB_MODULES = ("psycopg", "psycopg2", "sqlalchemy", "sqlite3", "asyncpg", "pymysql")
+
+SAFE_TOOL_MESSAGES = {
+    "database_error": "A database error prevented this tool from completing.",
+    "provider_error": "The upstream provider request failed.",
+    "validation_error": "The tool arguments or result were invalid.",
+    "risk_run_not_found": "The requested risk run was not found.",
+    "unknown_error": "The tool could not complete.",
+}
+
+
+def sanitize_internal_text(message: str | None, *, api_key: str | None = None) -> str:
+    """Redact secrets, filesystem paths, and SQL from exception text."""
+    text = sanitize_provider_message(message, api_key=api_key)
+    text = _SQL_RE.sub("[REDACTED_SQL]", text)
+    text = _PATH_RE.sub("[REDACTED_PATH]", text)
+    return text
+
+
+def safe_tool_error_payload(exc: BaseException, *, api_key: str | None = None) -> dict[str, Any]:
+    """Map a tool exception to a typed public error (no internals)."""
+    code, retryable = _classify_tool_exception(exc)
+    return {
+        "error": {
+            "code": code,
+            "retryable": retryable,
+            "message": SAFE_TOOL_MESSAGES[code],
+        }
+    }
+
+
+def log_tool_exception(exc: BaseException, *, api_key: str | None = None) -> None:
+    """Log the full exception server-side after redacting secrets/paths/SQL."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+    code, _retryable = _classify_tool_exception(exc)
+    logger.error(
+        "Tool execution failed (%s): %s",
+        code,
+        sanitize_internal_text(str(exc), api_key=api_key),
+        exc_info=True,
+    )
+
+
+def _classify_tool_exception(exc: BaseException) -> tuple[str, bool]:
+    from pydantic import ValidationError
+
+    from app.services.risk_run_service import RiskRunNotFound
+
+    if isinstance(exc, RiskRunNotFound):
+        return "risk_run_not_found", False
+    if isinstance(exc, OpenAIProviderError):
+        return "provider_error", bool(getattr(exc, "retryable", False))
+    if isinstance(exc, ValidationError):
+        return "validation_error", False
+
+    module = (type(exc).__module__ or "").lower()
+    name = type(exc).__name__.lower()
+    if any(token in module for token in _DB_MODULES) or any(
+        token in name for token in ("operationalerror", "integrityerror", "dbapi", "databaseerror")
+    ):
+        return "database_error", True
+
+    if isinstance(exc, (ValueError, TypeError)):
+        return "validation_error", False
+    return "unknown_error", False
