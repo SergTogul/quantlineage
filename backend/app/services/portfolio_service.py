@@ -43,6 +43,7 @@ from app.risk.query import AssistantMetadataContext, RiskQueryEngine
 
 if TYPE_CHECKING:
     from app.ai.config import AISettings
+    from app.ai.conversations import ConversationRepository
     from app.risk.query import RiskAssistantModel
 from app.risk.risk_attribution import RiskChangeAttributionEngine
 from app.risk.scenario_attribution import ScenarioLike
@@ -167,6 +168,7 @@ class PortfolioService:
         market_data: MarketDataProvider | None = None,
         risk_assistant_model: RiskAssistantModel | None = None,
         ai_settings: AISettings | None = None,
+        conversation_repo: ConversationRepository | None = None,
     ):
         self.pricing = pricing
         self.risk = risk
@@ -213,6 +215,11 @@ class PortfolioService:
         self.query_engine = RiskQueryEngine()
         self.risk_assistant_model = risk_assistant_model
         self.ai_settings = ai_settings
+        if conversation_repo is None:
+            from app.ai.conversations import InMemoryConversationRepository
+
+            conversation_repo = InMemoryConversationRepository()
+        self.conversation_repo = conversation_repo
         self.risk_run_compare = None
         self.risk_run_worker = None
 
@@ -558,32 +565,79 @@ class PortfolioService:
             )
         return AssistantMetadataContext(provider="openai", model=None)
 
-    def query(self, portfolio, question):
+    def query(
+        self,
+        portfolio,
+        question,
+        *,
+        conversation_id: str | None = None,
+        principal: str | None = None,
+    ):
+        from app.ai.conversations import conversation_history_for_model
+
+        repo = self.conversation_repo
+        record = None
+        history: list[dict] = []
+        if repo is not None:
+            if conversation_id:
+                record = repo.get(conversation_id, principal=principal)
+                history = conversation_history_for_model(record)
+            else:
+                record = repo.create(principal)
+
         if self.risk_assistant_model is None:
-            return self.query_engine.answer(question, portfolio, self)
-        settings = self.ai_settings
-        if (
-            settings is not None
-            and settings.provider == "openai"
-            and settings.assistant_loop != "router"
-            and hasattr(self.risk_assistant_model, "continue_after_tools")
-        ):
-            return self.query_engine.answer_with_bounded_assistant(
-                question,
-                portfolio,
-                self,
-                self.risk_assistant_model,
-                max_rounds=settings.max_model_turns,
-                max_tool_calls=settings.max_tool_calls,
-                assistant_context=self._assistant_metadata_context(),
+            response = self.query_engine.answer(
+                question, portfolio, self, principal=principal
             )
-        return self.query_engine.answer_with_model(
-            question,
-            portfolio,
-            self,
-            self.risk_assistant_model,
-            assistant_context=self._assistant_metadata_context(),
-        )
+        else:
+            settings = self.ai_settings
+            if (
+                settings is not None
+                and settings.provider == "openai"
+                and settings.assistant_loop != "router"
+                and hasattr(self.risk_assistant_model, "continue_after_tools")
+            ):
+                response = self.query_engine.answer_with_bounded_assistant(
+                    question,
+                    portfolio,
+                    self,
+                    self.risk_assistant_model,
+                    max_rounds=settings.max_model_turns,
+                    max_tool_calls=settings.max_tool_calls,
+                    assistant_context=self._assistant_metadata_context(),
+                    principal=principal,
+                    conversation_history=history,
+                )
+            else:
+                response = self.query_engine.answer_with_model(
+                    question,
+                    portfolio,
+                    self,
+                    self.risk_assistant_model,
+                    assistant_context=self._assistant_metadata_context(),
+                    principal=principal,
+                    conversation_history=history,
+                )
+
+        if record is not None and repo is not None:
+            tool_args: dict = {}
+            investigation = response.data.get("investigation") or {}
+            turns = investigation.get("turns") or []
+            if turns:
+                tool_args = dict(turns[-1].get("tool_args") or {})
+            repo.append_turn(
+                record.id,
+                principal=principal,
+                question=question,
+                answer=response.answer,
+                tool_name=response.tool_name,
+                tool_args=tool_args,
+                tool_result=response.data.get("tool_result"),
+            )
+            data = dict(response.data)
+            data["conversation_id"] = record.id
+            response = response.model_copy(update={"data": data})
+        return response
 
     def dashboard(
         self,

@@ -55,6 +55,7 @@ class RiskAssistantModelRequest(BaseModel):
     tools: list[dict[str, Any]]
     portfolio_id: str | None = None
     available_run_ids: list[str] = Field(default_factory=list)
+    conversation_history: list[dict[str, Any]] = Field(default_factory=list)
     instruction: str = (
         "Select at most one deterministic QuantLineage tool. Do not calculate or invent "
         "VaR, Greeks, P&L, prices, stress losses, or limit values. Ask for clarification "
@@ -858,6 +859,7 @@ class RiskQueryEngine:
         *,
         principal: str | None = None,
         assistant_context: AssistantMetadataContext | None = None,
+        conversation_history: list[dict[str, Any]] | None = None,
     ) -> RiskQueryResponse:
         context = assistant_context or AssistantMetadataContext(
             provider="openai",
@@ -873,6 +875,7 @@ class RiskQueryEngine:
         request = RiskAssistantModelRequest(
             question=question,
             tools=tool_contract_schemas(),
+            conversation_history=list(conversation_history or []),
         )
         try:
             model_response = model.complete(request)
@@ -973,6 +976,7 @@ class RiskQueryEngine:
         max_tool_calls: int = 1,
         principal: str | None = None,
         assistant_context: AssistantMetadataContext | None = None,
+        conversation_history: list[dict[str, Any]] | None = None,
     ) -> RiskQueryResponse:
         """Run the T21 bounded tool loop, then format a grounded HTTP response."""
         from app.ai.assistant import BoundedRiskAssistant, RiskAssistantRequest
@@ -1025,6 +1029,7 @@ class RiskQueryEngine:
             portfolio_id=getattr(portfolio, "id", None),
             max_rounds=max_rounds,
             max_tool_calls=max_tool_calls,
+            conversation_history=list(conversation_history or []),
         )
         try:
             result = assistant.run(request)

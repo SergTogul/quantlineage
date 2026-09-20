@@ -84,6 +84,7 @@ class RiskAssistantRequest(BaseModel):
     tools: list[dict[str, Any]] = Field(default_factory=list)
     portfolio_id: str | None = None
     available_run_ids: list[str] = Field(default_factory=list)
+    conversation_history: list[dict[str, Any]] = Field(default_factory=list)
     max_rounds: int = Field(default=2, ge=1, le=4)
     max_tool_calls: int = Field(default=4, ge=1, le=4)
 
@@ -143,6 +144,7 @@ class OneShotRiskAssistant:
             tools=request.tools,
             portfolio_id=request.portfolio_id,
             available_run_ids=list(request.available_run_ids),
+            conversation_history=list(request.conversation_history),
         )
         response = self._model.complete(model_request)
         return _result_from_one_shot(response)
@@ -174,6 +176,7 @@ class BoundedRiskAssistant:
             tools=request.tools,
             portfolio_id=request.portfolio_id,
             available_run_ids=list(request.available_run_ids),
+            conversation_history=list(request.conversation_history),
         )
 
         tool_turns: list[RiskAssistantToolTurn] = []

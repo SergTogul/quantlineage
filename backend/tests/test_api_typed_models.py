@@ -309,7 +309,35 @@ def test_investigation_turn_schema_forbids_provider_ids_and_requires_turns() -> 
         {
             "intent": "final",
             "answer": "ok",
-            "data": {"investigation": investigation.model_dump(mode="json")},
+            "data": {
+                "investigation": investigation.model_dump(mode="json"),
+                "conversation_id": "conv_app",
+            },
             "tool_name": "get_limits",
         }
     )
+
+
+def test_risk_query_request_conversation_id_is_optional_and_provider_neutral() -> None:
+    from pydantic import ValidationError
+
+    from app.api.schemas.transport import RiskQueryRequest
+    from app.sample import SAMPLE_PORTFOLIO
+
+    payload = SAMPLE_PORTFOLIO.model_dump(mode="json")
+    bare = RiskQueryRequest.model_validate({"portfolio": payload, "question": "VaR?"})
+    assert bare.conversation_id is None
+    with_id = RiskQueryRequest.model_validate(
+        {"portfolio": payload, "question": "VaR?", "conversation_id": "conv_app"}
+    )
+    assert with_id.conversation_id == "conv_app"
+    dumped = with_id.model_dump(mode="json")
+    assert "previous_response_id" not in dumped
+    with pytest.raises(ValidationError):
+        RiskQueryRequest.model_validate(
+            {
+                "portfolio": payload,
+                "question": "VaR?",
+                "previous_response_id": "resp_secret",
+            }
+        )
