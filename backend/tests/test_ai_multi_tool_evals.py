@@ -344,13 +344,10 @@ def test_investigation_eval_covers_required_categories() -> None:
 def test_investigation_sequences_stay_within_four_rounds() -> None:
     for case in INVESTIGATION_CASES:
         assert case.max_rounds <= 4
-<<<<<<< HEAD
         executed = len(case.expected_tools)
         assert executed <= case.max_rounds
         assert executed <= 4
+        scripted_tools = sum(1 for turn in case.model_turns if turn.tool_name)
+        assert scripted_tools <= 4
         # C03: last executed tool may reserve one extra model continue.
         assert len(case.model_turns) <= case.max_rounds + 1
-=======
-        tool_turns = sum(1 for turn in case.model_turns if turn.tool_name)
-        assert tool_turns <= 4
->>>>>>> 34f2c3e (fix: ground narration with typed metric/unit manifests (C05))

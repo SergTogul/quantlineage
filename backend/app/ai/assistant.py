@@ -14,9 +14,9 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.ai.narration import (
+    build_grounding_manifest,
     format_tool_turns_deterministically,
     ground_narration,
-    build_grounding_manifest,
 )
 from app.risk.query import (
     RiskAssistantModel,

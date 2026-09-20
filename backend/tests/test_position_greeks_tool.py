@@ -182,36 +182,6 @@ def test_answer_with_model_does_not_refuse_greeks_when_tool_exists() -> None:
 
 
 def _fmt_in(answer: str, value: float) -> bool:
-
-    class _Scripted:
-        def __init__(self) -> None:
-            self.requests: list = []
-
-        def complete(self, request):  # noqa: ANN001
-            self.requests.append(request)
-            return RiskAssistantModelResponse(
-                tool_name=RiskToolName.GET_POSITION_GREEKS,
-                tool_args={"greek": "delta"},
-                intent="position_greeks",
-            )
-
-    service = build_portfolio_service()
-    model = _Scripted()
-    response = RiskQueryEngine().answer_with_model(
-        "Biggest options delta?",
-        SAMPLE_PORTFOLIO,
-        service,
-        model,
-    )
-
-    assert len(model.requests) == 1
-    assert response.tool_name == "get_position_greeks"
-    assert response.requires_clarification is False
-    assert "not available" not in response.answer.lower()
-    assert response.data["assistant"]["mode"] == "model-routed"
-
-
-def _fmt_in(answer: str, value: float) -> bool:
     from app.risk.query import _fmt
 
     return _fmt(value) in answer or f"{abs(value):.0f}" in answer or f"{value:.4g}" in answer
