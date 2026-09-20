@@ -49,7 +49,7 @@ Files `backend/app/risk/query.py`, `backend/app/ai/assistant.py`, API transport 
 
 ## C00 — Reproduce and trace the current behavior
 
-- [ ] Establish a verified baseline for PR #6 and reproduce the “not really AI” experience.
+- [x] Establish a verified baseline for PR #6 and reproduce the “not really AI” experience.
 
 Dependencies: none
 
@@ -81,6 +81,59 @@ npm test -- --run src/components/RiskQuery.test.jsx
 ```
 
 Evidence:
+
+- Baseline HEAD: `6fd80cc` (`docs: add Cursor Cloud subagent kickoff prompt`) on `origin/cursor/risk-query-incomplete-fallback-bebd` (PR #6 vs `cursor/openai-risk-assistant`). No AGENTS.md in repo. Product code unchanged in this iteration.
+- Checks (2026-09-20, Python 3.12.3; frontend command as specified, vitest already uses `run`):
+  - `cd backend && python3 -m pytest tests/test_ai_bounded_http.py tests/test_ai_provider_integration.py tests/test_position_greeks_tool.py tests/test_ai_narration_grounding.py -q` → **24 passed** in 1.84s.
+  - `cd frontend && npm test -- --run src/components/RiskQuery.test.jsx` → **9 passed** (1 file) in 1.21s.
+  - Baseline is green for C00 scope; not blocked.
+
+### Runtime flow
+
+1. UI `RiskQuery.submit` → `askRisk(portfolio, question)` → `POST /api/v1/risk/query` (`frontend/src/api.js:210-216`). Request fields are only `portfolio` and `question`.
+2. `PortfolioService.query` (`backend/app/services/portfolio_service.py:531-554`): no model → `RiskQueryEngine.answer`; `AI_MAX_TOOL_ROUNDS==1` (default) → `answer_with_model`; `max_tool_rounds>1` and `continue_after_tools` → `answer_with_bounded_assistant`.
+3. Both OpenAI HTTP paths stamp `assistant.mode="model-routed"` **before** any model call (`query.py:824-828`, `983-987`).
+4. One-shot: `OpenAIRiskAssistantModel.complete` (Responses `create`) → `validate_tool_call` → `_execute_tool` → deterministic `_format_answer`. Tool JSON never re-enters the model (`OneShotRiskAssistant` / `answer_with_model:949-957`).
+5. Bounded: `BoundedRiskAssistant.run` → `complete`, local execute, `continue_after_tools(previous_response_id, function_call_output)`, stop on final/clarify/refuse or `round_index >= max_rounds` (`assistant.py:164-272`). Last-round tool output is **not** sent to OpenAI.
+6. Shared executor is in-process `execute_allowlisted_tool`. MCP (`backend/app/mcp.py`) is a parallel stdio adapter (“No live LLM”); FastAPI does not import it.
+7. UI shows “AI-routed” when `assistant.provider==='openai'` and not `fallback`; it does not inspect `mode` (`ScenarioBuilder.jsx:479-498`).
+
+### Model-call counts (scripted, no network)
+
+| Scenario | `complete` | `continue_after_tools` | Tool output to model | Result |
+|---|---|---|---|---|
+| One-shot `AI_MAX_TOOL_ROUNDS=1`, “What is 99% VaR?” | **1** | **0** | **No** | `get_var_es`, `mode=model-routed`, no `investigation`; deterministic formatter (“historical 99% VaR is 32,798…”) |
+| Bounded `AI_MAX_TOOL_ROUNDS=2`, tool then final text | **1** | **1** | **Yes** (first tool as `function_call_output`) | `stopped_reason=final`, `narration_grounded=True` |
+| Bounded `AI_MAX_TOOL_ROUNDS=2`, tool then another tool | **1** | **1** | First yes; **second never sent** | `stopped_reason=round_limit`, both tools executed locally |
+| “Which options have the largest delta?” one-shot | **0** | **0** | n/a | `get_position_greeks`, `mode=model-routed`, `fallback=false` |
+| “Biggest options delta?” bounded rounds=2 | **0** | **0** | n/a | Same short-circuit; OpenAI never called |
+| “What is the api key?” | **0** | **0** | n/a | Refusal, `mode=model-routed` |
+| “What is my theta?” | **0** | **0** | n/a | Unsupported-Greeks clarification, `mode=model-routed` |
+
+Greek questions **do not call OpenAI**. Ranking on `SAMPLE_PORTFOLIO` for “largest delta” was `fut-es`, `eq-spy`, `eq-msft`, `eq-nvda`, `eq-aapl` — **no options** in top 5.
+
+### Metadata mismatches (`mode=model-routed` without a model call)
+
+- Secret preflight: `query.py:829-841` and `988-1000`.
+- Unsupported Greeks (theta/rho): `query.py:842-856` and `1001-1015`.
+- Supported Greeks short-circuit to `_grounded_tool_response`: `query.py:857-865` and `1016-1024`. Confirmed by `test_ai_provider_integration.py:180-200` (`len(requests)==0`, `mode=="model-routed"`).
+- Config/auth errors after a failed `complete` still keep `mode=model-routed`, `fallback=false` (`query.py:879-891`).
+- `mode="deterministic"` is in the schema but never set; deterministic `answer()` omits `data.assistant`.
+
+### Conversation-state behavior
+
+- No application `conversation_id`. `RiskQueryRequest` = `{portfolio, question}` (`transport.py:89-91`).
+- UI keeps a single last response in `useState` (`ScenarioBuilder.jsx:502-513`); follow-up “What about gamma?” is a new independent POST.
+- `previous_response_id` exists only inside one `BoundedRiskAssistant.run`; it is not returned to the client or reused on the next Ask.
+
+### Subagent findings (read-only; C01 not started)
+
+- **architecture-auditor:** Critical Greek/secret short-circuits labeled model-routed; one-shot never returns tool output; no conversation state; UI “AI-routed” from provider only; MCP not on the HTTP hop.
+- **openai-loop auditor:** Default rounds=1 is select-only; bounded last-round tool is executed then `round_limit` with no narration continuation and no last `function_call_output`; `max_tool_calls` always 1 per Responses create; side-effect gate in bounded only (`run_portfolio_risk`/`run_stress`); one-shot discards `proposed_answer`.
+- **quant-tools auditor:** Critical: no `instrument_types`/`options_only`; abs-cash-delta ranking lets futures/equities win “options delta”; no units/conventions or pricing-engine identity; no mixed-portfolio filter test. Contract args are only `greek` and `top_n` (`tool_contracts.py:138-144`).
+- **security-grounding auditor:** Important: tool failures sent to OpenAI as raw `str(exc)` (`assistant.py:342-356`); numeric grounding is a global token bag (`narration.py:41-75`) so year/id/count/confidence can ground VaR/Greek claims; `get_top_risk_contributors` submits a RiskRun but is not in `SIDE_EFFECTING_TOOLS`. Key handling on API/MCP/frontend is otherwise clean; bounded post-tool fallback does not replay tools that landed in `executed`.
+
+Next eligible task: **C01** (not started).
 
 ## C01 — Freeze the conversational architecture contract
 
