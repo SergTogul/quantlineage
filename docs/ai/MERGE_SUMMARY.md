@@ -35,13 +35,14 @@ Targeted AI suites (earlier tasks): config, tool schemas, request builder, model
 
 ## Limitations
 
-- Default HTTP path remains one tool call per turn (`AI_MAX_TOOL_ROUNDS=1`). Setting `AI_MAX_TOOL_ROUNDS` to `2`–`4` runs the read-only `BoundedRiskAssistant` loop on `POST /api/v1/risk/query`.
-- Live OpenAI smoke is opt-in only (`RUN_LIVE_AI_TESTS=1` + key).
+- Conversational OpenAI defaults to one executed tool plus reserved narration (`AI_ASSISTANT_LOOP=conversational`, `AI_MAX_TOOL_ROUNDS=2`, `AI_MAX_TOOL_CALLS=1`). Explicit `AI_ASSISTANT_LOOP=router` is one-shot and never `model-narrated`.
+- Conversation state is in-memory (24h TTL, 8 turns) and does not survive process restarts.
+- Live OpenAI smoke is opt-in only (`RUN_LIVE_AI_TESTS=1` + key). Normal CI makes no OpenAI network call.
 - Worker process does not independently construct a separate OpenAI client beyond shared env; interactive query path is lifespan-wired.
 - Agent VM used Python 3.12.3; Docker images target 3.13.
 
 ## Follow-ups
 
-- Optional follow-up tool: `get_position_greeks` per `docs/ai/T24_QUANTLIB_TOOLS_EVAL.md` (not implemented in T24).
+- Persist conversation state beyond in-memory (24h TTL, max 8 turns) for shared deployments.
 - Confirm live smoke against the chosen production model before enabling by default in shared deployments.
 - Optional: wire worker-only AI path if workers ever need model routing (currently unused).

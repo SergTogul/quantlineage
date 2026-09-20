@@ -1,5 +1,10 @@
 # OpenAI Risk Assistant — Task Queue
 
+Conversational OpenAI defaults and C00–C12 live in
+[CONVERSATIONAL_ASSISTANT_TASKS.md](CONVERSATIONAL_ASSISTANT_TASKS.md) and the
+operator guide [docs/openai_risk_assistant.md](../openai_risk_assistant.md).
+This file is the first-release (T00–T24) queue.
+
 Read [GOAL.md](GOAL.md) before every task. Work top to bottom. One loop iteration completes at most one task.
 
 Status syntax:
@@ -506,8 +511,10 @@ Evidence:
 **CRITICAL (historical):** “Deferred” did **not** mean complete while unchecked.
 T20–T24 are now checked with evidence below. The first-release gate (T00–T15)
 remains the production default; multi-tool investigation lives behind
-`AI_MAX_TOOL_ROUNDS` / `BoundedRiskAssistant`. The HTTP query path uses the
-bounded loop when `AI_MAX_TOOL_ROUNDS` is `2`–`4` (default remains `1`).
+`AI_MAX_TOOL_ROUNDS` / `BoundedRiskAssistant`. Historical T21 default was `1`
+(one-shot). Conversational OpenAI defaults are `AI_ASSISTANT_LOOP=conversational`,
+`AI_MAX_TOOL_ROUNDS=2` (model turns), `AI_MAX_TOOL_CALLS=1` (executed tools) —
+see C03/C11 in [CONVERSATIONAL_ASSISTANT_TASKS.md](CONVERSATIONAL_ASSISTANT_TASKS.md).
 
 ### T20 — Introduce the multi-tool assistant interface
 
