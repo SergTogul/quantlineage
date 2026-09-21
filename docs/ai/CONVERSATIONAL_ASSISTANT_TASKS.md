@@ -693,7 +693,7 @@ For every task below, the root agent must:
 
 ## C13 — Preserve policy on every Responses continuation
 
-- [ ] Keep the security and grounding policy active after `function_call_output`.
+- [x] Keep the security and grounding policy active after `function_call_output`.
 
 Dependencies: C04
 
@@ -719,6 +719,22 @@ cd backend
 python3 -m pytest tests/test_openai_request_builder.py tests/test_openai_model.py tests/test_ai_security.py -q
 ruff check app/ai tests/test_openai_request_builder.py tests/test_openai_model.py tests/test_ai_security.py
 ```
+
+Evidence:
+
+- Product: `backend/app/ai/policy.py` v**1.1.0** adds distinct `ROUTING_POLICY_INSTRUCTION` and `NARRATION_POLICY_INSTRUCTION`. `build_openai_continue_request` now sets `instructions` on every `previous_response_id` continue (routing while tools may still be selected; narration when `reserve_narration=True`). Tool output remains untrusted data in both texts. `openai_model.py` unchanged (uses the builder).
+- Replaced `assert "instructions" not in payload.create_params` in `test_continue_request_appends_function_call_outputs`. Added malicious tool-output tests with prompt injection and sentinels (`sk-sentinel-tool-inject-c13-*`, `QL_INTERNAL_PROMPT_C13*`). Client dumps must not contain policy text or planted secrets.
+- Security-grounding reviewer (read-only): continue omitted `instructions` at `request_builder.py` create_params; only routing policy existed; no active client prompt leak found. Root implemented under TDD.
+- Regression vs `b70fccd`: restoring that commit's `policy.py` / `request_builder.py` fails the four continue-instruction tests with `KeyError: 'instructions'` (4 failed). After the fix they pass.
+- Checks (2026-09-21, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_openai_request_builder.py tests/test_openai_model.py tests/test_ai_security.py -q
+  ruff check app/ai tests/test_openai_request_builder.py tests/test_openai_model.py tests/test_ai_security.py
+  ```
+  → **65 passed**, 1 warning, exit **0** (2.97s). ruff: All checks passed.
+
+Next eligible after this commit: **C14**. Do not start it in this run. C12 stays open until C13–C19 finish.
 
 ## C14 — Enforce hard model-turn and tool-call budgets
 

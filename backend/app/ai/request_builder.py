@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from app.ai.config import AISettings
-from app.ai.policy import ASSISTANT_POLICY_INSTRUCTION
+from app.ai.policy import (
+    ASSISTANT_POLICY_INSTRUCTION,
+    NARRATION_POLICY_INSTRUCTION,
+    ROUTING_POLICY_INSTRUCTION,
+)
 from app.ai.tool_schemas import openai_function_tools
 from app.risk.query import RiskAssistantModelRequest
 
@@ -54,6 +58,10 @@ def build_openai_continue_request(
 ) -> OpenAIResponsesRequest:
     """Continue a Responses turn with ``function_call_output`` items.
 
+    Every continue, including ``previous_response_id`` turns, supplies a
+    versioned instruction: routing policy while tools may still be selected,
+    narration policy when ``reserve_narration`` is true.
+
     ``settings.max_tool_rounds`` / ``max_tool_calls`` are owned by
     :class:`BoundedRiskAssistant`. Each continue still allows at most one tool
     call unless ``reserve_narration`` forces a final text turn.
@@ -81,6 +89,11 @@ def build_openai_continue_request(
 
     create_params: dict[str, Any] = {
         "model": settings.openai_model,
+        "instructions": (
+            NARRATION_POLICY_INSTRUCTION
+            if reserve_narration
+            else ROUTING_POLICY_INSTRUCTION
+        ),
         "previous_response_id": previous_response_id.strip(),
         "input": input_items,
         "tools": openai_function_tools(),
