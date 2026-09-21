@@ -825,7 +825,7 @@ Next eligible after this commit: **C16**. Do not start C12 until C13–C19 finis
 
 ## C16 — Make two-turn chat work in the shipped Compose topology
 
-- [ ] Remove the split between synchronous chat and external-worker fallback.
+- [x] Remove the split between synchronous chat and external-worker fallback.
 
 Dependencies: C14
 
@@ -852,6 +852,21 @@ cd ..
 docker compose -f docker-compose.yml config
 POSTGRES_PASSWORD=dummy-ci QUANTLINEAGE_API_TOKEN=dummy-token docker compose -f docker-compose.shared.yml config
 ```
+
+Evidence:
+
+- Product HEAD: `893c47a` (`fix: keep Risk Query interactive in Compose worker topology (C16)`). Chose the interactive production path: `POST /risk/query` is no longer `reject_inline_heavy`. Workload caps still apply via `enforce_workload_limits`. Chat is not a worker job; in-memory conversation state stays in the API process. `askRisk` posts only to `/risk/query` and does not fall back to `QueryRiskRunRequest` (which `extra=forbid` rejects `conversation_id`). Cross-principal denial remains in `test_cross_principal_conversation_access_fails_closed`. Compose-shaped HTTP test: first turn returns `conv_*`, follow-up reuses it under `QUANTLINEAGE_EXTERNAL_WORKER=1`.
+- Frontend vitest `src/api.test.js` + `src/components/RiskQuery.test.jsx` → **36 passed**. Browser UI not exercised (no `/tmp/cursor/start-user` services).
+- Checks (2026-09-21, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_conversations.py tests/test_ai_bounded_http.py tests/test_api_typed_models.py -q
+  docker compose -f docker-compose.yml config
+  POSTGRES_PASSWORD=dummy-ci QUANTLINEAGE_API_TOKEN=dummy-token docker compose -f docker-compose.shared.yml config
+  ```
+  → **48 passed**, 1 warning, exit **0** (2.30s). Both compose configs render.
+
+Next eligible after this commit: **C17**. Do not start C12 until C13–C19 finish.
 
 ## C17 — Store useful bounded context and reclaim expired state
 
