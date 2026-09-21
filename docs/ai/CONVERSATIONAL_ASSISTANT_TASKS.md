@@ -909,7 +909,7 @@ Next eligible after this commit: **C18**. Do not start C12 until C13–C19 finis
 
 ## C18 — Report the actual Greek pricing engine
 
-- [ ] Distinguish wrappers from the deterministic pricing engine/model.
+- [x] Distinguish wrappers from the deterministic pricing engine/model.
 
 Dependencies: C15
 
@@ -931,6 +931,19 @@ Checks:
 cd backend
 python3 -m pytest tests/test_position_greeks_tool.py tests/test_ai_bounded_http.py tests/test_api_typed_models.py -q
 ```
+
+Evidence:
+
+- Product HEAD: `8673895` (`fix: report underlying Greek pricing engine behind the cache (C18)`). `report_pricing_engine_identity` unwraps `CachedPricingEngine.inner`. Greeks reports set `pricing_engine`/`pricing_model` to `QuantLibPricingEngine` or `BuiltinPricingEngine` and `pricing_wrapper` to `CachedPricingEngine` when cached. Payload remains JSON-safe (no `ql.` objects). Units, scale, ranking_basis, and options_only are unchanged.
+- Checks (2026-09-21, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_position_greeks_tool.py tests/test_ai_bounded_http.py tests/test_api_typed_models.py -q
+  ruff check app/pricing/cache.py app/services/portfolio_service.py tests/test_position_greeks_tool.py
+  ```
+  → **52 passed**, 1 warning, exit **0** (2.17s). ruff: All checks passed.
+
+Next eligible after this commit: **C19**. Do not start C12 until C13–C19 finish.
 
 ## C19 — Add production-path and regression gates
 
