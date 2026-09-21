@@ -75,6 +75,15 @@ _METRIC_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(?:worst\s+)?loss\b", re.I), "stress_loss"),
     (re.compile(r"\bconfidence\b", re.I), "confidence"),
 )
+_ABS_LOSS_CONVENTIONS = frozenset(
+    {
+        "absolute_loss",
+        "abs_loss",
+        "absolute_loss_display",
+    }
+)
+_MISSING_ON_PAYLOAD = "not on this payload"
+_MISSING_ON_PAYLOAD_RE = re.compile(re.escape(_MISSING_ON_PAYLOAD), re.I)
 
 
 class GroundingClaim(BaseModel):
@@ -184,7 +193,9 @@ def format_tool_turns_deterministically(tool_turns: Sequence[Any]) -> str | None
         except ValueError:
             continue
         card = _grounded_card(name, tool_output)
-        return _format_answer(name, tool_output, card=card)
+        return _strip_missing_payload_placeholder(
+            _format_answer(name, tool_output, card=card)
+        )
     return None
 
 
@@ -367,14 +378,8 @@ def _metric_compatible(claimed: str | None, claim: GroundingClaim) -> bool:
     if claim.metric not in _FINANCIAL_METRICS:
         return False
     if claimed is None:
-        return True
-    if claimed == claim.metric:
-        return True
-    if claimed == "var" and claim.metric == "var":
-        return True
-    if claimed == "es" and claim.metric == "es":
-        return True
-    return False
+        return False
+    return claimed == claim.metric
 
 
 def _value_matches(claim: GroundingClaim, token_value: float, *, token_is_percent: bool) -> bool:
@@ -392,7 +397,12 @@ def _value_matches(claim: GroundingClaim, token_value: float, *, token_is_percen
         candidates.append(claim.value)
 
     for candidate in candidates:
-        if _numeric_close(candidate, token_value) or _numeric_close(abs(candidate), token_value):
+        if _numeric_close(candidate, token_value):
+            return True
+        if (
+            claim.sign_convention in _ABS_LOSS_CONVENTIONS
+            and _numeric_close(abs(candidate), token_value)
+        ):
             return True
     return False
 
@@ -428,3 +438,14 @@ def _add_claim_forms(allowed: set[str], claim: GroundingClaim) -> None:
     if claim.unit == "percent":
         allowed.add(f"{value:g}%")
         allowed.add(f"{value:.0f}%")
+
+
+def _strip_missing_payload_placeholder(text: str | None) -> str | None:
+    if text is None:
+        return None
+    cleaned = _MISSING_ON_PAYLOAD_RE.sub("", text)
+    cleaned = re.sub(r"\s+;", ";", cleaned)
+    cleaned = re.sub(r";\s*;", ";", cleaned)
+    cleaned = re.sub(r"\s+\.", ".", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip()

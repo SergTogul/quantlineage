@@ -153,6 +153,7 @@ def test_bounded_assistant_falls_back_when_narration_has_hallucinated_numbers() 
     assert "444" in result.proposed_answer
     # Deterministic formatter path
     assert "VaR" in result.proposed_answer
+    assert "not on this payload" not in result.proposed_answer.lower()
 
 
 def test_year_or_id_cannot_ground_invented_var() -> None:
@@ -236,3 +237,78 @@ def test_format_tool_turns_deterministically_uses_last_successful_payload() -> N
     assert text is not None
     assert "444" in text
     assert "555" in text
+    assert "not on this payload" not in text.lower()
+
+
+def test_unclassified_count_phrase_cannot_use_var_value() -> None:
+    result = ground_narration(
+        "The book has 100 positions.",
+        [{"methods": [{"var": 100.0, "confidence": 0.99}]}],
+    )
+    assert result.accepted is False
+    assert any("100" in token for token in result.rejected_tokens)
+
+
+def test_negative_loss_cannot_ground_profit_or_unsigned_loss() -> None:
+    payload = [{"worst_loss": -100.0}]
+    profit = ground_narration("The stress shows a profit of 100.", payload)
+    assert profit.accepted is False
+    assert any("100" in token for token in profit.rejected_tokens)
+
+    unsigned_loss = ground_narration("Worst loss is 100.", payload)
+    assert unsigned_loss.accepted is False
+
+    signed_loss = ground_narration("Worst loss is -100.", payload)
+    assert signed_loss.accepted is True
+
+
+def test_absolute_loss_convention_may_display_positive_magnitude() -> None:
+    from app.ai.narration import GroundingClaim
+
+    claim = GroundingClaim(
+        metric="stress_loss",
+        value=-100.0,
+        unit="currency",
+        sign_convention="absolute_loss",
+        field_path="worst_loss",
+    )
+    result = ground_narration("Worst loss is 100.", [claim])
+    assert result.accepted is True
+
+
+def test_equal_var_and_delta_values_cannot_cross_ground() -> None:
+    var_as_delta = ground_narration("Delta is 100.", [{"var_99": 100.0}])
+    assert var_as_delta.accepted is False
+    delta_as_var = ground_narration(
+        "VaR is 100.",
+        [{"greek": "delta", "positions": [{"position_id": "opt-1", "greek": "delta", "value": 100.0}]}],
+    )
+    assert delta_as_var.accepted is False
+
+
+def test_ratio_percent_and_currency_cannot_cross_ground() -> None:
+    currency_as_percent = ground_narration(
+        "Utilization is 50%.",
+        [{"methods": [{"var": 50.0, "confidence": 0.99}]}],
+    )
+    assert currency_as_percent.accepted is False
+
+    percent_as_currency = ground_narration(
+        "VaR is 50.",
+        [{"contribution_pct": 50.0}],
+    )
+    assert percent_as_currency.accepted is False
+
+    ratio_as_currency = ground_narration(
+        "VaR is 0.5.",
+        [{"confidence": 0.5}],
+    )
+    assert ratio_as_currency.accepted is False
+
+
+def test_confidence_metadata_cannot_ground_unclassified_numeric_prose() -> None:
+    result = ground_narration(
+        "About 0.99 of the book.",
+        [{"methods": [{"var": 444.0, "confidence": 0.99}]}],
+    )
+    assert result.accepted is False

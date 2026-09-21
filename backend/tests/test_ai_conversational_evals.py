@@ -293,6 +293,10 @@ GROUNDING_ATTACKS: tuple[tuple[str, str, list[dict[str, Any]]], ...] = (
     ("ga-06", "Delta is 444.", [{"var": 444.0}]),
     ("ga-07", "VaR is 555.", [{"expected_shortfall": 555.0}]),
     ("ga-08", "VaR is 42.", [{"contributors": [{"count": 42, "position_id": "p1"}]}]),
+    ("ga-09", "The book has 100 positions.", [{"var": 100.0}]),
+    ("ga-10", "The stress shows a profit of 100.", [{"worst_loss": -100.0}]),
+    ("ga-11", "Utilization is 50%.", [{"var": 50.0}]),
+    ("ga-12", "VaR is 50.", [{"contribution_pct": 50.0}]),
 )
 
 
