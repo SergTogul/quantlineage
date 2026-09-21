@@ -110,7 +110,7 @@ def build_openai_continue_request(
 
 
 def _format_user_input(request: RiskAssistantModelRequest) -> str:
-    lines = [f"Question: {request.question.strip()}"]
+    lines = []
     context_parts: list[str] = []
     if request.portfolio_id:
         context_parts.append(f"portfolio_id={request.portfolio_id}")
@@ -118,18 +118,25 @@ def _format_user_input(request: RiskAssistantModelRequest) -> str:
         context_parts.append(
             "available_run_ids=" + ",".join(request.available_run_ids)
         )
-    if context_parts:
-        lines.append("Routing context: " + "; ".join(context_parts))
     if request.conversation_history:
         lines.append("Prior conversation:")
         for turn in request.conversation_history:
             question = str(turn.get("question") or "").strip()
+            answer = str(turn.get("answer") or "").strip()
             tool_name = str(turn.get("tool_name") or "").strip()
             tool_args = turn.get("tool_args") or {}
             if question:
                 lines.append(f"- User: {question}")
             if tool_name:
-                lines.append(f"  Tool: {tool_name} args={json.dumps(tool_args, sort_keys=True)}")
+                lines.append(
+                    "  Tool: "
+                    f"{tool_name} args={json.dumps(tool_args, sort_keys=True)}"
+                )
+            if answer:
+                lines.append(f"  Assistant: {answer}")
+    lines.append(f"Question: {request.question.strip()}")
+    if context_parts:
+        lines.append("Routing context: " + "; ".join(context_parts))
     return "\n".join(lines)
 
 

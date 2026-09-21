@@ -12,6 +12,7 @@ access always fails closed.
 
 from __future__ import annotations
 
+import json
 import threading
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -21,6 +22,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 CONVERSATION_MAX_TURNS = 8
 CONVERSATION_TTL_SECONDS = 24 * 60 * 60
+CONVERSATION_MAX_CONTEXT_BYTES = 2048
+CONVERSATION_MAX_PER_PRINCIPAL = 8
+CONVERSATION_MAX_TOOL_ARGS_BYTES = 256
 LOCAL_PRINCIPAL = "demo"
 
 
@@ -74,12 +78,40 @@ def conversation_history_for_model(record: ConversationRecord) -> list[dict[str,
         history.append(
             {
                 "question": turn.question,
-                "tool_name": turn.tool_name,
-                "tool_args": dict(turn.tool_args or {}),
                 "answer": turn.answer,
+                "tool_name": turn.tool_name,
+                "tool_args": _clip_tool_args(turn.tool_args),
             }
         )
+    while history and _history_size(history) > CONVERSATION_MAX_CONTEXT_BYTES:
+        history.pop(0)
+    if history and _history_size(history) > CONVERSATION_MAX_CONTEXT_BYTES:
+        history[-1] = _clip_history_item(history[-1], CONVERSATION_MAX_CONTEXT_BYTES)
     return history
+
+
+def _clip_tool_args(tool_args: dict[str, Any] | None) -> dict[str, Any]:
+    payload = dict(tool_args or {})
+    encoded = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+    if len(encoded) <= CONVERSATION_MAX_TOOL_ARGS_BYTES:
+        return payload
+    return {"_truncated": True}
+
+
+def _history_size(history: list[dict[str, Any]]) -> int:
+    return len(json.dumps(history, default=str).encode("utf-8"))
+
+
+def _clip_history_item(item: dict[str, Any], max_bytes: int) -> dict[str, Any]:
+    clipped = dict(item)
+    answer = clipped.get("answer")
+    if isinstance(answer, str):
+        budget = max(max_bytes // 2, 32)
+        encoded = answer.encode("utf-8")
+        if len(encoded) > budget:
+            clipped["answer"] = encoded[:budget].decode("utf-8", errors="ignore")
+    clipped["tool_args"] = _clip_tool_args(clipped.get("tool_args"))
+    return clipped
 
 
 class ConversationRepository(Protocol):
@@ -113,10 +145,12 @@ class InMemoryConversationRepository:
         *,
         ttl_seconds: int = CONVERSATION_TTL_SECONDS,
         max_turns: int = CONVERSATION_MAX_TURNS,
+        max_conversations: int = CONVERSATION_MAX_PER_PRINCIPAL,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self._ttl_seconds = max(int(ttl_seconds), 1)
         self._max_turns = max(int(max_turns), 1)
+        self._max_conversations = max(int(max_conversations), 1)
         self._now = now or _utcnow
         self._lock = threading.RLock()
         self._records: dict[str, ConversationRecord] = {}
@@ -134,11 +168,14 @@ class InMemoryConversationRepository:
             expires_at=now + timedelta(seconds=self._ttl_seconds),
         )
         with self._lock:
+            self._reclaim_expired_unlocked()
+            self._evict_for_capacity_unlocked(owner)
             self._records[record.id] = record
         return record.model_copy(deep=True)
 
     def get(self, conversation_id: str, *, principal: str | None) -> ConversationRecord:
         with self._lock:
+            self._reclaim_expired_unlocked()
             return self._load_owned(conversation_id, principal).model_copy(deep=True)
 
     def append_turn(
@@ -154,6 +191,7 @@ class InMemoryConversationRepository:
         provider_response_id: str | None = None,
     ) -> ConversationRecord:
         with self._lock:
+            self._reclaim_expired_unlocked()
             record = self._load_owned(conversation_id, principal)
             now = self._now()
             turn = ConversationTurn(
@@ -185,6 +223,10 @@ class InMemoryConversationRepository:
             self._records.pop(conversation_id, None)
             self._provider_response_ids.pop(conversation_id, None)
 
+    def reclaim_expired(self) -> int:
+        with self._lock:
+            return self._reclaim_expired_unlocked()
+
     def peek_provider_response_id(
         self, conversation_id: str, *, principal: str | None
     ) -> str | None:
@@ -206,3 +248,31 @@ class InMemoryConversationRepository:
         if record.principal != owner:
             raise ConversationAccessDenied(conversation_id)
         return record
+
+    def _reclaim_expired_unlocked(self) -> int:
+        now = self._now()
+        expired = [
+            conversation_id
+            for conversation_id, record in self._records.items()
+            if record.expires_at <= now
+        ]
+        for conversation_id in expired:
+            self._records.pop(conversation_id, None)
+            self._provider_response_ids.pop(conversation_id, None)
+        return len(expired)
+
+    def _evict_for_capacity_unlocked(self, owner: str) -> None:
+        owned = [
+            record
+            for record in self._records.values()
+            if record.principal == owner
+        ]
+        while len(owned) >= self._max_conversations:
+            oldest = min(owned, key=lambda record: (record.updated_at, record.created_at, record.id))
+            self._records.pop(oldest.id, None)
+            self._provider_response_ids.pop(oldest.id, None)
+            owned = [
+                record
+                for record in self._records.values()
+                if record.principal == owner
+            ]

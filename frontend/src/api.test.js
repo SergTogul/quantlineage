@@ -639,7 +639,7 @@ describe('askRisk interactive chat', () => {
       http.post(`${API_BASE}${API_V1}/risk/query`, async ({ request }) => {
         const body = await request.json()
         queryBodies.push(body)
-        expect(JSON.stringify(body)).not.toMatch(/OPENAI_API_KEY/)
+        expect(JSON.stringify(body)).not.toMatch(/OPENAI_API[_-]KEY/)
         return HttpResponse.json({
           intent: 'var_es',
           answer: 'ok',

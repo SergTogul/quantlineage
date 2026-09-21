@@ -16,6 +16,7 @@ from app.ai.conversations import (
     ConversationAccessDenied,
     ConversationNotFound,
     InMemoryConversationRepository,
+    conversation_history_for_model,
 )
 from app.api.schemas.transport import RiskQueryRequest, RiskQueryResponse
 from app.pricing.builtin import BuiltinPricingEngine
@@ -254,6 +255,188 @@ def test_conversation_history_is_bounded() -> None:
     assert len(loaded.turns) == CONVERSATION_MAX_TURNS
     assert loaded.turns[0].question == "q3"
     assert loaded.turns[-1].question == f"q{CONVERSATION_MAX_TURNS + 2}"
+
+
+def test_model_history_is_chronological_and_includes_prior_answer() -> None:
+    repo = InMemoryConversationRepository()
+    record = repo.create(principal="alice")
+    repo.append_turn(
+        record.id,
+        principal="alice",
+        question="Which options have the largest delta?",
+        answer="Delta ranking starts with opt-1.",
+        tool_name="get_position_greeks",
+        tool_args={"greek": "delta", "options_only": True},
+        tool_result={"positions": [{"value": 12.5}] * 50, "secret": "sk-hidden"},
+        provider_response_id="resp_secret",
+    )
+    loaded = repo.get(record.id, principal="alice")
+    history = conversation_history_for_model(loaded)
+    assert list(history[0])[:4] == ["question", "answer", "tool_name", "tool_args"]
+    assert history[0]["question"] == "Which options have the largest delta?"
+    assert history[0]["answer"] == "Delta ranking starts with opt-1."
+    assert history[0]["tool_name"] == "get_position_greeks"
+    assert history[0]["tool_args"]["greek"] == "delta"
+    assert "tool_result" not in history[0]
+    assert "sk-hidden" not in json.dumps(history)
+    assert "resp_secret" not in json.dumps(history)
+    assert "provider_response_id" not in json.dumps(history)
+    assert "chain_of_thought" not in json.dumps(history)
+
+
+def test_model_history_enforces_context_byte_cap() -> None:
+    repo = InMemoryConversationRepository()
+    record = repo.create(principal="alice")
+    repo.append_turn(
+        record.id,
+        principal="alice",
+        question="old question",
+        answer="A" * 4000,
+        tool_name="get_var_es",
+        tool_args={"huge": "B" * 4000},
+        tool_result={"blob": "C" * 8000},
+    )
+    repo.append_turn(
+        record.id,
+        principal="alice",
+        question="latest question",
+        answer="VaR is 444.",
+        tool_name="get_var_es",
+        tool_args={"confidence": 0.99},
+        tool_result={"var": 444.0},
+    )
+    history = conversation_history_for_model(repo.get(record.id, principal="alice"))
+    encoded = json.dumps(history)
+    from app.ai.conversations import CONVERSATION_MAX_CONTEXT_BYTES
+
+    assert len(encoded.encode("utf-8")) <= CONVERSATION_MAX_CONTEXT_BYTES
+    assert history[-1]["question"] == "latest question"
+    assert "444" in (history[-1]["answer"] or "")
+    assert all("tool_result" not in item for item in history)
+
+
+def test_reclaim_expired_does_not_require_lookup_of_that_id() -> None:
+    clock = {"now": datetime(2026, 9, 21, tzinfo=UTC)}
+    repo = InMemoryConversationRepository(ttl_seconds=10, now=lambda: clock["now"])
+    expired = repo.create(principal="alice")
+    clock["now"] = clock["now"] + timedelta(seconds=5)
+    alive = repo.create(principal="alice")
+    clock["now"] = clock["now"] + timedelta(seconds=6)
+    reclaimed = repo.reclaim_expired()
+    assert reclaimed >= 1
+    with pytest.raises(ConversationNotFound):
+        repo.get(expired.id, principal="alice")
+    still = repo.get(alive.id, principal="alice")
+    assert still.id == alive.id
+
+
+def test_capacity_evicts_oldest_conversation_deterministically() -> None:
+    clock = {"now": datetime(2026, 9, 21, tzinfo=UTC)}
+    repo = InMemoryConversationRepository(
+        max_conversations=2,
+        now=lambda: clock["now"],
+    )
+    first = repo.create(principal="alice")
+    clock["now"] = clock["now"] + timedelta(seconds=1)
+    second = repo.create(principal="alice")
+    clock["now"] = clock["now"] + timedelta(seconds=1)
+    third = repo.create(principal="alice")
+    with pytest.raises(ConversationNotFound):
+        repo.get(first.id, principal="alice")
+    assert repo.get(second.id, principal="alice").id == second.id
+    assert repo.get(third.id, principal="alice").id == third.id
+    bob = repo.create(principal="bob")
+    assert repo.get(second.id, principal="alice").id == second.id
+    assert repo.get(bob.id, principal="bob").id == bob.id
+
+
+def test_clarification_follow_up_includes_prior_assistant_text() -> None:
+    class _ClarifyThenGreek(_ContextAwareGreeksModel):
+        def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
+            if not request.conversation_history:
+                return RiskAssistantModelResponse(
+                    intent="ambiguous",
+                    requires_clarification=True,
+                    clarification="Which greek do you want?",
+                    provider_response_id="resp_clarify",
+                )
+            assert request.conversation_history[0]["answer"] == "Which greek do you want?"
+            assert request.conversation_history[0]["question"] == "Show me Greeks"
+            return super().complete(request)
+
+    model = _ClarifyThenGreek()
+    service = _service(model)
+    first = service.query(SAMPLE_PORTFOLIO, "Show me Greeks", principal="alice")
+    assert first.requires_clarification is True
+    cid = first.data["conversation_id"]
+    second = service.query(
+        SAMPLE_PORTFOLIO,
+        "gamma please",
+        conversation_id=cid,
+        principal="alice",
+    )
+    assert second.tool_name == "get_position_greeks"
+    assert second.data["tool_result"]["greek"] == "gamma"
+
+
+def test_follow_up_can_refer_to_prior_visible_answer() -> None:
+    class _NarratingGreeks(_ContextAwareGreeksModel):
+        def continue_after_tools(self, **_kwargs: Any) -> RiskAssistantModelResponse:
+            self.continue_count += 1
+            return RiskAssistantModelResponse(
+                proposed_answer="Largest options delta is on opt-es.",
+                intent="final",
+                provider_response_id="resp_final",
+            )
+
+        def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
+            if request.conversation_history:
+                prior = request.conversation_history[0]
+                assert prior["answer"] == "Largest options delta is on opt-es."
+                assert "opt-es" in (prior["answer"] or "")
+            return super().complete(request)
+
+    model = _NarratingGreeks()
+    service = _service(model)
+    first = service.query(
+        SAMPLE_PORTFOLIO,
+        "Which options have the largest delta?",
+        principal="alice",
+    )
+    cid = first.data["conversation_id"]
+    assert "opt-es" in first.answer
+    second = service.query(
+        SAMPLE_PORTFOLIO,
+        "What about that same name for gamma?",
+        conversation_id=cid,
+        principal="alice",
+    )
+    assert second.data["conversation_id"] == cid
+    assert second.data["tool_result"]["greek"] == "gamma"
+
+
+def test_concurrent_access_stays_ownership_safe() -> None:
+    import threading
+
+    repo = InMemoryConversationRepository()
+    record = repo.create(principal="alice")
+    errors: list[BaseException] = []
+
+    def _intrude() -> None:
+        try:
+            repo.get(record.id, principal="bob")
+        except ConversationAccessDenied:
+            return
+        except BaseException as exc:  # pragma: no cover
+            errors.append(exc)
+
+    threads = [threading.Thread(target=_intrude) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == []
+    assert repo.get(record.id, principal="alice").id == record.id
 
 
 def test_compose_external_worker_two_turn_query_keeps_conversation(

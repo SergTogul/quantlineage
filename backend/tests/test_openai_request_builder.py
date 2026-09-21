@@ -94,6 +94,33 @@ def test_request_includes_question_and_minimal_routing_context_only(
     assert "available_run_ids=run-a,run-b" in user_input
 
 
+def test_prior_conversation_is_chronological_then_current_question(
+    openai_settings: AISettings,
+) -> None:
+    request = RiskAssistantModelRequest(
+        question="What about gamma?",
+        tools=tool_contract_schemas(),
+        conversation_history=[
+            {
+                "question": "Which options have the largest delta?",
+                "answer": "Delta ranking starts with opt-1.",
+                "tool_name": "get_position_greeks",
+                "tool_args": {"greek": "delta", "options_only": True},
+            }
+        ],
+    )
+    user_input = build_openai_responses_request(request, openai_settings).create_params[
+        "input"
+    ]
+    prior_at = user_input.index("Prior conversation:")
+    user_at = user_input.index("- User: Which options have the largest delta?")
+    assistant_at = user_input.index("Assistant: Delta ranking starts with opt-1.")
+    current_at = user_input.index("Question: What about gamma?")
+    assert prior_at < user_at < assistant_at < current_at
+    assert "tool_result" not in user_input
+    assert "resp_" not in user_input
+
+
 def test_request_omits_empty_routing_context(openai_settings: AISettings) -> None:
     request = RiskAssistantModelRequest(
         question="Show VaR",
