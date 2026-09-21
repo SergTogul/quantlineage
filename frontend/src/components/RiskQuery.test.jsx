@@ -376,4 +376,36 @@ describe('RiskQuery', () => {
     expect(screen.getByTestId('risk-query-assistant-fallback')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled()
   })
+
+  it('Retry after a failed ask does not duplicate the user turn in the transcript', async () => {
+    let attempts = 0
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/query`, async () => {
+        attempts += 1
+        if (attempts === 1) {
+          return HttpResponse.json({ code: 'provider_error', message: 'unavailable' }, { status: 503 })
+        }
+        return HttpResponse.json({
+          answer: 'Worst stress scenario is Dot-com-style equity crash.',
+          data: { conversation_id: 'conv_retry' },
+        })
+      }),
+    )
+    const user = userEvent.setup()
+    render(<RiskQuery portfolio={demoPortfolio} />)
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
+
+    expect(await screen.findByTestId('risk-query-error')).toBeInTheDocument()
+    const transcript = screen.getByTestId('risk-query-transcript')
+    expect(transcript.querySelectorAll('.risk-query-turn-user')).toHaveLength(1)
+    expect(transcript).toHaveTextContent('What is the worst stress scenario?')
+    expect(transcript.querySelectorAll('.risk-query-turn-assistant')).toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByTestId('risk-query-answer')).toHaveTextContent(/Worst stress scenario/i)
+    expect(screen.queryByTestId('risk-query-error')).not.toBeInTheDocument()
+    expect(attempts).toBe(2)
+    expect(transcript.querySelectorAll('.risk-query-turn-user')).toHaveLength(1)
+    expect(transcript.querySelectorAll('.risk-query-turn-assistant')).toHaveLength(1)
+  })
 })

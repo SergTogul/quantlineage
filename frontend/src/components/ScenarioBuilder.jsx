@@ -570,7 +570,14 @@ export function RiskQuery({ portfolio }) {
     setBusy(true)
     setError('')
     setCancelled(false)
-    setMessages((current) => [...current, { role: 'user', text }])
+    setMessages((current) => {
+      const last = current[current.length - 1]
+      if (last?.role === 'user') {
+        if (last.text === text) return current
+        return [...current.slice(0, -1), { role: 'user', text }]
+      }
+      return [...current, { role: 'user', text }]
+    })
     const controller = new AbortController()
     abortRef.current = controller
     try {
