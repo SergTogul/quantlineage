@@ -738,7 +738,7 @@ Next eligible after this commit: **C14**. Do not start it in this run. C12 stays
 
 ## C14 — Enforce hard model-turn and tool-call budgets
 
-- [ ] Make configured budgets true upper bounds and remove exception-driven replay.
+- [x] Make configured budgets true upper bounds and remove exception-driven replay.
 
 Dependencies: C13
 
@@ -763,6 +763,23 @@ Checks:
 cd backend
 python3 -m pytest tests/test_ai_bounded_assistant.py tests/test_ai_bounded_http.py tests/test_ai_config.py tests/test_openai_model.py -q
 ```
+
+Evidence:
+
+- Product HEAD: `b8b371c` (`fix: enforce hard model-turn budget without hidden extra continue (C14)`). `BoundedRiskAssistant.run` loops `range(1, max_model_turns + 1)` only. A tool on the last model turn does not execute (no hidden continue to send `function_call_output`). After an executed tool, the next continue is reserved when the tool budget is exhausted **or** the next round is the last model turn. `rounds_used` is never `max_model_turns + 1`.
+- `continue_after_tools` `TypeError` is converted to `OpenAIModelParseError` with no retry. HTTP already maps that after executed tools to truncated fallback without replay (`test_continue_type_error_after_tool_is_partial_fallback_without_replay`).
+- Conversational `get_ai_settings` fails when `max_tool_rounds < max_tool_calls + 1`. Router may use `AI_MAX_TOOL_ROUNDS=1`. `test_max_tool_rounds_allows_one_through_four` sets router for rounds=1.
+- Exact provider/tool counts at limits 1–4: provider calls == `max_rounds`; tools == `max(max_rounds - 1, 0)`. Cap-at-four is 4 provider calls / 3 tools, not 5/4. `test_final_tool_turn_*` uses `max_rounds=2`.
+- `mt-safe-02` no longer expects two executed tools under `max_rounds=2` (that encoded the hidden +1).
+- Checks (2026-09-21, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_bounded_assistant.py tests/test_ai_bounded_http.py tests/test_ai_config.py tests/test_openai_model.py -q
+  ruff check app/ai/assistant.py app/ai/config.py tests/test_ai_bounded_assistant.py tests/test_ai_bounded_http.py tests/test_ai_config.py tests/test_ai_multi_tool_evals.py
+  ```
+  → **87 passed**, exit **0** (2.43s) for the C14 suite; related AI evals including `test_ai_multi_tool_evals.py` also green (**189 passed** across the combined related run). ruff: All checks passed.
+
+Next eligible after this commit: **C15**. Do not start C12 until C13–C19 finish.
 
 ## C15 — Make quantitative grounding fail closed
 
