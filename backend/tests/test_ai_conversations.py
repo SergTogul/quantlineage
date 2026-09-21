@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -253,3 +254,42 @@ def test_conversation_history_is_bounded() -> None:
     assert len(loaded.turns) == CONVERSATION_MAX_TURNS
     assert loaded.turns[0].question == "q3"
     assert loaded.turns[-1].question == f"q{CONVERSATION_MAX_TURNS + 2}"
+
+
+def test_compose_external_worker_two_turn_query_keeps_conversation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """C16: QUANTLINEAGE_EXTERNAL_WORKER=1 still serves interactive chat."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
+    with TestClient(app) as client:
+        book = client.get("/api/v1/portfolio").json()
+        first = client.post(
+            "/api/v1/risk/query",
+            json={"portfolio": book, "question": "What is 99% VaR?"},
+        )
+        assert first.status_code == 200, first.text
+        body = first.json()
+        conversation_id = body["data"]["conversation_id"]
+        assert conversation_id.startswith("conv_")
+        blob = json.dumps(body)
+        assert "OPENAI_API_KEY" not in blob
+        assert "previous_response_id" not in blob
+
+        second = client.post(
+            "/api/v1/risk/query",
+            json={
+                "portfolio": book,
+                "question": "What about ES?",
+                "conversation_id": conversation_id,
+            },
+        )
+        assert second.status_code == 200, second.text
+        follow = second.json()
+        assert follow["data"]["conversation_id"] == conversation_id
+        follow_blob = json.dumps(follow)
+        assert "OPENAI_API_KEY" not in follow_blob
+        assert "sk-" not in follow_blob.lower()

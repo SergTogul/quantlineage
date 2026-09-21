@@ -169,7 +169,11 @@ def risk_query(
     request: Request,
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> RiskQueryResponse:
-    reject_inline_heavy(route="POST /risk/query")
+    """Interactive Risk Query chat. Stays on the request thread under Compose.
+
+    Workload caps still apply via ``enforce_workload_limits``. HEAVY RiskRuns
+    remain on ``POST /risk/runs``; chat is not converted to a worker job.
+    """
     try:
         return service.query(
             body.portfolio,

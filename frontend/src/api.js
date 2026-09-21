@@ -210,17 +210,11 @@ export function compareHedge(portfolio, hedged_portfolio, scenarios, methodology
 export function askRisk(portfolio, question, { conversationId, signal } = {}) {
   const body = { portfolio, question }
   if (conversationId) body.conversation_id = conversationId
-  return postHeavyOrRiskRun(
-    `${API_V1}/risk/query`,
-    { method: 'POST', body: JSON.stringify(body), signal },
-    {
-      portfolio,
-      run_type: 'query',
-      request: conversationId
-        ? { question, conversation_id: conversationId }
-        : { question },
-    },
-  )
+  return json(`${API_V1}/risk/query`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    signal,
+  })
 }
 /**
  * Limit breach drill-down → LimitDrilldownReport.

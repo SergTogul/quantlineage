@@ -341,3 +341,18 @@ def test_risk_query_request_conversation_id_is_optional_and_provider_neutral() -
                 "previous_response_id": "resp_secret",
             }
         )
+
+
+def test_query_risk_run_request_rejects_conversation_id() -> None:
+    from pydantic import ValidationError
+
+    from app.api.schemas.transport import QueryRiskRunRequest
+
+    QueryRiskRunRequest.model_validate({"question": "What is 99% VaR?"})
+    with pytest.raises(ValidationError):
+        QueryRiskRunRequest.model_validate(
+            {"question": "What is 99% VaR?", "conversation_id": "conv_app"}
+        )
+    dumped = QueryRiskRunRequest.model_validate({"question": "VaR?"}).model_dump()
+    assert "OPENAI_API_KEY" not in dumped
+    assert "conversation_id" not in dumped
