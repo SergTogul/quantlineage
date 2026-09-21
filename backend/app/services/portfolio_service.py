@@ -26,6 +26,7 @@ from app.domain.models import (
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.market.snapshot import FixedMarketDataProvider, MarketDataProvider
+from app.pricing.cache import report_pricing_engine_identity
 from app.pricing.instrument_capabilities import get_capability
 from app.risk.attribution import AttributionEngine
 from app.risk.es import ESContributionAnalytics
@@ -753,7 +754,7 @@ class PortfolioService:
         total_abs = sum(abs(float(row["value"])) for row in rows) or 1.0
         for row in top:
             row["share_pct"] = 100.0 * abs(float(row["value"])) / total_abs
-        engine_name = type(self.pricing).__name__
+        identity = report_pricing_engine_identity(self.pricing)
         return {
             "greek": greek,
             "unit": meta["unit"],
@@ -765,8 +766,9 @@ class PortfolioService:
             "positions": top,
             "portfolio_id": portfolio.id,
             "market_snapshot_id": getattr(market, "id", None),
-            "pricing_engine": engine_name,
-            "pricing_model": engine_name,
+            "pricing_engine": identity["pricing_engine"],
+            "pricing_model": identity["pricing_model"],
+            "pricing_wrapper": identity["pricing_wrapper"],
         }
 
     def limits(self, portfolio: Portfolio):

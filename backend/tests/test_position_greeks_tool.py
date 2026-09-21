@@ -126,10 +126,10 @@ def test_position_greeks_report_includes_units_engine_and_no_quantlib() -> None:
     assert report["convention"] == "cash_delta"
     assert "S" in report["scale"] and "dV" in report["scale"]
     assert report["ranking_basis"] == "abs_value"
+    assert report["options_only"] is True
     assert report["portfolio_id"] == SAMPLE_PORTFOLIO.id
     assert report["market_snapshot_id"]
     assert report["pricing_engine"]
-    assert "QuantLib" not in str(report["pricing_engine"])
     blob = str(report)
     assert "ql." not in blob.lower()
     row = report["positions"][0]
@@ -141,6 +141,46 @@ def test_position_greeks_report_includes_units_engine_and_no_quantlib() -> None:
         "cap_floor",
         "swaption",
     }
+
+
+def test_cached_quantlib_greeks_identify_underlying_engine_not_only_wrapper() -> None:
+    from app.pricing.cache import CachedPricingEngine
+    from app.pricing.quantlib import QuantLibPricingEngine
+    from app.risk.historical import HistoricalRiskEngine
+
+    service = PortfolioService(
+        CachedPricingEngine(QuantLibPricingEngine()),
+        HistoricalRiskEngine(seed=1, observations=20),
+    )
+    report = service.position_greeks(
+        SAMPLE_PORTFOLIO, greek="delta", top_n=2, options_only=True
+    )
+    assert report["pricing_engine"] == "QuantLibPricingEngine"
+    assert report["pricing_model"] == "QuantLibPricingEngine"
+    assert report["pricing_wrapper"] == "CachedPricingEngine"
+    assert report["ranking_basis"] == "abs_value"
+    assert report["options_only"] is True
+    assert report["unit"]
+    assert report["scale"]
+    blob = str(report)
+    assert "ql." not in blob.lower()
+    assert "QuantLib::" not in blob
+
+
+def test_builtin_greeks_identify_builtin_engine() -> None:
+    from app.pricing.builtin import BuiltinPricingEngine
+    from app.pricing.cache import CachedPricingEngine
+    from app.risk.historical import HistoricalRiskEngine
+
+    service = PortfolioService(
+        CachedPricingEngine(BuiltinPricingEngine()),
+        HistoricalRiskEngine(seed=1, observations=20),
+    )
+    report = service.position_greeks(SAMPLE_PORTFOLIO, greek="vega", top_n=2)
+    assert report["pricing_engine"] == "BuiltinPricingEngine"
+    assert report["pricing_model"] == "BuiltinPricingEngine"
+    assert report["pricing_wrapper"] == "CachedPricingEngine"
+    assert "ql." not in str(report).lower()
 
 
 def test_generic_position_delta_may_include_non_options() -> None:
