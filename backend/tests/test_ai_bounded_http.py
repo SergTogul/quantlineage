@@ -254,6 +254,41 @@ def test_provider_error_after_a_tool_does_not_replay() -> None:
     assert "not replayed" in response.answer.lower()
 
 
+def test_continue_type_error_after_tool_is_partial_fallback_without_replay() -> None:
+    model = _ScriptedLoopModel(
+        [
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.GET_VAR_ES,
+                intent="var_es",
+                tool_call_id="call_var",
+                provider_response_id="resp_1",
+            )
+        ],
+        continue_error=TypeError(
+            "got an unexpected keyword argument 'reserve_narration'"
+        ),
+    )
+    service = _service(model, rounds=4)
+    original = service.var_report
+    calls = {"n": 0}
+
+    def _count(*args: Any, **kwargs: Any):
+        calls["n"] += 1
+        return original(*args, **kwargs)
+
+    service.var_report = _count  # type: ignore[method-assign]
+
+    response = service.query(SAMPLE_PORTFOLIO, "What is 99% VaR?")
+
+    assert calls["n"] == 1
+    assert model.continue_count == 1
+    assert response.requires_clarification is True
+    assert response.data["investigation"]["truncated"] is True
+    assert response.data["assistant"]["mode"] == "fallback"
+    assert response.data["assistant"]["fallback"] is True
+    assert "not replayed" in response.answer.lower()
+
+
 def test_bounded_greeks_question_calls_the_model() -> None:
     model = _ScriptedLoopModel(
         [

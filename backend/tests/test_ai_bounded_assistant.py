@@ -14,6 +14,7 @@ from app.ai.assistant import (
     RiskAssistantRequest,
     RiskAssistantResult,
 )
+from app.ai.errors import OpenAIModelParseError
 from app.risk.query import (
     RiskAssistantModelRequest,
     RiskAssistantModelResponse,
@@ -153,19 +154,60 @@ def test_final_tool_turn_still_sends_function_call_output_for_narration() -> Non
         RiskAssistantRequest(
             question="What is 99% VaR?",
             tools=[],
-            max_rounds=1,
+            max_rounds=2,
             max_tool_calls=1,
         )
     )
 
     assert result.stopped_reason == "final"
+    assert result.rounds_used == 2
     assert len(exec_calls) == 1
+    assert len(model.complete_requests) == 1
     assert len(model.continue_calls) == 1
+    assert len(model.complete_requests) + len(model.continue_calls) == 2
     output = model.continue_calls[0]["tool_outputs"][0]
     assert output.call_id == "call_var"
     assert json.loads(output.output)["tool"] == "get_var_es"
     assert result.proposed_answer == "Historical VaR was calculated by QuantLineage."
     assert model.continue_calls[0].get("reserve_narration") is True
+
+
+def test_single_model_turn_does_not_add_a_hidden_continue() -> None:
+    """C14: max_rounds=1 is a hard provider-call cap; no hidden +1 narration."""
+    model = _ScriptedLoopModel(
+        [
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.GET_VAR_ES,
+                tool_args={},
+                tool_call_id="call_var",
+                provider_response_id="resp_1",
+                intent="var_es",
+            ),
+            RiskAssistantModelResponse(
+                intent="final",
+                proposed_answer="This continuation must never run.",
+                provider_response_id="resp_2",
+            ),
+        ]
+    )
+    exec_calls, execute = _executor_recording()
+    assistant = BoundedRiskAssistant(model, execute)
+
+    result = assistant.run(
+        RiskAssistantRequest(
+            question="What is 99% VaR?",
+            tools=[],
+            max_rounds=1,
+            max_tool_calls=1,
+        )
+    )
+
+    assert result.stopped_reason == "round_limit"
+    assert result.rounds_used == 1
+    assert len(model.complete_requests) == 1
+    assert model.continue_calls == []
+    assert len(exec_calls) == 0
+    assert result.tool_turns == []
 
 
 def test_tool_budget_exhausted_does_not_execute_another_tool_after_reserved_narration() -> None:
@@ -315,6 +357,45 @@ def test_bounded_assistant_rejects_side_effecting_tools_by_default() -> None:
     ).lower() or "not enabled" in (result.refusal or "").lower()
 
 
+@pytest.mark.parametrize("max_rounds", [1, 2, 3, 4])
+def test_provider_and_tool_counts_are_exact_at_model_turn_limits(max_rounds: int) -> None:
+    """C14: provider calls == configured model turns; tools never need a hidden +1."""
+    responses = [
+        RiskAssistantModelResponse(
+            tool_name=RiskToolName.GET_LIMITS,
+            tool_args={},
+            tool_call_id=f"call_{i}",
+            provider_response_id=f"resp_{i}",
+        )
+        for i in range(1, 8)
+    ]
+    model = _ScriptedLoopModel(responses)
+    exec_calls, execute = _executor_recording()
+    assistant = BoundedRiskAssistant(model, execute)
+
+    result = assistant.run(
+        RiskAssistantRequest(
+            question="Keep going",
+            tools=[],
+            max_rounds=max_rounds,
+            max_tool_calls=max_rounds,
+        )
+    )
+
+    provider_calls = len(model.complete_requests) + len(model.continue_calls)
+    expected_tools = max(max_rounds - 1, 0)
+    expected_continues = max(max_rounds - 1, 0)
+    assert provider_calls == max_rounds
+    assert result.rounds_used == max_rounds
+    assert result.stopped_reason == "round_limit"
+    assert len(exec_calls) == expected_tools
+    assert len(result.tool_turns) == expected_tools
+    assert len(model.complete_requests) == 1
+    assert len(model.continue_calls) == expected_continues
+    if expected_continues:
+        assert model.continue_calls[-1]["reserve_narration"] is True
+
+
 def test_bounded_assistant_caps_max_rounds_at_four() -> None:
     responses = [
         RiskAssistantModelResponse(
@@ -323,20 +404,19 @@ def test_bounded_assistant_caps_max_rounds_at_four() -> None:
             tool_call_id=f"call_{i}",
             provider_response_id=f"resp_{i}",
         )
-        for i in range(1, 5)
+        for i in range(1, 6)
     ]
     responses.append(
         RiskAssistantModelResponse(
             intent="final",
             proposed_answer="Stop.",
-            provider_response_id="resp_5",
+            provider_response_id="resp_6",
         )
     )
     model = _ScriptedLoopModel(responses)
     exec_calls, execute = _executor_recording()
     assistant = BoundedRiskAssistant(model, execute)
 
-    # Pydantic request rejects >4; last tool still reserves a narration continue.
     result = assistant.run(
         RiskAssistantRequest(
             question="Keep going",
@@ -346,10 +426,55 @@ def test_bounded_assistant_caps_max_rounds_at_four() -> None:
         )
     )
 
-    assert result.rounds_used >= 4
-    assert len(exec_calls) == 4
-    assert len(model.continue_calls) == 4
+    provider_calls = len(model.complete_requests) + len(model.continue_calls)
+    assert provider_calls == 4
+    assert result.rounds_used == 4
+    assert len(exec_calls) == 3
+    assert len(model.continue_calls) == 3
     assert model.continue_calls[-1]["reserve_narration"] is True
+
+
+def test_continue_type_error_invokes_adapter_once_and_raises_parse_error() -> None:
+    """C14: no except TypeError retry that double-invokes continue_after_tools."""
+
+    class _TypeErrorContinueModel:
+        def __init__(self) -> None:
+            self.complete_count = 0
+            self.continue_count = 0
+
+        def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
+            del request
+            self.complete_count += 1
+            return RiskAssistantModelResponse(
+                tool_name=RiskToolName.GET_VAR_ES,
+                tool_args={},
+                tool_call_id="call_var",
+                provider_response_id="resp_1",
+                intent="var_es",
+            )
+
+        def continue_after_tools(self, **kwargs: Any) -> RiskAssistantModelResponse:
+            del kwargs
+            self.continue_count += 1
+            raise TypeError("got an unexpected keyword argument 'reserve_narration'")
+
+    model = _TypeErrorContinueModel()
+    exec_calls, execute = _executor_recording()
+    assistant = BoundedRiskAssistant(model, execute)
+
+    with pytest.raises(OpenAIModelParseError):
+        assistant.run(
+            RiskAssistantRequest(
+                question="What is 99% VaR?",
+                tools=[],
+                max_rounds=2,
+                max_tool_calls=1,
+            )
+        )
+
+    assert model.complete_count == 1
+    assert model.continue_count == 1
+    assert len(exec_calls) == 1
 
 
 def test_tool_executor_error_is_returned_as_function_output_and_loop_continues() -> None:

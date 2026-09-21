@@ -276,12 +276,11 @@ INVESTIGATION_CASES: tuple[InvestigationCase, ...] = (
         question="Keep calling limits until round limit",
         model_turns=(
             _tool(RiskToolName.GET_LIMITS, call_id="c1", response_id="r1"),
+            # C14: reserved narration is the second (last) model turn; a further
+            # tool is not executed and no hidden +1 continue runs.
             _tool(RiskToolName.GET_LIMITS, call_id="c2", response_id="r2"),
-            # C03 reserved-narration continue: still a tool, so the loop stops
-            # without executing a third call.
-            _tool(RiskToolName.GET_LIMITS, call_id="c3", response_id="r3"),
         ),
-        expected_tools=("get_limits", "get_limits"),
+        expected_tools=("get_limits",),
         expected_stopped="round_limit",
         max_rounds=2,
     ),
@@ -349,5 +348,5 @@ def test_investigation_sequences_stay_within_four_rounds() -> None:
         assert executed <= 4
         scripted_tools = sum(1 for turn in case.model_turns if turn.tool_name)
         assert scripted_tools <= 4
-        # C03: last executed tool may reserve one extra model continue.
-        assert len(case.model_turns) <= case.max_rounds + 1
+        # C14: reserved narration counts toward max_rounds; no hidden extra continue.
+        assert len(case.model_turns) <= case.max_rounds

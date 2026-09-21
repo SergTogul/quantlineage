@@ -261,6 +261,16 @@ def get_ai_settings(
             default=DEFAULT_MAX_TOOL_CALLS,
         )
 
+    if (
+        resolved_loop == "conversational"
+        and resolved_rounds < resolved_tool_calls + 1
+    ):
+        raise ValueError(
+            "Conversational AI_MAX_TOOL_ROUNDS must be at least "
+            "AI_MAX_TOOL_CALLS + 1 to reserve a narration turn "
+            f"(got rounds={resolved_rounds}, tool_calls={resolved_tool_calls})."
+        )
+
     if resolved_provider == "openai":
         if get_openai_api_key() is None:
             raise ValueError(

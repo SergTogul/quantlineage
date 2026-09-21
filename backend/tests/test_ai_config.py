@@ -143,6 +143,7 @@ def test_assistant_loop_rejects_unknown_values(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_max_tool_calls_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "router")
     monkeypatch.setenv("AI_MAX_TOOL_CALLS", "3")
     assert get_ai_settings().max_tool_calls == 3
 
@@ -156,8 +157,42 @@ def test_max_tool_rounds_allows_one_through_four(
     monkeypatch: pytest.MonkeyPatch,
     rounds: int,
 ) -> None:
+    if rounds == 1:
+        monkeypatch.setenv("AI_ASSISTANT_LOOP", "router")
     monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", str(rounds))
     assert get_ai_settings().max_tool_rounds == rounds
+
+
+def test_conversational_loop_rejects_rounds_too_small_for_tool_plus_narration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "conversational")
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "1")
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "1")
+    with pytest.raises(ValueError, match="AI_MAX_TOOL_CALLS \\+ 1"):
+        get_ai_settings()
+
+
+def test_conversational_loop_rejects_equal_rounds_and_tool_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "conversational")
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "2")
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "2")
+    with pytest.raises(ValueError, match="AI_MAX_TOOL_CALLS \\+ 1"):
+        get_ai_settings()
+
+
+def test_router_loop_allows_one_model_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "router")
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "1")
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "1")
+    settings = get_ai_settings()
+    assert settings.assistant_loop == "router"
+    assert settings.max_tool_rounds == 1
+    assert settings.max_tool_calls == 1
 
 
 @pytest.mark.parametrize(

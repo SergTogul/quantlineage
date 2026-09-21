@@ -13,6 +13,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.ai.errors import OpenAIModelParseError
 from app.ai.narration import (
     build_grounding_manifest,
     format_tool_turns_deterministically,
@@ -184,25 +185,23 @@ class BoundedRiskAssistant:
         previous_response_id: str | None = None
         last_response: RiskAssistantModelResponse | None = None
         reserve_narration = False
-        # One extra slot beyond the model-turn budget for a reserved narration continue.
-        for round_index in range(1, max_model_turns + 2):
+        for round_index in range(1, max_model_turns + 1):
             if round_index == 1:
                 response = self._model.complete(model_request)
             else:
                 assert previous_response_id is not None
                 assert pending_outputs is not None
-                continue_kwargs: dict[str, Any] = {
-                    "previous_response_id": previous_response_id,
-                    "tool_outputs": pending_outputs,
-                    "request": model_request,
-                }
                 try:
                     response = self._model.continue_after_tools(
-                        **continue_kwargs,
+                        previous_response_id=previous_response_id,
+                        tool_outputs=pending_outputs,
+                        request=model_request,
                         reserve_narration=reserve_narration,
                     )
-                except TypeError:
-                    response = self._model.continue_after_tools(**continue_kwargs)
+                except TypeError as exc:
+                    raise OpenAIModelParseError(
+                        "Model continuation failed with an internal adapter error."
+                    ) from exc
             last_response = response
 
             if response.refusal:
@@ -250,7 +249,11 @@ class BoundedRiskAssistant:
                     stopped_reason="refusal",
                 )
 
-            if reserve_narration or len(tool_turns) >= max_tool_calls:
+            if (
+                reserve_narration
+                or len(tool_turns) >= max_tool_calls
+                or round_index >= max_model_turns
+            ):
                 return RiskAssistantResult(
                     intent=response.intent,
                     tool_turns=tool_turns,
@@ -283,15 +286,15 @@ class BoundedRiskAssistant:
                 response.provider_response_id or f"resp_round_{round_index}"
             )
             reserve_narration = (
-                len(tool_turns) >= max_tool_calls or round_index >= max_model_turns
+                len(tool_turns) >= max_tool_calls
+                or round_index + 1 >= max_model_turns
             )
-            # Always continue so the executed result is sent as function_call_output.
 
         assert last_response is not None
         return RiskAssistantResult(
             intent=last_response.intent,
             tool_turns=tool_turns,
-            rounds_used=max_model_turns + 1,
+            rounds_used=max_model_turns,
             stopped_reason="round_limit",
         )
 
