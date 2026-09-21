@@ -83,7 +83,7 @@ def conversation_history_for_model(record: ConversationRecord) -> list[dict[str,
                 "tool_args": _clip_tool_args(turn.tool_args),
             }
         )
-    while history and _history_size(history) > CONVERSATION_MAX_CONTEXT_BYTES:
+    while len(history) > 1 and _history_size(history) > CONVERSATION_MAX_CONTEXT_BYTES:
         history.pop(0)
     if history and _history_size(history) > CONVERSATION_MAX_CONTEXT_BYTES:
         history[-1] = _clip_history_item(history[-1], CONVERSATION_MAX_CONTEXT_BYTES)
@@ -104,13 +104,17 @@ def _history_size(history: list[dict[str, Any]]) -> int:
 
 def _clip_history_item(item: dict[str, Any], max_bytes: int) -> dict[str, Any]:
     clipped = dict(item)
-    answer = clipped.get("answer")
-    if isinstance(answer, str):
-        budget = max(max_bytes // 2, 32)
-        encoded = answer.encode("utf-8")
-        if len(encoded) > budget:
-            clipped["answer"] = encoded[:budget].decode("utf-8", errors="ignore")
     clipped["tool_args"] = _clip_tool_args(clipped.get("tool_args"))
+    # Budget the serialized representation, including JSON escapes and brackets.
+    # Retain prefixes of both sides of the latest exchange, even for Unicode.
+    while _history_size([clipped]) > max_bytes:
+        fields = [key for key in ("question", "answer", "tool_name")
+                  if isinstance(clipped.get(key), str) and clipped[key]]
+        if not fields:
+            clipped["tool_args"] = {}
+            break
+        key = max(fields, key=lambda name: len(json.dumps(clipped[name]).encode("utf-8")))
+        clipped[key] = clipped[key][:len(clipped[key]) // 2]
     return clipped
 
 

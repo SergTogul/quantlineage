@@ -2,6 +2,8 @@
 
 ## Setup
 
+**Merge status: BLOCKED (C12).** The required authorized live OpenAI smoke has not passed. The earlier C12 completion claim is withdrawn; historical network-free results below are not a waiver of that gate.
+
 ```bash
 cp .env.example .env
 # set OPENAI_API_KEY, AI_PROVIDER=openai, OPENAI_MODEL
@@ -20,6 +22,18 @@ Set `AI_PROVIDER=deterministic` (or unset it). No code change required.
 To keep OpenAI but disable chat continuation, set `AI_ASSISTANT_LOOP=router`.
 
 ## Test evidence (C12 merge gate, post C13–C19)
+
+### C20–C22 corrective verification (2026-09-21)
+
+- Full backend: `python -m pytest -q` → **2211 passed, 10 skipped**, one dependency deprecation warning (54.46s).
+- Focused grounding/conversation/C19 regressions → **50 passed**.
+- `ruff check app tests` → clean; `git diff --check` → clean.
+- `mypy app` → **263 errors in 3 files**, matching the previously documented count and files; no findings in the two implementation files changed here. `mypy app/ai --follow-imports=silent` → success, 11 files. This is not a claim that full-project mypy passes.
+- `RUN_LIVE_AI_TESTS=1 python -m pytest tests/test_openai_live.py -q -rs` → **1 skipped**, missing `OPENAI_API_KEY`. **C12 remains blocked.**
+- Fresh Python 3.12.14 environment installed repository requirements. The first full run failed because this workspace's SOCKS proxy required optional `socksio`; installing `httpx[socks]` in the temporary environment resolved it. No repository dependency change.
+- Frontend/Compose/browser checks below are historical, not rerun for this backend-only correction.
+
+### Historical C13–C19 evidence
 
 Independent coordinator rerun on `cursor/risk-query-incomplete-fallback-bebd`
 at HEAD `2005f3c`, after C19 product `a8b1422` / evidence `f3fccf4`. Base

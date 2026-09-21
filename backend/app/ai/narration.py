@@ -166,7 +166,7 @@ def ground_narration(
     for match in tokens:
         token = match.group(0)
         metric = _claimed_metric(text, match)
-        if not _token_grounded(token, metric, manifests):
+        if not _token_grounded(token, metric, manifests, claimed_unit=_claimed_unit(text, match)):
             rejected.append(token)
 
     if rejected:
@@ -355,10 +355,32 @@ def _claimed_metric(text: str, match: re.Match[str]) -> str | None:
     return best
 
 
+def _claimed_unit(text: str, match: re.Match[str]) -> str | None:
+    """Bind explicit adjacent units; bare numbers retain metric-default units."""
+    before = text[:match.start()]
+    after = text[match.end():]
+    currency_prefix = re.search(r"(?:[$€£¥]|\b(?:USD|EUR|GBP|JPY))\s*$", before, re.I)
+    if re.match(r"\s*(?:%|percent\b|percentage\s+points?\b)", after, re.I) or match.group().endswith("%"):
+        return "conflicting_units" if currency_prefix else "percent"
+    if re.match(r"\s*(?:(?:USD|EUR|GBP|dollars?|euros?|pounds?)\s*)?(?:/\s*bp\b|per\s+(?:bp|basis\s+point)\b)", after, re.I):
+        return "per_bp"
+    if currency_prefix or re.match(r"\s*(?:USD|EUR|GBP|JPY|dollars?|euros?|pounds?|yen)\b", after, re.I):
+        return "currency"
+    if re.match(r"\s*(?:ratio|fraction)\b", after, re.I):
+        return "ratio"
+    if re.match(r"\s*(?:bp|bps|basis\s+points?)\b", after, re.I):
+        return "basis_points"
+    if re.match(r"\s*greek\s+units?\b", after, re.I):
+        return "greek"
+    return None
+
+
 def _token_grounded(
     token: str,
     claimed_metric: str | None,
     manifests: Sequence[GroundingClaim],
+    *,
+    claimed_unit: str | None = None,
 ) -> bool:
     token_is_percent = token.strip().endswith("%")
     try:
@@ -369,7 +391,11 @@ def _token_grounded(
     for claim in manifests:
         if not _metric_compatible(claimed_metric, claim):
             continue
-        if _value_matches(claim, token_value, token_is_percent=token_is_percent):
+        if claimed_unit is not None and claimed_unit != claim.unit:
+            if not (claimed_unit == "percent" and claim.unit == "ratio"
+                    and claim.allow_percent_from_fraction):
+                continue
+        if _value_matches(claim, token_value, token_is_percent=token_is_percent or claimed_unit == "percent"):
             return True
     return False
 

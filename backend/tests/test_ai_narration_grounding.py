@@ -312,3 +312,38 @@ def test_confidence_metadata_cannot_ground_unclassified_numeric_prose() -> None:
         [{"methods": [{"var": 444.0, "confidence": 0.99}]}],
     )
     assert result.accepted is False
+
+
+def test_same_metric_explicit_units_cannot_cross_ground() -> None:
+    from app.ai.narration import GroundingClaim
+
+    for prose, payload in [
+        ("Contribution is $50.", {"contribution_pct": 50.0}),
+        ("Contribution is 50 dollars.", {"contribution_pct": 50.0}),
+        ("Confidence is USD 0.5.", {"confidence": 0.5}),
+        ("Delta is 50 dollars.", {"delta": 50.0}),
+        ("VaR is 50 percent.", {"var": 50.0}),
+        ("VaR is 50 per bp.", {"var": 50.0}),
+        ("Contribution is 50 ratio.", {"contribution_pct": 50.0}),
+        ("Contribution is $50%.", {"contribution_pct": 50.0}),
+    ]:
+        assert not ground_narration(prose, [payload]).accepted, prose
+    assert ground_narration("Contribution is 50 percent.", [{"contribution_pct": 50.0}]).accepted
+    assert ground_narration("Confidence is 50 percent.", [{"confidence": 0.5}]).accepted
+    assert ground_narration("VaR is $50.", [{"var": 50.0}]).accepted
+    claim = GroundingClaim(metric="dv01", value=50, unit="per_bp", field_path="dv01")
+    assert ground_narration("DV01 is 50 USD per bp.", [claim]).accepted
+    assert not ground_narration("DV01 is 50 dollars.", [claim]).accepted
+
+
+def test_explicit_unit_matrix_holds_metric_and_value_constant() -> None:
+    from app.ai.narration import GroundingClaim
+
+    displays = {"currency": "$50", "percent": "50%", "ratio": "50 ratio",
+                "per_bp": "50 per bp", "greek": "50 Greek units"}
+    for source_unit in displays:
+        claim = GroundingClaim(metric="delta", value=50, unit=source_unit, field_path="delta")
+        for displayed_unit, value in displays.items():
+            assert ground_narration(f"Delta is {value}.", [claim]).accepted == (
+                source_unit == displayed_unit
+            ), (source_unit, displayed_unit)

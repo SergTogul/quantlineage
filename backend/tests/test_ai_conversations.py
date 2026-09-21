@@ -315,6 +315,21 @@ def test_model_history_enforces_context_byte_cap() -> None:
     assert all("tool_result" not in item for item in history)
 
 
+@pytest.mark.parametrize("text", ["A" * 4000, "界😀\"\\" * 2000])
+def test_oversized_latest_exchange_is_retained_within_serialized_cap(text: str) -> None:
+    from app.ai.conversations import CONVERSATION_MAX_CONTEXT_BYTES
+
+    repo = InMemoryConversationRepository()
+    record = repo.create(principal="alice")
+    repo.append_turn(record.id, principal="alice", question=text, answer=text,
+                     tool_name=text, tool_args={"huge": text})
+    history = conversation_history_for_model(repo.get(record.id, principal="alice"))
+    assert len(history) == 1
+    assert history[0]["question"]
+    assert history[0]["answer"]
+    assert len(json.dumps(history).encode("utf-8")) <= CONVERSATION_MAX_CONTEXT_BYTES
+
+
 def test_reclaim_expired_does_not_require_lookup_of_that_id() -> None:
     clock = {"now": datetime(2026, 9, 21, tzinfo=UTC)}
     repo = InMemoryConversationRepository(ttl_seconds=10, now=lambda: clock["now"])

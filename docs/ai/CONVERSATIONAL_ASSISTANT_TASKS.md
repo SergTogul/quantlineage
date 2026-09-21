@@ -612,9 +612,9 @@ Evidence:
 
 ## C12 — Run the merge gate
 
-- [x] Verify the complete corrective goal and prepare a focused merge summary.
+- [!] Verify the complete corrective goal and prepare a focused merge summary. BLOCKED: authorized live OpenAI smoke has not passed.
 
-Dependencies: C00–C11, C13–C19
+Dependencies: C00–C11, C13–C22
 
 Primary owner: qa-integrator  
 Root owns final decision.
@@ -1007,15 +1007,33 @@ Evidence:
   ```
   → pytest **142 passed**, 1 warning, exit **0** (2.54s). ruff: All checks passed. vitest **13 passed**. eslint 0. vite build 0. Playwright **2 passed**.
 
-C12 merge-gate Checks were rerun independently after C19. Opt-in live OpenAI smoke remains operator-run; a skip is not passing evidence and is recorded as an explicit remaining limitation (same as T14 and the original C12 close). Do not treat skip as a live-test pass.
+C12 network-free checks were rerun after C19. C12 remains blocked: the required opt-in live OpenAI smoke has not passed. Historical checks are not evidence for later code changes.
 
 Completion note:
 
 - After C19, C12 reran the documented merge-gate Checks on the new HEAD.
-- Opt-in live OpenAI smoke is not in the C12 Checks block and is not run by CI. Without an authorized key, document the skip as a limitation rather than claiming the live test passed.
+- The opt-in live OpenAI smoke must actually succeed. Without an authorized key, mark C12 `[!]` and stop; a skipped test is not passing evidence. Do not weaken acceptance criteria to close a task.
 - Run `mypy app` exactly as documented. If policy permits a known baseline, record the full comparison and prove zero new findings in every changed file; do not report `mypy app/ai` as equivalent.
 
 ---
+
+## C20 — Restore the mandatory live-smoke gate
+
+- [x] Restore C12 to blocked and preserve the original acceptance requirement.
+- C12 may only close after an authorized live tool call → function output → narration succeeds, with fresh full-suite evidence. No API key is configured in this environment. Do not place a key in source, PR text, or the browser.
+
+## C21 — Bind explicit narration units
+
+- [x] Reject same-metric currency/percent/ratio/per-bp/Greek unit collisions.
+- Parse adjacent currency symbols/codes/names and percentage, ratio, basis-point, and Greek-unit suffixes. Explicit units must match the typed claim, except the existing authorized ratio-to-percent conversion. Bare numbers retain metric-default units for compatibility.
+- Regression coverage includes `contribution_pct=50` narrated as `$50`, confidence as currency, delta as currency, currency as percent/per-bp, and valid currency/percent/per-bp displays.
+
+## C22 — Retain the newest oversized exchange
+
+- [x] Evict older turns first, then clip the latest exchange to the serialized JSON byte budget.
+- Question, answer, and tool name are bounded along with arguments. Regression coverage includes a single oversized latest exchange and Unicode/JSON-escaped text.
+
+Fresh C20–C22 verification (2026-09-21): full backend **2211 passed, 10 skipped**; focused grounding/conversation/C19 **50 passed**; ruff and diff checks clean; AI mypy clean. Full `mypy app` retains the documented **263 errors in 3 files**, with no findings in changed implementation files. Opt-in live smoke **1 skipped** for missing key; C12 remains `[!]`. See `MERGE_SUMMARY.md` for commands and environment notes.
 
 ## Global stop conditions
 
