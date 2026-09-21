@@ -947,7 +947,7 @@ Next eligible after this commit: **C19**. Do not start C12 until C13–C19 finis
 
 ## C19 — Add production-path and regression gates
 
-- [ ] Prove every post-review failure remains fixed before C12.
+- [x] Prove every post-review failure remains fixed before C12.
 
 Dependencies: C13–C18
 
@@ -975,6 +975,26 @@ npm run build
 cd ../e2e
 npx playwright test tests/risk-query.spec.ts
 ```
+
+Evidence:
+
+- Product HEAD: `a8b1422` (`test: add C19 production-path regressions and stop retry duplicating user turns`). `backend/tests/test_ai_c19_regressions.py` covers C13 continue policy + client dump, C14 exact budgets 1–4 / TypeError one-invoke without replay / conversational rounds=1 rejected, C15 count/sign/metric/unit fail-closed plus deterministic fallback without `not on this payload`, C16 Compose `QUANTLINEAGE_EXTERNAL_WORKER=1` + `QUANTLINEAGE_HEAVY_INLINE=0` two-turn `/risk/query` while dashboard still refuses inline, C17 chronological/capped/reclaim/capacity/cross-principal, C18 QuantLib vs cache wrapper identity.
+- Frontend Retry after a failed ask keeps a single user turn (`ScenarioBuilder.jsx` does not re-append an unmatched last user message). Playwright two-turn Risk Query asserts `conversation_id` round-trip. Browser UI of Retry was exercised via vitest, not a live Compose stack (no `/tmp/cursor/start-user` services).
+- Checks (2026-09-21, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_conversational_evals.py tests/test_ai_security.py tests/test_ai_conversations.py tests/test_ai_bounded_assistant.py tests/test_ai_bounded_http.py tests/test_ai_c19_regressions.py -q
+  ruff check tests/test_ai_c19_regressions.py
+  cd /workspace/frontend
+  npm test -- --run src/components/RiskQuery.test.jsx
+  npm run lint
+  npm run build
+  cd /workspace/e2e
+  QUANTLINEAGE_E2E_UVICORN="python3 -m uvicorn" PLAYWRIGHT_USE_CHROMIUM=1 npx playwright test tests/risk-query.spec.ts
+  ```
+  → pytest **142 passed**, 1 warning, exit **0** (2.54s). ruff: All checks passed. vitest **13 passed**. eslint 0. vite build 0. Playwright **2 passed**.
+
+Next eligible after this commit: **C12**. Run the full merge gate on the new HEAD. The opt-in live OpenAI smoke must actually succeed; without an authorized key mark C12 `[!]` rather than treating a skip as pass.
 
 Completion note:
 
