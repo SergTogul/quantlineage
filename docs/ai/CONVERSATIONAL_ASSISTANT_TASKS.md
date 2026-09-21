@@ -870,7 +870,7 @@ Next eligible after this commit: **C17**. Do not start C12 until C13–C19 finis
 
 ## C17 — Store useful bounded context and reclaim expired state
 
-- [ ] Make conversation state a real bounded transcript with bounded storage.
+- [x] Make conversation state a real bounded transcript with bounded storage.
 
 Dependencies: C16
 
@@ -893,6 +893,19 @@ Checks:
 cd backend
 python3 -m pytest tests/test_ai_conversations.py tests/test_ai_provider_integration.py tests/test_ai_security.py -q
 ```
+
+Evidence:
+
+- Product HEAD: `7d435ab` (`fix: bound conversation context, expiry sweep, and capacity (C17)`). `conversation_history_for_model` emits question → answer → tool identity/args (no `tool_result`, no provider ids). Context is capped at `CONVERSATION_MAX_CONTEXT_BYTES` (2048) in addition to 8 turns. `reclaim_expired()` sweeps TTL without looking up that id (also on create/get/append). Per-principal `CONVERSATION_MAX_PER_PRINCIPAL` evicts oldest `updated_at`. OpenAI request input is chronological prior turns then current question. Concurrent cross-principal access stays fail-closed.
+- Checks (2026-09-21, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_conversations.py tests/test_ai_provider_integration.py tests/test_ai_security.py -q
+  ruff check app/ai/conversations.py app/ai/request_builder.py tests/test_ai_conversations.py tests/test_openai_request_builder.py
+  ```
+  → **50 passed**, 1 warning, exit **0** (1.55s). ruff: All checks passed.
+
+Next eligible after this commit: **C18**. Do not start C12 until C13–C19 finish.
 
 ## C18 — Report the actual Greek pricing engine
 
