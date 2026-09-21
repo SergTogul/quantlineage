@@ -777,13 +777,13 @@ Evidence:
   python3 -m pytest tests/test_ai_bounded_assistant.py tests/test_ai_bounded_http.py tests/test_ai_config.py tests/test_openai_model.py -q
   ruff check app/ai/assistant.py app/ai/config.py tests/test_ai_bounded_assistant.py tests/test_ai_bounded_http.py tests/test_ai_config.py tests/test_ai_multi_tool_evals.py
   ```
-  → **87 passed**, exit **0** (2.43s) for the C14 suite; related AI evals including `test_ai_multi_tool_evals.py` also green (**189 passed** across the combined related run). ruff: All checks passed.
+  → **87 passed**, exit **0** (2.47s) for the C14 suite; related AI evals including `test_ai_multi_tool_evals.py` also green (**189 passed** across the combined related run). ruff: All checks passed.
 
 Next eligible after this commit: **C15**. Do not start C12 until C13–C19 finish.
 
 ## C15 — Make quantitative grounding fail closed
 
-- [ ] Require the correct metric, unit, and sign convention for every numeric claim.
+- [x] Require the correct metric, unit, and sign convention for every numeric claim.
 
 Dependencies: C13, C14
 
@@ -808,6 +808,20 @@ Checks:
 cd backend
 python3 -m pytest tests/test_ai_narration_grounding.py tests/test_ai_security.py tests/test_ai_conversational_evals.py -q
 ```
+
+Evidence:
+
+- Product HEAD: `fb9a3cf` (`fix: fail-closed quantitative narration grounding (C15)`). `_metric_compatible` no longer treats unclassified numeric phrases as matching any financial claim. `_value_matches` preserves sign unless `sign_convention` is an absolute-loss display convention. Deterministic fallback strips `not on this payload` so rejected narration cannot leak that placeholder into user prose. `narration_grounded` remains false on rejection (existing bounded-assistant fallback test).
+- Attacks covered: `100 positions` vs VaR=100; `profit 100` and unsigned `loss 100` vs `worst_loss=-100`; VaR/delta collisions; ratio/percent/currency collisions; unclassified confidence `0.99`.
+- Checks (2026-09-21, Python 3.12.3), fresh:
+  ```
+  cd /workspace/backend
+  python3 -m pytest tests/test_ai_narration_grounding.py tests/test_ai_security.py tests/test_ai_conversational_evals.py -q
+  ruff check app/ai/narration.py tests/test_ai_narration_grounding.py tests/test_ai_conversational_evals.py
+  ```
+  → **101 passed**, 1 warning, exit **0** (1.93s). ruff: All checks passed.
+
+Next eligible after this commit: **C16**. Do not start C12 until C13–C19 finish.
 
 ## C16 — Make two-turn chat work in the shipped Compose topology
 
