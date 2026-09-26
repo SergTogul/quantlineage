@@ -9,17 +9,15 @@ final narration (not one-shot routing).
 
 from __future__ import annotations
 
-import json
 import os
 
 import pytest
 
-from app.ai.assistant import FunctionCallOutput
+from app.ai.assistant import BoundedRiskAssistant, RiskAssistantRequest
 from app.ai.config import get_ai_settings, get_openai_api_key
 from app.ai.factory import RiskAssistantResources, build_risk_assistant_resources
 from app.risk.query import (
     TOOL_CONTRACTS,
-    RiskAssistantModelRequest,
     RiskToolName,
     tool_contract_schemas,
 )
@@ -40,6 +38,7 @@ _CANNED_TOOL_OUTPUT = {
     "tool": "get_portfolio_summary",
     "portfolio_id": "rates-macro",
     "position_count": 3,
+    "market_value": 125000.0,
     "status": "ok",
 }
 
@@ -88,40 +87,21 @@ def test_live_openai_tool_then_function_output_then_narration(
     """
     model = live_resources.model
     assert model is not None
-    continue_after_tools = getattr(model, "continue_after_tools", None)
-    assert callable(continue_after_tools), (
-        "Live smoke requires continue_after_tools for reserved narration."
-    )
+    executed = []
+    def execute(name, args):
+        assert name == _EXPECTED_TOOL.value
+        assert name in {name.value for name in TOOL_CONTRACTS}
+        assert name not in {name.value for name in _HEAVY_SIDE_EFFECT_TOOLS}
+        executed.append(name)
+        return _CANNED_TOOL_OUTPUT
 
-    request = RiskAssistantModelRequest(
-        question=_SMOKE_QUESTION,
-        tools=tool_contract_schemas(),
-        portfolio_id="rates-macro",
-    )
-    selected = model.complete(request)
-
-    assert selected.tool_name is not None, (
-        "Expected one allowlisted tool; got clarification/refusal instead."
-    )
-    assert selected.tool_name in {name.value for name in TOOL_CONTRACTS}
-    assert selected.tool_name not in {name.value for name in _HEAVY_SIDE_EFFECT_TOOLS}
-    assert selected.tool_name == _EXPECTED_TOOL.value
-    assert selected.tool_call_id
-    assert selected.provider_response_id
-    assert selected.proposed_answer is None
-
-    continued = continue_after_tools(
-        previous_response_id=selected.provider_response_id,
-        tool_outputs=[
-            FunctionCallOutput(
-                call_id=selected.tool_call_id,
-                output=json.dumps(_CANNED_TOOL_OUTPUT),
-            )
-        ],
-        request=request,
-        reserve_narration=True,
-    )
-
-    assert continued.tool_name is None
-    assert continued.proposed_answer
-    assert continued.proposed_answer.strip()
+    result = BoundedRiskAssistant(model, execute).run(RiskAssistantRequest(
+        question=_SMOKE_QUESTION, tools=tool_contract_schemas(),
+        portfolio_id="rates-macro", max_rounds=2, max_tool_calls=1,
+        timeout_seconds=live_resources.settings.timeout_seconds,
+    ))
+    assert executed == [_EXPECTED_TOOL.value]
+    assert result.rounds_used == 2
+    assert result.narration_grounded is True
+    assert result.proposed_answer
+    assert "125000" in result.proposed_answer

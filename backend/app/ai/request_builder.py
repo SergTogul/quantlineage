@@ -102,6 +102,14 @@ def build_openai_continue_request(
     }
     if not reserve_narration:
         create_params["max_tool_calls"] = _MAX_TOOL_CALLS_PER_ROUND
+    else:
+        create_params["text"] = {"format": {
+            "type": "json_schema", "name": "claim_selection", "strict": True,
+            "schema": {"type": "object", "additionalProperties": False,
+                       "properties": {"claim_ids": {"type": "array", "maxItems": 32,
+                                                     "items": {"type": "string"}}},
+                       "required": ["claim_ids"]},
+        }}
 
     return OpenAIResponsesRequest(
         create_params=create_params,

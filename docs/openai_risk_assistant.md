@@ -31,8 +31,12 @@ introduce `QUANTLINEAGE_AI_*` aliases.
 
 - **`AI_ASSISTANT_LOOP=conversational`** (chat default when OpenAI is enabled):
   the model selects a tool, QuantLineage executes it, the result is sent back
-  as Responses `function_call_output`, and a reserved narration turn produces
-  grounded prose. Successful grounded answers use `assistant.mode=model-narrated`.
+  as Responses `function_call_output` with a server-issued claim catalogue. The
+  final turn selects claim IDs in strict JSON; the server validates every ID
+  and renders exact tool facts. Free-text assertions, including qualitative
+  conclusions, are rejected and replaced by deterministic formatting. The
+  existing wire label `assistant.mode=model-narrated` denotes validated claim
+  selection with server-rendered facts, not trusted model-authored prose.
 - **`AI_ASSISTANT_LOOP=router`**: explicit one-shot intent router. Tool JSON
   never re-enters the model. Never present this as chat and never label it
   `model-narrated` (`model-routed` only).
@@ -127,7 +131,13 @@ The UI keys badges off `assistant.mode`: **AI-narrated**, **AI-routed**,
 
 - Conversational mode: one tool-selection turn plus reserved narration by default.
 - Router mode: one model round and at most one tool call per query.
-- Bounded timeout and output token cap (see table above).
+- One SDK request per model turn. Adapter and SDK automatic retries are disabled.
+- `AI_TIMEOUT_SECONDS` is shared across conversational provider calls and tool
+  boundaries; each provider call receives only the remaining time. Synchronous
+  tools cannot be interrupted mid-call: late results stop further model/tool
+  work. This is not a hard wall-clock cancellation guarantee for native pricing.
+- Expiry before tool execution does not launch deterministic fallback work.
+- Output token cap applies to every provider response (see table above).
 - Default provider is deterministic (zero OpenAI cost).
 
 Monitor OpenAI usage in your provider dashboard when enabled.

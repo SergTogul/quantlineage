@@ -107,7 +107,8 @@ def test_bounded_assistant_executes_tool_and_continues_until_final() -> None:
     assert isinstance(result, RiskAssistantResult)
     assert result.stopped_reason == "final"
     assert result.rounds_used == 3
-    assert result.proposed_answer == "Investigation complete."
+    assert result.proposed_answer != "Investigation complete."
+    assert result.narration_grounded is False
     assert len(result.tool_turns) == 2
     assert result.tool_turns[0].tool_name == "get_var_es"
     assert result.tool_turns[0].tool_call_id == "call_var"
@@ -125,7 +126,7 @@ def test_bounded_assistant_executes_tool_and_continues_until_final() -> None:
     assert len(first_continue["tool_outputs"]) == 1
     output = first_continue["tool_outputs"][0]
     assert output.call_id == "call_var"
-    assert json.loads(output.output)["tool"] == "get_var_es"
+    assert json.loads(output.output)["result"]["tool"] == "get_var_es"
     assert model.continue_calls[1]["previous_response_id"] == "resp_2"
 
 
@@ -167,8 +168,9 @@ def test_final_tool_turn_still_sends_function_call_output_for_narration() -> Non
     assert len(model.complete_requests) + len(model.continue_calls) == 2
     output = model.continue_calls[0]["tool_outputs"][0]
     assert output.call_id == "call_var"
-    assert json.loads(output.output)["tool"] == "get_var_es"
-    assert result.proposed_answer == "Historical VaR was calculated by QuantLineage."
+    assert json.loads(output.output)["result"]["tool"] == "get_var_es"
+    assert result.proposed_answer != "Historical VaR was calculated by QuantLineage."
+    assert result.narration_grounded is False
     assert model.continue_calls[0].get("reserve_narration") is True
 
 

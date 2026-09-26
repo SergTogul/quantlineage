@@ -150,20 +150,19 @@ SINGLE_TOOL_CASES: tuple[SingleToolCase, ...] = (
 
 
 @pytest.mark.parametrize("case", SINGLE_TOOL_CASES, ids=lambda c: c.case_id)
-def test_single_tool_narration_is_grounded_and_allowlisted(
+def test_single_tool_unstructured_narration_falls_back_and_is_allowlisted(
     case: SingleToolCase, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(socket, "socket", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("network")))
     model = _QueueModel([_tool(case.tool, case.args), _final(case.narration)])
     response = _service(model).query(SAMPLE_PORTFOLIO, case.question, principal="alice")
     assert response.tool_name == case.tool.value
-    assert response.data["assistant"]["mode"] == "model-narrated"
+    assert response.data["assistant"]["mode"] == "model-routed"
     turns = response.data["investigation"]["turns"]
     assert turns[0]["tool_name"] == case.tool.value
     _assert_allowlisted(turns[0]["tool_name"], turns[0]["tool_args"])
-    manifests = turns[0]["grounding_manifest"]
-    grounding = ground_narration(response.answer, [c for c in manifests] or manifests)
-    assert grounding.accepted is True
+    assert response.data["investigation"]["narration_grounded"] is False
+    assert response.answer != case.narration
     _assert_client_safe(response.model_dump(mode="json"))
 
 

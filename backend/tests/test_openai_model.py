@@ -622,7 +622,7 @@ def test_non_object_function_call_arguments_raise_typed_error(
         )
 
 
-def test_incomplete_response_retries_once_then_raises(
+def test_incomplete_response_raises_without_retry(
     openai_settings: AISettings,
 ) -> None:
     incomplete = Response(
@@ -646,10 +646,10 @@ def test_incomplete_response_retries_once_then_raises(
         model.complete(
             RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
         )
-    assert len(client.responses.calls) == 2
+    assert len(client.responses.calls) == 1
 
 
-def test_incomplete_response_retries_once_then_succeeds(
+def test_incomplete_response_does_not_consume_queued_success(
     openai_settings: AISettings,
 ) -> None:
     incomplete = Response(
@@ -672,14 +672,9 @@ def test_incomplete_response_retries_once_then_succeeds(
     )
     model = OpenAIRiskAssistantModel(client, openai_settings)
 
-    result = model.complete(
-        RiskAssistantModelRequest(
-            question="Top contributors?", tools=tool_contract_schemas()
-        )
-    )
-
-    assert result.tool_name == "get_contributors"
-    assert len(client.responses.calls) == 2
+    with pytest.raises(OpenAIIncompleteResponseError):
+        model.complete(RiskAssistantModelRequest(question="Top contributors?", tools=tool_contract_schemas()))
+    assert len(client.responses.calls) == 1
 
 
 def test_failed_response_with_error_raises_typed_error(openai_settings: AISettings) -> None:
@@ -702,7 +697,7 @@ def test_failed_response_with_error_raises_typed_error(openai_settings: AISettin
         model.complete(
             RiskAssistantModelRequest(question="Show VaR", tools=tool_contract_schemas())
         )
-    assert len(client.responses.calls) == 2
+    assert len(client.responses.calls) == 1
 
 
 def _sdk_request() -> httpx.Request:

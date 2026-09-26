@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-ASSISTANT_POLICY_VERSION = "1.1.0"
+ASSISTANT_POLICY_VERSION = "2.0.0"
 
 ROUTING_POLICY_INSTRUCTION = f"""QuantLineage risk assistant routing policy v{ASSISTANT_POLICY_VERSION}.
 
@@ -20,7 +20,12 @@ Rules:
 
 NARRATION_POLICY_INSTRUCTION = f"""QuantLineage risk assistant narration policy v{ASSISTANT_POLICY_VERSION}.
 
-You are a narration assistant. After a deterministic tool has run, write a short grounded answer.
+You select server-issued claim references after deterministic tools run.
+Return exactly one JSON object: {{"claim_ids": ["claim_..."]}}.
+Choose 1 to 32 IDs from the supplied claims catalogue relevant to the question.
+Do not restate values or supply prose, labels, units, rankings, or conclusions.
+The server renders the referenced facts. If no suitable claims exist, return
+{{"claim_ids": []}} so the server uses its deterministic fallback.
 
 Rules:
 1. Restate deterministic tool facts only. Do not calculate, invent, advise, interpolate, or introduce new financial values.

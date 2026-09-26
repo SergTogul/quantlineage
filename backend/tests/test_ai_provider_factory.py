@@ -60,7 +60,7 @@ def test_openai_mode_constructs_one_reusable_client_and_model(
 
     resources = build_risk_assistant_resources(settings=settings)
 
-    openai_ctor.assert_called_once_with(api_key="sk-test-key-1234567890")
+    openai_ctor.assert_called_once_with(api_key="sk-test-key-1234567890", max_retries=0)
     assert isinstance(resources.model, OpenAIRiskAssistantModel)
     assert resources._openai_client is sentinel_client
 

@@ -1024,9 +1024,7 @@ Completion note:
 
 ## C21 — Bind explicit narration units
 
-- [x] Reject same-metric currency/percent/ratio/per-bp/Greek unit collisions.
-- Parse adjacent currency symbols/codes/names and percentage, ratio, basis-point, and Greek-unit suffixes. Explicit units must match the typed claim, except the existing authorized ratio-to-percent conversion. Bare numbers retain metric-default units for compatibility.
-- Regression coverage includes `contribution_pct=50` narrated as `$50`, confidence as currency, delta as currency, currency as percent/per-bp, and valid currency/percent/per-bp displays.
+- [x] Superseded by C23. The interim free-text unit parser was removed rather than extended.
 
 ## C22 — Retain the newest oversized exchange
 
@@ -1034,6 +1032,31 @@ Completion note:
 - Question, answer, and tool name are bounded along with arguments. Regression coverage includes a single oversized latest exchange and Unicode/JSON-escaped text.
 
 Fresh C20–C22 verification (2026-09-21): full backend **2211 passed, 10 skipped**; focused grounding/conversation/C19 **50 passed**; ruff and diff checks clean; AI mypy clean. Full `mypy app` retains the documented **263 errors in 3 files**, with no findings in changed implementation files. Opt-in live smoke **1 skipped** for missing key; C12 remains `[!]`. See `MERGE_SUMMARY.md` for commands and environment notes.
+
+## C23 — Replace prose grounding with immutable claim selection
+
+- [x] Final model output is strict JSON containing only server-issued claim IDs.
+- Claim IDs bind value, metric, entity, unit, field path, tool, run/snapshot, sign convention, and qualifiers such as method, confidence, currency, and scale.
+- The server validates IDs and renders exact facts. Unknown IDs, extra fields, empty selections, non-finite values, and all model-authored financial or qualitative prose fail closed to deterministic formatting.
+- Ranking, comparison, breach, and direction conclusions remain deterministic unless represented as an explicit typed claim.
+
+## C24 — Make provider calls and time budget real upper bounds
+
+- [x] Remove adapter retries and construct the production OpenAI SDK client with `max_retries=0`.
+- Each model turn produces exactly one `responses.create` call.
+- Apply one request-local deadline across provider calls and tool boundaries; later provider calls receive only the remaining time.
+- Do not launch deterministic fallback work when the deadline expires before any tool starts. Synchronous pricing is not forcibly cancelled mid-call; a late result prevents further work.
+
+## C25 — Exercise the real adapter-to-HTTP path
+
+- [x] Use the real OpenAI SDK with `httpx.MockTransport`, then pass through `OpenAIRiskAssistantModel`, `BoundedRiskAssistant`, `PortfolioService`, and `POST /api/v1/risk/query`.
+- Cover valid claim selection, numeric prose, magnitude injection, qualitative conclusions, wrong-entity prose, unknown IDs, extra fields, incomplete/failed provider responses, SDK retry suppression, shrinking timeouts, and deadline expiry.
+
+## C26 — Make malicious tool-output testing behavioral
+
+- [x] Put an instruction in the actual tool result, assert it reaches the continuation only as untrusted data, simulate a model following it, and prove the attempted disclosure is excluded from the client answer.
+
+Fresh C23–C26 verification (2026-09-26): focused production-path suite **114 passed**; full backend **2236 passed, 10 skipped**; frontend **218 passed** across 27 files, eslint clean, and production build successful; ruff clean; `mypy app/ai --follow-imports=silent` clean for 12 files. Full-suite evidence is recorded in `MERGE_SUMMARY.md`. The authorized live smoke remains blocked by the absent key, so C12 remains `[!]`.
 
 ## Global stop conditions
 

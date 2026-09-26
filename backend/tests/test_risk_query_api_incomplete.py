@@ -127,7 +127,7 @@ def openai_env(monkeypatch: pytest.MonkeyPatch):
     )
 
 
-def test_api_incomplete_then_success_retries_and_returns_200(openai_env) -> None:
+def test_api_incomplete_does_not_consume_queued_success(openai_env) -> None:
     fake = _FakeResponses(responses=[_incomplete_sdk_response(), _contributors_sdk_response()])
     model = OpenAIRiskAssistantModel(SimpleNamespace(responses=fake), _openai_settings())
 
@@ -140,10 +140,10 @@ def test_api_incomplete_then_success_retries_and_returns_200(openai_env) -> None
     body = response.json()
     assert body["intent"] == "contributors"
     assert body["tool_name"] == "get_contributors"
-    assert body["data"]["assistant"]["mode"] == "model-routed"
-    assert body["data"]["assistant"]["fallback"] is False
+    assert body["data"]["assistant"]["mode"] == "fallback"
+    assert body["data"]["assistant"]["fallback"] is True
     assert "Top risk contributors" in body["answer"]
-    assert len(fake.calls) == 2
+    assert len(fake.calls) == 1
 
 
 def test_api_incomplete_exhausted_falls_back_with_200(openai_env) -> None:
@@ -164,7 +164,7 @@ def test_api_incomplete_exhausted_falls_back_with_200(openai_env) -> None:
     assert body["data"]["assistant"]["mode"] == "fallback"
     assert body["data"]["assistant"]["fallback"] is True
     assert "Top risk contributors" in body["answer"]
-    assert len(fake.calls) == 2
+    assert len(fake.calls) == 1
 
 
 def test_api_scripted_incomplete_before_tool_falls_back_with_200(openai_env) -> None:

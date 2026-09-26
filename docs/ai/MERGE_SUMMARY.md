@@ -23,6 +23,20 @@ To keep OpenAI but disable chat continuation, set `AI_ASSISTANT_LOOP=router`.
 
 ## Test evidence (C12 merge gate, post C13–C19)
 
+### C23–C26 principal-engineer correction (2026-09-26)
+
+- Replaced regex/free-text grounding with strict selection of immutable server-issued claim IDs and deterministic server rendering.
+- Disabled adapter and production SDK retries; added a shared conversational deadline with remaining-time propagation.
+- Added real SDK → adapter → assistant → service → HTTP tests using an in-memory HTTP transport, plus behavioral prompt-injection and fake-clock deadline tests.
+- Focused production-path suite: **114 passed**.
+- Full backend suite: **2236 passed, 10 skipped** (74.76s).
+- `ruff check app tests`: clean. `mypy app/ai --follow-imports=silent`: success, 12 files.
+- Full `mypy app`: the same documented **263 errors in 3 legacy files**; no new AI-file findings. This is not a claim that full-project mypy passes.
+- `RUN_LIVE_AI_TESTS=1 ... tests/test_openai_live.py`: **1 skipped**, missing `OPENAI_API_KEY`; C12 remains blocked.
+- The live smoke now exercises the complete bounded assistant and requires a valid claim selection plus server-rendered numeric fact, rather than accepting arbitrary final text.
+- Frontend: **218 passed** (27 files); eslint clean; production build succeeded.
+- Docker Compose validation was unavailable because this environment does not provide the `docker` executable. Browser tests were not rerun; prior browser evidence below remains historical.
+
 ### C20–C22 corrective verification (2026-09-21)
 
 - Full backend: `python -m pytest -q` → **2211 passed, 10 skipped**, one dependency deprecation warning (54.46s).

@@ -1,17 +1,18 @@
-"""Typed claim grounding for bounded multi-tool investigations.
+"""Validate server-issued claim references and render facts deterministically.
 
-Every quantitative token in model prose must bind to a grounding manifest
-entry (metric, value, unit, source field). Dates, ids, years, counts, and
-unrelated metadata cannot ground VaR or Greek claims. On rejection, callers
-replace narration with deterministic formatting.
+Free-form model prose is never accepted as grounded. IDs bind the full fact,
+including its value, entity, unit, qualifiers, source field and run/snapshot.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
+import math
 import re
 from typing import Any, Sequence
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 _NUMERIC_TOKEN_RE = re.compile(
     r"(?<![A-Za-z0-9_])"
@@ -61,27 +62,6 @@ _FINANCIAL_METRICS = frozenset(
     }
 )
 
-_METRIC_WINDOW = 48
-_METRIC_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\b(?:expected\s+shortfall|shortfall|\bes\b)", re.I), "es"),
-    (re.compile(r"\b(?:value at risk|var)\b", re.I), "var"),
-    (re.compile(r"\bgamma\b", re.I), "gamma"),
-    (re.compile(r"\bvega\b", re.I), "vega"),
-    (re.compile(r"\bdv01\b", re.I), "dv01"),
-    (re.compile(r"\bdelta\b", re.I), "delta"),
-    (re.compile(r"\b(?:contribution|contributor|share)\b", re.I), "contribution"),
-    (re.compile(r"\butilization\b", re.I), "utilization"),
-    (re.compile(r"\blimit\b", re.I), "limit"),
-    (re.compile(r"\b(?:worst\s+)?loss\b", re.I), "stress_loss"),
-    (re.compile(r"\bconfidence\b", re.I), "confidence"),
-)
-_ABS_LOSS_CONVENTIONS = frozenset(
-    {
-        "absolute_loss",
-        "abs_loss",
-        "absolute_loss_display",
-    }
-)
 _MISSING_ON_PAYLOAD = "not on this payload"
 _MISSING_ON_PAYLOAD_RE = re.compile(re.escape(_MISSING_ON_PAYLOAD), re.I)
 
@@ -100,6 +80,7 @@ class GroundingClaim(BaseModel):
     field_path: str
     snapshot_or_run_id: str | None = None
     allow_percent_from_fraction: bool = False
+    qualifiers: dict[str, Any] = Field(default_factory=dict)
 
 
 class NarrationGroundingResult(BaseModel):
@@ -152,30 +133,63 @@ def ground_narration(
     narration: str,
     payloads: Sequence[Any],
 ) -> NarrationGroundingResult:
-    """Accept narration only when every numeric token binds to a typed claim."""
-    text = (narration or "").strip()
-    if not text:
-        return NarrationGroundingResult(accepted=True, narration=None)
+    """Validate references, never model-written financial prose or conclusions."""
+    try:
+        selection = ClaimSelection.model_validate_json(narration, strict=True)
+    except (ValidationError, ValueError):
+        return NarrationGroundingResult(accepted=False, narration=None,
+                                       rejected_tokens=extract_numeric_tokens(narration))
+    claims = claim_catalogue(payloads)
+    if any(key not in claims for key in selection.claim_ids):
+        return NarrationGroundingResult(accepted=False, narration=None)
+    # IDs bind the entire server-side record. The model cannot replace a value,
+    # entity, scale, source, or unit and cannot append qualitative conclusions.
+    rendered = []
+    for key in dict.fromkeys(selection.claim_ids):
+        claim = claims[key]
+        rendered.append(_render_claim(claim))
+    from app.ai.config import get_openai_api_key
+    from app.ai.errors import sanitize_provider_message
 
-    tokens = list(_NUMERIC_TOKEN_RE.finditer(text))
-    if not tokens:
-        return NarrationGroundingResult(accepted=True, narration=text)
+    return NarrationGroundingResult(
+        accepted=True,
+        narration=sanitize_provider_message("Verified tool facts:\n" + "\n".join(rendered),
+                                            api_key=get_openai_api_key()),
+    )
 
-    manifests = _manifests_from_source(payloads)
-    rejected: list[str] = []
-    for match in tokens:
-        token = match.group(0)
-        metric = _claimed_metric(text, match)
-        if not _token_grounded(token, metric, manifests, claimed_unit=_claimed_unit(text, match)):
-            rejected.append(token)
 
-    if rejected:
-        return NarrationGroundingResult(
-            accepted=False,
-            narration=None,
-            rejected_tokens=rejected,
-        )
-    return NarrationGroundingResult(accepted=True, narration=text)
+class ClaimSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    claim_ids: list[str] = Field(min_length=1, max_length=32)
+
+
+def claim_catalogue(payloads: Sequence[Any]) -> dict[str, GroundingClaim]:
+    result = {}
+    for claim in _manifests_from_source(payloads):
+        if not math.isfinite(claim.value) or claim.metric not in _FINANCIAL_METRICS:
+            continue
+        encoded = json.dumps(claim.model_dump(), sort_keys=True).encode()
+        result["claim_" + hashlib.sha256(encoded).hexdigest()] = claim
+    return result
+
+
+def _render_claim(claim: GroundingClaim) -> str:
+    """Render one immutable claim without model-authored text or arithmetic."""
+    parts = [f"- {claim.metric}: {claim.value:.12g} {claim.unit}"]
+    metadata = {
+        "entity": claim.entity_id,
+        "source": claim.source_tool,
+        "field": claim.field_path,
+        "snapshot_or_run": claim.snapshot_or_run_id,
+        "sign_convention": claim.sign_convention,
+        **claim.qualifiers,
+    }
+    suffix = "; ".join(
+        f"{key}={json.dumps(value, ensure_ascii=True, sort_keys=True)}"
+        for key, value in sorted(metadata.items())
+        if value is not None
+    )
+    return f"{parts[0]} ({suffix})" if suffix else parts[0]
 
 
 def format_tool_turns_deterministically(tool_turns: Sequence[Any]) -> str | None:
@@ -244,6 +258,7 @@ def _walk_payload(
                 field_path=".".join(path) if path else metric,
                 snapshot_or_run_id=ctx.get("snapshot_or_run_id"),
                 allow_percent_from_fraction=allow_percent,
+                qualifiers=dict(ctx.get("qualifiers", {})),
             )
         )
         return
@@ -251,6 +266,13 @@ def _walk_payload(
         return
     if isinstance(value, dict):
         local = dict(ctx)
+        qualifiers = dict(ctx.get("qualifiers", {}))
+        for key in ("currency", "unit", "convention", "scale", "method", "methodology",
+                    "confidence", "as_of", "portfolio_id", "market_snapshot_id",
+                    "risk_run_id", "run_id", "t0_run_id", "t1_run_id"):
+            if key in value and isinstance(value[key], (str, int, float)):
+                qualifiers[key] = value[key]
+        local["qualifiers"] = qualifiers
         if isinstance(value.get("greek"), str):
             local["greek"] = value["greek"].lower()
         if isinstance(value.get("metric"), str):
@@ -303,146 +325,23 @@ def _classify_field(key: str, ctx: dict[str, Any]) -> tuple[str, str, bool] | No
     if k == "delta":
         if ctx.get("tool") == "compare_risk_runs":
             return ("risk_change", "currency", False)
-        return ("delta", "greek", False)
+        return ("delta", ctx.get("qualifiers", {}).get("unit", "greek"), False)
     if k in _GREEK_KEYS:
-        return (k, "greek", False)
+        return (k, ctx.get("qualifiers", {}).get("unit", "greek"), False)
     if k == "value":
         greek = ctx.get("greek")
         if isinstance(greek, str) and greek in _GREEK_KEYS:
-            return (greek, "greek", False)
+            return (greek, ctx.get("qualifiers", {}).get("unit", "greek"), False)
         metric = ctx.get("metric")
         if isinstance(metric, str):
-            if "var" in metric:
+            if metric in _VAR_KEYS:
                 return ("var", "currency", False)
-            if "es" in metric or "shortfall" in metric:
+            if metric in _ES_KEYS:
                 return ("es", "currency", False)
             if metric.endswith("_pct"):
                 return ("percent", "percent", False)
-        return ("market_value", "currency", False)
+        return None
     return None
-
-
-def _claimed_metric(text: str, match: re.Match[str]) -> str | None:
-    token = match.group(0)
-    start, end = match.span()
-    if token.endswith("%"):
-        after = text[end : end + 16]
-        if re.search(r"^\s*(?:historical\s+)?(?:var|es|expected\s+shortfall)\b", after, re.I):
-            return "confidence"
-        before = text[max(0, start - 16) : start]
-        if re.search(r"\b(?:var|es)\b\s*$", before, re.I):
-            return "confidence"
-
-    window_start = max(0, start - _METRIC_WINDOW)
-    window = text[window_start : min(len(text), end + _METRIC_WINDOW)]
-    best: str | None = None
-    best_key: tuple[int, int] | None = None
-    for pattern, metric in _METRIC_HINTS:
-        for hint in pattern.finditer(window):
-            hint_start = window_start + hint.start()
-            hint_end = window_start + hint.end()
-            if hint_end <= start:
-                key = (0, start - hint_end)
-            elif hint_start >= end:
-                key = (1, hint_start - end)
-            else:
-                key = (0, 0)
-            if best_key is None or key < best_key:
-                best_key = key
-                best = metric
-    if token.endswith("%") and best == "var":
-        return "confidence"
-    return best
-
-
-def _claimed_unit(text: str, match: re.Match[str]) -> str | None:
-    """Bind explicit adjacent units; bare numbers retain metric-default units."""
-    before = text[:match.start()]
-    after = text[match.end():]
-    currency_prefix = re.search(r"(?:[$€£¥]|\b(?:USD|EUR|GBP|JPY))\s*$", before, re.I)
-    if re.match(r"\s*(?:%|percent\b|percentage\s+points?\b)", after, re.I) or match.group().endswith("%"):
-        return "conflicting_units" if currency_prefix else "percent"
-    if re.match(r"\s*(?:(?:USD|EUR|GBP|dollars?|euros?|pounds?)\s*)?(?:/\s*bp\b|per\s+(?:bp|basis\s+point)\b)", after, re.I):
-        return "per_bp"
-    if currency_prefix or re.match(r"\s*(?:USD|EUR|GBP|JPY|dollars?|euros?|pounds?|yen)\b", after, re.I):
-        return "currency"
-    if re.match(r"\s*(?:ratio|fraction)\b", after, re.I):
-        return "ratio"
-    if re.match(r"\s*(?:bp|bps|basis\s+points?)\b", after, re.I):
-        return "basis_points"
-    if re.match(r"\s*greek\s+units?\b", after, re.I):
-        return "greek"
-    return None
-
-
-def _token_grounded(
-    token: str,
-    claimed_metric: str | None,
-    manifests: Sequence[GroundingClaim],
-    *,
-    claimed_unit: str | None = None,
-) -> bool:
-    token_is_percent = token.strip().endswith("%")
-    try:
-        token_value = float(token.strip().replace(",", "").rstrip("%"))
-    except ValueError:
-        return False
-
-    for claim in manifests:
-        if not _metric_compatible(claimed_metric, claim):
-            continue
-        if claimed_unit is not None and claimed_unit != claim.unit:
-            if not (claimed_unit == "percent" and claim.unit == "ratio"
-                    and claim.allow_percent_from_fraction):
-                continue
-        if _value_matches(claim, token_value, token_is_percent=token_is_percent or claimed_unit == "percent"):
-            return True
-    return False
-
-
-def _metric_compatible(claimed: str | None, claim: GroundingClaim) -> bool:
-    if claim.metric not in _FINANCIAL_METRICS:
-        return False
-    if claimed is None:
-        return False
-    return claimed == claim.metric
-
-
-def _value_matches(claim: GroundingClaim, token_value: float, *, token_is_percent: bool) -> bool:
-    candidates: list[float] = []
-    if token_is_percent:
-        if claim.unit == "percent":
-            candidates.append(claim.value)
-        elif claim.allow_percent_from_fraction and claim.unit == "ratio":
-            candidates.append(claim.value * 100.0)
-        else:
-            return False
-    else:
-        if claim.unit in {"year", "count", "identifier", "date"}:
-            return False
-        candidates.append(claim.value)
-
-    for candidate in candidates:
-        if _numeric_close(candidate, token_value):
-            return True
-        if (
-            claim.sign_convention in _ABS_LOSS_CONVENTIONS
-            and _numeric_close(abs(candidate), token_value)
-        ):
-            return True
-    return False
-
-
-def _numeric_close(actual: float, token: float) -> bool:
-    if abs(actual - token) <= 1e-6:
-        return True
-    if abs(token - round(token)) <= 1e-9 and abs(round(actual) - token) <= 1e-9:
-        return True
-    for decimals in (1, 2):
-        if abs(round(actual, decimals) - token) <= 1e-9:
-            return True
-    scale = max(abs(actual), 1.0)
-    return abs(actual - token) / scale <= 1e-4
 
 
 def _add_claim_forms(allowed: set[str], claim: GroundingClaim) -> None:

@@ -407,8 +407,8 @@ def test_follow_up_can_refer_to_prior_visible_answer() -> None:
         def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
             if request.conversation_history:
                 prior = request.conversation_history[0]
-                assert prior["answer"] == "Largest options delta is on opt-es."
-                assert "opt-es" in (prior["answer"] or "")
+                assert "Top position delta:" in prior["answer"]
+                assert "SPY put" in (prior["answer"] or "")
             return super().complete(request)
 
     model = _NarratingGreeks()
@@ -419,7 +419,7 @@ def test_follow_up_can_refer_to_prior_visible_answer() -> None:
         principal="alice",
     )
     cid = first.data["conversation_id"]
-    assert "opt-es" in first.answer
+    assert "SPY put" in first.answer
     second = service.query(
         SAMPLE_PORTFOLIO,
         "What about that same name for gamma?",

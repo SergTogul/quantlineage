@@ -122,14 +122,14 @@ def test_default_conversational_http_continues_after_one_tool() -> None:
     assert model.continue_count == 1
     assert response.tool_name == "get_var_es"
     assert response.data["investigation"]["tool_names"] == ["get_var_es"]
-    assert response.data["investigation"]["narration_grounded"] is True
+    assert response.data["investigation"]["narration_grounded"] is False
     turns = response.data["investigation"]["turns"]
     assert [turn["tool_name"] for turn in turns] == ["get_var_es"]
     assert turns[0]["status"] == "success"
     assert turns[0]["result"] is not None
     assert turns[0]["grounding_manifest"]
     assert response.data["tool_result"] == turns[0]["result"]
-    assert response.data["assistant"]["mode"] == "model-narrated"
+    assert response.data["assistant"]["mode"] == "model-routed"
     assert response.data["assistant"]["fallback"] is False
 
 
@@ -167,9 +167,9 @@ def test_multi_round_http_executes_tools_and_continues() -> None:
         "get_limits",
     ]
     assert response.data["investigation"]["rounds_used"] == 3
-    assert response.data["investigation"]["narration_grounded"] is True
+    assert response.data["investigation"]["narration_grounded"] is False
     assert "assistant" in response.data
-    assert response.data["assistant"]["mode"] == "model-narrated"
+    assert response.data["assistant"]["mode"] == "model-routed"
     assert response.data["assistant"]["fallback"] is False
     turns = response.data["investigation"]["turns"]
     assert [turn["tool_name"] for turn in turns] == ["get_var_es", "get_limits"]
@@ -313,7 +313,7 @@ def test_bounded_greeks_question_calls_the_model() -> None:
     assert model.complete_count == 1
     assert model.continue_count == 1
     assert response.tool_name == "get_position_greeks"
-    assert response.data["assistant"]["mode"] == "model-narrated"
+    assert response.data["assistant"]["mode"] == "model-routed"
 
 
 def test_bounded_theta_question_calls_the_model() -> None:

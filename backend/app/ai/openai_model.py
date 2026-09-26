@@ -53,7 +53,7 @@ class OpenAIRiskAssistantModel:
     def complete(self, request: RiskAssistantModelRequest) -> RiskAssistantModelResponse:
         """Return one tool request, clarification, or refusal from OpenAI.
 
-        Incomplete Responses API outputs are retried once before raising.
+        One provider request per model turn; incomplete output is not retried.
         """
         openai_request = build_openai_responses_request(request, self._settings)
         return self._create_parsed(openai_request.create_params, openai_request.timeout_seconds)
@@ -92,43 +92,19 @@ class OpenAIRiskAssistantModel:
         *,
         allow_final_text: bool = False,
     ) -> RiskAssistantModelResponse:
-        call_kwargs = {**create_kwargs, "timeout": timeout_seconds}
-        last_incomplete: OpenAIIncompleteResponseError | None = None
-        for attempt in range(2):
-            try:
-                sdk_response = self._client.responses.create(**call_kwargs)
-            except Exception as exc:
-                mapped = map_openai_sdk_error(exc, api_key=get_openai_api_key())
-                logger.warning(
-                    "OpenAI provider error (%s): %s",
-                    mapped.code,
-                    mapped,
-                    extra={
-                        "error_code": mapped.code,
-                        "request": redact_request_kwargs(
-                            call_kwargs,
-                            api_key=get_openai_api_key(),
-                        ),
-                    },
-                )
-                raise mapped from exc
-            try:
-                return _parse_sdk_response(
-                    sdk_response,
-                    allow_final_text=allow_final_text,
-                )
-            except OpenAIIncompleteResponseError as exc:
-                last_incomplete = exc
-                if attempt == 0:
-                    logger.warning(
-                        "OpenAI incomplete response; retrying once: %s",
-                        exc,
-                        extra={"error_code": exc.code, "attempt": attempt},
-                    )
-                    continue
-                raise
-        assert last_incomplete is not None  # pragma: no cover - loop always sets
-        raise last_incomplete
+        from app.ai.budget import remaining_seconds
+
+        call_kwargs = {**create_kwargs, "timeout": remaining_seconds(timeout_seconds)}
+        try:
+            sdk_response = self._client.responses.create(**call_kwargs)
+        except Exception as exc:
+            mapped = map_openai_sdk_error(exc, api_key=get_openai_api_key())
+            logger.warning("OpenAI provider error (%s): %s", mapped.code, mapped,
+                           extra={"error_code": mapped.code,
+                                  "request": redact_request_kwargs(call_kwargs, api_key=get_openai_api_key())})
+            raise mapped from exc
+        remaining_seconds(timeout_seconds)
+        return _parse_sdk_response(sdk_response, allow_final_text=allow_final_text)
 
 
 def _parse_sdk_response(
@@ -218,12 +194,10 @@ def _parse_text_only_response(
         )
 
     text = (assistant_text or "").strip()
+    if text and allow_final_text:
+        # Candidate only: the assistant validates claim references before display.
+        return RiskAssistantModelResponse(intent="final", proposed_answer=text)
     if text and not _contains_numeric_prose(text):
-        if allow_final_text:
-            return RiskAssistantModelResponse(
-                intent="final",
-                proposed_answer=text,
-            )
         return RiskAssistantModelResponse(
             intent="ambiguous",
             requires_clarification=True,

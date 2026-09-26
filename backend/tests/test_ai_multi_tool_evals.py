@@ -317,7 +317,8 @@ def test_multi_tool_investigation_case(case: InvestigationCase) -> None:
     assert all(turn.tool_output is not None for turn in result.tool_turns)
 
     if case.expect_grounded_narration is True:
-        assert result.narration_grounded is True
+        # Legacy free text is no longer a verifiable claim selection.
+        assert result.narration_grounded is False
         assert result.proposed_answer
         assert "999999999" not in result.proposed_answer
     elif case.expect_grounded_narration is False:

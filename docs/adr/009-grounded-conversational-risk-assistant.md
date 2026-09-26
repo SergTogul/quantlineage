@@ -9,6 +9,28 @@
 
 ## Context
 
+### 2026-09-21 amendment: claim selection and execution budgets
+
+This amendment supersedes the free-text numeric-grounding design below. Final
+model responses may select only server-issued claim IDs in strict JSON. IDs
+bind the full fact (value, entity, metric, unit, source field, run/snapshot and
+qualifiers such as confidence, method, currency and scale). The server renders
+the referenced record. Unknown IDs, extra fields, empty selections and all
+free-text conclusions fall back to deterministic formatting; they are never
+marked grounded. Arbitrary ranking, comparison and breach conclusions are not
+supported by this selection protocol. Existing deterministic tools/formatters
+remain the source of such conclusions. Public response shapes are preserved;
+the manifest adds optional qualifiers and the legacy model-narrated mode now
+means validated selection plus server rendering.
+
+Each adapter invocation makes one provider request. SDK retries are disabled.
+Conversational calls share a request-local deadline; timeouts shrink across
+turns, and expiry prevents new tool/model work. Synchronous native tools are
+not forcibly cancelled. Tests exercise the actual SDK with an in-memory HTTP
+transport through the application HTTP endpoint, plus injected tool-output
+attacks and fake-clock deadlines. C12 still requires a successful authorized
+live smoke; network-free tests do not waive it.
+
 PR #6 ships an opt-in OpenAI path, but C00 showed it is still a one-shot
 intent router: default `AI_MAX_TOOL_ROUNDS=1` never returns tool output to the
 model; Greek and secret short-circuits stamp `mode=model-routed` with zero

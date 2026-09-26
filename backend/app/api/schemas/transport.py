@@ -125,6 +125,7 @@ class GroundingClaimWire(BaseModel):
     field_path: str
     snapshot_or_run_id: str | None = None
     allow_percent_from_fraction: bool = False
+    qualifiers: dict[str, Any] = Field(default_factory=dict)
 
 
 class InvestigationTurnError(BaseModel):

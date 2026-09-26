@@ -980,6 +980,7 @@ class RiskQueryEngine:
     ) -> RiskQueryResponse:
         """Run the T21 bounded tool loop, then format a grounded HTTP response."""
         from app.ai.assistant import BoundedRiskAssistant, RiskAssistantRequest
+        from app.ai.budget import AssistantDeadlineExceeded
         from app.ai.errors import (
             OpenAIConfigurationError,
             OpenAIModelParseError,
@@ -1029,6 +1030,7 @@ class RiskQueryEngine:
             portfolio_id=getattr(portfolio, "id", None),
             max_rounds=max_rounds,
             max_tool_calls=max_tool_calls,
+            timeout_seconds=getattr(getattr(service, "ai_settings", None), "timeout_seconds", 30),
             conversation_history=list(conversation_history or []),
         )
         try:
@@ -1041,7 +1043,7 @@ class RiskQueryEngine:
                 fallback=True,
                 answer=message,
             )
-        except (OpenAITransientProviderError, OpenAIModelParseError):
+        except (OpenAITransientProviderError, OpenAIModelParseError) as exc:
             if executed:
                 return self._partial_bounded_response(
                     executed_tools=executed,
@@ -1051,6 +1053,11 @@ class RiskQueryEngine:
                         fallback=True,
                     ),
                     executed_turns=executed_turns,
+                )
+            if isinstance(exc, AssistantDeadlineExceeded):
+                return _ungrounded_assistant_response(
+                    context=context, mode="fallback", fallback=True,
+                    answer="Assistant execution deadline exceeded. Please retry.",
                 )
             fallback_response = self.answer(
                 question, portfolio, service, principal=principal
@@ -1131,6 +1138,10 @@ class RiskQueryEngine:
 
         tool_name = RiskToolName(last_success.tool_name)
         payload = last_success.tool_output or {}
+        from app.ai.config import get_openai_api_key
+        from app.ai.errors import sanitize_client_data
+
+        client_payload = sanitize_client_data(payload, api_key=get_openai_api_key())
         card = _grounded_card(tool_name, payload)
         provenance = _grounded_provenance(card)
         if not answer:
@@ -1140,7 +1151,7 @@ class RiskQueryEngine:
             answer=answer,
             data={
                 "tool_contract": TOOL_CONTRACTS[tool_name].model_dump(mode="json"),
-                "tool_result": payload,
+                "tool_result": client_payload,
                 "card": card,
                 "provenance": provenance,
                 **extra,
@@ -1216,9 +1227,12 @@ class RiskQueryEngine:
             )
         card = _grounded_card(tool_name, payload)
         provenance = _grounded_provenance(card)
+        from app.ai.config import get_openai_api_key
+        from app.ai.errors import sanitize_client_data
+
         data = {
             "tool_contract": contract.model_dump(mode="json"),
-            "tool_result": payload,
+            "tool_result": sanitize_client_data(payload, api_key=get_openai_api_key()),
             "card": card,
             "provenance": provenance,
             **(extra_data or {}),
@@ -1254,11 +1268,14 @@ def _investigation_turn_payload(
             name = None
         if name is not None:
             provenance = _grounded_provenance(_grounded_card(name, result))
+    from app.ai.config import get_openai_api_key
+    from app.ai.errors import sanitize_client_data
+
     return {
         "tool_name": tool_name,
         "tool_args": dict(tool_args or {}),
         "status": "error" if error else "success",
-        "result": result,
+        "result": sanitize_client_data(result, api_key=get_openai_api_key()),
         "error": error,
         "grounding_manifest": manifest,
         "provenance": provenance,

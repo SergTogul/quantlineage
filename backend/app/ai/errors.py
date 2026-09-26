@@ -23,6 +23,11 @@ _SECRET_PATTERNS = (
     re.compile(r"Authorization:\s*[^\s,;]+", re.IGNORECASE),
 )
 
+_SENSITIVE_FIELD_PARTS = frozenset(
+    {"api_key", "apikey", "authorization", "credential", "password", "secret",
+     "system_prompt", "system", "instructions", "private_key", "access_token"}
+)
+
 
 class OpenAIProviderError(Exception):
     """Base adapter failure. ``code`` is a stable taxonomy token."""
@@ -92,6 +97,26 @@ def sanitize_provider_message(
     for pattern in _SECRET_PATTERNS:
         text = pattern.sub("[REDACTED]", text)
     return text.strip()
+
+
+def sanitize_client_data(value: Any, *, api_key: str | None = None) -> Any:
+    """Recursively redact secret-like fields and tokens from client-visible data."""
+    if isinstance(value, dict):
+        result = {}
+        for key, nested in value.items():
+            normalized = str(key).lower().replace("-", "_")
+            if normalized in _SENSITIVE_FIELD_PARTS:
+                result[key] = "[REDACTED]"
+            else:
+                result[key] = sanitize_client_data(nested, api_key=api_key)
+        return result
+    if isinstance(value, list):
+        return [sanitize_client_data(item, api_key=api_key) for item in value]
+    if isinstance(value, tuple):
+        return tuple(sanitize_client_data(item, api_key=api_key) for item in value)
+    if isinstance(value, str):
+        return sanitize_provider_message(value, api_key=api_key)
+    return value
 
 
 def map_openai_sdk_error(

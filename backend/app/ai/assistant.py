@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.ai.errors import OpenAIModelParseError
 from app.ai.narration import (
     build_grounding_manifest,
+    claim_catalogue,
     format_tool_turns_deterministically,
     ground_narration,
 )
@@ -88,6 +89,7 @@ class RiskAssistantRequest(BaseModel):
     conversation_history: list[dict[str, Any]] = Field(default_factory=list)
     max_rounds: int = Field(default=2, ge=1, le=4)
     max_tool_calls: int = Field(default=4, ge=1, le=4)
+    timeout_seconds: float = Field(default=30, gt=0, le=120)
 
 
 class RiskAssistantResult(BaseModel):
@@ -170,6 +172,12 @@ class BoundedRiskAssistant:
         self._allow_side_effecting = allow_side_effecting
 
     def run(self, request: RiskAssistantRequest) -> RiskAssistantResult:
+        from app.ai.budget import execution_budget
+
+        with execution_budget(request.timeout_seconds):
+            return self._run(request)
+
+    def _run(self, request: RiskAssistantRequest) -> RiskAssistantResult:
         max_model_turns = min(max(request.max_rounds, 1), 4)
         max_tool_calls = min(max(request.max_tool_calls, 1), 4)
         model_request = RiskAssistantModelRequest(
@@ -186,6 +194,9 @@ class BoundedRiskAssistant:
         last_response: RiskAssistantModelResponse | None = None
         reserve_narration = False
         for round_index in range(1, max_model_turns + 1):
+            from app.ai.budget import remaining_seconds
+
+            remaining_seconds(request.timeout_seconds)
             if round_index == 1:
                 response = self._model.complete(model_request)
             else:
@@ -203,6 +214,7 @@ class BoundedRiskAssistant:
                         "Model continuation failed with an internal adapter error."
                     ) from exc
             last_response = response
+            remaining_seconds(request.timeout_seconds)
 
             if response.refusal:
                 return RiskAssistantResult(
@@ -281,6 +293,7 @@ class BoundedRiskAssistant:
                 rationale=response.rationale,
             )
             tool_turns.append(turn)
+            remaining_seconds(request.timeout_seconds)
             pending_outputs = [output_item]
             previous_response_id = (
                 response.provider_response_id or f"resp_round_{round_index}"
@@ -354,7 +367,11 @@ class BoundedRiskAssistant:
             )
             output = FunctionCallOutput(
                 call_id=tool_call_id,
-                output=json.dumps(payload, default=str, sort_keys=True),
+                output=json.dumps({
+                    "result": payload,
+                    "claims": {key: claim.model_dump() for key, claim in
+                               claim_catalogue(build_grounding_manifest(tool_name, payload)).items()},
+                }, default=str, sort_keys=True),
             )
             return turn, output
         except Exception as exc:
