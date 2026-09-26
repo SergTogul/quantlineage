@@ -248,3 +248,20 @@ class CachedPricingEngine(PricingEngine):
             while len(self._cache) > self._maxsize:
                 self._cache.popitem(last=False)
             return valuation.model_copy()
+
+
+def report_pricing_engine_identity(engine: PricingEngine) -> dict[str, str | None]:
+    """Name the calculating engine; wrappers are reported separately.
+
+    Cached QuantLib must identify ``QuantLibPricingEngine``, not only
+    ``CachedPricingEngine``. Does not return engine instances or QuantLib
+    objects.
+    """
+    wrapper_name = type(engine).__name__
+    inner = engine.inner if isinstance(engine, CachedPricingEngine) else engine
+    inner_name = type(inner).__name__
+    return {
+        "pricing_engine": inner_name,
+        "pricing_model": inner_name,
+        "pricing_wrapper": wrapper_name if wrapper_name != inner_name else None,
+    }

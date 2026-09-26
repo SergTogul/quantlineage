@@ -26,6 +26,7 @@ from app.domain.models import (
 from app.interfaces.pricing import PricingEngine
 from app.interfaces.risk import RiskEngine
 from app.market.snapshot import FixedMarketDataProvider, MarketDataProvider
+from app.pricing.cache import report_pricing_engine_identity
 from app.pricing.instrument_capabilities import get_capability
 from app.risk.attribution import AttributionEngine
 from app.risk.es import ESContributionAnalytics
@@ -43,6 +44,7 @@ from app.risk.query import AssistantMetadataContext, RiskQueryEngine
 
 if TYPE_CHECKING:
     from app.ai.config import AISettings
+    from app.ai.conversations import ConversationRepository
     from app.risk.query import RiskAssistantModel
 from app.risk.risk_attribution import RiskChangeAttributionEngine
 from app.risk.scenario_attribution import ScenarioLike
@@ -114,6 +116,36 @@ _LABEL_HANDLERS = MappingProxyType(
     }
 )
 
+_GREEK_REPORT_META = MappingProxyType(
+    {
+        "delta": {
+            "unit": "currency",
+            "convention": "cash_delta",
+            "scale": "S * dV/dS",
+        },
+        "gamma": {
+            "unit": "currency",
+            "convention": "dollar_gamma",
+            "scale": "S^2 * d2V/dS2",
+        },
+        "vega": {
+            "unit": "currency",
+            "convention": "pnl_per_vol_point",
+            "scale": "P&L per 0.01 vol",
+        },
+        "dv01": {
+            "unit": "currency",
+            "convention": "pnl_per_bp",
+            "scale": "P&L for +1bp",
+        },
+        "fx_delta": {
+            "unit": "currency",
+            "convention": "cash_fx_delta",
+            "scale": "S * dV/dS_fx",
+        },
+    }
+)
+
 
 def position_label(position: Position) -> str:
     """Human-readable trade label that distinguishes instrument type."""
@@ -137,6 +169,7 @@ class PortfolioService:
         market_data: MarketDataProvider | None = None,
         risk_assistant_model: RiskAssistantModel | None = None,
         ai_settings: AISettings | None = None,
+        conversation_repo: ConversationRepository | None = None,
     ):
         self.pricing = pricing
         self.risk = risk
@@ -183,6 +216,11 @@ class PortfolioService:
         self.query_engine = RiskQueryEngine()
         self.risk_assistant_model = risk_assistant_model
         self.ai_settings = ai_settings
+        if conversation_repo is None:
+            from app.ai.conversations import InMemoryConversationRepository
+
+            conversation_repo = InMemoryConversationRepository()
+        self.conversation_repo = conversation_repo
         self.risk_run_compare = None
         self.risk_run_worker = None
 
@@ -528,16 +566,79 @@ class PortfolioService:
             )
         return AssistantMetadataContext(provider="openai", model=None)
 
-    def query(self, portfolio, question):
+    def query(
+        self,
+        portfolio,
+        question,
+        *,
+        conversation_id: str | None = None,
+        principal: str | None = None,
+    ):
+        from app.ai.conversations import conversation_history_for_model
+
+        repo = self.conversation_repo
+        record = None
+        history: list[dict] = []
+        if repo is not None:
+            if conversation_id:
+                record = repo.get(conversation_id, principal=principal)
+                history = conversation_history_for_model(record)
+            else:
+                record = repo.create(principal)
+
         if self.risk_assistant_model is None:
-            return self.query_engine.answer(question, portfolio, self)
-        return self.query_engine.answer_with_model(
-            question,
-            portfolio,
-            self,
-            self.risk_assistant_model,
-            assistant_context=self._assistant_metadata_context(),
-        )
+            response = self.query_engine.answer(
+                question, portfolio, self, principal=principal
+            )
+        else:
+            settings = self.ai_settings
+            if (
+                settings is not None
+                and settings.provider == "openai"
+                and settings.assistant_loop != "router"
+                and hasattr(self.risk_assistant_model, "continue_after_tools")
+            ):
+                response = self.query_engine.answer_with_bounded_assistant(
+                    question,
+                    portfolio,
+                    self,
+                    self.risk_assistant_model,
+                    max_rounds=settings.max_model_turns,
+                    max_tool_calls=settings.max_tool_calls,
+                    assistant_context=self._assistant_metadata_context(),
+                    principal=principal,
+                    conversation_history=history,
+                )
+            else:
+                response = self.query_engine.answer_with_model(
+                    question,
+                    portfolio,
+                    self,
+                    self.risk_assistant_model,
+                    assistant_context=self._assistant_metadata_context(),
+                    principal=principal,
+                    conversation_history=history,
+                )
+
+        if record is not None and repo is not None:
+            tool_args: dict = {}
+            investigation = response.data.get("investigation") or {}
+            turns = investigation.get("turns") or []
+            if turns:
+                tool_args = dict(turns[-1].get("tool_args") or {})
+            repo.append_turn(
+                record.id,
+                principal=principal,
+                question=question,
+                answer=response.answer,
+                tool_name=response.tool_name,
+                tool_args=tool_args,
+                tool_result=response.data.get("tool_result"),
+            )
+            data = dict(response.data)
+            data["conversation_id"] = record.id
+            response = response.model_copy(update={"data": data})
+        return response
 
     def dashboard(
         self,
@@ -587,6 +688,88 @@ class PortfolioService:
             )
             for c in report.contributions
         ]
+
+    def position_greeks(
+        self,
+        portfolio: Portfolio,
+        *,
+        greek: str = "delta",
+        top_n: int = 5,
+        options_only: bool = False,
+        instrument_types: list[str] | None = None,
+        ranking_basis: str = "abs_value",
+    ) -> dict:
+        """Rank positions by a Valuation Greek from the pricing engine.
+
+        Conventions match ``app.risk.sensitivities`` / Builtin+QuantLib adapters:
+        cash delta ``S·∂V/∂S``; dollar gamma ``S²·∂²V/∂S²``; vega as P&L per
+        1 vol point (``0.01``); DV01 as P&L for +1bp; cash FX delta.
+        """
+        allowed = {"delta", "gamma", "vega", "dv01", "fx_delta"}
+        if greek not in allowed:
+            raise ValueError(f"unsupported greek: {greek!r}")
+        if ranking_basis != "abs_value":
+            raise ValueError(f"unsupported ranking_basis: {ranking_basis!r}")
+        meta = _GREEK_REPORT_META[greek]
+        option_families = {
+            "european_option",
+            "fx_option",
+            "cap_floor",
+            "swaption",
+        }
+        allowed_types: set[str] | None = None
+        if instrument_types:
+            allowed_types = set(instrument_types)
+        if options_only:
+            allowed_types = (
+                option_families
+                if allowed_types is None
+                else allowed_types & option_families
+            )
+
+        market = self.market_snapshot(portfolio)
+        valuations = self.pricing.value_portfolio(portfolio, market)
+        labels = {p.id: position_label(p) for p in portfolio.positions}
+        types = {p.id: getattr(p, "type", "unknown") for p in portfolio.positions}
+        rows: list[dict] = []
+        for valuation in valuations:
+            instrument_type = types.get(valuation.position_id, "unknown")
+            if allowed_types is not None and instrument_type not in allowed_types:
+                continue
+            amount = float(getattr(valuation, greek))
+            rows.append(
+                {
+                    "position_id": valuation.position_id,
+                    "label": labels.get(valuation.position_id, valuation.position_id),
+                    "instrument_type": instrument_type,
+                    "greek": greek,
+                    "value": amount,
+                    "unit": meta["unit"],
+                    "convention": meta["convention"],
+                    "market_value": float(valuation.market_value),
+                }
+            )
+        rows.sort(key=lambda row: abs(float(row["value"])), reverse=True)
+        top = rows[: max(1, int(top_n))] if rows else []
+        total_abs = sum(abs(float(row["value"])) for row in rows) or 1.0
+        for row in top:
+            row["share_pct"] = 100.0 * abs(float(row["value"])) / total_abs
+        identity = report_pricing_engine_identity(self.pricing)
+        return {
+            "greek": greek,
+            "unit": meta["unit"],
+            "convention": meta["convention"],
+            "scale": meta["scale"],
+            "ranking_basis": ranking_basis,
+            "options_only": bool(options_only),
+            "instrument_types": sorted(allowed_types) if allowed_types is not None else None,
+            "positions": top,
+            "portfolio_id": portfolio.id,
+            "market_snapshot_id": getattr(market, "id", None),
+            "pricing_engine": identity["pricing_engine"],
+            "pricing_model": identity["pricing_model"],
+            "pricing_wrapper": identity["pricing_wrapper"],
+        }
 
     def limits(self, portfolio: Portfolio):
         market = self.market_snapshot(portfolio)

@@ -12,7 +12,6 @@ from app.ai.config import AISettings, get_ai_settings
 from app.ai.factory import (
     RiskAssistantResources,
     build_risk_assistant_resources,
-    load_application_dotenv,
 )
 from app.ai.openai_model import OpenAIRiskAssistantModel
 from app.main import app
@@ -28,6 +27,8 @@ def _clear_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "AI_TIMEOUT_SECONDS",
         "AI_MAX_OUTPUT_TOKENS",
         "AI_MAX_TOOL_ROUNDS",
+        "AI_MAX_TOOL_CALLS",
+        "AI_ASSISTANT_LOOP",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -59,7 +60,7 @@ def test_openai_mode_constructs_one_reusable_client_and_model(
 
     resources = build_risk_assistant_resources(settings=settings)
 
-    openai_ctor.assert_called_once_with(api_key="sk-test-key-1234567890")
+    openai_ctor.assert_called_once_with(api_key="sk-test-key-1234567890", max_retries=0)
     assert isinstance(resources.model, OpenAIRiskAssistantModel)
     assert resources._openai_client is sentinel_client
 

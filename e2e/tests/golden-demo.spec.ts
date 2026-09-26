@@ -66,7 +66,7 @@ test.describe('Stage 10.4 golden institutional demo', () => {
     await expect(stress.getByRole('heading', { name: 'Stress Tests' })).toBeVisible()
     await expect(stress.locator('table tbody tr')).not.toHaveCount(0)
 
-    await page.getByRole('navigation', MAIN).getByRole('button', { name: /Scenario Builder/ }).click()
+    await page.getByRole('navigation', MAIN).getByRole('button', { name: /Risk Query/ }).click()
     const query = page.getByTestId('golden-demo-risk-query')
     await expect(query).toBeVisible()
     await query.locator('.query input').fill('Why did my risk change?')

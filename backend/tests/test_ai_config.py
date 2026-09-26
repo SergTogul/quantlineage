@@ -11,8 +11,9 @@ import pytest
 from app.ai.config import (
     DEFAULT_AI_TIMEOUT_SECONDS,
     DEFAULT_MAX_OUTPUT_TOKENS,
+    DEFAULT_MAX_TOOL_ROUNDS,
     MAX_AI_TIMEOUT_SECONDS,
-    REQUIRED_MAX_TOOL_ROUNDS,
+    MAX_TOOL_ROUNDS,
     get_ai_settings,
     get_openai_api_key,
 )
@@ -27,6 +28,8 @@ def _clear_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "AI_TIMEOUT_SECONDS",
         "AI_MAX_OUTPUT_TOKENS",
         "AI_MAX_TOOL_ROUNDS",
+        "AI_MAX_TOOL_CALLS",
+        "AI_ASSISTANT_LOOP",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -37,7 +40,10 @@ def test_defaults_to_deterministic_provider() -> None:
     assert settings.openai_model is None
     assert settings.timeout_seconds == DEFAULT_AI_TIMEOUT_SECONDS
     assert settings.max_output_tokens == DEFAULT_MAX_OUTPUT_TOKENS
-    assert settings.max_tool_rounds == REQUIRED_MAX_TOOL_ROUNDS
+    assert settings.max_tool_rounds == DEFAULT_MAX_TOOL_ROUNDS
+    assert settings.max_tool_calls == 1
+    assert settings.assistant_loop == "conversational"
+    assert settings.max_model_turns == settings.max_tool_rounds
 
 
 def test_supported_providers_are_deterministic_and_openai(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -97,14 +103,115 @@ def test_timeout_accepts_valid_values(monkeypatch: pytest.MonkeyPatch) -> None:
     assert get_ai_settings().timeout_seconds == MAX_AI_TIMEOUT_SECONDS
 
 
-def test_max_tool_rounds_must_be_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "2")
-    with pytest.raises(ValueError, match="Milestone 1 requires exactly 1"):
+def test_conversational_openai_defaults_allow_one_tool_plus_narration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """C03: OpenAI chat defaults to select + reserved narration, not one-shot."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+
+    settings = get_ai_settings()
+
+    assert settings.assistant_loop == "conversational"
+    assert settings.max_tool_rounds == 2
+    assert settings.max_model_turns == 2
+    assert settings.max_tool_calls == 1
+    assert settings.max_tool_rounds != settings.max_tool_calls
+
+
+def test_explicit_router_loop_is_one_shot_and_named(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "router")
+
+    settings = get_ai_settings()
+
+    assert settings.assistant_loop == "router"
+    assert settings.max_model_turns == 1
+    assert settings.max_tool_rounds == 1
+    assert settings.max_tool_calls == 1
+
+
+def test_assistant_loop_rejects_unknown_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "chat")
+    with pytest.raises(ValueError, match="AI_ASSISTANT_LOOP"):
         get_ai_settings()
 
-    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "not-int")
-    with pytest.raises(ValueError, match="Milestone 1 requires exactly 1"):
+
+def test_max_tool_calls_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "router")
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "3")
+    assert get_ai_settings().max_tool_calls == 3
+
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "5")
+    with pytest.raises(ValueError, match="AI_MAX_TOOL_CALLS"):
         get_ai_settings()
+
+
+@pytest.mark.parametrize("rounds", [1, 2, 3, 4])
+def test_max_tool_rounds_allows_one_through_four(
+    monkeypatch: pytest.MonkeyPatch,
+    rounds: int,
+) -> None:
+    if rounds == 1:
+        monkeypatch.setenv("AI_ASSISTANT_LOOP", "router")
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", str(rounds))
+    assert get_ai_settings().max_tool_rounds == rounds
+
+
+def test_conversational_loop_rejects_rounds_too_small_for_tool_plus_narration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "conversational")
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "1")
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "1")
+    with pytest.raises(ValueError, match="AI_MAX_TOOL_CALLS \\+ 1"):
+        get_ai_settings()
+
+
+def test_conversational_loop_rejects_equal_rounds_and_tool_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "conversational")
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "2")
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "2")
+    with pytest.raises(ValueError, match="AI_MAX_TOOL_CALLS \\+ 1"):
+        get_ai_settings()
+
+
+def test_router_loop_allows_one_model_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_ASSISTANT_LOOP", "router")
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", "1")
+    monkeypatch.setenv("AI_MAX_TOOL_CALLS", "1")
+    settings = get_ai_settings()
+    assert settings.assistant_loop == "router"
+    assert settings.max_tool_rounds == 1
+    assert settings.max_tool_calls == 1
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["0", "5", "-1", "not-int"],
+)
+def test_max_tool_rounds_rejects_out_of_range(
+    monkeypatch: pytest.MonkeyPatch,
+    raw: str,
+) -> None:
+    monkeypatch.setenv("AI_MAX_TOOL_ROUNDS", raw)
+    with pytest.raises(ValueError, match=f"1 and {MAX_TOOL_ROUNDS}"):
+        get_ai_settings()
+
+
+def test_max_tool_rounds_explicit_arg_bounded() -> None:
+    assert get_ai_settings(max_tool_rounds=3).max_tool_rounds == 3
+    with pytest.raises(ValueError, match=f"1 and {MAX_TOOL_ROUNDS}"):
+        get_ai_settings(max_tool_rounds=5)
 
 
 def test_api_key_excluded_from_settings_repr(monkeypatch: pytest.MonkeyPatch) -> None:

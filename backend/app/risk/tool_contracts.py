@@ -132,6 +132,21 @@ class GetRunProvenanceArgs(BaseModel):
     run_id: str = Field(min_length=1, max_length=TOOL_ARG_MAX_CHARS)
 
 
+PositionGreekName = Literal["delta", "gamma", "vega", "dv01", "fx_delta"]
+GreekRankingBasis = Literal["abs_value"]
+
+
+class GetPositionGreeksArgs(BaseModel):
+    """Rank positions by a Valuation Greek from PricingEngine."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    greek: PositionGreekName = "delta"
+    top_n: int = Field(default=5, ge=1, le=50)
+    options_only: bool = False
+    ranking_basis: GreekRankingBasis = "abs_value"
+
+
 C1_ARG_MODELS: dict[str, type[BaseModel]] = {
     "search_instruments": SearchInstrumentsArgs,
     "get_market_history": GetMarketHistoryArgs,
@@ -144,6 +159,7 @@ C1_ARG_MODELS: dict[str, type[BaseModel]] = {
     "get_key_rate_dv01": GetKeyRateDv01Args,
     "get_top_risk_contributors": GetTopRiskContributorsArgs,
     "get_run_provenance": GetRunProvenanceArgs,
+    "get_position_greeks": GetPositionGreeksArgs,
 }
 
 
@@ -291,6 +307,20 @@ def execute_allowlisted_tool(
         if not callable(fetch):
             raise ValueError("run provenance service is not configured")
         return _dump(_call(fetch, args["run_id"], principal=principal))
+    if tool_name == "get_position_greeks":
+        fetch = getattr(service, "position_greeks", None)
+        if not callable(fetch):
+            raise ValueError("position greeks service is not configured")
+        return _dump(
+            _call(
+                fetch,
+                portfolio,
+                greek=args.get("greek", "delta"),
+                top_n=args.get("top_n", 5),
+                options_only=args.get("options_only", False),
+                ranking_basis=args.get("ranking_basis", "abs_value"),
+            )
+        )
     if tool_name == "get_portfolio_summary":
         return _dump(service.summary(portfolio))
     if tool_name == "get_var_es":

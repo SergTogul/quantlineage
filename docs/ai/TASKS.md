@@ -1,5 +1,10 @@
 # OpenAI Risk Assistant — Task Queue
 
+Conversational OpenAI defaults and C00–C12 live in
+[CONVERSATIONAL_ASSISTANT_TASKS.md](CONVERSATIONAL_ASSISTANT_TASKS.md) and the
+operator guide [docs/openai_risk_assistant.md](../openai_risk_assistant.md).
+This file is the first-release (T00–T24) queue.
+
 Read [GOAL.md](GOAL.md) before every task. Work top to bottom. One loop iteration completes at most one task.
 
 Status syntax:
@@ -501,28 +506,59 @@ Evidence:
 - Commit `95542a8` — Complete T15 first-release gate.
 - Checks: backend `pytest -q` → 2000 passed, 10 skipped; `ruff check app tests` clean; frontend `npm test -- --run` → 208 passed; `npm run lint` clean; `npm run build` success; `docker compose config` renders (AI on backend/worker only); shared compose renders with dummy required secrets; full-suite log contains no `api.openai.com`; `docs/ai/GOAL.md` DoD all checked; merge summary at `docs/ai/MERGE_SUMMARY.md`.
 
-## Deferred tasks — do not select during the first-release loop
+## Deferred tasks — COMPLETE (design/implementation as specified)
 
-These tasks require the T15 gate and an explicit update to the goal.
+**CRITICAL (historical):** “Deferred” did **not** mean complete while unchecked.
+T20–T24 are now checked with evidence below. The first-release gate (T00–T15)
+remains the production default; multi-tool investigation lives behind
+`AI_MAX_TOOL_ROUNDS` / `BoundedRiskAssistant`. Historical T21 default was `1`
+(one-shot). Conversational OpenAI defaults are `AI_ASSISTANT_LOOP=conversational`,
+`AI_MAX_TOOL_ROUNDS=2` (model turns), `AI_MAX_TOOL_CALLS=1` (executed tools) —
+see C03/C11 in [CONVERSATIONAL_ASSISTANT_TASKS.md](CONVERSATIONAL_ASSISTANT_TASKS.md).
 
 ### T20 — Introduce the multi-tool assistant interface
 
-- [ ] Add a higher-level `RiskAssistant` protocol without breaking the milestone 1 adapter.
+- [x] Add a higher-level `RiskAssistant` protocol without breaking the milestone 1 adapter.
+
+Evidence:
+
+- Commit `d9b2a32` — `backend/app/ai/assistant.py` adds `RiskAssistant` protocol, request/result types, and `OneShotRiskAssistant` / `adapt_model_as_assistant` wrapping `RiskAssistantModel.complete`.
+- Checks: `cd backend && python3 -m pytest tests/test_ai_assistant_protocol.py tests/test_ai_provider_integration.py tests/test_ai_query_orchestration.py -q` → 33 passed.
 
 ### T21 — Implement the bounded Responses tool loop
 
-- [ ] Execute function calls, append `function_call_output`, and continue for at most four rounds.
+- [x] Execute function calls, append `function_call_output`, and continue for at most four rounds.
+
+Evidence:
+
+- Commit `d698e83` — `BoundedRiskAssistant` in `backend/app/ai/assistant.py` executes validated read-only tools, appends `FunctionCallOutput`, and continues via `OpenAIRiskAssistantModel.continue_after_tools` / `build_openai_continue_request` for at most four rounds; side-effecting tools refused by default; `AI_MAX_TOOL_ROUNDS` accepts `1`–`4` (default `1`); per-round `max_tool_calls` stays `1`.
+- Checks: `cd backend && python3 -m pytest tests/test_ai_bounded_assistant.py tests/test_ai_config.py tests/test_openai_request_builder.py tests/test_openai_model.py tests/test_ai_assistant_protocol.py tests/test_ai_provider_factory.py tests/test_ai_provider_integration.py -q` → 89 passed.
 
 ### T22 — Add numeric narration grounding
 
-- [ ] Reject narration with unsupported numeric claims and fall back to deterministic formatting.
+- [x] Reject narration with unsupported numeric claims and fall back to deterministic formatting.
+
+Evidence:
+
+- Commit `1f07e9f` — `backend/app/ai/narration.py` extracts numeric tokens, allows only values present/derived from tool payloads, and `BoundedRiskAssistant` replaces ungrounded `proposed_answer` with `_format_answer` output (`narration_grounded=False`).
+- Checks: `cd backend && python3 -m pytest tests/test_ai_narration_grounding.py tests/test_ai_bounded_assistant.py -q` → 15 passed.
 
 ### T23 — Add multi-tool investigation evals
 
-- [ ] Cover run comparisons, provenance, contributors, limits, and stress in bounded sequences.
+- [x] Cover run comparisons, provenance, contributors, limits, and stress in bounded sequences.
+
+Evidence:
+
+- Commit `ddb816b` — `backend/tests/test_ai_multi_tool_evals.py` table-driven bounded sequences for compare/provenance/contributors/limits/stress plus grounding and side-effect refusals.
+- Checks: `cd backend && python3 -m pytest tests/test_ai_multi_tool_evals.py -q` → 12 passed.
 
 ### T24 — Evaluate new direct QuantLib tools
 
-- [ ] Decide whether missing use cases justify new `price_instrument`, `calculate_greeks`, or curve tools.
+- [x] Decide whether missing use cases justify new `price_instrument`, `calculate_greeks`, or curve tools.
+
+Evidence:
+
+- Commit `1bb9369` — Design decision at `docs/ai/T24_QUANTLIB_TOOLS_EVAL.md`: approve future `calculate_greeks`/`get_position_greeks` candidate via `PortfolioService` (not implemented); defer `price_instrument`; reject curve dump tools; no raw QuantLib exposure.
+- Checks: documentation-only; `cd backend && python3 -m pytest tests/test_ai_multi_tool_evals.py tests/test_ai_narration_grounding.py tests/test_ai_bounded_assistant.py -q` still green (regression).
 
 T24 is a design task, not permission to expose raw QuantLib APIs. Any new tool must enter `TOOL_CONTRACTS`, use typed schemas, call existing pricing abstractions, include provenance, and pass the same security gate.

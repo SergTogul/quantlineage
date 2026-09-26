@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.ai.config import AISettings
-from app.ai.errors import OpenAIAuthenticationError, OpenAITimeoutError
+from app.ai.errors import (
+    OpenAIAuthenticationError,
+    OpenAIIncompleteResponseError,
+    OpenAITimeoutError,
+)
 from app.pricing.builtin import BuiltinPricingEngine
 from app.risk.historical import HistoricalRiskEngine
 from app.risk.query import (
@@ -105,6 +109,24 @@ class _FixtureService:
             )
         ]
 
+    def position_greeks(self, portfolio, *, greek: str = "delta", top_n: int = 5) -> dict:
+        self.calls.append("position_greeks")
+        return {
+            "greek": greek,
+            "portfolio_id": portfolio.id,
+            "market_snapshot_id": "fixture-snap",
+            "positions": [
+                {
+                    "position_id": "opt-1",
+                    "label": "NVDA call",
+                    "greek": greek,
+                    "value": 1234.5,
+                    "market_value": 5000.0,
+                    "share_pct": 80.0,
+                }
+            ][:top_n],
+        }
+
 
 class _ScriptedModel:
     def __init__(self, response: RiskAssistantModelResponse | None = None, *, error=None) -> None:
@@ -155,7 +177,93 @@ def test_default_deterministic_query_path_unchanged() -> None:
     assert "assistant" not in routed.data
 
 
-def test_model_selected_valid_tool_executes_once() -> None:
+def test_model_options_delta_question_invokes_openai_and_uses_selected_tool() -> None:
+    fixture = _FixtureService()
+    fixture.risk_assistant_model = _ScriptedModel(
+        RiskAssistantModelResponse(
+            tool_name=RiskToolName.GET_POSITION_GREEKS,
+            tool_args={"greek": "delta"},
+            intent="position_greeks",
+            rationale="Largest option delta ranking.",
+        )
+    )
+
+    response = fixture.query(SAMPLE_PORTFOLIO, "Biggest options delta?")
+
+    assert fixture.calls == ["position_greeks"]
+    assert response.tool_name == "get_position_greeks"
+    assert response.requires_clarification is False
+    assert response.intent == "position_greeks"
+    assert response.data["assistant"]["mode"] == "model-routed"
+    assert response.data["assistant"]["fallback"] is False
+    assert len(fixture.risk_assistant_model.requests) == 1
+
+
+def test_model_greeks_questions_are_not_bypassed() -> None:
+    for question, greek in (
+        ("Which options have the largest delta?", "delta"),
+        ("What about gamma?", "gamma"),
+        ("Show vega ranking", "vega"),
+    ):
+        fixture = _FixtureService()
+        fixture.risk_assistant_model = _ScriptedModel(
+            RiskAssistantModelResponse(
+                tool_name=RiskToolName.GET_POSITION_GREEKS,
+                tool_args={"greek": greek},
+                intent="position_greeks",
+            )
+        )
+        response = fixture.query(SAMPLE_PORTFOLIO, question)
+        assert len(fixture.risk_assistant_model.requests) == 1, question
+        assert fixture.calls == ["position_greeks"], question
+        assert response.tool_name == "get_position_greeks", question
+        assert response.data["assistant"]["mode"] == "model-routed", question
+        assert "get_position_greeks" in {
+            tool["name"] for tool in fixture.risk_assistant_model.requests[0].tools
+        }, question
+
+
+def test_model_theta_and_rho_questions_are_not_preflight_shortcuts() -> None:
+    """Theta/rho are unsupported Greeks, not security preflight — the model must run."""
+    scripted_clarification = "Scripted model asked for a supported greek."
+    for question in ("What is my theta?", "What is our rho?"):
+        fixture = _FixtureService()
+        fixture.risk_assistant_model = _ScriptedModel(
+            RiskAssistantModelResponse(
+                intent="unsupported",
+                requires_clarification=True,
+                clarification=scripted_clarification,
+            )
+        )
+        response = fixture.query(SAMPLE_PORTFOLIO, question)
+        assert len(fixture.risk_assistant_model.requests) == 1, question
+        assert fixture.calls == [], question
+        assistant = response.data["assistant"]
+        assert assistant["mode"] == "model-routed", question
+        assert assistant["mode"] not in {"preflight-refused", "model-narrated"}, question
+        assert assistant["fallback"] is False, question
+        assert response.answer == scripted_clarification, question
+        assert "valuation payloads" not in response.answer.lower(), question
+
+
+def test_secret_preflight_is_not_labeled_model_routed() -> None:
+    fixture = _FixtureService()
+    fixture.risk_assistant_model = _ScriptedModel(
+        RiskAssistantModelResponse(
+            tool_name=RiskToolName.GET_PORTFOLIO_SUMMARY,
+            intent="summary",
+        )
+    )
+
+    response = fixture.query(SAMPLE_PORTFOLIO, "What is the api key?")
+
+    assert fixture.calls == []
+    assert len(fixture.risk_assistant_model.requests) == 0
+    assert response.tool_name is None
+    assert response.data["assistant"]["mode"] == "preflight-refused"
+    assert response.data["assistant"]["fallback"] is False
+    assert "api key" in response.answer.lower() or "secrets" in response.answer.lower()
+
     fixture = _FixtureService()
     fixture.risk_assistant_model = _ScriptedModel(
         RiskAssistantModelResponse(
@@ -239,6 +347,26 @@ def test_transient_failure_before_tool_exec_falls_back() -> None:
     }
 
 
+def test_incomplete_response_before_tool_exec_falls_back() -> None:
+    fixture = _FixtureService()
+    fixture.risk_assistant_model = _ScriptedModel(
+        error=OpenAIIncompleteResponseError("OpenAI response status was 'incomplete'."),
+    )
+
+    response = fixture.query(SAMPLE_PORTFOLIO, "Top contributors?")
+
+    assert len(fixture.risk_assistant_model.requests) == 1
+    assert fixture.calls == ["contributors"]
+    assert response.intent == "contributors"
+    assert response.tool_name == "get_contributors"
+    assert response.data["assistant"] == {
+        "provider": "openai",
+        "model": None,
+        "mode": "fallback",
+        "fallback": True,
+    }
+
+
 def test_configuration_error_does_not_fallback() -> None:
     fixture = _FixtureService()
     fixture.risk_assistant_model = _ScriptedModel(
@@ -252,8 +380,8 @@ def test_configuration_error_does_not_fallback() -> None:
     assert response.data["assistant"] == {
         "provider": "openai",
         "model": None,
-        "mode": "model-routed",
-        "fallback": False,
+        "mode": "fallback",
+        "fallback": True,
     }
     assert "error" not in response.data["assistant"]
     assert "authentication failed" in response.answer.lower()

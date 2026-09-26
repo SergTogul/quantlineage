@@ -8,7 +8,8 @@ thread and point clients at ``POST /risk/runs``.
 
 This is not a job platform: it does not enqueue work. Workload caps
 (positions / scenarios / bytes) remain in ``app.api.workload``.
-INTERACTIVE LINEAR / DELTA_GAMMA summary stays synchronous.
+INTERACTIVE LINEAR / DELTA_GAMMA summary and ``POST /risk/query`` stay
+synchronous.
 """
 
 from __future__ import annotations

@@ -3,8 +3,8 @@
 When Compose / production-shaped deploys set ``QUANTLINEAGE_EXTERNAL_WORKER=1``
 (or ``QUANTLINEAGE_HEAVY_INLINE=0``), HEAVY ``/risk/*`` handlers refuse
 request-thread compute and point clients at ``POST /risk/runs``.
-INTERACTIVE LINEAR / DELTA_GAMMA summary, stress scenario GETs, and
-``/limits/drilldown`` stay sync.
+INTERACTIVE LINEAR / DELTA_GAMMA summary, stress scenario GETs,
+``POST /risk/query``, and ``/limits/drilldown`` stay sync.
 """
 
 from __future__ import annotations
@@ -163,7 +163,7 @@ def test_what_if_refused_when_external_worker(
         _assert_refused_inline(response)
 
 
-def test_query_refused_when_external_worker(
+def test_query_stays_interactive_when_external_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("QUANTLINEAGE_EXTERNAL_WORKER", "1")
@@ -173,7 +173,8 @@ def test_query_refused_when_external_worker(
             "/api/v1/risk/query",
             json={"portfolio": book, "question": "What is 99% VaR?"},
         )
-        _assert_refused_inline(response)
+        assert response.status_code == 200, response.text
+        assert response.json().get("answer")
 
 
 def test_leftover_heavy_refused_when_heavy_inline_disabled(

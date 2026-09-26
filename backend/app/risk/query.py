@@ -36,6 +36,7 @@ class RiskToolName(str, Enum):
     GET_KEY_RATE_DV01 = "get_key_rate_dv01"
     GET_TOP_RISK_CONTRIBUTORS = "get_top_risk_contributors"
     GET_RUN_PROVENANCE = "get_run_provenance"
+    GET_POSITION_GREEKS = "get_position_greeks"
 
 
 class RiskToolContract(BaseModel):
@@ -54,6 +55,7 @@ class RiskAssistantModelRequest(BaseModel):
     tools: list[dict[str, Any]]
     portfolio_id: str | None = None
     available_run_ids: list[str] = Field(default_factory=list)
+    conversation_history: list[dict[str, Any]] = Field(default_factory=list)
     instruction: str = (
         "Select at most one deterministic QuantLineage tool. Do not calculate or invent "
         "VaR, Greeks, P&L, prices, stress losses, or limit values. Ask for clarification "
@@ -70,6 +72,8 @@ class RiskAssistantModelResponse(BaseModel):
     refusal: str | None = None
     rationale: str | None = None
     proposed_answer: str | None = None
+    tool_call_id: str | None = None
+    provider_response_id: str | None = None
 
 
 class RiskAssistantModel(Protocol):
@@ -79,7 +83,13 @@ class RiskAssistantModel(Protocol):
         """Return one tool request, a clarification, or a refusal."""
 
 
-AssistantMode = Literal["model-routed", "deterministic", "fallback"]
+AssistantMode = Literal[
+    "model-narrated",
+    "model-routed",
+    "deterministic",
+    "preflight-refused",
+    "fallback",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +113,34 @@ def build_assistant_metadata(
         mode=mode,
         fallback=fallback,
     ).model_dump(mode="json")
+
+
+def _normalized_question(question: str) -> str:
+    return " ".join(question.strip().split()).lower()
+
+
+def _ungrounded_assistant_response(
+    *,
+    context: AssistantMetadataContext,
+    mode: AssistantMode,
+    fallback: bool,
+    answer: str,
+) -> RiskQueryResponse:
+    """Clarification/refusal with truthful assistant metadata and no tool result."""
+    return RiskQueryResponse(
+        intent="unsupported",
+        answer=answer,
+        data={
+            "tool_contract": None,
+            "tool_result": None,
+            "supported_tools": tool_contract_schemas(),
+            "assistant": build_assistant_metadata(
+                context, mode=mode, fallback=fallback
+            ),
+        },
+        tool_name=None,
+        requires_clarification=True,
+    )
 
 
 class RiskQueryPlan(BaseModel):
@@ -164,7 +202,10 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
     ),
     RiskToolName.GET_CONTRIBUTORS: RiskToolContract(
         name=RiskToolName.GET_CONTRIBUTORS,
-        description="Rank top position-level risk contributors.",
+        description=(
+            "Rank top position-level risk contributors (component VaR / risk share). "
+            "Not for option Greeks such as delta, gamma, vega, or theta."
+        ),
         service_method="contributors",
         required_inputs=["portfolio"],
         returns=["list[Contributor]"],
@@ -345,6 +386,26 @@ TOOL_CONTRACTS: dict[RiskToolName, RiskToolContract] = {
             "methodology",
         ],
     ),
+    RiskToolName.GET_POSITION_GREEKS: RiskToolContract(
+        name=RiskToolName.GET_POSITION_GREEKS,
+        description=(
+            "Rank positions by a valuation Greek from PricingEngine "
+            "(delta, gamma, vega, dv01, or fx_delta). Use options_only or "
+            "instrument_types to restrict families. Not component VaR contributors."
+        ),
+        service_method="position_greeks",
+        required_inputs=["portfolio"],
+        returns=["PositionGreeksReport"],
+        numeric_source="deterministic PortfolioService.position_greeks from Valuation",
+        provenance_fields=[
+            "portfolio_id",
+            "market_snapshot_id",
+            "greek",
+            "unit",
+            "convention",
+            "pricing_engine",
+        ],
+    ),
 }
 
 TOOL_ARG_MODELS: dict[RiskToolName, type[BaseModel]] = {
@@ -365,6 +426,11 @@ _SECRET_REFUSAL_ANSWER = (
 
 _FAKE_TOOL_REFUSAL_ANSWER = (
     "Unknown tool is not in the QuantLineage allowlist."
+)
+
+_GREEKS_UNSUPPORTED_ANSWER = (
+    "Theta and rho are not available on valuation payloads. "
+    "Ask for delta, gamma, vega, dv01, or fx_delta position Greeks instead."
 )
 
 _TOOL_FAILURE_ANSWER = (
@@ -436,6 +502,7 @@ _NUMERIC_TOOLS = frozenset(
         RiskToolName.GET_KEY_RATE_DV01,
         RiskToolName.GET_TOP_RISK_CONTRIBUTORS,
         RiskToolName.GET_RUN_PROVENANCE,
+        RiskToolName.GET_POSITION_GREEKS,
     }
 )
 
@@ -570,6 +637,15 @@ class RiskQueryEngine:
             return _clarification_plan("unsupported", _FAKE_TOOL_REFUSAL_ANSWER)
         if _is_secret_request(q):
             return _clarification_plan("unsupported", _SECRET_REFUSAL_ANSWER)
+        if _is_greeks_question(q):
+            greek = _infer_position_greek(q)
+            if greek is None:
+                return _clarification_plan("unsupported", _GREEKS_UNSUPPORTED_ANSWER)
+            return RiskQueryPlan(
+                intent="position_greeks",
+                tool_name=RiskToolName.GET_POSITION_GREEKS,
+                tool_args=_position_greeks_tool_args(q, greek),
+            )
         if _is_advisory(q):
             return _clarification_plan(
                 "unsupported",
@@ -783,53 +859,42 @@ class RiskQueryEngine:
         *,
         principal: str | None = None,
         assistant_context: AssistantMetadataContext | None = None,
+        conversation_history: list[dict[str, Any]] | None = None,
     ) -> RiskQueryResponse:
         context = assistant_context or AssistantMetadataContext(
             provider="openai",
             model=None,
         )
-        assistant_meta = build_assistant_metadata(
-            context,
-            mode="model-routed",
-            fallback=False,
-        )
-        if _is_secret_request(" ".join(question.strip().split()).lower()):
-            return RiskQueryResponse(
-                intent="unsupported",
+        if _is_secret_request(_normalized_question(question)):
+            return _ungrounded_assistant_response(
+                context=context,
+                mode="preflight-refused",
+                fallback=False,
                 answer=_SECRET_REFUSAL_ANSWER,
-                data={
-                    "tool_contract": None,
-                    "tool_result": None,
-                    "supported_tools": tool_contract_schemas(),
-                    "assistant": assistant_meta,
-                },
-                tool_name=None,
-                requires_clarification=True,
             )
         request = RiskAssistantModelRequest(
             question=question,
             tools=tool_contract_schemas(),
+            conversation_history=list(conversation_history or []),
         )
         try:
             model_response = model.complete(request)
         except Exception as exc:
-            from app.ai.errors import OpenAIConfigurationError, OpenAITransientProviderError
+            from app.ai.errors import (
+                OpenAIConfigurationError,
+                OpenAIModelParseError,
+                OpenAITransientProviderError,
+            )
 
-            if not isinstance(exc, OpenAITransientProviderError):
-                if isinstance(exc, OpenAIConfigurationError):
-                    message = str(exc).strip() or "AI assistant configuration is invalid."
-                    return RiskQueryResponse(
-                        intent="unsupported",
-                        answer=message,
-                        data={
-                            "tool_contract": None,
-                            "tool_result": None,
-                            "supported_tools": tool_contract_schemas(),
-                            "assistant": assistant_meta,
-                        },
-                        tool_name=None,
-                        requires_clarification=True,
-                    )
+            if isinstance(exc, OpenAIConfigurationError):
+                message = str(exc).strip() or "AI assistant configuration is invalid."
+                return _ungrounded_assistant_response(
+                    context=context,
+                    mode="fallback",
+                    fallback=True,
+                    answer=message,
+                )
+            if not isinstance(exc, (OpenAITransientProviderError, OpenAIModelParseError)):
                 raise
             fallback_response = self.answer(
                 question, portfolio, service, principal=principal
@@ -841,6 +906,11 @@ class RiskQueryEngine:
                 fallback=True,
             )
             return fallback_response.model_copy(update={"data": data})
+        assistant_meta = build_assistant_metadata(
+            context,
+            mode="model-routed",
+            fallback=False,
+        )
         default_clarification = (
             "Please choose a deterministic risk view: VaR/ES, limits, contributors, "
             "worst stress, or portfolio summary."
@@ -895,6 +965,237 @@ class RiskQueryEngine:
             extra_data={"assistant": assistant_meta},
         )
 
+    def answer_with_bounded_assistant(
+        self,
+        question: str,
+        portfolio: Portfolio,
+        service,
+        model,
+        *,
+        max_rounds: int,
+        max_tool_calls: int = 1,
+        principal: str | None = None,
+        assistant_context: AssistantMetadataContext | None = None,
+        conversation_history: list[dict[str, Any]] | None = None,
+    ) -> RiskQueryResponse:
+        """Run the T21 bounded tool loop, then format a grounded HTTP response."""
+        from app.ai.assistant import BoundedRiskAssistant, RiskAssistantRequest
+        from app.ai.budget import AssistantDeadlineExceeded
+        from app.ai.errors import (
+            OpenAIConfigurationError,
+            OpenAIModelParseError,
+            OpenAITransientProviderError,
+        )
+        from app.ai.narration import format_tool_turns_deterministically
+
+        context = assistant_context or AssistantMetadataContext(
+            provider="openai",
+            model=None,
+        )
+        if _is_secret_request(_normalized_question(question)):
+            return _ungrounded_assistant_response(
+                context=context,
+                mode="preflight-refused",
+                fallback=False,
+                answer=_SECRET_REFUSAL_ANSWER,
+            )
+
+        executed: list[str] = []
+        executed_turns: list[dict[str, Any]] = []
+
+        def _execute(tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
+            name = RiskToolName(tool_name)
+            payload = _execute_tool(
+                name,
+                portfolio,
+                service,
+                args=tool_args,
+                principal=principal,
+            )
+            executed.append(tool_name)
+            executed_turns.append(
+                _investigation_turn_payload(
+                    tool_name=tool_name,
+                    tool_args=dict(tool_args or {}),
+                    result=payload,
+                    error=None,
+                )
+            )
+            return payload
+
+        assistant = BoundedRiskAssistant(model, _execute)
+        request = RiskAssistantRequest(
+            question=question,
+            tools=tool_contract_schemas(),
+            portfolio_id=getattr(portfolio, "id", None),
+            max_rounds=max_rounds,
+            max_tool_calls=max_tool_calls,
+            timeout_seconds=getattr(getattr(service, "ai_settings", None), "timeout_seconds", 30),
+            conversation_history=list(conversation_history or []),
+        )
+        try:
+            result = assistant.run(request)
+        except OpenAIConfigurationError as exc:
+            message = str(exc).strip() or "AI assistant configuration is invalid."
+            return _ungrounded_assistant_response(
+                context=context,
+                mode="fallback",
+                fallback=True,
+                answer=message,
+            )
+        except (OpenAITransientProviderError, OpenAIModelParseError) as exc:
+            if executed:
+                return self._partial_bounded_response(
+                    executed_tools=executed,
+                    assistant_meta=build_assistant_metadata(
+                        context,
+                        mode="fallback",
+                        fallback=True,
+                    ),
+                    executed_turns=executed_turns,
+                )
+            if isinstance(exc, AssistantDeadlineExceeded):
+                return _ungrounded_assistant_response(
+                    context=context, mode="fallback", fallback=True,
+                    answer="Assistant execution deadline exceeded. Please retry.",
+                )
+            fallback_response = self.answer(
+                question, portfolio, service, principal=principal
+            )
+            data = dict(fallback_response.data)
+            data["assistant"] = build_assistant_metadata(
+                context,
+                mode="fallback",
+                fallback=True,
+            )
+            return fallback_response.model_copy(update={"data": data})
+
+        assistant_mode: AssistantMode = (
+            "model-narrated" if result.narration_grounded else "model-routed"
+        )
+        assistant_meta = build_assistant_metadata(
+            context,
+            mode=assistant_mode,
+            fallback=False,
+        )
+        investigation = _investigation_from_result(result)
+        extra = {"assistant": assistant_meta, "investigation": investigation}
+
+        if result.requires_clarification and not any(
+            turn.tool_output for turn in result.tool_turns
+        ):
+            default_clarification = (
+                "Please choose a deterministic risk view: VaR/ES, limits, contributors, "
+                "worst stress, or portfolio summary."
+            )
+            return RiskQueryResponse(
+                intent=result.intent
+                or ("unsupported" if result.refusal else "ambiguous"),
+                answer=_safe_ungrounded_text(
+                    result.refusal,
+                    result.clarification,
+                    fallback=default_clarification,
+                ),
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    **extra,
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+
+        last_success = next(
+            (
+                turn
+                for turn in reversed(result.tool_turns)
+                if isinstance(turn.tool_output, dict)
+            ),
+            None,
+        )
+        answer = result.proposed_answer or format_tool_turns_deterministically(
+            result.tool_turns
+        )
+        if last_success is None:
+            return RiskQueryResponse(
+                intent=result.intent or "unsupported",
+                answer=_safe_ungrounded_text(
+                    answer,
+                    result.refusal,
+                    result.clarification,
+                    fallback=SAFE_UNGROUNDED_ANSWER,
+                ),
+                data={
+                    "tool_contract": None,
+                    "tool_result": None,
+                    "supported_tools": tool_contract_schemas(),
+                    **extra,
+                },
+                tool_name=None,
+                requires_clarification=True,
+            )
+
+        tool_name = RiskToolName(last_success.tool_name)
+        payload = last_success.tool_output or {}
+        from app.ai.config import get_openai_api_key
+        from app.ai.errors import sanitize_client_data
+
+        client_payload = sanitize_client_data(payload, api_key=get_openai_api_key())
+        card = _grounded_card(tool_name, payload)
+        provenance = _grounded_provenance(card)
+        if not answer:
+            answer = _format_answer(tool_name, payload, card=card)
+        return RiskQueryResponse(
+            intent=result.intent or _intent_for_tool(tool_name),
+            answer=answer,
+            data={
+                "tool_contract": TOOL_CONTRACTS[tool_name].model_dump(mode="json"),
+                "tool_result": client_payload,
+                "card": card,
+                "provenance": provenance,
+                **extra,
+            },
+            tool_name=tool_name.value,
+        )
+
+    def _partial_bounded_response(
+        self,
+        *,
+        executed_tools: list[str],
+        assistant_meta: dict[str, Any],
+        executed_turns: list[dict[str, Any]] | None = None,
+    ) -> RiskQueryResponse:
+        """Stop after tools already ran; never replay a fallback router."""
+        from app.api.schemas.transport import RiskQueryInvestigation
+
+        investigation = RiskQueryInvestigation.model_validate(
+            {
+                "rounds_used": len(executed_tools),
+                "stopped_reason": "round_limit",
+                "tool_names": list(executed_tools),
+                "narration_grounded": None,
+                "truncated": True,
+                "turns": executed_turns or [],
+            }
+        ).model_dump(mode="json")
+        return RiskQueryResponse(
+            intent="unsupported",
+            answer=(
+                "The investigation stopped after a provider error. "
+                "Already-executed tools were not replayed."
+            ),
+            data={
+                "tool_contract": None,
+                "tool_result": None,
+                "supported_tools": tool_contract_schemas(),
+                "assistant": assistant_meta,
+                "investigation": investigation,
+            },
+            tool_name=executed_tools[-1] if executed_tools else None,
+            requires_clarification=True,
+        )
+
     def _grounded_tool_response(
         self,
         *,
@@ -926,9 +1227,12 @@ class RiskQueryEngine:
             )
         card = _grounded_card(tool_name, payload)
         provenance = _grounded_provenance(card)
+        from app.ai.config import get_openai_api_key
+        from app.ai.errors import sanitize_client_data
+
         data = {
             "tool_contract": contract.model_dump(mode="json"),
-            "tool_result": payload,
+            "tool_result": sanitize_client_data(payload, api_key=get_openai_api_key()),
             "card": card,
             "provenance": provenance,
             **(extra_data or {}),
@@ -939,6 +1243,77 @@ class RiskQueryEngine:
             data=data,
             tool_name=tool_name.value,
         )
+
+
+def _investigation_turn_payload(
+    *,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    result: dict[str, Any] | None,
+    error: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Client-safe executed turn (no provider ids, prompts, or raw exceptions)."""
+    from app.ai.narration import build_grounding_manifest
+
+    manifest: list[dict[str, Any]] = []
+    provenance: dict[str, Any] = {}
+    if result is not None:
+        manifest = [
+            claim.model_dump(mode="json")
+            for claim in build_grounding_manifest(tool_name, result)
+        ]
+        try:
+            name = RiskToolName(str(tool_name))
+        except ValueError:
+            name = None
+        if name is not None:
+            provenance = _grounded_provenance(_grounded_card(name, result))
+    from app.ai.config import get_openai_api_key
+    from app.ai.errors import sanitize_client_data
+
+    return {
+        "tool_name": tool_name,
+        "tool_args": dict(tool_args or {}),
+        "status": "error" if error else "success",
+        "result": sanitize_client_data(result, api_key=get_openai_api_key()),
+        "error": error,
+        "grounding_manifest": manifest,
+        "provenance": provenance,
+    }
+
+
+def _investigation_from_result(result: Any) -> dict[str, Any]:
+    """Build a client-safe investigation payload (no provider ids or CoT)."""
+    from app.api.schemas.transport import RiskQueryInvestigation
+
+    turns: list[dict[str, Any]] = []
+    for turn in result.tool_turns:
+        result_payload = turn.tool_output if isinstance(turn.tool_output, dict) else None
+        error = None
+        if turn.safe_error:
+            error = dict(turn.safe_error)
+        elif turn.tool_error:
+            error = {
+                "code": "unknown_error",
+                "retryable": False,
+                "message": turn.tool_error,
+            }
+        turns.append(
+            _investigation_turn_payload(
+                tool_name=turn.tool_name,
+                tool_args=dict(turn.tool_args or {}),
+                result=result_payload,
+                error=error,
+            )
+        )
+    payload = {
+        "rounds_used": result.rounds_used,
+        "stopped_reason": result.stopped_reason,
+        "tool_names": [turn.tool_name for turn in result.tool_turns],
+        "narration_grounded": result.narration_grounded,
+        "turns": turns,
+    }
+    return RiskQueryInvestigation.model_validate(payload).model_dump(mode="json")
 
 
 def _execute_tool(
@@ -1241,6 +1616,18 @@ def _format_answer(
             ]
             text = "Top risk contributors: " + ", ".join(names) + "."
         return _join_grounding(text, card, require_present_identity=True)
+    if tool_name == RiskToolName.GET_POSITION_GREEKS:
+        greek = payload.get("greek") or "delta"
+        positions = payload.get("positions") or []
+        if not positions:
+            text = f"No position {greek} values returned."
+        else:
+            names = [
+                f"{item.get('label', item.get('position_id'))} {_fmt(item.get('value'))}"
+                for item in positions
+            ]
+            text = f"Top position {greek}: " + ", ".join(names) + "."
+        return _join_grounding(text, card, require_present_identity=True)
     if tool_name in (
         RiskToolName.EXPLAIN_RISK_CHANGE,
         RiskToolName.COMPARE_RISK_RUNS,
@@ -1260,6 +1647,8 @@ def _intent_for_tool(tool_name: RiskToolName) -> str:
         return "limits"
     if tool_name == RiskToolName.GET_CONTRIBUTORS:
         return "contributors"
+    if tool_name == RiskToolName.GET_POSITION_GREEKS:
+        return "position_greeks"
     if tool_name == RiskToolName.EXPLAIN_RISK_CHANGE:
         return "explain_risk_change"
     if tool_name == RiskToolName.SEARCH_INSTRUMENTS:
@@ -1591,6 +1980,38 @@ def _is_fake_tool_request(question: str) -> bool:
 
 def _is_secret_request(question: str) -> bool:
     return any(marker in question for marker in _SECRET_REQUEST_MARKERS)
+
+
+def _is_greeks_question(question: str) -> bool:
+    """True when the user asks for position Greeks (delta/gamma/vega/…)."""
+    if _mentions(question, "greeks", "greek"):
+        return True
+    if not re.search(r"\b(delta|gamma|vega|theta|rho)\b", question, re.I):
+        return False
+    # Keep explain-risk-change paths that mention a greek metric name.
+    return not _is_risk_change_question(question)
+
+
+def _infer_position_greek(question: str) -> str | None:
+    """Map NL Greek asks onto Valuation fields. Theta/rho are not on Valuation."""
+    if re.search(r"\btheta\b", question, re.I) or re.search(r"\brho\b", question, re.I):
+        return None
+    if re.search(r"\bgamma\b", question, re.I):
+        return "gamma"
+    if re.search(r"\bvega\b", question, re.I):
+        return "vega"
+    if re.search(r"\bdv01\b", question, re.I):
+        return "dv01"
+    if re.search(r"\bfx[_\s-]?delta\b", question, re.I):
+        return "fx_delta"
+    return "delta"
+
+
+def _position_greeks_tool_args(question: str, greek: str) -> dict[str, Any]:
+    args: dict[str, Any] = {"greek": greek}
+    if re.search(r"\boptions?\b", question, re.I):
+        args["options_only"] = True
+    return args
 
 
 def _tool_args_oversized(args: dict[str, Any] | None) -> bool:

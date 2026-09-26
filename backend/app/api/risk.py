@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 
+from app.ai.conversations import ConversationAccessDenied, ConversationNotFound
+from app.api.acl import request_principal
 from app.api.backpressure import reject_inline_heavy
 from app.api.dashboard import router as dashboard_router
 from app.api.deps import get_portfolio_service
-from app.api.errors import http_bad_request
+from app.api.errors import error_payload, http_bad_request, http_forbidden
 from app.api.openapi_examples import (
     PORTFOLIO_BODY_EXAMPLES,
     RESP_ES,
@@ -163,11 +165,33 @@ def risk_hierarchy(
 
 @router.post("/query", response_model=RiskQueryResponse)
 def risk_query(
-    request: RiskQueryRequest,
+    body: RiskQueryRequest,
+    request: Request,
     service: PortfolioService = Depends(get_portfolio_service),
 ) -> RiskQueryResponse:
-    reject_inline_heavy(route="POST /risk/query")
-    return service.query(request.portfolio, request.question)
+    """Interactive Risk Query chat. Stays on the request thread under Compose.
+
+    Workload caps still apply via ``enforce_workload_limits``. HEAVY RiskRuns
+    remain on ``POST /risk/runs``; chat is not converted to a worker job.
+    """
+    try:
+        return service.query(
+            body.portfolio,
+            body.question,
+            conversation_id=body.conversation_id,
+            principal=request_principal(request),
+        )
+    except ConversationAccessDenied as exc:
+        raise http_forbidden() from exc
+    except ConversationNotFound as extra:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=error_payload(
+                code="not_found",
+                message="Conversation not found",
+                details=None,
+            ),
+        ) from extra
 
 
 @router.post("/contributors")

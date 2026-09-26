@@ -14,6 +14,7 @@ This index lists accepted architecture decisions that are already evidenced in c
 | [`006-llm-orchestrates-not-calculates.md`](006-llm-orchestrates-not-calculates.md) | Accepted | LLM/NL layers orchestrate deterministic risk tools and never calculate risk values themselves. | `backend/app/risk/query.py` |
 | [`007-quantlib-concurrency.md`](007-quantlib-concurrency.md) | Accepted | QuantLib access is serialized inside a process; process isolation is preferred for parallel full revaluation; native kernels stay off QuantLib globals. R0.6.5: RiskRun / Compose worker is the HEAVY full-reval partition (no unused ProcessPoolExecutor). | `backend/app/pricing/quantlib.py`, `backend/app/services/risk_run_worker.py`, `backend/tests/test_r065_process_partition.py`, `backend/native/` |
 | [`008-api-v1-canonical-and-legacy-sunset.md`](008-api-v1-canonical-and-legacy-sunset.md) | Accepted | `/api/v1` is canonical; legacy unversioned routes remain dual-mounted with deprecation headers until the sunset gate. | `backend/app/api/`, `docs/api/v1_canonical_and_legacy_sunset.md`, frontend `/api/v1` client |
+| [`009-grounded-conversational-risk-assistant.md`](009-grounded-conversational-risk-assistant.md) | Accepted (operating contract; implementation C02–C12) | OpenAI conversational path is model-led tool loop with `function_call_output`, truthful modes, provider-neutral conversation ids, typed grounding manifests, and filtered Greeks. ADR 006 still forbids model arithmetic. | `docs/ai/CONVERSATIONAL_ASSISTANT_GOAL.md`, C00 evidence in `docs/ai/CONVERSATIONAL_ASSISTANT_TASKS.md` |
 
 ## Not Yet ADRs
 
@@ -22,4 +23,4 @@ The following topics are documented elsewhere but are not separate ADRs yet beca
 - VaR methodology modes: documented in [`docs/methodology/README.md`](../methodology/README.md) as implemented behavior; no separate architectural choice beyond existing risk-engine design has been recorded.
 - Scenario-kernel performance SLA: documented in [`docs/performance.md`](../performance.md), [`benchmarks/README.md`](../../benchmarks/README.md), and [`benchmarks/RESULTS.md`](../../benchmarks/RESULTS.md); the native/QuantLib boundary is covered by ADR 007.
 - Redis/RQ or another external queue: explicitly deferred. Current durable claim safety is Postgres `SKIP LOCKED` under ADR 005.
-- Full external LLM tool loop: not implemented. The deterministic guardrail is captured by ADR 006.
+- Conversational OpenAI loop implementation: contract frozen in ADR 009; code still matches C00 until C02–C12. The deterministic calculation guardrail remains ADR 006.

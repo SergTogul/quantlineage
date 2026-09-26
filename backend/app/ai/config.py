@@ -12,13 +12,22 @@ from dataclasses import dataclass
 from typing import Literal
 
 AIProvider = Literal["deterministic", "openai"]
+AssistantLoop = Literal["conversational", "router"]
 
 DEFAULT_AI_PROVIDER: AIProvider = "deterministic"
 DEFAULT_AI_TIMEOUT_SECONDS = 30.0
 MAX_AI_TIMEOUT_SECONDS = 120.0
 DEFAULT_MAX_OUTPUT_TOKENS = 512
 MAX_AI_OUTPUT_TOKENS = 4096
-REQUIRED_MAX_TOOL_ROUNDS = 1
+# Conversational OpenAI: one tool-selection model turn + reserved narration.
+DEFAULT_MAX_TOOL_ROUNDS = 2
+DEFAULT_MAX_TOOL_CALLS = 1
+DEFAULT_ASSISTANT_LOOP: AssistantLoop = "conversational"
+MAX_TOOL_ROUNDS = 4
+MAX_TOOL_CALLS = 4
+# Backward-compatible alias for the model-turn ceiling.
+REQUIRED_MAX_TOOL_ROUNDS = DEFAULT_MAX_TOOL_ROUNDS
+_SUPPORTED_LOOPS: frozenset[str] = frozenset({"conversational", "router"})
 
 _SUPPORTED_PROVIDERS: frozenset[str] = frozenset({"deterministic", "openai"})
 
@@ -32,6 +41,13 @@ class AISettings:
     timeout_seconds: float
     max_output_tokens: int
     max_tool_rounds: int
+    max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS
+    assistant_loop: AssistantLoop = DEFAULT_ASSISTANT_LOOP
+
+    @property
+    def max_model_turns(self) -> int:
+        """Model Responses turns (complete + continue), distinct from executed tools."""
+        return self.max_tool_rounds
 
 
 def get_openai_api_key() -> str | None:
@@ -96,24 +112,57 @@ def _parse_max_output_tokens(raw: str | None) -> int:
     return tokens
 
 
-def _parse_max_tool_rounds(raw: str | None) -> int:
+def _parse_assistant_loop(raw: str | None) -> AssistantLoop:
     if raw is None or not raw.strip():
-        return REQUIRED_MAX_TOOL_ROUNDS
+        return DEFAULT_ASSISTANT_LOOP
+    loop = raw.strip().lower()
+    if loop not in _SUPPORTED_LOOPS:
+        supported = ", ".join(sorted(_SUPPORTED_LOOPS))
+        raise ValueError(
+            f"Invalid AI_ASSISTANT_LOOP: {loop!r}. "
+            f"Supported loops: {supported}."
+        )
+    return loop  # type: ignore[return-value]
+
+
+def _parse_max_tool_rounds(raw: str | None, *, default: int) -> int:
+    if raw is None or not raw.strip():
+        return default
     try:
         rounds = int(raw.strip())
     except ValueError as exc:
         raise ValueError(
             "Invalid AI_MAX_TOOL_ROUNDS: "
-            f"{raw.strip()!r}. Milestone 1 requires exactly "
-            f"{REQUIRED_MAX_TOOL_ROUNDS}."
+            f"{raw.strip()!r}. Expected an integer between 1 and "
+            f"{MAX_TOOL_ROUNDS}."
         ) from exc
-    if rounds != REQUIRED_MAX_TOOL_ROUNDS:
+    if rounds < 1 or rounds > MAX_TOOL_ROUNDS:
         raise ValueError(
             "Invalid AI_MAX_TOOL_ROUNDS: "
-            f"{rounds!r}. Milestone 1 requires exactly "
-            f"{REQUIRED_MAX_TOOL_ROUNDS}."
+            f"{rounds!r}. Expected an integer between 1 and "
+            f"{MAX_TOOL_ROUNDS}."
         )
     return rounds
+
+
+def _parse_max_tool_calls(raw: str | None, *, default: int) -> int:
+    if raw is None or not raw.strip():
+        return default
+    try:
+        calls = int(raw.strip())
+    except ValueError as exc:
+        raise ValueError(
+            "Invalid AI_MAX_TOOL_CALLS: "
+            f"{raw.strip()!r}. Expected an integer between 1 and "
+            f"{MAX_TOOL_CALLS}."
+        ) from exc
+    if calls < 1 or calls > MAX_TOOL_CALLS:
+        raise ValueError(
+            "Invalid AI_MAX_TOOL_CALLS: "
+            f"{calls!r}. Expected an integer between 1 and "
+            f"{MAX_TOOL_CALLS}."
+        )
+    return calls
 
 
 def _optional_model(raw: str | None) -> str | None:
@@ -130,6 +179,8 @@ def get_ai_settings(
     timeout_seconds: float | None = None,
     max_output_tokens: int | None = None,
     max_tool_rounds: int | None = None,
+    max_tool_calls: int | None = None,
+    assistant_loop: AssistantLoop | None = None,
 ) -> AISettings:
     """Load AI settings from explicit args or environment.
 
@@ -138,7 +189,9 @@ def get_ai_settings(
     - ``OPENAI_MODEL`` — model name (required when provider is openai)
     - ``AI_TIMEOUT_SECONDS`` — request timeout (default 30, max 120)
     - ``AI_MAX_OUTPUT_TOKENS`` — output token cap (default 512, max 4096)
-    - ``AI_MAX_TOOL_ROUNDS`` — must be ``1`` in milestone 1
+    - ``AI_ASSISTANT_LOOP`` — ``conversational`` (default chat) or ``router``
+    - ``AI_MAX_TOOL_ROUNDS`` — model turns ``1``–``4`` (conversational default 2)
+    - ``AI_MAX_TOOL_CALLS`` — executed tools ``1``–``4`` (conversational default 1)
 
     ``OPENAI_API_KEY`` is read via :func:`get_openai_api_key` when provider is
     ``openai``; it is never stored on the returned settings object.
@@ -175,17 +228,47 @@ def get_ai_settings(
         resolved_output_tokens = _parse_max_output_tokens(
             os.environ.get("AI_MAX_OUTPUT_TOKENS")
         )
+    resolved_loop = (
+        assistant_loop
+        if assistant_loop is not None
+        else _parse_assistant_loop(os.environ.get("AI_ASSISTANT_LOOP"))
+    )
+    default_model_turns = 1 if resolved_loop == "router" else DEFAULT_MAX_TOOL_ROUNDS
     if max_tool_rounds is not None:
         resolved_rounds = max_tool_rounds
-        if resolved_rounds != REQUIRED_MAX_TOOL_ROUNDS:
+        if resolved_rounds < 1 or resolved_rounds > MAX_TOOL_ROUNDS:
             raise ValueError(
                 "Invalid max_tool_rounds: "
-                f"{resolved_rounds!r}. Milestone 1 requires exactly "
-                f"{REQUIRED_MAX_TOOL_ROUNDS}."
+                f"{resolved_rounds!r}. Expected an integer between 1 and "
+                f"{MAX_TOOL_ROUNDS}."
             )
     else:
         resolved_rounds = _parse_max_tool_rounds(
-            os.environ.get("AI_MAX_TOOL_ROUNDS")
+            os.environ.get("AI_MAX_TOOL_ROUNDS"),
+            default=default_model_turns,
+        )
+    if max_tool_calls is not None:
+        resolved_tool_calls = max_tool_calls
+        if resolved_tool_calls < 1 or resolved_tool_calls > MAX_TOOL_CALLS:
+            raise ValueError(
+                "Invalid max_tool_calls: "
+                f"{resolved_tool_calls!r}. Expected an integer between 1 and "
+                f"{MAX_TOOL_CALLS}."
+            )
+    else:
+        resolved_tool_calls = _parse_max_tool_calls(
+            os.environ.get("AI_MAX_TOOL_CALLS"),
+            default=DEFAULT_MAX_TOOL_CALLS,
+        )
+
+    if (
+        resolved_loop == "conversational"
+        and resolved_rounds < resolved_tool_calls + 1
+    ):
+        raise ValueError(
+            "Conversational AI_MAX_TOOL_ROUNDS must be at least "
+            "AI_MAX_TOOL_CALLS + 1 to reserve a narration turn "
+            f"(got rounds={resolved_rounds}, tool_calls={resolved_tool_calls})."
         )
 
     if resolved_provider == "openai":
@@ -205,4 +288,6 @@ def get_ai_settings(
         timeout_seconds=resolved_timeout,
         max_output_tokens=resolved_output_tokens,
         max_tool_rounds=resolved_rounds,
+        max_tool_calls=resolved_tool_calls,
+        assistant_loop=resolved_loop,
     )

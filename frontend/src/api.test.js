@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import {
   API_V1,
+  askRisk,
   compareHedge,
   evaluateCustomScenario,
   explainPnL,
@@ -627,5 +628,60 @@ describe('historicalAnalytics', () => {
     expect(seen.start).toBe('2024-01-02')
     expect(result.sharpe).toBeNull()
     expect(result.include_echo).toBe(true)
+  })
+})
+
+describe('askRisk interactive chat', () => {
+  it('posts two turns to /risk/query and never creates a RiskRun', async () => {
+    const queryBodies = []
+    let runHits = 0
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/query`, async ({ request }) => {
+        const body = await request.json()
+        queryBodies.push(body)
+        expect(JSON.stringify(body)).not.toMatch(/OPENAI_API[_-]KEY/)
+        return HttpResponse.json({
+          intent: 'var_es',
+          answer: 'ok',
+          data: { conversation_id: body.conversation_id || 'conv_compose_1' },
+        })
+      }),
+      http.post(`${API_BASE}${API_V1}/risk/runs`, async ({ request }) => {
+        runHits += 1
+        const body = await request.json()
+        expect(body.request?.conversation_id).toBeUndefined()
+        return HttpResponse.json({ id: 'nope' }, { status: 202 })
+      }),
+    )
+
+    const first = await askRisk(DEMO_PORTFOLIO, 'What is 99% VaR?')
+    const second = await askRisk(DEMO_PORTFOLIO, 'What about ES?', {
+      conversationId: first.data.conversation_id,
+    })
+
+    expect(runHits).toBe(0)
+    expect(queryBodies).toHaveLength(2)
+    expect(queryBodies[0].conversation_id).toBeUndefined()
+    expect(queryBodies[1].conversation_id).toBe('conv_compose_1')
+    expect(second.data.conversation_id).toBe('conv_compose_1')
+  })
+
+  it('does not fall back to RiskRun when interactive query is refused', async () => {
+    let runHits = 0
+    server.use(
+      http.post(`${API_BASE}${API_V1}/risk/query`, () =>
+        HttpResponse.json(refuseBody(`${API_V1}/risk/query`), { status: 400 }),
+      ),
+      http.post(`${API_BASE}${API_V1}/risk/runs`, async ({ request }) => {
+        runHits += 1
+        await request.json()
+        return HttpResponse.json({ id: 'nope' }, { status: 202 })
+      }),
+    )
+
+    await expect(
+      askRisk(DEMO_PORTFOLIO, 'What is 99% VaR?', { conversationId: 'conv_1' }),
+    ).rejects.toThrow()
+    expect(runHits).toBe(0)
   })
 })

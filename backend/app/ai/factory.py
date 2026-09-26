@@ -55,7 +55,7 @@ def build_risk_assistant_resources(
 
     from openai import OpenAI
 
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, max_retries=0)
     model = OpenAIRiskAssistantModel(client, resolved)
     return RiskAssistantResources(
         settings=resolved,

@@ -257,3 +257,102 @@ def test_m73_live_responses_validate_against_domain_models() -> None:
         assert v1_var.status_code == 200
         VaRReport.model_validate(v1_var.json())
         assert v1_var.json() == var_payload.json()
+
+
+def test_investigation_turn_schema_forbids_provider_ids_and_requires_turns() -> None:
+    from pydantic import ValidationError
+
+    from app.api.schemas.transport import (
+        InvestigationTurn,
+        RiskQueryInvestigation,
+        RiskQueryResponse,
+    )
+
+    turn = InvestigationTurn.model_validate(
+        {
+            "tool_name": "get_var_es",
+            "tool_args": {},
+            "status": "success",
+            "result": {"methods": []},
+            "error": None,
+            "grounding_manifest": [],
+            "provenance": {"portfolio_id": "global-macro"},
+        }
+    )
+    assert turn.tool_name == "get_var_es"
+    for forbidden in (
+        {"provider_response_id": "resp_secret"},
+        {"previous_response_id": "resp_secret"},
+        {"prompt": "system prompt"},
+        {"chain_of_thought": "hidden"},
+    ):
+        with pytest.raises(ValidationError):
+            InvestigationTurn.model_validate(
+                {
+                    "tool_name": "get_var_es",
+                    "tool_args": {},
+                    "status": "success",
+                    **forbidden,
+                }
+            )
+
+    investigation = RiskQueryInvestigation.model_validate(
+        {
+            "rounds_used": 2,
+            "stopped_reason": "final",
+            "tool_names": ["get_var_es", "get_limits"],
+            "narration_grounded": True,
+            "turns": [turn.model_dump(mode="json")],
+        }
+    )
+    RiskQueryResponse.model_validate(
+        {
+            "intent": "final",
+            "answer": "ok",
+            "data": {
+                "investigation": investigation.model_dump(mode="json"),
+                "conversation_id": "conv_app",
+            },
+            "tool_name": "get_limits",
+        }
+    )
+
+
+def test_risk_query_request_conversation_id_is_optional_and_provider_neutral() -> None:
+    from pydantic import ValidationError
+
+    from app.api.schemas.transport import RiskQueryRequest
+    from app.sample import SAMPLE_PORTFOLIO
+
+    payload = SAMPLE_PORTFOLIO.model_dump(mode="json")
+    bare = RiskQueryRequest.model_validate({"portfolio": payload, "question": "VaR?"})
+    assert bare.conversation_id is None
+    with_id = RiskQueryRequest.model_validate(
+        {"portfolio": payload, "question": "VaR?", "conversation_id": "conv_app"}
+    )
+    assert with_id.conversation_id == "conv_app"
+    dumped = with_id.model_dump(mode="json")
+    assert "previous_response_id" not in dumped
+    with pytest.raises(ValidationError):
+        RiskQueryRequest.model_validate(
+            {
+                "portfolio": payload,
+                "question": "VaR?",
+                "previous_response_id": "resp_secret",
+            }
+        )
+
+
+def test_query_risk_run_request_rejects_conversation_id() -> None:
+    from pydantic import ValidationError
+
+    from app.api.schemas.transport import QueryRiskRunRequest
+
+    QueryRiskRunRequest.model_validate({"question": "What is 99% VaR?"})
+    with pytest.raises(ValidationError):
+        QueryRiskRunRequest.model_validate(
+            {"question": "What is 99% VaR?", "conversation_id": "conv_app"}
+        )
+    dumped = QueryRiskRunRequest.model_validate({"question": "VaR?"}).model_dump()
+    assert "OPENAI_API_KEY" not in dumped
+    assert "conversation_id" not in dumped

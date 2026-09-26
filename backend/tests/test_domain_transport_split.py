@@ -97,7 +97,11 @@ def test_moved_http_bodies_keep_forbid_and_json_field_names() -> None:
     )
 
     assert set(CustomStressRequest.model_fields) == {"portfolio", "scenarios"}
-    assert set(RiskQueryRequest.model_fields) == {"portfolio", "question"}
+    assert set(RiskQueryRequest.model_fields) == {
+        "portfolio",
+        "question",
+        "conversation_id",
+    }
     assert set(RiskRunCreateRequest.model_fields) == {
         "portfolio",
         "run_type",

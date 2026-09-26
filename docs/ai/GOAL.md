@@ -70,3 +70,5 @@ The browser never receives or stores the key.
 ## Loop instruction
 
 Work exactly one unchecked task from `TASKS.md` per iteration. Meet its acceptance criteria, run its checks, record evidence, then stop.
+
+Deferred tasks T20–T24 are checked with evidence in `TASKS.md`. See `T24_QUANTLIB_TOOLS_EVAL.md` for the QuantLib-tools design decision.
